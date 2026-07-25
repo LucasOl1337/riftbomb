@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const [htmlPath = "riftbomb-symphony.html", assetDir = "art/zed-game-model/ui"] = process.argv.slice(2);
+const [
+  htmlPath = "game/draw-bomber-rift.js",
+  assetDir = "champions/zed/match-icons"
+] = process.argv.slice(2);
 let html = fs.readFileSync(htmlPath, "utf8");
 
 const files = {
