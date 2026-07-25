@@ -14,7 +14,7 @@ const expectedEntrypoints = [
   "animate-bomber-rift-background.js",
   "draw-bomber-rift.js",
   "play-rift-soundtrack.js",
-  "run-champion-duel.js",
+  "run-champion-bomb-duel.js",
   "start-champion-duel.js"
 ];
 

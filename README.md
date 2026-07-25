@@ -23,7 +23,7 @@ capacidade que entregam:
 - `animate-bomber-rift-background.js`: fundo vivo da arena.
 - `draw-bomber-rift.js`: WebGL, modelos e efeitos.
 - `play-rift-soundtrack.js`: música e efeitos sonoros.
-- `run-champion-duel.js`: regras, campeões, bombas, CPU e placar.
+- `run-champion-bomb-duel.js`: regras, campeões, bombas, CPU e placar.
 - `start-champion-duel.js`: controles e início da partida.
 
 Gere novamente o HTML autocontido e rode os gates:
