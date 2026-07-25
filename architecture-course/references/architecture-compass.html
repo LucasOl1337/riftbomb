@@ -63,21 +63,23 @@
       <h2>Árvore provisória · primeiro passe</h2>
       <p class="measure">Esta árvore descreve os seams que já existem no HTML. Ela não antecipa uma engine futura e não autoriza subdivisões internas.</p>
       <pre><code>riftbomb/
-├─ index.html
-├─ src/
-│  ├─ main.js
-│  ├─ game.js
-│  ├─ renderer.js
-│  ├─ music-engine.js
-│  ├─ ui-input.js
-│  └─ generated/
-│     └─ champion-models.js
-├─ art/                    # fontes artísticas atuais
-├─ tools/model-baker/      # pipeline já real
-├─ tests/                  # criado somente com o primeiro teste útil
-└─ dist/
-   └─ riftbomb.html</code></pre>
-      <p class="small">Os nomes e extensões podem mudar. O princípio não: primeiro extraímos classes existentes sem redesenhar seu interior.</p>
+├─ riftbomb.html
+├─ game/
+│  ├─ play-riftbomb.html
+│  ├─ draw-bomber-rift.js
+│  ├─ play-rift-soundtrack.js
+│  ├─ run-champion-duel.js
+│  └─ start-champion-duel.js
+├─ champions/
+│  ├─ katarina/
+│  ├─ zed/
+│  ├─ renekton/
+│  ├─ vladimir/
+│  ├─ ziggs/
+│  └─ prepare-playable-models/
+└─ architecture-course/
+   └─ course-map.html</code></pre>
+      <p class="small">A árvore registra os seams extraídos sem redesenhar o interior das classes.</p>
     </section>
 
     <section>

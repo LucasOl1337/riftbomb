@@ -32,4 +32,19 @@ Gere novamente o HTML autocontido e rode os gates:
 npm test
 ```
 
+## Mudar um campeão
+
+Cada campeão concentra modelo jogável, arquivos extraídos, ícones e evidências no próprio
+nome:
+
+- `champions/katarina/`
+- `champions/zed/`
+- `champions/renekton/`
+- `champions/vladimir/`
+- `champions/ziggs/`
+
+`champions/prepare-playable-models/` é a entrada para converter, assar, inspecionar e
+incorporar esses modelos. O material do curso de arquitetura começa em
+`architecture-course/course-map.html`.
+
 Projeto de fã não comercial e não endossado pela Riot Games.

@@ -2,7 +2,7 @@
 **/node_modules/
 tools/cdtb-env/
 tools/cdragon-data/
-tools/img2threejs/.git/
+champions/ziggs/reconstruct-reference-model/.git/
 
 # Local packages and temporary output
 *.tgz

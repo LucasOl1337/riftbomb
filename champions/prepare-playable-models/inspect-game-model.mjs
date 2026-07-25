@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 const input = process.argv[2];
-if (!input) throw new Error("Usage: node inspect-gltf.mjs <model.glb>");
+if (!input) throw new Error("Usage: node inspect-game-model.mjs <model.glb>");
 
 const bytes = await fs.readFile(input);
 const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);

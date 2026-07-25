@@ -5,7 +5,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 const [inputPath, outputDirectory, requestedChampion = "renekton"] = process.argv.slice(2);
 if (!inputPath || !outputDirectory) {
-  throw new Error("Usage: node bake-renekton.mjs <animated.glb> <output-directory> [renekton|vladimir]");
+  throw new Error("Usage: node bake-renekton-or-vladimir.mjs <animated.glb> <output-directory> [renekton|vladimir]");
 }
 
 const championConfigs = {

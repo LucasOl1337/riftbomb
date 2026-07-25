@@ -3,7 +3,7 @@ import path from "node:path";
 
 const [htmlPath, bakedDirectory, requestedChampion = "renekton"] = process.argv.slice(2);
 if (!htmlPath || !bakedDirectory) {
-  throw new Error("Usage: node embed-renekton.mjs <game.html> <baked-directory> [renekton|vladimir]");
+  throw new Error("Usage: node embed-renekton-or-vladimir.mjs <game-source> <baked-directory> [renekton|vladimir]");
 }
 
 const champion = requestedChampion.toLowerCase();
