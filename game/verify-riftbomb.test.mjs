@@ -3,6 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import vm from "node:vm";
 
 const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.dirname(gameDirectory);
@@ -39,9 +40,58 @@ test("the built game is one offline HTML artifact", async () => {
   assert.match(document, /class Renderer/);
   assert.match(document, /class MusicEngine/);
   assert.match(document, /class Game/);
+  assert.match(document, /class BrowserMatchPresentation/);
   assert.match(document, /boot\(\);/);
   assert.match(document, /var FluidBg=/);
   assert.match(document, /const PLAYABLE_CHAMPIONS = Object\.freeze/);
+  assert.doesNotMatch(document, /<(?:script|img)[^>]+src=["'](?!data:)/i);
+  assert.doesNotMatch(document, /<link[^>]+href=/i);
+  assert.doesNotMatch(document, /\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/);
+  assert.doesNotMatch(document, /url\(["']?https?:/i);
+});
+
+test("match rules cross one presentation seam without requiring a DOM", async () => {
+  const rulesPath = path.join(gameDirectory, "run-champion-bomb-duel.js");
+  const rules = await readFile(rulesPath, "utf8");
+  const context = vm.createContext({ console });
+  vm.runInContext(`${rules}\nglobalThis.Game = Game;`, context);
+
+  const events = [];
+  const presentation = {
+    selectChampion: (champion) => events.push(["champion", champion]),
+    prepareRound: () => events.push(["round"]),
+    announce: (message) => events.push(["announce", message]),
+    update: (match) => events.push(["update", match.selectedChampion]),
+    finish: () => events.push(["finish"]),
+    setPaused: (paused) => events.push(["paused", paused])
+  };
+  const music = { togglePause: (paused) => events.push(["music", paused]) };
+  const match = new context.Game({}, music, presentation);
+
+  assert.deepEqual(events.shift(), ["champion", "katarina"]);
+  match.selectChampion("zed");
+  assert.ok(events.some(([event, value]) => event === "champion" && value === "zed"));
+  assert.ok(events.some(([event, value]) => event === "update" && value === "zed"));
+
+  events.length = 0;
+  match.start();
+  match.togglePause();
+  assert.ok(events.some(([event]) => event === "round"));
+  assert.ok(events.some(([event, value]) => event === "paused" && value === true));
+  assert.ok(events.some(([event, value]) => event === "music" && value === true));
+});
+
+test("match rules do not write browser presentation directly", async () => {
+  const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
+  const presentationCalls = [...rules.matchAll(/this\.presentation\.([A-Za-z]+)\(/g)]
+    .map((match) => match[1]);
+
+  assert.ok(!/\bUI\.|\bdocument\.|\$\$\(/.test(rules));
+  assert.ok(!/syncChampionPresentation/.test(await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8")));
+  assert.deepEqual(
+    [...new Set(presentationCalls)].sort(),
+    ["announce", "finish", "prepareRound", "selectChampion", "setPaused", "update"]
+  );
 });
 
 test("playable model bytes stay out of the renderer implementation", async () => {

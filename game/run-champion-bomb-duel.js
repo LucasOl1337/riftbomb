@@ -1,9 +1,10 @@
 "use strict";
 
     class Game {
-      constructor(renderer, music) {
+      constructor(renderer, music, presentation) {
         this.renderer = renderer;
         this.music = music;
+        this.presentation = presentation;
         this.cols = 13;
         this.rows = 11;
         this.tile = 1.32;
@@ -177,99 +178,14 @@
       resetPlayers() {
         this.players = [this.createPlayer(1), this.createPlayer(2)];
         this.player = this.players[0];
-        this.syncChampionPresentation();
+        this.presentation.selectChampion(this.selectedChampion);
       }
 
       selectChampion(champion) {
         if (!["katarina", "zed", "renekton", "vladimir", "ziggs"].includes(champion) || this.mode !== "intro") return;
         this.selectedChampion = champion;
         this.resetPlayers();
-        this.updateUI(true);
-      }
-
-      syncChampionPresentation() {
-        const presentations = {
-          katarina: {
-            name: "Katarina", alt: "Katarina, a Lâmina Sinistra", portrait: KATARINA_PORTRAIT,
-            passive: KATARINA_ASSETS.passive,
-            art: [KATARINA_ASSETS.q, KATARINA_ASSETS.w, KATARINA_ASSETS.e, KATARINA_ASSETS.r],
-            abilities: ["Bouncing Blade", "Preparation", "Shunpo", "Death Lotus"]
-          },
-          zed: {
-            name: "Zed", alt: "Zed, o Mestre das Sombras", portrait: ZED_ASSETS.portrait,
-            passive: ZED_ASSETS.passive,
-            art: [ZED_ASSETS.q, ZED_ASSETS.w, ZED_ASSETS.e, ZED_ASSETS.r],
-            abilities: ["Razor Shuriken", "Living Shadow", "Shadow Slash", "Death Mark"]
-          },
-          renekton: {
-            name: "Renekton", alt: "Renekton, o Carniceiro das Areias", portrait: RENEKTON_ASSETS.portrait,
-            passive: RENEKTON_ASSETS.passive,
-            art: [RENEKTON_ASSETS.q, RENEKTON_ASSETS.w, RENEKTON_ASSETS.e, RENEKTON_ASSETS.r],
-            abilities: ["Cull the Meek", "Ruthless Predator", "Slice and Dice", "Dominus"]
-          },
-          vladimir: {
-            name: "Vladimir", alt: "Vladimir, o Sanguinário Escarlate", portrait: VLADIMIR_ASSETS.portrait,
-            passive: VLADIMIR_ASSETS.passive,
-            art: [VLADIMIR_ASSETS.q, VLADIMIR_ASSETS.w, VLADIMIR_ASSETS.e, VLADIMIR_ASSETS.r],
-            abilities: ["Transfusion", "Sanguine Pool", "Tides of Blood", "Hemoplague"]
-          },
-          ziggs: {
-            name: "Blue Ziggs", alt: "Ziggs, o Especialista em Hexplosivos", portrait: ZIGGS_PORTRAIT,
-            passive: null, art: null, abilities: ["Place bomb", "Satchel burst", "Current blast range", "Current speed and shield"]
-          }
-        };
-        const presentation = presentations[this.selectedChampion];
-        const skillChampion = this.selectedChampion !== "ziggs";
-        const championName = presentation.name;
-        document.documentElement.dataset.champion = this.selectedChampion;
-        UI.championChoices.forEach((button) =>
-          button.setAttribute("aria-pressed", String(button.dataset.champion === this.selectedChampion))
-        );
-        UI.championPortrait.src = presentation.portrait;
-        UI.championPortrait.alt = presentation.alt;
-        UI.playerName.textContent = `P1 · ${championName}`;
-        UI.matchSubtitle.textContent = skillChampion
-          ? `${championName} vs Ziggs · first to 3`
-          : "Ziggs mirror match · first to 3";
-        UI.abilityDock.setAttribute("aria-label", skillChampion ? `${championName} abilities` : "Blue Ziggs arena stats");
-        UI.start.textContent = `Play ${championName} + music`;
-
-        const icons = [UI.bombIcon, UI.dashIcon, UI.mineIcon, UI.ultIcon];
-        const art = presentation.art;
-        const glyphs = ["✦", "⌁", "↔", "⬡"];
-        icons.forEach((icon, index) => {
-          icon.classList.toggle("has-art", skillChampion);
-          icon.style.backgroundImage = skillChampion ? `url(${art[index]})` : "";
-          icon.textContent = skillChampion ? "" : glyphs[index];
-        });
-        for (const [key, config] of Object.entries(presentations)) {
-          if (!config.passive) continue;
-          const glyph = UI.championChoices
-            .find((button) => button.dataset.champion === key)
-            ?.querySelector(".champion-glyph");
-          if (!glyph) continue;
-          glyph.style.backgroundImage = `linear-gradient(rgb(15 2 8 / 8%), rgb(15 2 8 / 46%)), url(${config.passive})`;
-          glyph.textContent = "";
-        }
-
-        UI.bombKey.textContent = "Q";
-        UI.dashKey.textContent = skillChampion ? "F" : "⇧";
-        UI.mineKey.textContent = skillChampion ? "E" : "+";
-        UI.ultKey.textContent = skillChampion ? "R" : "◆";
-        UI.bombAction.setAttribute("aria-label", `${presentation.abilities[0]}. Q key.`);
-        UI.dashAction.setAttribute("aria-label", `${presentation.abilities[1]}. ${skillChampion ? "F" : "Left Shift"} key.`);
-        UI.mineAction.setAttribute("aria-label", presentation.abilities[2]);
-        UI.ultAction.setAttribute("aria-label", presentation.abilities[3]);
-        UI.mineAction.classList.toggle("stat", !skillChampion);
-        UI.ultAction.classList.toggle("stat", !skillChampion);
-        UI.touchQ.hidden = !skillChampion;
-        UI.touchMine.hidden = !skillChampion;
-        UI.touchUlt.hidden = !skillChampion;
-        UI.touchDash.textContent = skillChampion ? "F" : "⌁";
-        UI.touchQ.setAttribute("aria-label", presentation.abilities[0]);
-        UI.touchDash.setAttribute("aria-label", presentation.abilities[1]);
-        UI.touchMine.setAttribute("aria-label", presentation.abilities[2]);
-        UI.touchUlt.setAttribute("aria-label", presentation.abilities[3]);
+        this.presentation.update(this);
       }
 
       start() {
@@ -309,9 +225,9 @@
         this.zedShadows = [];
         this.zedMarks = [];
         this.vladimirMarks = [];
-        UI.bossPanel.hidden = true;
-        this.announce(`Round ${this.round} · ${this.player.name} enters the arena`);
-        this.updateUI(true);
+        this.presentation.prepareRound();
+        this.presentation.announce(`Round ${this.round} · ${this.player.name} enters the arena`);
+        this.presentation.update(this);
       }
 
       activatePlayerTwo() {
@@ -322,8 +238,8 @@
           p2.aiDx = 0;
           p2.aiDz = 0;
         }
-        this.announce("Player 2 joined · Red Ziggs is local");
-        this.updateUI(true);
+        this.presentation.announce("Player 2 joined · Red Ziggs is local");
+        this.presentation.update(this);
       }
 
       isBlocked(x, z, radius = 0.31, ignoreBombAt = null) {
@@ -378,7 +294,7 @@
         this.music.effect("bomb");
         this.spawnParticles(x, 0.45, z,
           player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 9, 0.6, 0.08);
-        this.updateUI(true);
+        this.presentation.update(this);
         return true;
       }
 
@@ -494,8 +410,8 @@
           duration: clamp(distance / 12, 0.28, 0.52)
         });
         this.music.effect("katQ");
-        this.announce("Katarina · Bouncing Blade");
-        this.updateUI(true);
+        this.presentation.announce("Katarina · Bouncing Blade");
+        this.presentation.update(this);
         return true;
       }
 
@@ -507,8 +423,8 @@
         this.dropDagger(player.x, player.z, 0.48);
         this.spawnParticles(player.x, 0.72, player.z, Renderer.colors.katCrimson, 18, 0.75, 0.1);
         this.music.effect("katW");
-        this.announce("Katarina · Preparation");
-        this.updateUI(true);
+        this.presentation.announce("Katarina · Preparation");
+        this.presentation.update(this);
         return true;
       }
 
@@ -525,7 +441,7 @@
           .sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(b.x - player.x, b.z - player.z))[0];
         const target = readyDaggers[0] || rival || pickup;
         if (!target) {
-          this.announce("Shunpo needs a dagger, pickup, or rival in range");
+          this.presentation.announce("Shunpo needs a dagger, pickup, or rival in range");
           return false;
         }
         const fromX = player.x;
@@ -546,8 +462,8 @@
           this.hitSkill(rival, 0.18, player, "Shunpo");
         }
         this.music.effect("shunpo");
-        this.announce("Katarina · Shunpo");
-        this.updateUI(true);
+        this.presentation.announce("Katarina · Shunpo");
+        this.presentation.update(this);
         return true;
       }
 
@@ -555,7 +471,7 @@
         if (player.rCooldown > 0 || player.ultChannel > 0) return false;
         const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
         if (!rival || Math.hypot(rival.x - player.x, rival.z - player.z) > this.tile * 3.35) {
-          this.announce("Death Lotus needs Red Ziggs nearby");
+          this.presentation.announce("Death Lotus needs Red Ziggs nearby");
           return false;
         }
         player.rCooldown = 28;
@@ -564,8 +480,8 @@
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 2.75, age: 0, life: 1.65, lotus: true });
         this.music.effect("deathLotus");
         this.renderer.addShock(player.x, player.z, 0.8);
-        this.announce("Katarina · Death Lotus");
-        this.updateUI(true);
+        this.presentation.announce("Katarina · Death Lotus");
+        this.presentation.update(this);
         return true;
       }
 
@@ -633,8 +549,8 @@
           });
         }
         this.music.effect("zedQ");
-        this.announce(`Zed · Razor Shuriken ×${origins.length}`);
-        this.updateUI(true);
+        this.presentation.announce(`Zed · Razor Shuriken ×${origins.length}`);
+        this.presentation.update(this);
         return true;
       }
 
@@ -662,7 +578,7 @@
           this.spawnParticles(fromX, 0.52, fromZ, Renderer.colors.zedCrimson, 24, 0.62, 0.1);
           this.spawnParticles(player.x, 0.52, player.z, Renderer.colors.zedShadow, 28, 0.66, 0.12);
           this.music.effect("zedSwap");
-          this.announce("Zed · Living Shadow exchange");
+          this.presentation.announce("Zed · Living Shadow exchange");
           return true;
         }
         if (player.wCooldown > 0) return false;
@@ -680,7 +596,7 @@
           }
         }
         if (!landing || Math.hypot(landing.x - player.x, landing.z - player.z) < this.tile * 0.55) {
-          this.announce("Living Shadow needs a free arena cell");
+          this.presentation.announce("Living Shadow needs a free arena cell");
           return false;
         }
         this.zedShadows = this.zedShadows.filter((shadow) =>
@@ -698,8 +614,8 @@
         this.spawnParticles(shadow.x, 0.48, shadow.z, Renderer.colors.zedCrimson, 28, 0.72, 0.11);
         this.renderer.addShock(shadow.x, shadow.z, 0.42);
         this.music.effect("zedW");
-        this.announce("Zed · Living Shadow · F again to exchange");
-        this.updateUI(true);
+        this.presentation.announce("Zed · Living Shadow · F again to exchange");
+        this.presentation.update(this);
         return true;
       }
 
@@ -735,8 +651,8 @@
         if (hitRival) player.wCooldown = Math.max(0, player.wCooldown - 2.2);
         this.renderer.addShock(player.x, player.z, 0.5);
         this.music.effect("zedE");
-        this.announce(hitRival ? "Shadow Slash · Living Shadow cooldown reduced" : `Zed · Shadow Slash ×${origins.length}`);
-        this.updateUI(true);
+        this.presentation.announce(hitRival ? "Shadow Slash · Living Shadow cooldown reduced" : `Zed · Shadow Slash ×${origins.length}`);
+        this.presentation.update(this);
         return true;
       }
 
@@ -744,7 +660,7 @@
         if (player.rCooldown > 0) return false;
         const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
         if (!rival || Math.hypot(rival.x - player.x, rival.z - player.z) > this.tile * 4.5) {
-          this.announce("Death Mark needs Red Ziggs in range");
+          this.presentation.announce("Death Mark needs Red Ziggs in range");
           return false;
         }
         const fromX = player.x;
@@ -784,8 +700,8 @@
         this.spawnParticles(fromX, 0.58, fromZ, Renderer.colors.zedShadow, 34, 0.86, 0.13);
         this.spawnParticles(player.x, 0.58, player.z, Renderer.colors.zedCrimson, 34, 0.86, 0.13);
         this.music.effect("deathMark");
-        this.announce("Zed · Death Mark");
-        this.updateUI(true);
+        this.presentation.announce("Zed · Death Mark");
+        this.presentation.update(this);
         return true;
       }
 
@@ -837,8 +753,8 @@
         this.spawnParticles(player.x, 0.56, player.z, Renderer.colors.renektonTeal,
           empowered ? 38 : 26, 0.82, 0.11);
         this.music.effect(empowered ? "renektonQEmpowered" : "renektonQ");
-        this.announce(`Renekton · ${empowered ? "Empowered " : ""}Cull the Meek${healing > 0 ? " · healed" : ""}`);
-        this.updateUI(true);
+        this.presentation.announce(`Renekton · ${empowered ? "Empowered " : ""}Cull the Meek${healing > 0 ? " · healed" : ""}`);
+        this.presentation.update(this);
         return true;
       }
 
@@ -878,8 +794,8 @@
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 0.82, age: 0, life: 0.42, renekton: true });
         this.renderer.addShock(player.x, player.z, empowered ? 0.78 : 0.54);
         this.music.effect(empowered ? "renektonWEmpowered" : "renektonW");
-        this.announce(`Renekton · ${empowered ? "Empowered " : ""}Ruthless Predator`);
-        this.updateUI(true);
+        this.presentation.announce(`Renekton · ${empowered ? "Empowered " : ""}Ruthless Predator`);
+        this.presentation.update(this);
         return true;
       }
 
@@ -946,8 +862,8 @@
         this.renderer.addShock(player.x, player.z, recast ? 0.58 : 0.42);
         this.spawnParticles(player.x, 0.42, player.z, Renderer.colors.renektonTeal, 24, 0.66, 0.1);
         this.music.effect(recast ? "renektonDice" : "renektonE");
-        this.announce(recast ? "Renekton · Dice" : `Renekton · Slice${hitUnit ? " · E again" : ""}`);
-        this.updateUI(true);
+        this.presentation.announce(recast ? "Renekton · Dice" : `Renekton · Slice${hitUnit ? " · E again" : ""}`);
+        this.presentation.update(this);
         return true;
       }
 
@@ -963,8 +879,8 @@
         this.renderer.addShock(player.x, player.z, 1.05);
         this.spawnParticles(player.x, 0.75, player.z, Renderer.colors.renektonTeal, 52, 1.15, 0.14);
         this.music.effect("dominus");
-        this.announce("Renekton · Dominus");
-        this.updateUI(true);
+        this.presentation.announce("Renekton · Dominus");
+        this.presentation.update(this);
         return true;
       }
 
@@ -972,7 +888,7 @@
         if (player.qCooldown > 0 || player.vladimirPool > 0) return false;
         const target = this.katTargetInFront(player, this.tile * 5);
         if (!target.player && !(Number.isInteger(target.r) && Number.isInteger(target.c))) {
-          this.announce("Transfusion needs a rival or Hextech crate");
+          this.presentation.announce("Transfusion needs a rival or Hextech crate");
           return false;
         }
         const empowered = player.vladimirQStacks >= 2;
@@ -996,8 +912,8 @@
           empowered ? 34 : 22, 0.74, 0.1);
         this.renderer.addShock(target.x, target.z, empowered ? 0.62 : 0.38);
         this.music.effect(empowered ? "vladimirQEmpowered" : "vladimirQ");
-        this.announce(`Vladimir · ${empowered ? "Empowered " : ""}Transfusion`);
-        this.updateUI(true);
+        this.presentation.announce(`Vladimir · ${empowered ? "Empowered " : ""}Transfusion`);
+        this.presentation.update(this);
         return true;
       }
 
@@ -1012,8 +928,8 @@
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 1.38, age: 0, life: 1.45, vladimir: true });
         this.renderer.addShock(player.x, player.z, 0.64);
         this.music.effect("sanguinePool");
-        this.announce("Vladimir · Sanguine Pool");
-        this.updateUI(true);
+        this.presentation.announce("Vladimir · Sanguine Pool");
+        this.presentation.update(this);
         return true;
       }
 
@@ -1042,8 +958,8 @@
         this.spawnParticles(player.x, 0.68, player.z, Renderer.colors.vladimirCrimson, 42, 0.96, 0.12);
         this.renderer.addShock(player.x, player.z, 0.72);
         this.music.effect("tidesOfBlood");
-        this.announce(`Vladimir · Tides of Blood${destroyed ? ` · ${destroyed} crates` : ""}`);
-        this.updateUI(true);
+        this.presentation.announce(`Vladimir · Tides of Blood${destroyed ? ` · ${destroyed} crates` : ""}`);
+        this.presentation.update(this);
         return true;
       }
 
@@ -1069,8 +985,8 @@
         this.renderer.addShock(landing.x, landing.z, 0.84);
         this.spawnParticles(landing.x, 0.58, landing.z, Renderer.colors.vladimirCrimson, 38, 0.92, 0.12);
         this.music.effect("hemoplague");
-        this.announce("Vladimir · Hemoplague");
-        this.updateUI(true);
+        this.presentation.announce("Vladimir · Hemoplague");
+        this.presentation.update(this);
         return true;
       }
 
@@ -1270,7 +1186,7 @@
             }
           }
         }
-        this.announce("Voracity · dagger reclaimed · Shunpo refunded");
+        this.presentation.announce("Voracity · dagger reclaimed · Shunpo refunded");
       }
 
       updateKatarina(dt) {
@@ -1625,7 +1541,7 @@
           player.shield -= 1;
           player.invulnerable = 0.72;
           this.music.effect("shield");
-          this.announce(`${player.name} shield shattered`);
+          this.presentation.announce(`${player.name} shield shattered`);
           this.spawnParticles(player.x, 0.55, player.z, Renderer.colors.ice, 28, 0.8, 0.13);
           this.renderer.addShock(player.x, player.z, 0.45);
           return;
@@ -1639,8 +1555,8 @@
           player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 54, 1.1, 0.15);
         const owner = this.players.find((candidate) => candidate.id === bomb.ownerId);
         const cause = owner?.id === player.id ? "self-destructed" : "was caught in the blast";
-        this.announce(`${player.name} ${cause}`);
-        this.updateUI(true);
+        this.presentation.announce(`${player.name} ${cause}`);
+        this.presentation.update(this);
       }
 
       hitSkill(player, damage, source, label, quiet = false) {
@@ -1652,7 +1568,7 @@
           player.shield -= 1;
           player.invulnerable = 0.48;
           this.music.effect("shield");
-          this.announce(`${player.name} blocked ${label}`);
+          this.presentation.announce(`${player.name} blocked ${label}`);
           this.spawnParticles(player.x, 0.55, player.z, Renderer.colors.ice, 26, 0.75, 0.12);
           this.renderer.addShock(player.x, player.z, 0.4);
           return false;
@@ -1683,7 +1599,7 @@
           this.music.effect("kill");
           this.spawnParticles(player.x, 0.62, player.z,
             player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 58, 1.12, 0.15);
-          this.announce(`${source?.name || "Katarina"} eliminated ${player.name} with ${label}`);
+          this.presentation.announce(`${source?.name || "Katarina"} eliminated ${player.name} with ${label}`);
           if (source?.champion === "katarina") {
             source.qCooldown = 0;
             source.wCooldown = 0;
@@ -1712,9 +1628,9 @@
           }
           if (this.roundDecisionTimer < 0) this.roundDecisionTimer = 0.16;
         } else if (!quiet) {
-          this.announce(`${label} · ${Math.ceil(player.health * 100)}% ${player.name} health`);
+          this.presentation.announce(`${label} · ${Math.ceil(player.health * 100)}% ${player.name} health`);
         }
-        this.updateUI(true);
+        this.presentation.update(this);
         return true;
       }
 
@@ -1726,14 +1642,14 @@
         const winner = forcedWinner || (survivors.length === 1 ? survivors[0] : null);
         if (winner) {
           this.roundWins[winner.id - 1] += 1;
-          this.announce(`${winner.name} wins round ${this.round}`);
+          this.presentation.announce(`${winner.name} wins round ${this.round}`);
           this.spawnParticles(winner.x, 0.7, winner.z,
             winner.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 72, 1.4, 0.17);
           if (this.roundWins[winner.id - 1] >= this.matchTarget) this.pendingMatchWinner = winner;
         } else {
-          this.announce(`Double knockout · round ${this.round} is a draw`);
+          this.presentation.announce(`Double knockout · round ${this.round} is a draw`);
         }
-        this.updateUI(true);
+        this.presentation.update(this);
       }
 
       resolveTimeout() {
@@ -1765,12 +1681,12 @@
             speed: "movement speed +1",
             shield: "spell shield acquired"
           };
-          this.announce(`${player.name} · ${labels[item.type]}`);
+          this.presentation.announce(`${player.name} · ${labels[item.type]}`);
           this.music.effect("pickup");
           this.spawnParticles(item.x, 0.5, item.z,
             player.id === 1 ? Renderer.colors.ice : Renderer.colors.ember, 24, 0.85, 0.11);
           this.pickups.splice(i, 1);
-          this.updateUI(true);
+          this.presentation.update(this);
         }
       }
 
@@ -1807,14 +1723,6 @@
         this.particles = this.particles.filter((particle) => particle.age < particle.life && particle.y > -0.2);
       }
 
-      announce(text) {
-        UI.eventKicker.textContent = text;
-        UI.eventKicker.classList.remove("is-live");
-        void UI.eventKicker.offsetWidth;
-        UI.eventKicker.classList.add("is-live");
-        UI.live.textContent = text;
-      }
-
       update(dt) {
         if (this.mode !== "playing" || this.paused) {
           this.updateParticles(dt * 0.35);
@@ -1834,7 +1742,7 @@
           this.statusTimer -= dt;
           if (this.statusTimer <= 0) {
             this.statusTimer = 0.1;
-            this.updateUI();
+            this.presentation.update(this);
           }
           return;
         }
@@ -1860,210 +1768,24 @@
         this.statusTimer -= dt;
         if (this.statusTimer <= 0) {
           this.statusTimer = 0.1;
-          this.updateUI();
+          this.presentation.update(this);
         }
-      }
-
-      updateUI() {
-        const p1 = this.players[0];
-        const p2 = this.players[1];
-        if (!p1 || !p2) return;
-        const crates = this.grid.reduce((sum, row) => sum + row.filter((tile) => tile === 2).length, 0);
-        UI.score.textContent = String(crates).padStart(3, "0");
-        UI.waveNumber.textContent = String(this.round);
-        UI.enemyCount.textContent = String(Math.ceil(this.roundTime)).padStart(2, "0");
-        UI.matchScoreline.textContent = `${p1.name} · ${this.roundWins[0]} — ${this.roundWins[1]} · Red Ziggs`;
-        UI.waveLabel.textContent = this.roundLocked
-          ? (this.pendingMatchWinner ? "Match point converted" : `Round ${String(this.round).padStart(2, "0")} complete`)
-          : `Round ${String(this.round).padStart(2, "0")} · ${this.p2Human ? "Local versus" : "CPU controls Red"}`;
-        UI.playerCard.dataset.worldX = p1.x.toFixed(3);
-        UI.playerCard.dataset.worldZ = p1.z.toFixed(3);
-        UI.playerCard.dataset.passableBombs = String(
-          this.bombs.filter((bomb) => !bomb.exploded && bomb.passOwners?.has(1)).length
-        );
-        UI.playerCard.dataset.redWorldX = p2.x.toFixed(3);
-        UI.playerCard.dataset.redWorldZ = p2.z.toFixed(3);
-        UI.playerCard.dataset.redHealth = p2.health.toFixed(3);
-        UI.playerCard.dataset.blueBombs = String(this.activeBombsFor(p1));
-        UI.playerCard.dataset.redBombs = String(this.activeBombsFor(p2));
-        UI.playerCard.dataset.round = String(this.round);
-        const healthRatio = clamp(p1.health / p1.maxHealth, 0, 1);
-        UI.hearts.setAttribute("aria-label", p1.alive
-          ? `${p1.name} has ${Math.ceil(healthRatio * 100)} percent health`
-          : `${p1.name} is eliminated`);
-        $$("#hearts .heart").forEach((heart, index) =>
-          heart.classList.toggle("is-empty", !p1.alive || healthRatio <= index / 5)
-        );
-        UI.healthFill.style.transform = `scaleX(${healthRatio})`;
-        UI.combo.classList.add("is-live");
-        UI.comboLabel.textContent = `P2 · ${this.p2Human ? "LOCAL" : "CPU"}`;
-        const available = Math.max(0, p1.maxBombs - this.activeBombsFor(p1));
-        const locked = !p1.alive || this.roundLocked || p1.ultChannel > 0 || p1.vladimirPool > 0;
-        if (p1.champion === "katarina") {
-          UI.resourceFill.style.transform = "scaleX(0.82)";
-          const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
-          UI.bombLabel.textContent = cooldownLabel("Bouncing Blade", p1.qCooldown);
-          UI.dashLabel.textContent = p1.speedBoost > 0
-            ? `Preparation · haste ${p1.speedBoost.toFixed(1)}s`
-            : cooldownLabel("Preparation", p1.wCooldown);
-          UI.rangeLabel.textContent = cooldownLabel("Shunpo", p1.eCooldown);
-          UI.shieldLabel.textContent = p1.ultChannel > 0
-            ? `Death Lotus · ${p1.ultChannel.toFixed(1)}s`
-            : cooldownLabel("Death Lotus", p1.rCooldown);
-          UI.bombFill.style.transform = `scaleX(${1 - clamp(p1.qCooldown / 4.5, 0, 1)})`;
-          UI.dashFill.style.transform = `scaleX(${1 - clamp(p1.wCooldown / 8, 0, 1)})`;
-          UI.mineFill.style.transform = `scaleX(${1 - clamp(p1.eCooldown / 8, 0, 1)})`;
-          UI.ultFill.style.transform = `scaleX(${p1.ultChannel > 0 ? p1.ultChannel / 1.65 : 1 - clamp(p1.rCooldown / 28, 0, 1)})`;
-          UI.bombAction.disabled = locked || p1.qCooldown > 0;
-          UI.dashAction.disabled = locked || p1.wCooldown > 0;
-          UI.mineAction.disabled = locked || p1.eCooldown > 0;
-          UI.ultAction.disabled = locked || p1.rCooldown > 0;
-          UI.playerCard.dataset.qCooldown = p1.qCooldown.toFixed(3);
-          UI.playerCard.dataset.wCooldown = p1.wCooldown.toFixed(3);
-          UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
-          UI.playerCard.dataset.rCooldown = p1.rCooldown.toFixed(3);
-          UI.playerCard.dataset.daggers = String(this.daggers.length);
-          UI.playerCard.dataset.ultChannel = p1.ultChannel.toFixed(3);
-        } else if (p1.champion === "zed") {
-          UI.resourceFill.style.transform = "scaleX(0.82)";
-          const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
-          const livingShadow = this.zedShadows.find((shadow) =>
-            shadow.ownerId === p1.id && shadow.kind === "living" && shadow.swapAvailable && shadow.age < shadow.life
-          );
-          const deathMark = this.zedMarks.find((mark) => mark.ownerId === p1.id && !mark.detonated);
-          UI.bombLabel.textContent = cooldownLabel("Razor Shuriken", p1.qCooldown);
-          UI.dashLabel.textContent = livingShadow && p1.zedSwapWindow > 0
-            ? `Living Shadow · F exchange ${p1.zedSwapWindow.toFixed(1)}s`
-            : cooldownLabel("Living Shadow", p1.wCooldown);
-          UI.rangeLabel.textContent = cooldownLabel("Shadow Slash", p1.eCooldown);
-          UI.shieldLabel.textContent = deathMark
-            ? `Death Mark · detonates ${Math.max(0, deathMark.fuse - deathMark.age).toFixed(1)}s`
-            : cooldownLabel("Death Mark", p1.rCooldown);
-          UI.bombFill.style.transform = `scaleX(${1 - clamp(p1.qCooldown / 5.6, 0, 1)})`;
-          UI.dashFill.style.transform = `scaleX(${livingShadow && p1.zedSwapWindow > 0 ? 1 : 1 - clamp(p1.wCooldown / 14, 0, 1)})`;
-          UI.mineFill.style.transform = `scaleX(${1 - clamp(p1.eCooldown / 5.2, 0, 1)})`;
-          UI.ultFill.style.transform = `scaleX(${deathMark ? 1 - deathMark.age / deathMark.fuse : 1 - clamp(p1.rCooldown / 30, 0, 1)})`;
-          UI.bombAction.disabled = locked || p1.qCooldown > 0;
-          UI.dashAction.disabled = locked || (p1.wCooldown > 0 && !(livingShadow && p1.zedSwapWindow > 0));
-          UI.mineAction.disabled = locked || p1.eCooldown > 0;
-          UI.ultAction.disabled = locked || p1.rCooldown > 0;
-          UI.playerCard.dataset.qCooldown = p1.qCooldown.toFixed(3);
-          UI.playerCard.dataset.wCooldown = p1.wCooldown.toFixed(3);
-          UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
-          UI.playerCard.dataset.rCooldown = p1.rCooldown.toFixed(3);
-          UI.playerCard.dataset.shadows = String(this.zedShadows.filter((shadow) => shadow.ownerId === p1.id).length);
-          UI.playerCard.dataset.deathMarks = String(this.zedMarks.filter((mark) => mark.ownerId === p1.id).length);
-        } else if (p1.champion === "renekton") {
-          const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
-          const empowered = p1.fury >= 50;
-          UI.bombLabel.textContent = `${cooldownLabel("Cull the Meek", p1.qCooldown)}${empowered ? " · empowered" : ""}`;
-          UI.dashLabel.textContent = `${cooldownLabel("Ruthless Predator", p1.wCooldown)}${empowered ? " · empowered" : ""}`;
-          UI.rangeLabel.textContent = p1.renektonDashRecast > 0
-            ? `Slice and Dice · E again ${p1.renektonDashRecast.toFixed(1)}s`
-            : cooldownLabel("Slice and Dice", p1.eCooldown);
-          UI.shieldLabel.textContent = p1.renektonDominus > 0
-            ? `Dominus · ${p1.renektonDominus.toFixed(1)}s`
-            : cooldownLabel("Dominus", p1.rCooldown);
-          UI.bombFill.style.transform = `scaleX(${1 - clamp(p1.qCooldown / 5.8, 0, 1)})`;
-          UI.dashFill.style.transform = `scaleX(${1 - clamp(p1.wCooldown / 9.5, 0, 1)})`;
-          UI.mineFill.style.transform = `scaleX(${p1.renektonDashRecast > 0 ? 1 : 1 - clamp(p1.eCooldown / 11.5, 0, 1)})`;
-          UI.ultFill.style.transform = `scaleX(${p1.renektonDominus > 0 ? p1.renektonDominus / 7.2 : 1 - clamp(p1.rCooldown / 31, 0, 1)})`;
-          UI.resourceFill.style.transform = `scaleX(${clamp(p1.fury / 100, 0, 1)})`;
-          UI.bombAction.disabled = locked || p1.qCooldown > 0;
-          UI.dashAction.disabled = locked || p1.wCooldown > 0;
-          UI.mineAction.disabled = locked || (p1.eCooldown > 0 && p1.renektonDashRecast <= 0);
-          UI.ultAction.disabled = locked || p1.rCooldown > 0;
-          UI.playerCard.dataset.qCooldown = p1.qCooldown.toFixed(3);
-          UI.playerCard.dataset.wCooldown = p1.wCooldown.toFixed(3);
-          UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
-          UI.playerCard.dataset.rCooldown = p1.rCooldown.toFixed(3);
-          UI.playerCard.dataset.fury = p1.fury.toFixed(2);
-          UI.playerCard.dataset.eRecast = p1.renektonDashRecast.toFixed(3);
-          UI.playerCard.dataset.dominus = p1.renektonDominus.toFixed(3);
-        } else if (p1.champion === "vladimir") {
-          const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
-          const mark = this.vladimirMarks.find((candidate) => candidate.ownerId === p1.id && !candidate.detonated);
-          UI.bombLabel.textContent = `${cooldownLabel("Transfusion", p1.qCooldown)} · crimson ${p1.vladimirQStacks}/2`;
-          UI.dashLabel.textContent = p1.vladimirPool > 0
-            ? `Sanguine Pool · ${p1.vladimirPool.toFixed(1)}s`
-            : cooldownLabel("Sanguine Pool", p1.wCooldown);
-          UI.rangeLabel.textContent = cooldownLabel("Tides of Blood", p1.eCooldown);
-          UI.shieldLabel.textContent = mark
-            ? `Hemoplague · detonates ${Math.max(0, mark.fuse - mark.age).toFixed(1)}s`
-            : cooldownLabel("Hemoplague", p1.rCooldown);
-          UI.bombFill.style.transform = `scaleX(${1 - clamp(p1.qCooldown / 4.4, 0, 1)})`;
-          UI.dashFill.style.transform = `scaleX(${p1.vladimirPool > 0 ? p1.vladimirPool / 1.45 : 1 - clamp(p1.wCooldown / 15, 0, 1)})`;
-          UI.mineFill.style.transform = `scaleX(${1 - clamp(p1.eCooldown / 7.6, 0, 1)})`;
-          UI.ultFill.style.transform = `scaleX(${mark ? 1 - mark.age / mark.fuse : 1 - clamp(p1.rCooldown / 30, 0, 1)})`;
-          UI.resourceFill.style.transform = `scaleX(${clamp(p1.vladimirQStacks / 2, 0, 1)})`;
-          UI.bombAction.disabled = locked || p1.qCooldown > 0;
-          UI.dashAction.disabled = locked || p1.wCooldown > 0;
-          UI.mineAction.disabled = locked || p1.eCooldown > 0;
-          UI.ultAction.disabled = locked || p1.rCooldown > 0;
-          UI.playerCard.dataset.qCooldown = p1.qCooldown.toFixed(3);
-          UI.playerCard.dataset.wCooldown = p1.wCooldown.toFixed(3);
-          UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
-          UI.playerCard.dataset.rCooldown = p1.rCooldown.toFixed(3);
-          UI.playerCard.dataset.crimsonRush = String(p1.vladimirQStacks);
-          UI.playerCard.dataset.pool = p1.vladimirPool.toFixed(3);
-          UI.playerCard.dataset.hemoplague = String(this.vladimirMarks.filter((candidate) => candidate.ownerId === p1.id).length);
-        } else {
-          UI.resourceFill.style.transform = "scaleX(0.82)";
-          UI.bombLabel.textContent = `Bomb · ${available}/${p1.maxBombs} ready`;
-          UI.dashLabel.textContent = p1.dashCooldown > 0 ? `Satchel · ${p1.dashCooldown.toFixed(1)}s` : "Satchel · ready";
-          UI.bombFill.style.transform = `scaleX(${available > 0 ? 1 : 0})`;
-          UI.dashFill.style.transform = `scaleX(${1 - clamp(p1.dashCooldown / 5, 0, 1)})`;
-          UI.rangeLabel.textContent = `Blast · ${p1.range} tiles`;
-          UI.mineFill.style.transform = `scaleX(${clamp(p1.range / 6, 0, 1)})`;
-          UI.shieldLabel.textContent = p1.shield > 0
-            ? `Shield · ${p1.shield} charge${p1.shield > 1 ? "s" : ""}`
-            : `Speed · ${(p1.speed / 3.45).toFixed(1)}×`;
-          UI.ultFill.style.transform = `scaleX(${p1.shield > 0 ? p1.shield / 2 : clamp((p1.speed - 3.2) / 1.55, 0.12, 1)})`;
-          UI.bombAction.disabled = available <= 0 || locked;
-          UI.dashAction.disabled = p1.dashCooldown > 0 || locked;
-          UI.mineAction.disabled = true;
-          UI.ultAction.disabled = true;
-        }
-
-        const maxX = this.tile * (this.cols - 1) / 2;
-        const maxZ = this.tile * (this.rows - 1) / 2;
-        UI.minimapPlayer.style.left = `${clamp((p1.x / maxX * 0.5 + 0.5) * 100, 4, 96)}%`;
-        UI.minimapPlayer.style.top = `${clamp((p1.z / maxZ * 0.5 + 0.5) * 100, 4, 96)}%`;
-        const left = clamp((p2.x / maxX * 0.5 + 0.5) * 100, 4, 96);
-        const top = clamp((p2.z / maxZ * 0.5 + 0.5) * 100, 4, 96);
-        UI.minimapEnemies.innerHTML = p2.alive
-          ? `<i class="map-enemy" style="left:${left}%;top:${top}%;width:0.62rem"></i>`
-          : "";
       }
 
       finishMatch(winner) {
         if (this.mode !== "playing") return;
         this.mode = "matchover";
         this.paused = false;
-        UI.endResult.textContent = "First to three · match complete";
-        UI.endTitle.textContent = `${winner.name} wins`;
-        UI.endScore.textContent = String(this.roundWins[0]);
-        UI.endChain.textContent = String(this.roundWins[1]);
-        UI.endTime.textContent = formatTime(this.elapsed);
-        UI.end.hidden = false;
-        UI.chrome.classList.add("is-hidden");
-        UI.chrome.setAttribute("aria-hidden", "true");
-        UI.chrome.setAttribute("inert", "");
-        this.announce(`${winner.name} wins the Rift Bomber match`);
-        setTimeout(() => UI.restart.focus(), 100);
+        this.presentation.finish(winner, this.roundWins, this.elapsed);
+        this.presentation.announce(`${winner.name} wins the Rift Bomber match`);
       }
 
       togglePause(force) {
         if (this.mode !== "playing") return false;
         this.paused = typeof force === "boolean" ? force : !this.paused;
-        UI.pause.setAttribute("aria-pressed", String(this.paused));
-        UI.pause.setAttribute("aria-label", this.paused ? "Resume game" : "Pause game");
-        UI.pauseIcon.innerHTML = this.paused
-          ? '<path d="M8 5v14l11-7L8 5z"/>'
-          : '<path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/>';
+        this.presentation.setPaused(this.paused);
         this.music.togglePause(this.paused);
-        this.announce(this.paused ? "Game paused" : "Game resumed");
+        this.presentation.announce(this.paused ? "Game paused" : "Game resumed");
         return this.paused;
       }
     }
-

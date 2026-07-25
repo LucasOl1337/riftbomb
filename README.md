@@ -16,13 +16,15 @@ Depois acesse `http://127.0.0.1:4177/riftbomb.html`.
 
 ## Mudar o jogo
 
-`game/play-riftbomb.html` é a entrada editável. Ela costura seis módulos nomeados pela
+`game/play-riftbomb.html` é a entrada editável. Ela declara a ordem dos módulos; o build
+descobre essa ordem, empacota os modelos e gera `riftbomb.html`. A página costura módulos nomeados pela
 capacidade que entregam:
 
 - `show-champion-duel.css`: apresentação da partida.
 - `animate-bomber-rift-background.js`: fundo vivo da arena.
 - `draw-bomber-rift.js`: WebGL, modelos e efeitos.
 - `play-rift-soundtrack.js`: música e efeitos sonoros.
+- `present-champion-bomb-duel.js`: apresentação da partida no navegador.
 - `run-champion-bomb-duel.js`: regras, campeões, bombas, CPU e placar.
 - `start-champion-duel.js`: controles e início da partida.
 
@@ -44,7 +46,8 @@ nome:
 - `champions/ziggs/`
 
 `champions/prepare-playable-models/` é a entrada para converter, assar, inspecionar e
-incorporar esses modelos. O material do curso de arquitetura começa em
+empacotar esses modelos. `bake-playable-champion.mjs` recebe o nome do campeão e preserva
+as diferenças de poses dentro de uma única implementação. O material do curso de arquitetura começa em
 `architecture-course/course-map.html`.
 
 Projeto de fã não comercial e não endossado pela Riot Games.

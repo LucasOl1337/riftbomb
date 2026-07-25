@@ -56,7 +56,6 @@
       UI.chrome.setAttribute("aria-hidden", "false");
       UI.chrome.removeAttribute("inert");
       UI.start.disabled = false;
-      game.syncChampionPresentation();
       UI.live.textContent = game.player.champion !== "ziggs"
         ? `Rift Bomber started. ${game.player.name} uses WASD, Q/F/E/R and Space for arena bombs. Red Ziggs uses arrows and Enter.`
         : "Rift Bomber started. Blue Ziggs uses WASD, Q and Shift. Red Ziggs uses arrows and Enter.";
@@ -153,7 +152,7 @@
       try {
         music = new MusicEngine();
         renderer = new Renderer(UI.canvas);
-        game = new Game(renderer, music);
+        game = new Game(renderer, music, new BrowserMatchPresentation());
         if (modelReviewMode) {
           UI.intro.classList.add("is-gone");
           game.enemies = [];
