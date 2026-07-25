@@ -1,6 +1,6 @@
 {
   "targetName": "Ziggs Riftbomb Champion",
-  "sourceImage": "C:\\Projetos\\Riftbomb-Symphony\\references\\Ziggs_0_splash.png",
+  "sourceImage": "champions/ziggs/reference-art/Ziggs_0_splash.png",
   "preSpecAssessment": {
     "objectClass": {
       "primaryType": "stylized yordle demolitionist champion",
@@ -142,7 +142,7 @@
       "confidence": 0.78,
       "note": "Normalized estimates from direct visual inspection. The official action splash is strongly foreshortened, so game-ready neutral limb lengths remain deliberately conservative."
     },
-    "sourceImage": "C:\\Projetos\\Riftbomb-Symphony\\references\\Ziggs_0_splash.png"
+    "sourceImage": "champions/ziggs/reference-art/Ziggs_0_splash.png"
   },
   "qualityContract": {
     "qualityBar": "ultra-complex",

@@ -38,7 +38,7 @@
     ],
     "descriptionRule": "Use measurable 3D graphics terms. Avoid vague words unless they are paired with concrete geometry/material/shader parameters."
   },
-  "sourceImage": "C:\\Projetos\\Riftbomb-Symphony\\references\\Ziggs_0_splash.png",
+  "sourceImage": "champions/ziggs/reference-art/Ziggs_0_splash.png",
   "referenceCamera": {
     "solved": false,
     "fovDegrees": 40.0,
@@ -458,7 +458,7 @@
       "confidence": 0.78,
       "note": "Normalized estimates from direct visual inspection. The official action splash is strongly foreshortened, so game-ready neutral limb lengths remain deliberately conservative."
     },
-    "sourceImage": "C:\\Projetos\\Riftbomb-Symphony\\references\\Ziggs_0_splash.png"
+    "sourceImage": "champions/ziggs/reference-art/Ziggs_0_splash.png"
   },
   "qualityContract": {
     "qualityBar": "ultra-complex",
@@ -4796,9 +4796,9 @@
           "notes": "Head-to-body ratio, short limbs, large gloves, and pointed boots avoid a generic human mannequin."
         }
       ],
-      "referenceScreenshot": "C:\\Projetos\\Riftbomb-Symphony\\model-ziggs\\reference-ziggs-crop.png",
-      "renderScreenshot": "C:\\Projetos\\Riftbomb-Symphony\\model-ziggs\\render-feature-pass.png",
-      "comparisonImage": "C:\\Projetos\\Riftbomb-Symphony\\model-ziggs\\comparison-feature-pass.png",
+      "referenceScreenshot": "champions/ziggs/reconstruction/reference-ziggs-crop.png",
+      "renderScreenshot": "champions/ziggs/reconstruction/render-feature-pass.png",
+      "comparisonImage": "champions/ziggs/reconstruction/comparison-feature-pass.png",
       "cameraView": "front-close-up",
       "notes": "Reviewed official face crop beside the WebGL model rendered through the same production shader and post stack.",
       "aiVisionNotes": "Critical semantic features pass individually. The largest remaining delta is surface treatment: the render is intentionally low-poly and top-down optimized rather than painterly. Identity, palette, prop asymmetry, and facial landmarks are strong enough to proceed."
@@ -4901,12 +4901,12 @@
         "replace open torus cuffs with solid metal bands"
       ],
       "evidence": [
-        "C:\\Projetos\\Riftbomb-Symphony\\model-ziggs\\comparison-feature-pass.png"
+        "champions/ziggs/reconstruction/comparison-feature-pass.png"
       ],
       "visualEvidence": {
-        "referenceScreenshot": "C:\\Projetos\\Riftbomb-Symphony\\model-ziggs\\reference-ziggs-crop.png",
-        "renderScreenshot": "C:\\Projetos\\Riftbomb-Symphony\\model-ziggs\\render-feature-pass.png",
-        "comparisonImage": "C:\\Projetos\\Riftbomb-Symphony\\model-ziggs\\comparison-feature-pass.png",
+        "referenceScreenshot": "champions/ziggs/reconstruction/reference-ziggs-crop.png",
+        "renderScreenshot": "champions/ziggs/reconstruction/render-feature-pass.png",
+        "comparisonImage": "champions/ziggs/reconstruction/comparison-feature-pass.png",
         "cameraView": "front-close-up",
         "notes": "Reviewed official face crop beside the WebGL model rendered through the same production shader and post stack.",
         "aiVisionNotes": "Critical semantic features pass individually. The largest remaining delta is surface treatment: the render is intentionally low-poly and top-down optimized rather than painterly. Identity, palette, prop asymmetry, and facial landmarks are strong enough to proceed."

@@ -1,7 +1,7 @@
 {
   "referenceCamera": {
     "version": "1.0",
-    "sourceImage": "C:\\Projetos\\Riftbomb-Symphony\\references\\Ziggs_0_splash.png",
+    "sourceImage": "champions/ziggs/reference-art/Ziggs_0_splash.png",
     "solver": "stage1_intake/solve_camera_pose.py",
     "method": "heuristic default-guess camera, not solved from image content; image dimensions give an exact aspect ratio, everything else is a starting point for agent refinement",
     "imageWidth": 1215,
