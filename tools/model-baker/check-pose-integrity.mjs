@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const bakedDirectory = process.argv[2] ?? "art/katarina-game-model/skin29-baked";
+const bakedDirectory = process.argv[2] ?? "champions/katarina/playable-model";
 const metadataFiles = fs.readdirSync(bakedDirectory).filter((file) => file.endsWith("-model-metadata.json"));
 if (metadataFiles.length !== 1) {
   throw new Error(`Expected one model metadata file in ${bakedDirectory}, found ${metadataFiles.length}`);
