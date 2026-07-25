@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const [htmlPath = "riftbomb-symphony.html", assetDir = "art/renekton-game-model/ui", requestedChampion = "renekton"] = process.argv.slice(2);
+const [
+  htmlPath = "game/draw-bomber-rift.js",
+  assetDir = "champions/renekton/match-icons",
+  requestedChampion = "renekton"
+] = process.argv.slice(2);
 let html = fs.readFileSync(htmlPath, "utf8");
 
 const champion = requestedChampion.toLowerCase();
