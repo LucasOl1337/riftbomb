@@ -5,6 +5,7 @@ tools/cdragon-data/
 champions/ziggs/reconstruct-reference-model/.git/
 
 # Local packages and temporary output
+fluidpkg/
 *.tgz
 *.log
 *.tmp
