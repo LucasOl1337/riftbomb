@@ -29,8 +29,8 @@ Curadoria inicial para o estudo arquitetural do Riftbomb. Fontes externas susten
 
 ### Evidência local
 
-- [Pesquisa 0001 — Fundamentos de arquitetura](research/0001-architecture-foundations.md) — síntese anotada das fontes e sua aplicação ao código atual do Riftbomb.
-- [Riftbomb atual](riftbomb-symphony.html) — artefato e fonte histórica do one-shot; deve permanecer como baseline executável durante a extração.
+- [Pesquisa 0001 — Fundamentos de arquitetura](research-0001-architecture-foundations.md) — síntese anotada das fontes e sua aplicação ao código atual do Riftbomb.
+- [Riftbomb atual](../riftbomb.html) — artefato executável autocontido; a fonte editável agora mora em `game/`.
 - `C:\Projetos\bombpvp` — referência histórica para arquitetura, commits, testes e decisões; não é uma base automática para copiar.
 
 ## Wisdom

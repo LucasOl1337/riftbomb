@@ -23,7 +23,7 @@ A fonte pode ser dividida com `import`/`export` e depois empacotada para produç
 
 ## 1. O que existe dentro do “HTML do Riftbomb”
 
-O artefato atual é um documento HTML contendo CSS inline a partir da [linha 9](../riftbomb-symphony.html#L9) e dois blocos JavaScript a partir das [linhas 1919](../riftbomb-symphony.html#L1919) e [2482](../riftbomb-symphony.html#L2482). As mecânicas não são executadas por HTML: são executadas pelo motor JavaScript do navegador. HTML fornece o documento e os pontos de montagem; CSS apresenta a interface; JavaScript mantém estado, calcula regras, usa WebGL e toca áudio.
+O artefato recebido era um documento HTML contendo CSS inline a partir da [linha 9](../riftbomb.html#L9) e dois blocos JavaScript a partir das [linhas 1919](../riftbomb.html#L1919) e [2482](../riftbomb.html#L2482). As mecânicas não são executadas por HTML: são executadas pelo motor JavaScript do navegador. HTML fornece o documento e os pontos de montagem; CSS apresenta a interface; JavaScript mantém estado, calcula regras, usa WebGL e toca áudio.
 
 ### 1.1 O que TypeScript realmente acrescenta
 
@@ -79,11 +79,11 @@ Fixed timestep melhora estabilidade e reprodutibilidade, mas não produz determi
 
 ### 3.2 Situação atual do Riftbomb
 
-O loop atual já chama `game.update(dt)` antes de `renderer.render(...)`, o que é uma boa separação inicial. Entretanto, o `dt` vem diretamente do intervalo entre frames, apenas limitado ao intervalo de 1–50 ms; assim, as regras ainda avançam com passo variável. Veja [`frame(now)`](../riftbomb-symphony.html#L7686).
+O loop atual já chama `game.update(dt)` antes de `renderer.render(...)`, o que é uma boa separação inicial. Entretanto, o `dt` vem diretamente do intervalo entre frames, apenas limitado ao intervalo de 1–50 ms; assim, as regras ainda avançam com passo variável. Veja [`frame(now)`](../riftbomb.html#L7686).
 
-A classe `Game` ainda realiza apresentação: `announce()` modifica DOM e `update()` chama `updateUI()`. Portanto, `Game` não é hoje uma simulação isolável, apesar da existência de uma classe `Renderer`. Veja [`announce`](../riftbomb-symphony.html#L7394), [`update`](../riftbomb-symphony.html#L7402) e [`updateUI`](../riftbomb-symphony.html#L7451).
+A classe `Game` ainda realiza apresentação: `announce()` modifica DOM e `update()` chama `updateUI()`. Portanto, `Game` não é hoje uma simulação isolável, apesar da existência de uma classe `Renderer`. Veja [`announce`](../riftbomb.html#L7394), [`update`](../riftbomb.html#L7402) e [`updateUI`](../riftbomb.html#L7451).
 
-Há uma base útil para reprodutibilidade: `Game.random()` implementa um PRNG com seed interna. Porém, `start()` troca a seed por um valor derivado de `Date.now()`, enquanto áudio/VFX também usam `Math.random()` em outros pontos. Isso sugere separar explicitamente aleatoriedade autoritativa de aleatoriedade cosmética. Veja [`random`](../riftbomb-symphony.html#L5639), [`start`](../riftbomb-symphony.html#L5859) e os usos de [`Math.random`](../riftbomb-symphony.html#L4916).
+Há uma base útil para reprodutibilidade: `Game.random()` implementa um PRNG com seed interna. Porém, `start()` troca a seed por um valor derivado de `Date.now()`, enquanto áudio/VFX também usam `Math.random()` em outros pontos. Isso sugere separar explicitamente aleatoriedade autoritativa de aleatoriedade cosmética. Veja [`random`](../riftbomb.html#L5639), [`start`](../riftbomb.html#L5859) e os usos de [`Math.random`](../riftbomb.html#L4916).
 
 ### 3.3 Loop recomendado
 

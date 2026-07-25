@@ -4,6 +4,6 @@
   "type": "module",
   "scripts": {
     "build": "node game/assemble-riftbomb.mjs",
-    "test": "npm run build && node --test game/verify-riftbomb.test.mjs"
+    "test": "npm run build && node --test game/verify-riftbomb.test.mjs architecture-course/verify-course-links.test.mjs"
   }
 }
