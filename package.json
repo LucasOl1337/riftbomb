@@ -1,0 +1,9 @@
+{
+  "name": "riftbomb",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node game/assemble-riftbomb.mjs",
+    "test": "npm run build && node --test game/verify-riftbomb.test.mjs"
+  }
+}

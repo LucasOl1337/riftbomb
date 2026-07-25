@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#050a18">
+  <meta name="description" content="League of Legends: Riftbomb — an unofficial Katarina, Zed, Renekton, Vladimir and Ziggs Bomber PvP arena with champion kits, breakable blocks, power-ups, music, and WebGL effects in one HTML file.">
+  <title>League of Legends: Riftbomb — Champions PvP Bomber Arena</title>
+  <link rel="stylesheet" href="./show-champion-duel.css">
+</head>
+<body>
+  <fluid-bg
+    fixed
+    z="-2"
+    mode="native"
+    hash="#p=0.4,1.6,5,0.03,1,10,0,5,40,0,0,1.7778,0,0,3"
+    aria-hidden="true"></fluid-bg>
+  <div class="scrim" aria-hidden="true"></div>
+  <a class="skip-link" href="#start-game">Skip to game controls</a>
+
+  <main id="app">
+    <canvas id="arena" role="img" aria-label="A top-down 3D League of Legends inspired Bomberman arena. Player 1 can choose Katarina, Zed, Renekton, Vladimir or Ziggs; Red Ziggs uses arrow keys and Enter."></canvas>
+    <div class="fx-grain" aria-hidden="true"></div>
+    <div class="frame" aria-hidden="true"></div>
+
+    <section class="intro" id="intro" aria-labelledby="title">
+      <div class="intro-content">
+        <div class="season-tag micro">Unofficial League of Legends fan game</div>
+        <div class="lol-wordmark" aria-hidden="true">League <small>of</small> Legends</div>
+        <h1 id="title"><span>Riftbomb</span><em>Champions of the Bomber Rift</em></h1>
+        <p class="intro-lede">
+          Choose Katarina, Zed, Renekton, Vladimir or Ziggs for Player 1. Bomb through Hextech crates, collect power-ups,
+          then combine authentic champion silhouettes with a lethal Bomber Rift ruleset.
+        </p>
+        <div class="champion-select" role="group" aria-label="Choose Player 1 champion">
+          <span class="micro">P1 champion</span>
+          <button class="champion-choice" data-champion="katarina" aria-pressed="true">
+            <span class="champion-glyph" aria-hidden="true">⚔</span>
+            <strong>Katarina</strong>
+            <small>Battle Queen · Q F E R</small>
+          </button>
+          <button class="champion-choice" data-champion="zed" aria-pressed="false">
+            <span class="champion-glyph" aria-hidden="true">◈</span>
+            <strong>Zed</strong>
+            <small>Master of Shadows · Q F E R</small>
+          </button>
+          <button class="champion-choice" data-champion="renekton" aria-pressed="false">
+            <span class="champion-glyph" aria-hidden="true">☀</span>
+            <strong>Renekton</strong>
+            <small>Butcher of the Sands · Q F E R</small>
+          </button>
+          <button class="champion-choice" data-champion="vladimir" aria-pressed="false">
+            <span class="champion-glyph" aria-hidden="true">◆</span>
+            <strong>Vladimir</strong>
+            <small>Crimson Reaper · Q F E R</small>
+          </button>
+          <button class="champion-choice" data-champion="ziggs" aria-pressed="false">
+            <span class="champion-glyph" aria-hidden="true">✦</span>
+            <strong>Ziggs</strong>
+            <small>Bomber · Q Shift</small>
+          </button>
+        </div>
+        <div class="intro-actions">
+          <button class="primary" id="start-game">Play Katarina + music</button>
+          <button class="secondary" id="open-guide-intro">Read arena rules</button>
+        </div>
+        <div class="intro-notes micro" aria-label="Game features">
+          <span>Best of five</span>
+          <span>Breakable Hextech blocks</span>
+          <span>Five playable champions</span>
+          <span>Local PvP · adaptive CPU</span>
+        </div>
+      </div>
+      <p class="legal">
+        Unofficial, non-commercial fan prototype; not endorsed by Riot Games. League of Legends, Katarina, Zed, Renekton, Vladimir, Ziggs, Summoner’s Rift and related marks belong to Riot Games. Champion meshes, textures and animation data are derived from locally installed Riot game assets; code, arena geometry, visual systems, and synthesized audio are original to this prototype.
+      </p>
+    </section>
+
+    <div class="chrome is-hidden" id="chrome" aria-hidden="true" inert>
+      <header class="topbar">
+        <div class="brand" aria-label="Riftbomb Symphony">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div class="brand-copy">
+            <strong>RIFT BOMBER ARENA</strong>
+            <span class="micro" id="match-subtitle">Katarina vs Ziggs · first to 3</span>
+          </div>
+        </div>
+
+        <div class="wave-ribbon" aria-live="polite">
+          <span class="label micro" id="match-scoreline">Katarina · 0 — 0 · Red Ziggs</span>
+          <strong id="wave-label">Round 01 · CPU controls Red</strong>
+        </div>
+
+        <section class="player-card" aria-label="Player status">
+          <img class="champion-portrait" id="champion-portrait"
+            alt="Ziggs, o Especialista em Hexplosivos"
+            src="data:image/webp;base64,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">
+          <div class="player-line">
+            <span class="micro" id="player-name">P1 · Katarina</span>
+            <div class="hearts" id="hearts" aria-label="Blue Ziggs is alive">
+              <i class="heart" aria-hidden="true"></i>
+              <i class="heart" aria-hidden="true"></i>
+              <i class="heart" aria-hidden="true"></i>
+              <i class="heart" aria-hidden="true"></i>
+              <i class="heart" aria-hidden="true"></i>
+            </div>
+          </div>
+          <div class="health-track" aria-hidden="true"><span id="health-fill"></span></div>
+          <div class="mana-track" aria-hidden="true"><span id="resource-fill"></span></div>
+        </section>
+      </header>
+
+      <section class="score-stack" aria-label="Match score">
+        <div class="eyebrow micro">Hextech crates left</div>
+        <div class="score" id="score">000</div>
+        <div class="score-meta micro">
+          <span>Round <b id="wave-number">1</b></span>
+          <span>Clock <b id="enemy-count">90</b></span>
+        </div>
+        <div class="combo micro is-live" id="combo"><span>◆</span><b id="combo-label">P2 · CPU</b></div>
+      </section>
+
+      <section class="boss-panel" id="boss-panel" aria-label="Boss health" hidden>
+        <div class="boss-name micro"><span>Baron Nashor</span><span id="boss-hp-text">12 / 12</span></div>
+        <div class="boss-track"><span id="boss-fill"></span></div>
+      </section>
+
+      <div class="system-stack micro" aria-hidden="true">
+        <span id="gpu-label">WebGL2 · adaptive</span>
+        <span>Rift mix · 128 BPM</span>
+        <span id="fx-label">Bloom · reactive</span>
+      </div>
+
+      <div class="event-feed" aria-hidden="true">
+        <div class="event-kicker micro" id="event-kicker">Round incoming</div>
+      </div>
+
+      <section class="music-console" aria-label="Soundtrack player">
+        <div class="music-shell">
+          <div class="album-glyph" aria-hidden="true"></div>
+          <div class="track-main">
+            <div class="track-heading">
+              <strong id="track-title">RIFT MIX · ORIGINAL</strong>
+              <span class="micro"><span id="track-time">00:00</span> / 04:00</span>
+            </div>
+            <div class="timeline" aria-hidden="true">
+              <div class="waveform" id="waveform"></div>
+              <i class="playhead" id="playhead"></i>
+            </div>
+            <div class="section-line micro">
+              <span id="music-section">Oracle prelude</span>
+              <span class="beat-dots" id="beat-dots" aria-hidden="true">
+                <i></i><i></i><i></i><i></i>
+              </span>
+            </div>
+          </div>
+          <div class="transport">
+            <button class="icon-button" id="sound-toggle" aria-label="Mute soundtrack" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12.2 3a4.2 4.2 0 0 0-2.2-3.7v7.4a4.2 4.2 0 0 0 2.2-3.7zm-2.2-8v2.1a6.5 6.5 0 0 1 0 11.8V20a8.5 8.5 0 0 0 0-16z"/></svg>
+            </button>
+            <button class="icon-button" id="pause-toggle" aria-label="Pause game" aria-pressed="false">
+              <svg id="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="ability-dock" id="ability-dock" aria-label="Katarina abilities">
+        <button class="ability" id="bomb-action" aria-label="Bouncing Blade. Q key.">
+          <kbd id="slot-q-key">Q</kbd>
+          <span class="ability-icon" id="slot-q-icon" aria-hidden="true">◇</span>
+          <span class="ability-name" id="bomb-label">Bouncing Blade</span>
+          <span class="cooldown-track" aria-hidden="true"><span id="bomb-fill"></span></span>
+        </button>
+        <button class="ability" id="dash-action" aria-label="Preparation. F key because W moves the champion.">
+          <kbd id="slot-w-key">F</kbd>
+          <span class="ability-icon" id="slot-w-icon" aria-hidden="true">↑</span>
+          <span class="ability-name" id="dash-label">Preparation</span>
+          <span class="cooldown-track" aria-hidden="true"><span id="dash-fill"></span></span>
+        </button>
+        <button class="ability" id="mine-action" aria-label="Shunpo. E key.">
+          <kbd id="slot-e-key">E</kbd>
+          <span class="ability-icon" id="slot-e-icon" aria-hidden="true">⌁</span>
+          <span class="ability-name" id="range-label">Shunpo</span>
+          <span class="cooldown-track" aria-hidden="true"><span id="mine-fill"></span></span>
+        </button>
+        <button class="ability ultimate" id="ult-action" aria-label="Death Lotus. R key.">
+          <kbd id="slot-r-key">R</kbd>
+          <span class="ability-icon" id="slot-r-icon" aria-hidden="true">◎</span>
+          <span class="ability-name" id="shield-label">Death Lotus</span>
+          <span class="cooldown-track" aria-hidden="true"><span id="ult-fill"></span></span>
+        </button>
+      </section>
+
+      <aside class="minimap" aria-label="Summoner's Rift minimap">
+        <i class="map-river" aria-hidden="true"></i>
+        <i class="map-lane" aria-hidden="true"></i>
+        <i class="map-base blue" aria-hidden="true"></i>
+        <i class="map-base red" aria-hidden="true"></i>
+        <span id="minimap-enemies" aria-hidden="true"></span>
+        <i class="map-player" id="minimap-player" aria-hidden="true"></i>
+      </aside>
+
+      <button class="guide-button micro" id="open-guide">H · Arena rules</button>
+    </div>
+
+    <div class="touch-controls" id="touch-controls" aria-label="Touch controls">
+      <div class="dpad" aria-label="Movement">
+        <button class="touch-key" data-dir="up" aria-label="Move up">▲</button>
+        <button class="touch-key" data-dir="left" aria-label="Move left">◀</button>
+        <button class="touch-key" data-dir="down" aria-label="Move down">▼</button>
+        <button class="touch-key" data-dir="right" aria-label="Move right">▶</button>
+      </div>
+      <div class="touch-actions">
+        <button class="touch-key kat-q" id="touch-q" aria-label="Bouncing Blade">Q</button>
+        <button class="touch-key dash" id="touch-dash" aria-label="Preparation">F</button>
+        <button class="touch-key mine" id="touch-mine" aria-label="Shunpo">E</button>
+        <button class="touch-key ult" id="touch-ult" aria-label="Death Lotus">R</button>
+        <button class="touch-key bomb" id="touch-bomb" aria-label="Place arena bomb">✦</button>
+      </div>
+    </div>
+
+    <section class="end-screen" id="end-screen" aria-labelledby="end-title" hidden>
+      <div class="end-card">
+        <div class="result micro" id="end-result">Match complete</div>
+        <h2 id="end-title">Blue side wins</h2>
+        <div class="end-stats">
+          <div><strong id="end-score">3</strong><span class="micro">Blue rounds</span></div>
+          <div><strong id="end-chain">0</strong><span class="micro">Red rounds</span></div>
+          <div><strong id="end-time">0:00</strong><span class="micro">Match time</span></div>
+        </div>
+        <button class="primary" id="restart-game">Run the rematch</button>
+      </div>
+    </section>
+
+    <div class="sr-only" id="live-status" role="status" aria-live="polite"></div>
+  </main>
+
+  <dialog id="combat-guide" aria-labelledby="guide-title">
+    <header class="guide-head">
+      <div>
+        <span class="micro" style="color:var(--gold)">Rift Bomber · local versus</span>
+        <h2 id="guide-title">Arena rules</h2>
+      </div>
+      <button class="icon-button" id="close-guide" aria-label="Close combat guide">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6.4 5 5.6 5.6L17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4 6.4 5z"/></svg>
+      </button>
+    </header>
+    <div class="guide-grid">
+      <section class="guide-section">
+        <h3>Controls</h3>
+        <dl class="control-table">
+          <dt>P1 · WASD</dt><dd>Move your selected champion. Space always plants the arena bomb.</dd>
+          <dt>Katarina · Q/F/E/R</dt><dd>Bouncing Blade, Preparation, Shunpo and Death Lotus. F replaces W because W is forward movement.</dd>
+          <dt>Voracity</dt><dd>Walk over a grounded dagger to spin, slash nearby targets and heavily reduce Shunpo’s cooldown.</dd>
+          <dt>Zed · Q/F/E/R</dt><dd>Razor Shuriken, Living Shadow, Shadow Slash and Death Mark. Press F again to exchange places with the living shadow.</dd>
+          <dt>Renekton · Q/F/E/R</dt><dd>Cull the Meek, Ruthless Predator, Slice and Dice, and Dominus. Fury empowers Q or F at 50.</dd>
+          <dt>Vladimir · Q/F/E/R</dt><dd>Transfusion, Sanguine Pool, Tides of Blood and Hemoplague. F replaces W because W moves the champion.</dd>
+          <dt>Ziggs · Q/Shift</dt><dd>Q plants a bomb and Left Shift triggers Satchel burst.</dd>
+          <dt>P2 · Arrows</dt><dd>Move Red Ziggs. Enter or Numpad 0 plants a bomb; Right Shift triggers Satchel burst.</dd>
+          <dt>Solo play</dt><dd>The CPU controls Red until Player 2 presses an arrow key or Enter.</dd>
+          <dt>M</dt><dd>Mute or restore the original soundtrack.</dd>
+          <dt>P</dt><dd>Pause the game and audio clock.</dd>
+          <dt>H</dt><dd>Open or close this guide.</dd>
+        </dl>
+      </section>
+      <section class="guide-section">
+        <h3>Blast doctrine</h3>
+        <ul>
+          <li>Bombs erupt in four straight lanes. Stone blocks stop every blast.</li>
+          <li>Break Hextech crates to uncover extra bombs, blast range, movement speed, and shields.</li>
+          <li>Power-up layouts are mirrored every round, so both corners receive equal opportunities.</li>
+          <li>One blast can trigger another bomb. Every explosion—including your own—can eliminate you.</li>
+          <li>Win three rounds before the rival. A double knockout replays the round without a point.</li>
+        </ul>
+      </section>
+      <section class="guide-section wide">
+        <h3>The symphony system</h3>
+        <p>
+          “Welcome to the Rift” is a four-minute, 128 BPM soundtrack synthesized live in your browser.
+          Its eight sections share one sample-accurate clock with bomb glow, interface meters,
+          post-processing, enemy aggression, and camera impact. No audio file is streamed or embedded.
+        </p>
+      </section>
+      <section class="guide-section">
+        <h3>Classic arena contract</h3>
+        <p>
+          Permanent stone pillars never break. Crates stop a blast and disappear after one hit.
+          The bomber who plants a bomb may leave its tile once; stepping back into it is blocked.
+        </p>
+      </section>
+      <section class="guide-section">
+        <h3>Katarina’s assassination route</h3>
+        <p>
+          Q leaves a dagger behind its target. F drops another dagger and grants movement speed.
+          E blinks to the nearest dagger or rival; picking up that dagger triggers Voracity. R only
+          channels when Red Ziggs is close enough, and movement stops during the blade storm.
+        </p>
+      </section>
+      <section class="guide-section">
+        <h3>Zed’s forbidden technique</h3>
+        <p>
+          Q and E are copied by every active shadow. F throws a Living Shadow into a free arena cell;
+          press F again before it fades to swap positions. R appears behind the rival, leaves a death
+          shadow at the cast point, and detonates its mark after a short execution window.
+        </p>
+      </section>
+      <section class="guide-section">
+        <h3>Renekton’s fury route</h3>
+        <p>
+          Q carves a circle and heals from targets hit. F lunges into a brutal stun. E slices forward
+          and grants a second dash after contact. At 50 Fury, Q or F consumes it for an empowered cast;
+          R activates Dominus, enlarges Renekton and burns nearby rivals.
+        </p>
+      </section>
+      <section class="guide-section">
+        <h3>Vladimir’s crimson cycle</h3>
+        <p>
+          Q drains a target and heals Vladimir, with every third cast empowered. F becomes an untargetable
+          blood pool, E releases a radial blood burst at the cost of health, and R marks an area before
+          detonating for amplified damage and a large heal.
+        </p>
+      </section>
+    </div>
+  </dialog>
+  <script src="./animate-bomber-rift-background.js"></script>
+  <script src="./draw-bomber-rift.js"></script>
+  <script src="./play-rift-soundtrack.js"></script>
+  <script src="./run-champion-duel.js"></script>
+  <script src="./start-champion-duel.js"></script>
+</body>
+</html>

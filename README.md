@@ -1,32 +1,35 @@
 # Riftbomb
 
-Protótipo PvP de arena inspirado em Bomberman e League of Legends, construído em um único
-HTML autocontido com WebGL2, shaders, áudio sintetizado e campeões jogáveis.
+Protótipo PvP de arena inspirado em Bomberman e League of Legends, com WebGL2, áudio
+sintetizado e cinco campeões jogáveis: Katarina, Zed, Renekton, Vladimir e Ziggs.
 
-## Executar
+## Jogar
 
-Abra `riftbomb-symphony.html` diretamente ou inicie um servidor local nesta pasta:
+`riftbomb.html` é o jogo completo e autocontido. Abra o arquivo diretamente ou sirva esta
+pasta:
 
 ```powershell
 python -m http.server 4177 --bind 127.0.0.1
 ```
 
-Depois acesse:
+Depois acesse `http://127.0.0.1:4177/riftbomb.html`.
 
-```text
-http://127.0.0.1:4177/riftbomb-symphony.html
+## Mudar o jogo
+
+`game/play-riftbomb.html` é a entrada editável. Ela costura seis módulos nomeados pela
+capacidade que entregam:
+
+- `show-champion-duel.css`: apresentação da partida.
+- `animate-bomber-rift-background.js`: fundo vivo da arena.
+- `draw-bomber-rift.js`: WebGL, modelos e efeitos.
+- `play-rift-soundtrack.js`: música e efeitos sonoros.
+- `run-champion-duel.js`: regras, campeões, bombas, CPU e placar.
+- `start-champion-duel.js`: controles e início da partida.
+
+Gere novamente o HTML autocontido e rode os gates:
+
+```powershell
+npm test
 ```
-
-## Conteúdo
-
-- `riftbomb-symphony.html`: jogo completo e autocontido.
-- `art/`: modelos, texturas, animações e material-fonte dos campeões.
-- `tools/model-baker/`: pipeline usado para converter e incorporar os modelos no HTML.
-- `references/`: referências visuais utilizadas durante o desenvolvimento.
-- `model-ziggs/`: material-fonte do Ziggs.
-
-## Campeões atuais
-
-Katarina, Zed, Renekton, Vladimir e Ziggs.
 
 Projeto de fã não comercial e não endossado pela Riot Games.
