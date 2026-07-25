@@ -1,0 +1,58 @@
+[
+  {
+    "id": "anatomy-proportion",
+    "score": 0.84,
+    "threshold": 0.78,
+    "status": "pass",
+    "notes": "The reconstructed model locks the reference's oversized head, compressed torso, short limbs, large gloves, and pointed boots."
+  },
+  {
+    "id": "pose-silhouette",
+    "score": 0.78,
+    "threshold": 0.75,
+    "status": "pass",
+    "notes": "Neutral action-ready gameplay stance preserves the wide ear/head/bomb silhouette; exact airborne foreshortening is intentionally not copied."
+  },
+  {
+    "id": "green-goggle-lenses",
+    "score": 0.94,
+    "threshold": 0.82,
+    "status": "pass",
+    "notes": "Twin oversized green lenses, brass rims, highlights, and bridge dominate the face in both reference and render."
+  },
+  {
+    "id": "crescent-grin",
+    "score": 0.88,
+    "threshold": 0.8,
+    "status": "pass",
+    "notes": "Wide dark mouth and repeated bright teeth preserve Ziggs' primary expression."
+  },
+  {
+    "id": "cream-ear-tufts",
+    "score": 0.81,
+    "threshold": 0.78,
+    "status": "pass",
+    "notes": "Large lateral triangular tufts match the reference silhouette at game scale, with intentionally reduced fur microstructure."
+  },
+  {
+    "id": "segmented-red-cap",
+    "score": 0.79,
+    "threshold": 0.76,
+    "status": "pass",
+    "notes": "Red cap dome, central navy panel, forehead clamp, and top explosive are all present."
+  },
+  {
+    "id": "rear-mega-bomb",
+    "score": 0.83,
+    "threshold": 0.8,
+    "status": "pass",
+    "notes": "Asymmetric red shoulder bomb, cream retaining straps, cap, and fuse read clearly from the review camera."
+  },
+  {
+    "id": "compact-yordle-proportions",
+    "score": 0.84,
+    "threshold": 0.8,
+    "status": "pass",
+    "notes": "Head-to-body ratio, short limbs, large gloves, and pointed boots avoid a generic human mannequin."
+  }
+]

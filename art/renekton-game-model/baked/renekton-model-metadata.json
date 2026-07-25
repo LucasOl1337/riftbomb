@@ -1,0 +1,141 @@
+{
+  "source": "Classic Renekton game mesh and matching base rig",
+  "unitScale": 0.018872496260134552,
+  "vertexCount": 5044,
+  "indexCount": 22419,
+  "strideFloats": 26,
+  "materials": [
+    "renekton_base_MD_02_lambert2"
+  ],
+  "skeletonBoneCount": 71,
+  "animationDiagnostics": [
+    {
+      "requestedName": "renekton_idle1",
+      "actualName": "renekton_idle1",
+      "duration": 3.1666667461395264,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "renekton_run",
+      "actualName": "renekton_run",
+      "duration": 0.774193525314331,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "renekton_spell1",
+      "actualName": "renekton_spell1",
+      "duration": 0.8387096524238586,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "renekton_spell4",
+      "actualName": "renekton_spell4",
+      "duration": 0.9677419066429138,
+      "trackCount": 213,
+      "coverage": 1
+    }
+  ],
+  "poseSpecs": [
+    [
+      "renekton_idle1",
+      0
+    ],
+    [
+      "renekton_idle1",
+      0.72
+    ],
+    [
+      "renekton_run",
+      0
+    ],
+    [
+      "renekton_run",
+      0.12
+    ],
+    [
+      "renekton_spell1",
+      0.35
+    ],
+    [
+      "renekton_spell4",
+      0.52
+    ]
+  ],
+  "bounds": [
+    {
+      "min": [
+        -1.3572198152542114,
+        -9.919089993815078e-10,
+        -1.7968206405639648
+      ],
+      "max": [
+        1.3448491096496582,
+        2.200000047683716,
+        1.3252075910568237
+      ]
+    },
+    {
+      "min": [
+        -1.862773060798645,
+        -3.7338379610396544e-10,
+        -1.7272796630859375
+      ],
+      "max": [
+        1.3674566745758057,
+        2.264338493347168,
+        1.245319128036499
+      ]
+    },
+    {
+      "min": [
+        -1.2142367362976074,
+        1.4990101382394982e-9,
+        -1.6601624488830566
+      ],
+      "max": [
+        1.451690912246704,
+        2.1693363189697266,
+        1.5822546482086182
+      ]
+    },
+    {
+      "min": [
+        -1.202659249305725,
+        -5.193258600932893e-10,
+        -1.6804895401000977
+      ],
+      "max": [
+        1.3833616971969604,
+        1.9915900230407715,
+        1.6380363702774048
+      ]
+    },
+    {
+      "min": [
+        -2.030815362930298,
+        -1.7138921393211604e-8,
+        -0.6680213809013367
+      ],
+      "max": [
+        0.953405499458313,
+        2.6441643238067627,
+        3.6474361419677734
+      ]
+    },
+    {
+      "min": [
+        -1.2261238098144531,
+        2.0512162801633593e-10,
+        -1.0233510732650757
+      ],
+      "max": [
+        1.929165005683899,
+        2.6873862743377686,
+        1.3938485383987427
+      ]
+    }
+  ]
+}

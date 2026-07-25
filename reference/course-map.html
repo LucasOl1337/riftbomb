@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mapa de estudo — Arquitetura do Riftbomb</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+  <main class="lesson-shell">
+    <nav class="lesson-nav" aria-label="Navegação do curso">
+      <a href="../MISSION.md">Missão</a>
+      <span>Referência · mapa vivo</span>
+    </nav>
+
+    <header class="hero">
+      <p class="eyebrow">Riftbomb architecture studio</p>
+      <h1>Aprender antes de congelar a estrutura</h1>
+      <p class="lede">Este mapa organiza o estudo e a transição. A ordem é deliberada: primeiro distinguimos as decisões, depois observamos o código mudando, e só então promovemos pastas e interfaces.</p>
+    </header>
+
+    <section>
+      <h2>Fase 1 · Ver corretamente</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>1. Fonte ≠ artefato</h3>
+          <p>Separar linguagem, organização do código-fonte e formato entregue ao navegador.</p>
+        </article>
+        <article class="card">
+          <h3>2. Mapa de mudança</h3>
+          <p>Descobrir quais partes do Riftbomb realmente mudam juntas antes de criar folders.</p>
+        </article>
+        <article class="card">
+          <h3>3. Fatias verticais</h3>
+          <p>Entender por que uma habilidade completa vale mais que várias camadas parcialmente prontas.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Fase 2 · Desenhar os seams reais</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>4. Loop e estado</h3>
+          <p>Separar entrada, atualização e renderização sem construir um kernel genérico.</p>
+        </article>
+        <article class="card">
+          <h3>5. Campeão como produto</h3>
+          <p>Projetar o menor contrato que mantenha mecânica, feedback e identidade próximos.</p>
+        </article>
+        <article class="card">
+          <h3>6. GPU, áudio e assets</h3>
+          <p>Definir interfaces profundas para Renderer, MusicEngine e pipeline de modelos.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Fase 3 · Extrair sem reescrever</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>7. Primeira extração</h3>
+          <p>Mover uma responsabilidade estável sem alterar comportamento ou experiência.</p>
+        </article>
+        <article class="card">
+          <h3>8. Gates úteis</h3>
+          <p>Combinar playtest, capturas visuais, erros de console e poucos testes de regra.</p>
+        </article>
+        <article class="card">
+          <h3>9. Um HTML no final</h3>
+          <p>Usar fonte modular e continuar distribuindo um artefato autocontido.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Fase 4 · Governar o investimento</h2>
+      <div class="grid">
+        <article class="card">
+          <h3>10. Orçamento de complexidade</h3>
+          <p>Toda abstração nova precisa pagar por uma mudança real ou reduzir risco observável.</p>
+        </article>
+        <article class="card">
+          <h3>11. Forense dos logs</h3>
+          <p>Relacionar prompts, tokens, commits, retrabalho e valor entregue ao jogador.</p>
+        </article>
+        <article class="card">
+          <h3>12. Aposentar sem apagar</h3>
+          <p>Congelar o Bomb PvP como evidência, salvar seus ativos úteis e encerrar investimento ativo.</p>
+        </article>
+      </div>
+    </section>
+
+    <aside class="callout">
+      <strong>Regra do curso:</strong> nenhuma aula autoriza automaticamente uma reescrita. Cada mudança no jogo precisa de uma hipótese, um resultado verificável e uma maneira barata de voltar atrás.
+    </aside>
+
+    <footer class="lesson-footer">
+      <p>Este mapa deve mudar quando o aprendizado mudar a missão. Ele não é um cronograma rígido.</p>
+    </footer>
+  </main>
+</body>
+</html>

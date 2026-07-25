@@ -1,0 +1,15 @@
+# Dependency and tool caches
+**/node_modules/
+tools/cdtb-env/
+tools/cdragon-data/
+tools/img2threejs/.git/
+
+# Local packages and temporary output
+*.tgz
+*.log
+*.tmp
+*.bak
+
+# Operating-system files
+Thumbs.db
+.DS_Store

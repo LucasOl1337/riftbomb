@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bússola de arquitetura — Riftbomb</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+  <main class="lesson-shell">
+    <nav class="lesson-nav" aria-label="Navegação da referência">
+      <a href="../lessons/0001-fonte-nao-e-artefato.html">← Lição 0001</a>
+      <a href="course-map.html">Mapa do curso</a>
+    </nav>
+
+    <header class="hero">
+      <p class="eyebrow">Referência rápida · versão 0.1</p>
+      <h1>Bússola de arquitetura</h1>
+      <p class="lede">Use estas perguntas antes de criar uma pasta, interface, sistema ou abstração no Riftbomb.</p>
+    </header>
+
+    <section>
+      <h2>Vocabulário do curso</h2>
+      <div class="grid">
+        <article class="card"><h3>Fonte</h3><p>Arquivos que editamos e organizamos para desenvolver o jogo.</p></article>
+        <article class="card"><h3>Artefato</h3><p>O resultado entregue ao navegador ou ao jogador depois do build.</p></article>
+        <article class="card"><h3>Módulo</h3><p>Comportamento substancial escondido atrás de uma interface.</p></article>
+        <article class="card"><h3>Interface</h3><p>Tudo que um chamador precisa saber para usar um módulo corretamente.</p></article>
+        <article class="card"><h3>Seam</h3><p>Lugar onde uma implementação pode mudar sem editar seus chamadores.</p></article>
+        <article class="card"><h3>Vertical slice</h3><p>Uma experiência completa: regra, feedback, apresentação e interação funcionando juntas.</p></article>
+        <article class="card"><h3>Localidade</h3><p>Conhecimento e mudanças relacionados permanecem próximos no código.</p></article>
+        <article class="card"><h3>Gate</h3><p>Verificação que protege um resultado relevante antes de aceitar uma mudança.</p></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Teste de extração</h2>
+      <div class="comparison">
+        <section>
+          <p class="eyebrow">Extrair quando</p>
+          <ul>
+            <li>existe uma razão independente e recorrente para mudar;</li>
+            <li>a interface pode ser pequena e nomeada no domínio;</li>
+            <li>a implementação esconde complexidade real;</li>
+            <li>o módulo pode ser verificado através da própria interface;</li>
+            <li>a extração reduz conhecimento exigido dos chamadores.</li>
+          </ul>
+        </section>
+        <section>
+          <p class="eyebrow">Manter junto quando</p>
+          <ul>
+            <li>as partes ainda mudam juntas em todo playtest;</li>
+            <li>a nova interface apenas repetiria a implementação;</li>
+            <li>só existe uma variação hipotética;</li>
+            <li>a separação quebra uma vertical slice em camadas;</li>
+            <li>o objetivo é apenas reduzir o tamanho aparente do arquivo.</li>
+          </ul>
+        </section>
+      </div>
+    </section>
+
+    <section>
+      <h2>Árvore provisória · primeiro passe</h2>
+      <p class="measure">Esta árvore descreve os seams que já existem no HTML. Ela não antecipa uma engine futura e não autoriza subdivisões internas.</p>
+      <pre><code>riftbomb/
+├─ index.html
+├─ src/
+│  ├─ main.js
+│  ├─ game.js
+│  ├─ renderer.js
+│  ├─ music-engine.js
+│  ├─ ui-input.js
+│  └─ generated/
+│     └─ champion-models.js
+├─ art/                    # fontes artísticas atuais
+├─ tools/model-baker/      # pipeline já real
+├─ tests/                  # criado somente com o primeiro teste útil
+└─ dist/
+   └─ riftbomb.html</code></pre>
+      <p class="small">Os nomes e extensões podem mudar. O princípio não: primeiro extraímos classes existentes sem redesenhar seu interior.</p>
+    </section>
+
+    <section>
+      <h2>Ordem segura de evolução</h2>
+      <div class="grid">
+        <article class="card"><h3>1 · Baseline</h3><p>Captura visual, console limpo, controles, partida iniciando e habilidades-chave funcionando.</p></article>
+        <article class="card"><h3>2 · Movimentação</h3><p>Extrair um bloco intacto. Nenhuma regra ou aparência muda no mesmo passo.</p></article>
+        <article class="card"><h3>3 · Verificação</h3><p>Comparar o mesmo cenário antes e depois. Reverter se a experiência divergir.</p></article>
+        <article class="card"><h3>4 · Tipagem</h3><p>Adicionar tipos somente em interfaces que sobreviveram à extração e aos playtests.</p></article>
+        <article class="card"><h3>5 · Segunda necessidade</h3><p>Subdividir novamente apenas quando uma nova mudança concreta tornar o seam valioso.</p></article>
+      </div>
+    </section>
+
+    <aside class="callout">
+      <strong>Antídoto ao Bomb PvP:</strong> “poderemos precisar depois” não é evidência. Uma abstração entra quando reduz o custo de algo que já precisamos fazer agora ou protege um risco que já observamos.
+    </aside>
+
+    <footer class="lesson-footer">
+      <p>Esta referência é uma hipótese de trabalho. Atualize-a quando os exercícios mostrarem que duas partes mudam juntas ou separadamente de maneira diferente do previsto.</p>
+    </footer>
+  </main>
+</body>
+</html>

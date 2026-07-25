@@ -1,0 +1,141 @@
+{
+  "source": "Classic Vladimir game mesh and matching base rig",
+  "unitScale": 0.013043901957309471,
+  "vertexCount": 3338,
+  "indexCount": 12270,
+  "strideFloats": 26,
+  "materials": [
+    "MAT_Vladimir_d"
+  ],
+  "skeletonBoneCount": 71,
+  "animationDiagnostics": [
+    {
+      "requestedName": "vladimir_idle1",
+      "actualName": "vladimir_idle1",
+      "duration": 1.6666667461395264,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "vladimir_run",
+      "actualName": "vladimir_run",
+      "duration": 1.6000001430511475,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "vladimir_spell1",
+      "actualName": "vladimir_spell1",
+      "duration": 1.3333333730697632,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "vladimir_spell4",
+      "actualName": "vladimir_spell4",
+      "duration": 0.9677419066429138,
+      "trackCount": 213,
+      "coverage": 1
+    }
+  ],
+  "poseSpecs": [
+    [
+      "vladimir_idle1",
+      0
+    ],
+    [
+      "vladimir_idle1",
+      0.74
+    ],
+    [
+      "vladimir_run",
+      0
+    ],
+    [
+      "vladimir_run",
+      0.62
+    ],
+    [
+      "vladimir_spell1",
+      0.58
+    ],
+    [
+      "vladimir_spell4",
+      0.48
+    ]
+  ],
+  "bounds": [
+    {
+      "min": [
+        -0.8616622090339661,
+        -6.640731367579811e-12,
+        -0.9506746530532837
+      ],
+      "max": [
+        0.8782634735107422,
+        2.0799999237060547,
+        0.8450756072998047
+      ]
+    },
+    {
+      "min": [
+        -0.9383059740066528,
+        1.1378321618238374e-9,
+        -0.8795191645622253
+      ],
+      "max": [
+        0.8987041711807251,
+        2.134777307510376,
+        0.8317346572875977
+      ]
+    },
+    {
+      "min": [
+        -0.9341069459915161,
+        1.2412360028690728e-10,
+        -1.384781002998352
+      ],
+      "max": [
+        1.0067694187164307,
+        1.897900104522705,
+        0.9502763152122498
+      ]
+    },
+    {
+      "min": [
+        -0.738325297832489,
+        8.158950737247039e-10,
+        -1.3302441835403442
+      ],
+      "max": [
+        1.1412278413772583,
+        1.8353902101516724,
+        0.9525567293167114
+      ]
+    },
+    {
+      "min": [
+        -0.9061218500137329,
+        1.3006502819212784e-10,
+        -1.2626932859420776
+      ],
+      "max": [
+        1.0488446950912476,
+        1.9672636985778809,
+        0.3627512454986572
+      ]
+    },
+    {
+      "min": [
+        -0.6101294755935669,
+        -1.648650313490485e-11,
+        -1.0860074758529663
+      ],
+      "max": [
+        1.371672511100769,
+        1.9999783039093018,
+        1.1703344583511353
+      ]
+    }
+  ]
+}

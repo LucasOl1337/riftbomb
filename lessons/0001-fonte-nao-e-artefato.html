@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Primeira lição do estudo arquitetural do Riftbomb: separar linguagem, código-fonte e artefato de entrega.">
+  <title>Lição 0001 — Fonte não é artefato</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+  <main class="lesson-shell">
+    <nav class="lesson-nav" aria-label="Navegação da lição">
+      <a href="../reference/course-map.html">← Mapa do curso</a>
+      <span>Lição 0001 · 8 minutos</span>
+    </nav>
+
+    <header class="hero">
+      <p class="eyebrow">Uma distinção que evita outra reescrita</p>
+      <h1>Fonte não é artefato</h1>
+      <p class="lede">Podemos escrever o Riftbomb em módulos pequenos e continuar entregando exatamente um HTML. “Usar TypeScript”, “separar arquivos” e “publicar um arquivo” são três decisões independentes.</p>
+    </header>
+
+    <section class="measure">
+      <h2>O erro de categoria</h2>
+      <p>Quando dizemos que o Riftbomb venceu por estar em um HTML, misturamos três eixos diferentes. O HTML atual contém JavaScript; é esse JavaScript que implementa as mecânicas. TypeScript também termina como JavaScript depois da compilação: anotações de tipo são removidas antes do runtime.</p>
+    </section>
+
+    <div class="grid" aria-label="Três decisões independentes">
+      <article class="card">
+        <h3>1 · Linguagem de autoria</h3>
+        <p>JavaScript, TypeScript ou uma transição gradual entre os dois.</p>
+      </article>
+      <article class="card">
+        <h3>2 · Organização da fonte</h3>
+        <p>Uma unidade grande ou poucos módulos com interfaces reais.</p>
+      </article>
+      <article class="card">
+        <h3>3 · Formato de entrega</h3>
+        <p>Um HTML autocontido ou vários arquivos baixados pelo navegador.</p>
+      </article>
+    </div>
+
+    <aside class="callout">
+      <strong>Conclusão:</strong> fonte modular não obriga entrega fragmentada. Um bundler percorre imports e dependências e pode produzir uma saída agregada. Embutir também CSS, modelos e áudio em um único HTML exige uma etapa adicional do nosso pipeline, mas não exige fonte monolítica.
+    </aside>
+
+    <section>
+      <h2>Os três projetos que estamos comparando</h2>
+      <div class="comparison">
+        <section>
+          <p class="eyebrow">Riftbomb atual</p>
+          <ul>
+            <li>Autoria em JavaScript dentro do HTML.</li>
+            <li>Fonte executável concentrada em um arquivo.</li>
+            <li>Entrega autocontida em um HTML.</li>
+          </ul>
+        </section>
+        <section>
+          <p class="eyebrow">Bomb PvP atual</p>
+          <ul>
+            <li>Autoria em TypeScript.</li>
+            <li>Dezenas de módulos e ampla superfície interna.</li>
+            <li>Build distribuído em 120 arquivos.</li>
+          </ul>
+        </section>
+      </div>
+
+      <p class="formula">Nossa hipótese: fonte pequena e modular → build → um HTML autocontido</p>
+    </section>
+
+    <section class="measure">
+      <h2>A primeira modularização não será uma reinvenção</h2>
+      <p>O arquivo atual já contém três módulos naturais: <code>Renderer</code>, <code>MusicEngine</code> e <code>Game</code>. Eles possuem nomes de domínio, comportamento substancial e interfaces menores que suas implementações. O primeiro movimento seguro é extrair esses blocos quase intactos, sem redesenhar o jogo durante a movimentação.</p>
+    </section>
+
+    <pre aria-label="Mapa provisório da primeira extração"><code>index.html                 # shell visual e ponto de entrada
+src/main.js                # composição, boot e frame
+src/game.js                # classe Game intacta no primeiro passe
+src/renderer.js            # classe Renderer + shaders
+src/music-engine.js        # classe MusicEngine
+src/ui-input.js            # DOM, teclado e touch
+src/generated/models.js    # payload produzido pelo model-baker
+dist/riftbomb.html         # continua sendo o artefato jogável</code></pre>
+
+    <aside class="callout">
+      <strong>Provisório significa provisório.</strong> Ainda não criaremos <code>engine/</code>, <code>kernel/</code>, <code>systems/</code>, <code>contracts/</code> ou dezenas de folders de campeão. Primeiro vamos observar mudanças reais e estabilizar uma interface por vez.
+    </aside>
+
+    <aside class="callout">
+      <strong>Sequência, não indecisão.</strong> A direção candidata é TypeScript, mas o primeiro passe mantém <code>.js</code>: extraímos os blocos sem alterar sua semântica, verificamos o jogo e só então tipamos uma fronteira por vez. Assim, se algo quebrar, sabemos se a causa foi movimentação ou tipagem.
+    </aside>
+
+    <section>
+      <h2>Prática · decidir pelo padrão de mudança</h2>
+
+      <article class="quiz" data-quiz data-correct="extract" data-success="Correto. Renderer já esconde muita implementação atrás de uma interface reconhecível e muda por razões diferentes das regras." data-retry="Ainda não. Aqui há comportamento substancial, interface reconhecível e uma razão independente para mudar.">
+        <h3>Caso A · Renderer</h3>
+        <p><code>Renderer</code> concentra cerca de duas mil linhas de WebGL, modelos, shaders e pós-processamento. As regras chamam operações de apresentação, mas não precisam conhecer buffers ou uniforms. No primeiro passe:</p>
+        <div class="quiz-actions">
+          <button type="button" data-answer="stay" aria-pressed="false">Manter unido</button>
+          <button type="button" data-answer="extract" aria-pressed="false">Extrair logo</button>
+        </div>
+        <p class="quiz-feedback" data-feedback aria-live="polite"></p>
+      </article>
+
+      <article class="quiz" data-quiz data-correct="stay" data-success="Correto. Enquanto a habilidade está sendo descoberta, separar suas partes aumenta coordenação e reduz a chance de uma vertical slice completa." data-retry="Ainda não. Mecânica, feedback, áudio e HUD continuam mudando como uma única experiência neste caso.">
+        <h3>Caso B · nova habilidade</h3>
+        <p>Durante playtests, a mecânica, as partículas, o som e o HUD de uma nova habilidade de Katarina mudam juntos a cada tentativa. Devemos distribuí-los agora em quatro subsistemas globais?</p>
+        <div class="quiz-actions">
+          <button type="button" data-answer="stay" aria-pressed="false">Manter unido</button>
+          <button type="button" data-answer="extract" aria-pressed="false">Extrair logo</button>
+        </div>
+        <p class="quiz-feedback" data-feedback aria-live="polite"></p>
+      </article>
+    </section>
+
+    <section class="measure">
+      <h2>Regra que levaremos para a próxima aula</h2>
+      <p>Não criamos um módulo porque um arquivo ficou grande. Criamos um módulo quando uma responsabilidade substancial pode ser escondida atrás de uma interface pequena e possui uma razão real para mudar separadamente.</p>
+      <p>Isso preserva duas vantagens ao mesmo tempo: <strong>localidade</strong> para continuar criando vertical slices e <strong>seams reais</strong> para testar ou substituir o que já estabilizou.</p>
+    </section>
+
+    <section>
+      <h2>Fontes primárias para continuar</h2>
+      <ul class="source-list">
+        <li>
+          <a href="../research/0001-architecture-foundations.md">Pesquisa 0001 · Fundamentos de arquitetura</a>
+          <span>Relatório local completo, com evidências do código atual, ressalvas e proposta de testes mínimos.</span>
+        </li>
+        <li>
+          <a href="https://www.typescriptlang.org/docs/handbook/typescript-from-scratch.html">TypeScript Handbook · TypeScript for the New Programmer</a>
+          <span>Fonte oficial para entender verificação estática, apagamento de tipos e JavaScript emitido.</span>
+        </li>
+        <li>
+          <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules">MDN · JavaScript modules</a>
+          <span>Referência para imports, exports e o grafo de módulos executado pelo navegador.</span>
+        </li>
+        <li>
+          <a href="https://esbuild.github.io/api/#bundle">esbuild API · Bundle</a>
+          <span>Definição oficial de bundling recursivo de dependências; útil para separar fonte de saída.</span>
+        </li>
+      </ul>
+    </section>
+
+    <footer class="lesson-footer">
+      <p><strong>Recuperação ativa:</strong> sem reler a página, explique no chat a diferença entre linguagem, organização da fonte e formato de entrega. Depois diga qual bloco do Riftbomb você extrairia primeiro e por quê.</p>
+      <p class="small">Se algo não ficou claro, pergunte. Esta lição só vira aprendizado registrado depois que você demonstrar que consegue usar a distinção.</p>
+    </footer>
+  </main>
+  <script src="../assets/lesson.js"></script>
+</body>
+</html>

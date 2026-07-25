@@ -1,0 +1,8 @@
+{
+  "name": "riftbomb-model-baker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "three": "^0.179.1"
+  }
+}
