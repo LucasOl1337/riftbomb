@@ -1,5 +1,6 @@
 # Dependency and tool caches
 **/node_modules/
+game/load-playable-champion-models.js
 tools/cdtb-env/
 tools/cdragon-data/
 champions/ziggs/reconstruct-reference-model/.git/

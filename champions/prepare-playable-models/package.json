@@ -2,6 +2,10 @@
   "name": "riftbomb-model-baker",
   "private": true,
   "type": "module",
+  "scripts": {
+    "bake": "node bake-playable-champion.mjs",
+    "check": "node check-pose-integrity.mjs"
+  },
   "dependencies": {
     "three": "^0.179.1"
   }

@@ -1,30 +1,31 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { packagePlayableChampions } from "../champions/prepare-playable-models/package-playable-champions.mjs";
 
 const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.dirname(gameDirectory);
 const sourcePath = path.join(gameDirectory, "play-riftbomb.html");
 const outputPath = path.join(repositoryRoot, "riftbomb.html");
-
-const stylesheet = "show-champion-duel.css";
-const scripts = [
-  "animate-bomber-rift-background.js",
-  "draw-bomber-rift.js",
-  "play-rift-soundtrack.js",
-  "run-champion-bomb-duel.js",
-  "start-champion-duel.js"
-];
+const playableChampionsPath = path.join(gameDirectory, "load-playable-champion-models.js");
 
 let document = await readFile(sourcePath, "utf8");
-const css = await readFile(path.join(gameDirectory, stylesheet), "utf8");
+const localStylesheets = [...document.matchAll(/<link rel="stylesheet" href="\.\/([^"]+)">/g)]
+  .map((match) => match[1]);
+const localScripts = [...document.matchAll(/<script src="\.\/([^"]+)"><\/script>/g)]
+  .map((match) => match[1]);
 
-document = document.replace(
-  `  <link rel="stylesheet" href="./${stylesheet}">`,
-  () => `  <style>\n${css.trimEnd()}\n  </style>`
-);
+await writeFile(playableChampionsPath, await packagePlayableChampions(repositoryRoot));
 
-for (const script of scripts) {
+for (const stylesheet of localStylesheets) {
+  const css = await readFile(path.join(gameDirectory, stylesheet), "utf8");
+  document = document.replace(
+    `  <link rel="stylesheet" href="./${stylesheet}">`,
+    () => `  <style>\n${css.trimEnd()}\n  </style>`
+  );
+}
+
+for (const script of localScripts) {
   const source = await readFile(path.join(gameDirectory, script), "utf8");
   document = document.replace(
     `  <script src="./${script}"></script>`,
