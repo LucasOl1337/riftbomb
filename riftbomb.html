@@ -643,9 +643,22 @@
       left: 50%;
       bottom: clamp(1rem, 2.5vh, 1.65rem);
       display: grid;
-      grid-template-columns: repeat(4, minmax(4.15rem, 4.8rem));
+      grid-template-columns: repeat(5, minmax(4.15rem, 4.8rem));
       gap: 0.5rem;
-      transform: translateX(-6.1rem);
+      transform: translateX(-50%);
+    }
+
+    .ability.arena-bomb {
+      border-color: rgb(246 207 120 / 42%);
+      background:
+        radial-gradient(circle at 50% 0, rgb(246 207 120 / 22%), transparent 62%),
+        linear-gradient(145deg, rgb(85 120 255 / 18%), transparent 55%),
+        rgb(5 13 31 / 82%);
+    }
+
+    .ability.arena-bomb kbd {
+      font-size: 0.52rem;
+      letter-spacing: 0.02em;
     }
 
     .ability {
@@ -1390,7 +1403,7 @@
       .system-stack { display: none; }
       .music-console { width: min(18rem, 25vw); }
       .score { font-size: clamp(2rem, 8vw, 3.4rem); }
-      .ability-dock { grid-template-columns: repeat(4, 4.1rem); transform: translateX(-5.4rem); }
+      .ability-dock { grid-template-columns: repeat(5, minmax(3.7rem, 4.1rem)); transform: translateX(-50%); }
     }
 
     @media (max-width: 42rem), (pointer: coarse) {
@@ -1758,6 +1771,12 @@
       </section>
 
       <section class="ability-dock" id="ability-dock" aria-label="Katarina abilities">
+        <button class="ability arena-bomb" id="arena-bomb-action" aria-label="Plant arena bomb. Space key.">
+          <kbd id="slot-space-key">Space</kbd>
+          <span class="ability-icon" id="slot-space-icon" aria-hidden="true">✦</span>
+          <span class="ability-name" id="arena-bomb-label">Arena bomb · 1</span>
+          <span class="cooldown-track" aria-hidden="true"><span id="arena-bomb-fill"></span></span>
+        </button>
         <button class="ability" id="bomb-action" aria-label="Bouncing Blade. Q key.">
           <kbd id="slot-q-key">Q</kbd>
           <span class="ability-icon" id="slot-q-icon" aria-hidden="true">◇</span>
@@ -2538,6 +2557,9 @@ const PLAYABLE_CHAMPIONS = Object.freeze({
       pause: $("#pause-toggle"),
       pauseIcon: $("#pause-icon"),
       abilityDock: $("#ability-dock"),
+      arenaBombAction: $("#arena-bomb-action"),
+      arenaBombLabel: $("#arena-bomb-label"),
+      arenaBombFill: $("#arena-bomb-fill"),
       bombAction: $("#bomb-action"),
       bombLabel: $("#bomb-label"),
       bombIcon: $("#slot-q-icon"),
@@ -5715,6 +5737,9 @@ const PLAYABLE_CHAMPIONS = Object.freeze({
         UI.comboLabel.textContent = `P2 · ${match.p2Human ? "LOCAL" : "CPU"}`;
         const available = Math.max(0, p1.maxBombs - match.activeBombsFor(p1));
         const locked = !p1.alive || match.roundLocked || p1.ultChannel > 0 || p1.vladimirPool > 0;
+        UI.arenaBombLabel.textContent = available > 0 ? `Arena bomb · ${available}` : "Arena bomb · planted";
+        UI.arenaBombFill.style.transform = `scaleX(${available > 0 ? 1 : 0.18})`;
+        UI.arenaBombAction.disabled = locked || available <= 0;
         if (p1.champion === "katarina") {
           UI.resourceFill.style.transform = "scaleX(0.82)";
           const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
@@ -7871,6 +7896,7 @@ const PLAYABLE_CHAMPIONS = Object.freeze({
         });
         UI.sound.addEventListener("click", toggleSound);
         UI.pause.addEventListener("click", () => game.togglePause());
+        UI.arenaBombAction.addEventListener("click", () => game.placeBomb());
         UI.bombAction.addEventListener("click", () => game.castAbility(0));
         UI.dashAction.addEventListener("click", () => game.castAbility(1));
         UI.mineAction.addEventListener("click", () => game.castAbility(2));

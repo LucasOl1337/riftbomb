@@ -133,6 +133,9 @@
         UI.comboLabel.textContent = `P2 · ${match.p2Human ? "LOCAL" : "CPU"}`;
         const available = Math.max(0, p1.maxBombs - match.activeBombsFor(p1));
         const locked = !p1.alive || match.roundLocked || p1.ultChannel > 0 || p1.vladimirPool > 0;
+        UI.arenaBombLabel.textContent = available > 0 ? `Arena bomb · ${available}` : "Arena bomb · planted";
+        UI.arenaBombFill.style.transform = `scaleX(${available > 0 ? 1 : 0.18})`;
+        UI.arenaBombAction.disabled = locked || available <= 0;
         if (p1.champion === "katarina") {
           UI.resourceFill.style.transform = "scaleX(0.82)";
           const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;

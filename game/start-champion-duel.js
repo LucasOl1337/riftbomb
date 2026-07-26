@@ -201,6 +201,7 @@
         });
         UI.sound.addEventListener("click", toggleSound);
         UI.pause.addEventListener("click", () => game.togglePause());
+        UI.arenaBombAction.addEventListener("click", () => game.placeBomb());
         UI.bombAction.addEventListener("click", () => game.castAbility(0));
         UI.dashAction.addEventListener("click", () => game.castAbility(1));
         UI.mineAction.addEventListener("click", () => game.castAbility(2));
