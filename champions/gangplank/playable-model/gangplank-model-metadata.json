@@ -1,0 +1,141 @@
+{
+  "source": "Khada Gangplank GLB (Skin07 body mesh + clips; crate mesh excluded)",
+  "unitScale": 1.1274418897161769,
+  "vertexCount": 5230,
+  "indexCount": 23577,
+  "strideFloats": 26,
+  "materials": [
+    "Gangplank_Skin07_MAT"
+  ],
+  "skeletonBoneCount": 82,
+  "animationDiagnostics": [
+    {
+      "requestedName": "Idle1",
+      "actualName": "Idle1",
+      "duration": 3.299999952316284,
+      "trackCount": 246,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Run_Haste",
+      "actualName": "Run_Haste",
+      "duration": 2,
+      "trackCount": 243,
+      "coverage": 0.9878048780487805
+    },
+    {
+      "requestedName": "Gangplank_spell1.anm",
+      "actualName": "Gangplank_spell1.anm",
+      "duration": 1.3333333730697632,
+      "trackCount": 243,
+      "coverage": 0.9878048780487805
+    },
+    {
+      "requestedName": "Gangplank_spell4.anm",
+      "actualName": "Gangplank_spell4.anm",
+      "duration": 0.5,
+      "trackCount": 243,
+      "coverage": 0.9878048780487805
+    }
+  ],
+  "poseSpecs": [
+    [
+      "Idle1",
+      0
+    ],
+    [
+      "Idle1",
+      0.55
+    ],
+    [
+      "Run_Haste",
+      0.12
+    ],
+    [
+      "Run_Haste",
+      0.4
+    ],
+    [
+      "Gangplank_spell1.anm",
+      0.55
+    ],
+    [
+      "Gangplank_spell4.anm",
+      0.35
+    ]
+  ],
+  "bounds": [
+    {
+      "min": [
+        -0.6564944386482239,
+        0,
+        -0.7372064590454102
+      ],
+      "max": [
+        1.0672529935836792,
+        2.1879894733428955,
+        0.46759310364723206
+      ]
+    },
+    {
+      "min": [
+        -0.6312347650527954,
+        0,
+        -0.7234530448913574
+      ],
+      "max": [
+        0.9828305244445801,
+        2.2412919998168945,
+        0.4599909484386444
+      ]
+    },
+    {
+      "min": [
+        -0.5314439535140991,
+        0,
+        -0.8335204124450684
+      ],
+      "max": [
+        0.6593465209007263,
+        2.281471014022827,
+        1.6829687356948853
+      ]
+    },
+    {
+      "min": [
+        -0.5839768648147583,
+        0,
+        -0.9698131084442139
+      ],
+      "max": [
+        0.6329687237739563,
+        2.2815310955047607,
+        1.3905225992202759
+      ]
+    },
+    {
+      "min": [
+        -0.6343567967414856,
+        0,
+        -1.5075721740722656
+      ],
+      "max": [
+        0.7084771990776062,
+        2.319084644317627,
+        0.46858638525009155
+      ]
+    },
+    {
+      "min": [
+        -0.5131727457046509,
+        0,
+        -0.9550120234489441
+      ],
+      "max": [
+        1.7308573722839355,
+        3.060281753540039,
+        0.5216854810714722
+      ]
+    }
+  ]
+}

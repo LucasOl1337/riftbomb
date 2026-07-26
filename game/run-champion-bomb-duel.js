@@ -1,5 +1,185 @@
 "use strict";
 
+    // Fixed-block (1) layouts for the 11×13 Bomber Rift. Soft crates (2) fill afterwards.
+    // Each template must leave blue spawn (bottom-left) and red spawn (top-right) open.
+    // theme.floor/wall/wallTop = ARENA_TEXTURES keys; hex colors drive procedural accents.
+    const ARENA_TEMPLATES = Object.freeze([
+      {
+        id: "lattice",
+        label: "Summoner's Lattice",
+        blurb: "Classic pillars · balanced lanes",
+        crateChance: 0.73,
+        powerupChance: 0.48,
+        theme: Object.freeze({
+          floor: "floorLattice",
+          wall: "wallLattice",
+          wallTop: "wallTopLattice",
+          clear: "#0c1412",
+          base: "#14382c",
+          floorA: "#1c443a",
+          floorB: "#163830",
+          lane: "#7a7d6a",
+          river: "#1a757e",
+          riverLight: "#4dcecf",
+          stone: "#4a5a62",
+          stoneTop: "#3a4a52",
+          crystal: "#4dcecf",
+          accent: "#c9a227"
+        }),
+        placeHard(grid, rows, cols) {
+          for (let r = 2; r < rows - 1; r += 2) {
+            for (let c = 2; c < cols - 1; c += 2) grid[r][c] = 1;
+          }
+        }
+      },
+      {
+        id: "clearing",
+        label: "Crystal Clearing",
+        blurb: "Open mid · sparse pillars · chaos fights",
+        crateChance: 0.58,
+        powerupChance: 0.52,
+        theme: Object.freeze({
+          floor: "floorClearing",
+          wall: "wallClearing",
+          wallTop: "wallTopClearing",
+          clear: "#0a1220",
+          base: "#142838",
+          floorA: "#1a3a52",
+          floorB: "#122a40",
+          lane: "#6a8aaa",
+          river: "#2a88c8",
+          riverLight: "#7ad4ff",
+          stone: "#4a6a88",
+          stoneTop: "#3a5a72",
+          crystal: "#7ad4ff",
+          accent: "#9ad4ff"
+        }),
+        placeHard(grid, rows, cols) {
+          const pillars = [
+            [3, 4], [3, 8], [5, 3], [5, 9], [7, 4], [7, 8], [5, 6]
+          ];
+          for (const [r, c] of pillars) {
+            if (r > 0 && r < rows - 1 && c > 0 && c < cols - 1) grid[r][c] = 1;
+          }
+        }
+      },
+      {
+        id: "labyrinth",
+        label: "Hextech Labyrinth",
+        blurb: "Long corridors · choke points",
+        crateChance: 0.68,
+        powerupChance: 0.45,
+        theme: Object.freeze({
+          floor: "floorLabyrinth",
+          wall: "wallLabyrinth",
+          wallTop: "wallTopLabyrinth",
+          clear: "#080e14",
+          base: "#0e1c24",
+          floorA: "#123038",
+          floorB: "#0c242c",
+          lane: "#3a6a72",
+          river: "#0a8a8a",
+          riverLight: "#2ef0e0",
+          stone: "#243442",
+          stoneTop: "#1c2a36",
+          crystal: "#2ef0e0",
+          accent: "#f0c040"
+        }),
+        placeHard(grid, rows, cols) {
+          for (let r = 1; r < rows - 1; r++) {
+            if (r === 3 || r === 5 || r === 7) continue;
+            grid[r][3] = 1;
+            grid[r][9] = 1;
+          }
+          for (let c = 1; c < cols - 1; c++) {
+            if (c === 2 || c === 6 || c === 10) continue;
+            grid[3][c] = 1;
+            grid[7][c] = 1;
+          }
+          grid[5][5] = 1;
+          grid[5][7] = 1;
+        }
+      },
+      {
+        id: "forts",
+        label: "Nexus Forts",
+        blurb: "Twin bastions · open kill lane",
+        crateChance: 0.70,
+        powerupChance: 0.50,
+        theme: Object.freeze({
+          floor: "floorForts",
+          wall: "wallForts",
+          wallTop: "wallTopForts",
+          clear: "#120c0a",
+          base: "#2a1c14",
+          floorA: "#3a2820",
+          floorB: "#2a1c18",
+          lane: "#8a7060",
+          river: "#6a4030",
+          riverLight: "#d08050",
+          stone: "#3a322c",
+          stoneTop: "#2a2420",
+          crystal: "#e8a050",
+          accent: "#e04040"
+        }),
+        placeHard(grid, rows, cols) {
+          const blue = [
+            [8, 3], [8, 4], [7, 4], [6, 4], [6, 3],
+            [8, 5], [7, 5]
+          ];
+          for (const [r, c] of blue) {
+            grid[r][c] = 1;
+            grid[rows - 1 - r][cols - 1 - c] = 1;
+          }
+          grid[5][2] = 1;
+          grid[5][10] = 1;
+          grid[2][6] = 1;
+          grid[8][6] = 1;
+        }
+      },
+      {
+        id: "pit",
+        label: "Baron Pit",
+        blurb: "Ring of stone · center pit · outer lane",
+        crateChance: 0.76,
+        powerupChance: 0.46,
+        theme: Object.freeze({
+          floor: "floorPit",
+          wall: "wallPit",
+          wallTop: "wallTopPit",
+          clear: "#0c0808",
+          base: "#1a1010",
+          floorA: "#2a1814",
+          floorB: "#1e100e",
+          lane: "#5a4038",
+          river: "#6a1818",
+          riverLight: "#e04030",
+          stone: "#222028",
+          stoneTop: "#18161c",
+          crystal: "#c03040",
+          accent: "#ff6040"
+        }),
+        placeHard(grid, rows, cols) {
+          for (let c = 3; c <= 9; c++) {
+            if (c !== 6) {
+              grid[2][c] = 1;
+              grid[8][c] = 1;
+            }
+          }
+          for (let r = 3; r <= 7; r++) {
+            if (r !== 5) {
+              grid[r][2] = 1;
+              grid[r][10] = 1;
+            }
+          }
+          grid[4][5] = 1;
+          grid[4][7] = 1;
+          grid[6][5] = 1;
+          grid[6][7] = 1;
+        }
+      }
+    ]);
+
     class Game {
       constructor(renderer, music, presentation) {
         this.renderer = renderer;
@@ -25,11 +205,14 @@
         this.zedShadows = [];
         this.zedMarks = [];
         this.vladimirMarks = [];
+        this.gangplankBarrels = [];
+        this.gangplankBarrages = [];
         this.players = [];
         this.player = null;
         this.daggerId = 0;
         this.shadowId = 0;
         this.selectedChampion = "katarina";
+        this.selectedArena = ARENA_TEMPLATES[0].id;
         this.round = 0;
         this.wave = 1;
         this.maxWave = 5;
@@ -60,20 +243,67 @@
         return (this.seed >>> 0) / 4294967296;
       }
 
+      listArenas() {
+        return ARENA_TEMPLATES.map(({ id, label, blurb }) => ({ id, label, blurb }));
+      }
+
+      arenaTemplate(id = this.selectedArena) {
+        return ARENA_TEMPLATES.find((entry) => entry.id === id) || ARENA_TEMPLATES[0];
+      }
+
+      /** Deterministic soft-crate preview for intro minimaps (no RNG). */
+      previewGrid(arenaId = this.selectedArena) {
+        const template = this.arenaTemplate(arenaId);
+        const grid = Array.from({ length: this.rows }, (_, r) =>
+          Array.from({ length: this.cols }, (_, c) =>
+            r === 0 || c === 0 || r === this.rows - 1 || c === this.cols - 1 ? 1 : 0
+          )
+        );
+        template.placeHard(grid, this.rows, this.cols);
+        const safe = this.spawnSafeCells();
+        for (let r = 1; r < this.rows - 1; r++) {
+          for (let c = 1; c < this.cols - 1; c++) {
+            if (grid[r][c] === 1 || safe.has(`${r},${c}`)) continue;
+            // Stable pseudo-density for UI: denser on template's crateChance
+            const hash = ((r * 31 + c * 17 + arenaId.length * 13) >>> 0) % 100;
+            if (hash < template.crateChance * 100) grid[r][c] = 2;
+          }
+        }
+        return grid;
+      }
+
+      spawnSafeCells() {
+        return new Set([
+          `${this.rows - 2},1`, `${this.rows - 3},1`, `${this.rows - 2},2`,
+          `1,${this.cols - 2}`, `2,${this.cols - 2}`, `1,${this.cols - 3}`
+        ]);
+      }
+
+      selectArena(arenaId) {
+        if (this.mode !== "intro") return;
+        if (!ARENA_TEMPLATES.some((entry) => entry.id === arenaId)) return;
+        this.selectedArena = arenaId;
+        this.seed = 0xA57A2026;
+        this.generateMap();
+        this.resetPlayers();
+        this.presentation.update(this);
+      }
+
       generateMap() {
+        const template = this.arenaTemplate();
         this.grid = Array.from({ length: this.rows }, (_, r) =>
           Array.from({ length: this.cols }, (_, c) =>
             r === 0 || c === 0 || r === this.rows - 1 || c === this.cols - 1 ? 1 : 0
           )
         );
         this.powerupPlan = new Map();
-        const safe = new Set([
-          `${this.rows - 2},1`, `${this.rows - 3},1`, `${this.rows - 2},2`,
-          `1,${this.cols - 2}`, `2,${this.cols - 2}`, `1,${this.cols - 3}`
-        ]);
+        template.placeHard(this.grid, this.rows, this.cols);
 
-        for (let r = 2; r < this.rows - 1; r += 2) {
-          for (let c = 2; c < this.cols - 1; c += 2) this.grid[r][c] = 1;
+        const safe = this.spawnSafeCells();
+        // Never hard-block spawn pockets even if a template is sloppy.
+        for (const key of safe) {
+          const [r, c] = key.split(",").map(Number);
+          this.grid[r][c] = 0;
         }
 
         const seen = new Set();
@@ -89,8 +319,8 @@
             seen.add(mirror);
             const cells = [[r, c]];
             if (mr !== r || mc !== c) cells.push([mr, mc]);
-            const breakable = this.random() < 0.73;
-            const hidden = breakable && this.random() < 0.48
+            const breakable = this.random() < template.crateChance;
+            const hidden = breakable && this.random() < template.powerupChance
               ? types[Math.floor(this.random() * types.length)]
               : null;
             for (const [rr, cc] of cells) {
@@ -124,7 +354,7 @@
           champion,
           side: id === 1 ? "blue" : "red",
           name: id === 1
-            ? ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir" }[champion] || "Blue Ziggs")
+            ? ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir", gangplank: "Gangplank" }[champion] || "Blue Ziggs")
             : "Red Ziggs",
           x, z,
           health: 1,
@@ -134,6 +364,11 @@
           maxBombs: 1,
           range: 2,
           shield: 0,
+          // Start with arena bomb only — Q/W/E/R unlock from crate skill drops.
+          // Ziggs: slot 0 is the bomb (always on); slot 1 is Satchel (locked).
+          skillsUnlocked: champion === "ziggs"
+            ? [true, false, false, false]
+            : [false, false, false, false],
           invulnerable: 1.25,
           hurt: 0,
           dashCooldown: 0,
@@ -165,6 +400,9 @@
           vladimirEAnim: 0,
           vladimirUltAnim: 0,
           vladimirQStacks: 0,
+          gangplankShotAnim: 0,
+          gangplankKegAnim: 0,
+          gangplankUltAnim: 0,
           facing: id === 1 ? Math.PI : 0,
           lastDx: 0,
           lastDz: id === 1 ? -1 : 1,
@@ -182,7 +420,7 @@
       }
 
       selectChampion(champion) {
-        if (!["katarina", "zed", "renekton", "vladimir", "ziggs"].includes(champion) || this.mode !== "intro") return;
+        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;
         this.selectedChampion = champion;
         this.resetPlayers();
         this.presentation.update(this);
@@ -225,6 +463,8 @@
         this.zedShadows = [];
         this.zedMarks = [];
         this.vladimirMarks = [];
+        this.gangplankBarrels = [];
+        this.gangplankBarrages = [];
         this.presentation.prepareRound();
         this.presentation.announce(`Round ${this.round} · ${this.player.name} enters the arena`);
         this.presentation.update(this);
@@ -276,6 +516,7 @@
       placeBomb(player = this.player) {
         if (this.mode !== "playing" || this.paused || this.roundLocked || !player?.alive ||
             player.ultChannel > 0 || player.vladimirPool > 0) return false;
+        this.dropOwnerId = player.id;
         if (this.activeBombsFor(player) >= player.maxBombs) return false;
         const { r, c } = this.cellFromWorld(player.x, player.z);
         if (this.grid[r][c] !== 0 || this.bombs.some((b) => b.r === r && b.c === c && !b.exploded)) return false;
@@ -315,15 +556,50 @@
           player.id === 1 ? Renderer.colors.rift : Renderer.colors.ember, 18, 0.48, 0.1);
       }
 
+      isSkillUnlocked(player, slot) {
+        if (!player?.skillsUnlocked) return true;
+        if (player.champion === "ziggs" && slot === 0) return true;
+        return Boolean(player.skillsUnlocked[slot]);
+      }
+
+      lockedSkillSlots(player) {
+        if (!player) return [];
+        if (player.champion === "ziggs") {
+          return player.skillsUnlocked[1] ? [] : [1];
+        }
+        return [0, 1, 2, 3].filter((slot) => !player.skillsUnlocked[slot]);
+      }
+
+      skillSlotLabel(player, slot) {
+        const kits = {
+          katarina: ["Bouncing Blade", "Preparation", "Shunpo", "Death Lotus"],
+          zed: ["Razor Shuriken", "Living Shadow", "Shadow Slash", "Death Mark"],
+          renekton: ["Cull the Meek", "Ruthless Predator", "Slice and Dice", "Dominus"],
+          vladimir: ["Transfusion", "Sanguine Pool", "Tides of Blood", "Hemoplague"],
+          gangplank: ["Parrrley", "Remove Scurvy", "Powder Keg", "Cannon Barrage"],
+          ziggs: ["Bomb", "Satchel burst", "Blast range", "Speed"]
+        };
+        return (kits[player.champion] || kits.ziggs)[slot] || `Skill ${slot + 1}`;
+      }
+
       castAbility(slot, player = this.player) {
         if (!player?.alive || this.mode !== "playing" || this.paused || this.roundLocked) return false;
         if (player.vladimirPool > 0) return false;
+        this.dropOwnerId = player.id;
         if (player.champion === "ziggs") {
           if (slot === 0) return this.placeBomb(player);
           if (slot === 1) {
+            if (!this.isSkillUnlocked(player, 1)) {
+              this.presentation.announce("Satchel locked · break crates");
+              return false;
+            }
             this.requestDash(player);
             return true;
           }
+          return false;
+        }
+        if (!this.isSkillUnlocked(player, slot)) {
+          this.presentation.announce(`${this.skillSlotLabel(player, slot)} locked · break crates`);
           return false;
         }
         if (player.champion === "zed") {
@@ -345,6 +621,13 @@
           if (slot === 1) return this.castVladimirW(player);
           if (slot === 2) return this.castVladimirE(player);
           if (slot === 3) return this.castVladimirR(player);
+          return false;
+        }
+        if (player.champion === "gangplank") {
+          if (slot === 0) return this.castGangplankQ(player);
+          if (slot === 1) return this.castGangplankW(player);
+          if (slot === 2) return this.castGangplankE(player);
+          if (slot === 3) return this.castGangplankR(player);
           return false;
         }
         if (slot === 0) return this.castKatarinaQ(player);
@@ -712,7 +995,9 @@
         const healed = player.health - before;
         if (healed > 0.001) {
           this.spawnParticles(player.x, 0.72, player.z,
-            player.champion === "renekton" ? Renderer.colors.renektonTeal : Renderer.colors.vladimirPale,
+            player.champion === "renekton" ? Renderer.colors.renektonTeal
+              : player.champion === "gangplank" ? Renderer.colors.gangplankGold
+              : Renderer.colors.vladimirPale,
             12, 0.52, 0.08);
         }
         return healed;
@@ -990,6 +1275,239 @@
         return true;
       }
 
+      castGangplankQ(player) {
+        if (player.qCooldown > 0) return false;
+        const dx = player.lastDx || Math.sin(player.facing);
+        const dz = player.lastDz || Math.cos(player.facing);
+        const length = Math.max(0.001, Math.hypot(dx, dz));
+        const dirX = dx / length;
+        const dirZ = dz / length;
+        player.qCooldown = 4.8;
+        player.castAnim = 0.42;
+        player.castDuration = 0.42;
+        player.gangplankShotAnim = 0.48;
+        this.projectiles.push({
+          id: ++this.daggerId,
+          kind: "gangplank",
+          ownerId: player.id,
+          x: player.x + dirX * 0.4,
+          y: 0.9,
+          z: player.z + dirZ * 0.4,
+          dx: dirX,
+          dz: dirZ,
+          speed: 14.2,
+          age: 0,
+          life: this.tile * 7.2 / 14.2,
+          resolved: false
+        });
+        this.music.effect("gangplankQ");
+        this.presentation.announce("Gangplank · Parrrley");
+        this.presentation.update(this);
+        return true;
+      }
+
+      castGangplankW(player) {
+        if (player.wCooldown > 0) return false;
+        player.wCooldown = 12;
+        player.castAnim = 0.4;
+        player.castDuration = 0.4;
+        player.stunned = 0;
+        player.invulnerable = Math.max(player.invulnerable, 0.55);
+        player.speedBoost = Math.max(player.speedBoost, 1.65);
+        this.healChampion(player, 0.28);
+        this.spawnParticles(player.x, 0.7, player.z, Renderer.colors.gangplankGold, 28, 0.7, 0.1);
+        this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 0.95, age: 0, life: 0.45, gangplank: true });
+        this.music.effect("removeScurvy");
+        this.presentation.announce("Gangplank · Remove Scurvy");
+        this.presentation.update(this);
+        return true;
+      }
+
+      castGangplankE(player) {
+        if (player.eCooldown > 0) return false;
+        const owned = this.gangplankBarrels.filter((b) => b.ownerId === player.id && !b.exploded).length;
+        if (owned >= 3) return false;
+        const dx = player.lastDx || Math.sin(player.facing);
+        const dz = player.lastDz || Math.cos(player.facing);
+        const length = Math.max(0.001, Math.hypot(dx, dz));
+        const preferX = player.x + (dx / length) * this.tile;
+        const preferZ = player.z + (dz / length) * this.tile;
+        let cell = this.cellFromWorld(preferX, preferZ);
+        if (this.grid[cell.r]?.[cell.c] !== 0) cell = this.cellFromWorld(player.x, player.z);
+        if (this.grid[cell.r]?.[cell.c] !== 0) return false;
+        if (this.gangplankBarrels.some((b) => !b.exploded && b.r === cell.r && b.c === cell.c)) return false;
+        if (this.bombs.some((b) => !b.exploded && b.r === cell.r && b.c === cell.c)) return false;
+        const [x, z] = this.worldFromCell(cell.r, cell.c);
+        player.eCooldown = 7.5;
+        player.castAnim = 0.36;
+        player.castDuration = 0.36;
+        player.gangplankKegAnim = 0.42;
+        this.gangplankBarrels.push({
+          id: ++this.bombId,
+          ownerId: player.id,
+          r: cell.r,
+          c: cell.c,
+          x, z,
+          age: 0,
+          life: 22,
+          exploded: false
+        });
+        this.spawnParticles(x, 0.4, z, Renderer.colors.gangplankOrange, 18, 0.5, 0.08);
+        this.music.effect("powderKeg");
+        this.presentation.announce("Gangplank · Powder Keg");
+        this.presentation.update(this);
+        return true;
+      }
+
+      castGangplankR(player) {
+        if (player.rCooldown > 0) return false;
+        const target = this.katTargetInFront(player, this.tile * 6.5);
+        player.rCooldown = 32;
+        player.castAnim = 0.55;
+        player.castDuration = 0.55;
+        player.gangplankUltAnim = 0.7;
+        this.gangplankBarrages.push({
+          ownerId: player.id,
+          x: target.x,
+          z: target.z,
+          radius: this.tile * 2.35,
+          age: 0,
+          fuse: 2.4,
+          detonated: false,
+          tick: 0
+        });
+        this.slashes.push({ x: target.x, z: target.z, radius: this.tile * 2.35, age: 0, life: 2.5, gangplank: true });
+        this.spawnParticles(target.x, 0.6, target.z, Renderer.colors.gangplankOrange, 36, 0.9, 0.12);
+        this.music.effect("cannonBarrage");
+        this.presentation.announce("Gangplank · Cannon Barrage");
+        this.presentation.update(this);
+        return true;
+      }
+
+      detonateGangplankBarrel(barrel, chainDepth = 0) {
+        if (!barrel || barrel.exploded) return;
+        barrel.exploded = true;
+        const owner = this.players.find((p) => p.id === barrel.ownerId);
+        const radius = this.tile * (1.75 + Math.min(chainDepth, 2) * 0.12);
+        let destroyed = 0;
+        for (let r = 1; r < this.rows - 1; r++) {
+          for (let c = 1; c < this.cols - 1; c++) {
+            if (this.grid[r][c] !== 2) continue;
+            const [x, z] = this.worldFromCell(r, c);
+            if (Math.hypot(x - barrel.x, z - barrel.z) <= radius &&
+                this.destroyBreakable(r, c, Renderer.colors.gangplankOrange)) destroyed++;
+          }
+        }
+        const rival = this.players.find((p) => p.id !== barrel.ownerId && p.alive);
+        if (rival && Math.hypot(rival.x - barrel.x, rival.z - barrel.z) <= radius) {
+          this.hitSkill(rival, 0.3 + chainDepth * 0.04, owner, "Powder Keg");
+        }
+        if (owner?.alive && destroyed > 0) {
+          owner.qCooldown = Math.max(0, owner.qCooldown - 1.1);
+          this.healChampion(owner, Math.min(0.12, destroyed * 0.03));
+        }
+        this.renderer.addShock(barrel.x, barrel.z, 0.85);
+        this.slashes.push({ x: barrel.x, z: barrel.z, radius, age: 0, life: 0.55, gangplank: true });
+        this.spawnParticles(barrel.x, 0.55, barrel.z, Renderer.colors.gangplankOrange, 42, 0.95, 0.13);
+        this.music.effect("barrelBoom");
+        for (const other of this.gangplankBarrels) {
+          if (other.exploded || other.id === barrel.id) continue;
+          if (Math.hypot(other.x - barrel.x, other.z - barrel.z) <= this.tile * 1.85) {
+            this.detonateGangplankBarrel(other, chainDepth + 1);
+          }
+        }
+      }
+
+      updateGangplank(dt) {
+        for (const player of this.players) {
+          if (player.champion !== "gangplank") continue;
+          player.gangplankShotAnim = Math.max(0, player.gangplankShotAnim - dt);
+          player.gangplankKegAnim = Math.max(0, player.gangplankKegAnim - dt);
+          player.gangplankUltAnim = Math.max(0, player.gangplankUltAnim - dt);
+        }
+
+        for (const barrel of this.gangplankBarrels) {
+          if (barrel.exploded) continue;
+          barrel.age += dt;
+          if (barrel.age >= barrel.life) barrel.exploded = true;
+        }
+        this.gangplankBarrels = this.gangplankBarrels.filter((b) => !b.exploded);
+
+        const shots = this.projectiles.filter((p) => p.kind === "gangplank");
+        for (const projectile of shots) {
+          projectile.age += dt;
+          projectile.x += projectile.dx * projectile.speed * dt;
+          projectile.z += projectile.dz * projectile.speed * dt;
+          projectile.y = 0.88 + Math.sin(projectile.age * 26) * 0.04;
+          const cell = this.cellFromWorld(projectile.x, projectile.z);
+          const tile = this.grid[cell.r]?.[cell.c];
+          const owner = this.players.find((p) => p.id === projectile.ownerId && p.alive);
+          const rival = this.players.find((p) => p.id !== projectile.ownerId && p.alive);
+          const hitBarrel = this.gangplankBarrels.find((b) =>
+            !b.exploded && Math.hypot(b.x - projectile.x, b.z - projectile.z) <= 0.62
+          );
+
+          if (hitBarrel) {
+            this.detonateGangplankBarrel(hitBarrel);
+            projectile.resolved = true;
+          } else if (tile === 1) {
+            projectile.resolved = true;
+          } else if (tile === 2) {
+            this.destroyBreakable(cell.r, cell.c, Renderer.colors.gangplankGold);
+            if (owner) {
+              owner.qCooldown = Math.max(0, owner.qCooldown - 1.4);
+              this.healChampion(owner, 0.06);
+            }
+            projectile.resolved = true;
+          } else if (owner && rival && Math.hypot(rival.x - projectile.x, rival.z - projectile.z) <= 0.58) {
+            this.hitSkill(rival, 0.22, owner, "Parrrley");
+            if (owner) owner.qCooldown = Math.max(0, owner.qCooldown - 0.8);
+            projectile.resolved = true;
+          } else if (projectile.age >= projectile.life) {
+            projectile.resolved = true;
+          }
+
+          if (projectile.resolved) {
+            this.spawnParticles(projectile.x, projectile.y, projectile.z,
+              Renderer.colors.gangplankGold, 12, 0.4, 0.07);
+          }
+        }
+        this.projectiles = this.projectiles.filter((p) => !p.resolved);
+
+        for (const barrage of this.gangplankBarrages) {
+          barrage.age += dt;
+          if (barrage.detonated) continue;
+          if (barrage.age < barrage.fuse * 0.55) continue;
+          barrage.tick -= dt;
+          while (barrage.tick <= 0 && barrage.age < barrage.fuse + 1.35) {
+            barrage.tick += 0.28;
+            const owner = this.players.find((p) => p.id === barrage.ownerId);
+            const rival = this.players.find((p) => p.id !== barrage.ownerId && p.alive);
+            if (rival && Math.hypot(rival.x - barrage.x, rival.z - barrage.z) <= barrage.radius) {
+              this.hitSkill(rival, 0.07, owner, "Cannon Barrage", true);
+            }
+            for (let r = 1; r < this.rows - 1; r++) {
+              for (let c = 1; c < this.cols - 1; c++) {
+                if (this.grid[r][c] !== 2) continue;
+                const [x, z] = this.worldFromCell(r, c);
+                if (Math.hypot(x - barrage.x, z - barrage.z) <= barrage.radius * 0.9) {
+                  this.destroyBreakable(r, c, Renderer.colors.gangplankOrange);
+                }
+              }
+            }
+            for (const barrel of this.gangplankBarrels) {
+              if (!barrel.exploded && Math.hypot(barrel.x - barrage.x, barrel.z - barrage.z) <= barrage.radius) {
+                this.detonateGangplankBarrel(barrel);
+              }
+            }
+            this.spawnParticles(barrage.x, 0.5, barrage.z, Renderer.colors.gangplankOrange, 10, 0.55, 0.08);
+          }
+          if (barrage.age >= barrage.fuse + 1.4) barrage.detonated = true;
+        }
+        this.gangplankBarrages = this.gangplankBarrages.filter((b) => !b.detonated);
+      }
+
+
       dropDagger(x, z, readyAt = 0.4, owner = this.player) {
         const landing = this.findOpenLanding(x, z, owner);
         const dagger = {
@@ -1107,15 +1625,44 @@
         }
       }
 
-      destroyBreakable(r, c, color = Renderer.colors.katCrimson) {
+      destroyBreakable(r, c, color = Renderer.colors.katCrimson, ownerId = null) {
         if (this.grid[r]?.[c] !== 2) return false;
         this.grid[r][c] = 0;
-        const hidden = this.powerupPlan.get(`${r},${c}`);
-        if (hidden) this.spawnPickup(r, c, hidden);
+        const dropOwner = ownerId ?? this.dropOwnerId ?? null;
+        this.rollCrateDrop(r, c, dropOwner);
         const [x, z] = this.worldFromCell(r, c);
         this.spawnParticles(x, 0.42, z, color, 22, 0.78, 0.12);
         this.renderer.addShock(x, z, 0.3);
         return true;
+      }
+
+      /**
+       * Crate loot: 50% chance to drop one still-locked skill for the breaker.
+       * Otherwise fall back to the pre-planned classic power-up (range/bomb/speed/shield).
+       */
+      rollCrateDrop(r, c, ownerId) {
+        const key = `${r},${c}`;
+        const owner = this.players.find((player) => player.id === ownerId);
+        if (owner?.alive) {
+          const locked = this.lockedSkillSlots(owner);
+          if (locked.length && this.random() < 0.5) {
+            const slot = locked[Math.floor(this.random() * locked.length)];
+            this.spawnPickup(r, c, "skill", {
+              slot,
+              ownerId: owner.id,
+              champion: owner.champion,
+              label: this.skillSlotLabel(owner, slot),
+              art: skillArtUrl(owner.champion, slot)
+            });
+            this.powerupPlan.delete(key);
+            return;
+          }
+        }
+        const hidden = this.powerupPlan.get(key);
+        if (hidden) {
+          this.spawnPickup(r, c, hidden);
+          this.powerupPlan.delete(key);
+        }
       }
 
       resolveKatarinaProjectile(projectile) {
@@ -1191,7 +1738,7 @@
 
       updateKatarina(dt) {
         for (const projectile of this.projectiles) {
-          if (projectile.kind === "zed") continue;
+          if (projectile.kind === "zed" || projectile.kind === "gangplank") continue;
           projectile.age += dt;
           const progress = clamp(projectile.age / projectile.duration, 0, 1);
           const eased = 1 - Math.pow(1 - progress, 2);
@@ -1502,7 +2049,11 @@
             if (r < 0 || c < 0 || r >= this.rows || c >= this.cols || this.grid[r][c] === 1) break;
             cells.push({ r, c, core: false });
             if (this.grid[r][c] === 2) {
-              this.destroyBreakable(r, c, bomb.ownerId === 1 ? Renderer.colors.gold : Renderer.colors.ember);
+              this.destroyBreakable(
+                r, c,
+                bomb.ownerId === 1 ? Renderer.colors.gold : Renderer.colors.ember,
+                bomb.ownerId
+              );
               break;
             }
           }
@@ -1659,9 +2210,9 @@
         this.finalizeRound(Math.abs(a - b) < 0.01 ? null : (a > b ? this.players[0] : this.players[1]));
       }
 
-      spawnPickup(r, c, type) {
+      spawnPickup(r, c, type, extra = {}) {
         const [x, z] = this.worldFromCell(r, c);
-        this.pickups.push({ r, c, x, z, type });
+        this.pickups.push({ r, c, x, z, type, ...extra });
       }
 
       collectPickups() {
@@ -1671,6 +2222,23 @@
             candidate.alive && Math.hypot(item.x - candidate.x, item.z - candidate.z) <= 0.58
           );
           if (!player) continue;
+          if (item.type === "skill") {
+            // Skill orbs only unlock for the breaker who earned them.
+            if (player.id !== item.ownerId) continue;
+            if (player.skillsUnlocked[item.slot]) {
+              this.pickups.splice(i, 1);
+              continue;
+            }
+            player.skillsUnlocked[item.slot] = true;
+            const skillName = item.label || this.skillSlotLabel(player, item.slot);
+            this.presentation.announce(`${player.name} unlocked ${skillName}`);
+            this.music.effect("pickup");
+            this.spawnParticles(item.x, 0.5, item.z,
+              player.id === 1 ? Renderer.colors.gold : Renderer.colors.ember, 28, 0.95, 0.12);
+            this.pickups.splice(i, 1);
+            this.presentation.update(this);
+            continue;
+          }
           if (item.type === "range") player.range = Math.min(6, player.range + 1);
           else if (item.type === "bomb") player.maxBombs = Math.min(5, player.maxBombs + 1);
           else if (item.type === "speed") player.speed = Math.min(4.75, player.speed + 0.25);
@@ -1755,6 +2323,7 @@
         this.updateZed(dt);
         this.updateRenekton(dt);
         this.updateVladimir(dt);
+        this.updateGangplank(dt);
         this.updateBombs(dt);
         this.collectPickups();
 

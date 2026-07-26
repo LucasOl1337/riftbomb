@@ -23,3 +23,15 @@ _Avoid_: Asset bundle, baked model
 **Offline game**:
 O HTML autocontido e versionado que pode ser aberto diretamente para jogar Riftbomb.
 _Avoid_: Build, release page
+
+**Bot**:
+O controlador de CPU de um contestant na Match (hoje o Red / P2 até handoff humano local).
+_Avoid_: NPC genérico, AI agent, enemy script
+
+**Bot policy**:
+O algoritmo em `BOTS/` que, a partir de um snapshot da arena, emite intenções (mover, bomba, skill).
+_Avoid_: Brain, neural net (salvo se existir de verdade)
+
+**Intent**:
+Pedido de ação do bot ainda sujeito às regras da Match.
+_Avoid_: Forced action, cheat command

@@ -14,14 +14,24 @@
     function updateMusicUI() {
       const position = music.position();
       const progress = position / music.duration;
-      const beatFloat = position / (60 / music.bpm);
-      const beat = Math.floor(beatFloat) % 4;
-      const bar = Math.floor(beatFloat / 4) % music.totalBars;
+      const beat = music.stepIndex % 4;
+      const bar = Math.floor(music.stepIndex / 16) % music.totalBars;
       const section = music.sectionForBar(bar);
       document.documentElement.style.setProperty("--beat", music.visualBeat().toFixed(3));
       UI.playhead.style.setProperty("--progress", progress.toFixed(5));
       UI.trackTime.textContent = formatTime(position);
       UI.musicSection.textContent = section.name;
+      const style = music.styles[music.styleId] || music.styles.gravesong;
+      if (UI.trackTitle) {
+        UI.trackTitle.textContent = music.samplesReady
+          ? `${style.label.toUpperCase()} · ${Math.round(music.bpm)} BPM`
+          : `SYNTH · ${style.label.toUpperCase()} · ${Math.round(music.bpm)} BPM`;
+      }
+      if (UI.bpmLabel) {
+        UI.bpmLabel.textContent = music.samplesReady
+          ? `${style.label} · ${Math.round(music.bpm)} BPM · heat ${Math.round(music.heat * 100)}%`
+          : `No samples · ${style.label} · ${Math.round(music.bpm)} BPM`;
+      }
       UI.beatDots.forEach((dot, i) => dot.classList.toggle("is-on", i === beat));
       const bars = UI.waveform.children;
       const energy = music.energy;
@@ -35,6 +45,7 @@
     function frame(now) {
       const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
       lastFrame = now;
+      music.syncFromGame(game, dt);
       music.updateEnergy();
       game.update(dt);
       renderer.render(game, music, dt, now);
@@ -44,9 +55,11 @@
 
     async function beginGame() {
       UI.start.disabled = true;
-      UI.start.textContent = "Calibrating audio…";
+      const alreadyAudible = Boolean(music.ctx);
+      UI.start.textContent = alreadyAudible ? "Starting match…" : "Loading cello / piano samples…";
       try {
         await music.start();
+        UI.start.textContent = music.samplesReady ? "Samples ready" : "Synth fallback";
       } catch (error) {
         console.warn("Audio could not start:", error);
       }
@@ -56,9 +69,10 @@
       UI.chrome.setAttribute("aria-hidden", "false");
       UI.chrome.removeAttribute("inert");
       UI.start.disabled = false;
+      const arenaName = game.arenaTemplate().label;
       UI.live.textContent = game.player.champion !== "ziggs"
-        ? `Rift Bomber started. ${game.player.name} uses WASD, Q/F/E/R and Space for arena bombs. Red Ziggs uses arrows and Enter.`
-        : "Rift Bomber started. Blue Ziggs uses WASD, Q and Shift. Red Ziggs uses arrows and Enter.";
+        ? `Rift Bomber · ${arenaName}. ${game.player.name} uses WASD, Q/F/E/R and Space. Red Ziggs uses arrows and Enter.`
+        : `Rift Bomber · ${arenaName}. Blue Ziggs uses WASD, Q and Shift. Red Ziggs uses arrows and Enter.`;
     }
 
     function openGuide() {
@@ -148,6 +162,131 @@
       UI.live.textContent = muted ? "Soundtrack muted" : "Soundtrack restored";
     }
 
+    function paintArenaMini(host, grid, arenaId) {
+      host.replaceChildren();
+      const safe = new Set([
+        `${grid.length - 2},1`, `${grid.length - 3},1`, `${grid.length - 2},2`,
+        `1,${grid[0].length - 2}`, `2,${grid[0].length - 2}`, `1,${grid[0].length - 3}`
+      ]);
+      host.dataset.arena = arenaId || "";
+      for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          const cell = document.createElement("i");
+          const key = `${r},${c}`;
+          if (safe.has(key)) cell.dataset.t = "s";
+          else if (grid[r][c] === 1) cell.dataset.t = "1";
+          else if (grid[r][c] === 2) cell.dataset.t = "2";
+          host.appendChild(cell);
+        }
+      }
+    }
+
+    function buildArenaPicker() {
+      const host = document.getElementById("arena-select") || document.querySelector(".arena-select");
+      if (!host || !game) return;
+      const heading = document.createElement("span");
+      heading.className = "micro";
+      heading.textContent = `[ ARENA TEMPLATE ] · ${game.listArenas().length} layouts`;
+      host.replaceChildren(heading);
+      game.listArenas().forEach((arena) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "arena-choice";
+        button.dataset.arena = arena.id;
+        button.setAttribute("role", "radio");
+        button.setAttribute("aria-checked", String(arena.id === game.selectedArena));
+        button.title = arena.blurb;
+        const mini = document.createElement("div");
+        mini.className = "arena-mini";
+        mini.setAttribute("aria-hidden", "true");
+        paintArenaMini(mini, game.previewGrid(arena.id), arena.id);
+        const title = document.createElement("strong");
+        title.textContent = arena.label;
+        const blurb = document.createElement("small");
+        blurb.textContent = arena.blurb;
+        button.append(mini, title, blurb);
+        button.addEventListener("click", () => {
+          game.selectArena(arena.id);
+          UI.arenaChoices.forEach((choice) => {
+            choice.setAttribute("aria-checked", String(choice.dataset.arena === arena.id));
+          });
+          heading.textContent = `[ ARENA ] ${arena.label.toUpperCase()}`;
+          UI.live.textContent = `Arena: ${arena.label} — ${arena.blurb}`;
+        });
+        host.appendChild(button);
+      });
+      UI.arenaChoices = [...host.querySelectorAll(".arena-choice")];
+    }
+
+    function buildSoundtrackPicker() {
+      const host = document.getElementById("soundtrack-select") || document.querySelector(".soundtrack-select");
+      if (!host || !music) return;
+      const heading = document.createElement("span");
+      heading.className = "micro";
+      heading.textContent = `[ AUDIO BANK ] · ${music.listStyles().length} styles · click to preview`;
+      host.replaceChildren(heading);
+      let previewToken = 0;
+      music.listStyles().forEach((style, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "soundtrack-choice";
+        button.dataset.style = style.id;
+        button.setAttribute("role", "radio");
+        button.setAttribute("aria-checked", String(style.id === music.styleId || (index === 0 && !music.styleId)));
+        button.title = `Preview ${style.label}`;
+        const title = document.createElement("strong");
+        title.textContent = style.label;
+        const blurb = document.createElement("small");
+        blurb.textContent = style.blurb;
+        button.append(title, blurb);
+        button.addEventListener("click", async () => {
+          const token = ++previewToken;
+          UI.soundtrackChoices.forEach((choice) => {
+            const selected = choice.dataset.style === style.id;
+            choice.setAttribute("aria-checked", String(selected));
+            choice.classList.toggle("is-loading", selected);
+            choice.classList.remove("is-previewing");
+          });
+          heading.textContent = `Loading preview · ${style.label}…`;
+          UI.live.textContent = `Loading soundtrack preview: ${style.label}`;
+          try {
+            const applied = await music.previewStyle(style.id);
+            if (token !== previewToken) return;
+            UI.soundtrackChoices.forEach((choice) => {
+              const selected = choice.dataset.style === style.id;
+              choice.classList.toggle("is-loading", false);
+              choice.classList.toggle("is-previewing", selected);
+            });
+            heading.textContent = `[ LIVE ] ${applied.label.toUpperCase()}`;
+            if (UI.trackTitle) {
+              UI.trackTitle.textContent = `${applied.label.toUpperCase()} · ${Math.round(music.bpm)} BPM`;
+            }
+            if (UI.bpmLabel) {
+              UI.bpmLabel.textContent = `${applied.label} · ${applied.blurb}`;
+            }
+            if (UI.musicSection) UI.musicSection.textContent = applied.sections[0].name;
+            UI.live.textContent = `Previewing ${applied.label}. Click Play to start the match with this track.`;
+            if (UI.sound) {
+              UI.sound.setAttribute("aria-pressed", "false");
+              UI.sound.setAttribute("aria-label", "Mute soundtrack");
+              UI.sound.style.color = "";
+            }
+          } catch (error) {
+            if (token !== previewToken) return;
+            console.warn("Soundtrack preview failed:", error);
+            UI.soundtrackChoices.forEach((choice) => {
+              choice.classList.remove("is-loading", "is-previewing");
+            });
+            heading.textContent = `[ AUDIO BANK ] · ${music.listStyles().length} styles · click to preview`;
+            music.setStyle(style.id);
+            UI.live.textContent = `Selected ${style.label} (preview unavailable — will play on start).`;
+          }
+        });
+        host.appendChild(button);
+      });
+      UI.soundtrackChoices = [...host.querySelectorAll(".soundtrack-choice")];
+    }
+
     function boot() {
       try {
         music = new MusicEngine();
@@ -184,6 +323,8 @@
         UI.championChoices.forEach((button) =>
           button.addEventListener("click", () => game.selectChampion(button.dataset.champion))
         );
+        buildArenaPicker();
+        buildSoundtrackPicker();
         UI.start.addEventListener("click", beginGame);
         UI.restart.addEventListener("click", () => {
           UI.end.hidden = true;

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-const playableChampions = ["katarina", "zed", "renekton", "vladimir"];
+const playableChampions = ["katarina", "zed", "renekton", "vladimir", "gangplank"];
 
 const encode = async (filePath) => (await readFile(filePath)).toString("base64");
 

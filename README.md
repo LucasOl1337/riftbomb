@@ -25,8 +25,10 @@ capacidade que entregam:
 - `draw-bomber-rift.js`: WebGL, modelos e efeitos.
 - `play-rift-soundtrack.js`: música e efeitos sonoros.
 - `present-champion-bomb-duel.js`: apresentação da partida no navegador.
-- `run-champion-bomb-duel.js`: regras, campeões, bombas, CPU e placar.
+- `run-champion-bomb-duel.js`: regras, campeões, bombas, CPU embutido (baseline) e placar.
 - `start-champion-duel.js`: controles e início da partida.
+
+Oponente AI (requisitos, plano e políticas futuras): `BOTS/`.
 
 Gere novamente o HTML autocontido e rode os gates:
 

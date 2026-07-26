@@ -1,0 +1,32 @@
+katarina.q: 5074 bytes → katarina-q.png
+katarina.w: 6391 bytes → katarina-w.png
+katarina.e: 7147 bytes → katarina-e.png
+katarina.r: 6215 bytes → katarina-r.png
+zed.q: 3218 bytes → zed-q.webp
+zed.w: 2514 bytes → zed-w.webp
+zed.e: 3198 bytes → zed-e.webp
+zed.r: 3818 bytes → zed-r.webp
+renekton.q: 2158 bytes → renekton-q.webp
+renekton.w: 2744 bytes → renekton-w.webp
+renekton.e: 2516 bytes → renekton-e.webp
+renekton.r: 2612 bytes → renekton-r.webp
+vladimir.q: 2150 bytes → vladimir-q.webp
+vladimir.w: 1768 bytes → vladimir-w.webp
+vladimir.e: 1984 bytes → vladimir-e.webp
+vladimir.r: 1828 bytes → vladimir-r.webp
+gangplank.q: 1290 bytes → gangplank-q.webp
+gangplank.w: 1276 bytes → gangplank-w.webp
+gangplank.e: 1740 bytes → gangplank-e.webp
+gangplank.r: 1556 bytes → gangplank-r.webp
+WIRING OK: RIFTBOMB_SKILL_ART table
+WIRING OK: skillArtUrl helper
+WIRING OK: syncSkillTokenDom method
+WIRING OK: sync called each frame
+WIRING OK: no mapId-4 white skillDisc art
+WIRING OK: skillDisc not textured with icon
+WIRING OK: spawn passes art URL
+WIRING OK: HTML skill-token-layer
+WIRING OK: CSS skill-token class
+WIRING OK: CSS skill-token-layer
+
+OK 20 / FAIL 0 / WIRING_FAIL 0

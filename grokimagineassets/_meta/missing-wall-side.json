@@ -1,0 +1,402 @@
+[
+  {
+    "i": 1,
+    "nn": "01",
+    "slug": "rift-stone-blocks",
+    "name": "wall-side_01_rift-stone-blocks.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_01_rift-stone-blocks.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 2,
+    "nn": "02",
+    "slug": "dark-granite-seams",
+    "name": "wall-side_02_dark-granite-seams.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_02_dark-granite-seams.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 3,
+    "nn": "03",
+    "slug": "hextech-metal-panels",
+    "name": "wall-side_03_hextech-metal-panels.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_03_hextech-metal-panels.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 4,
+    "nn": "04",
+    "slug": "weathered-brick",
+    "name": "wall-side_04_weathered-brick.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_04_weathered-brick.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 5,
+    "nn": "05",
+    "slug": "blue-side-crystal-stone",
+    "name": "wall-side_05_blue-side-crystal-stone.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_05_blue-side-crystal-stone.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 6,
+    "nn": "06",
+    "slug": "red-side-obsidian",
+    "name": "wall-side_06_red-side-obsidian.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_06_red-side-obsidian.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 7,
+    "nn": "07",
+    "slug": "mossy-castle-wall",
+    "name": "wall-side_07_mossy-castle-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_07_mossy-castle-wall.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 8,
+    "nn": "08",
+    "slug": "iron-rivet-plates",
+    "name": "wall-side_08_iron-rivet-plates.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_08_iron-rivet-plates.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 9,
+    "nn": "09",
+    "slug": "sandstone-blocks",
+    "name": "wall-side_09_sandstone-blocks.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_09_sandstone-blocks.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 10,
+    "nn": "10",
+    "slug": "void-carved-stone",
+    "name": "wall-side_10_void-carved-stone.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_10_void-carved-stone.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 11,
+    "nn": "11",
+    "slug": "wooden-fort-planks",
+    "name": "wall-side_11_wooden-fort-planks.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_11_wooden-fort-planks.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 12,
+    "nn": "12",
+    "slug": "bilgewater-ship-hull",
+    "name": "wall-side_12_bilgewater-ship-hull.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_12_bilgewater-ship-hull.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 13,
+    "nn": "13",
+    "slug": "piltover-brass-wall",
+    "name": "wall-side_13_piltover-brass-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_13_piltover-brass-wall.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 14,
+    "nn": "14",
+    "slug": "zaun-pipe-metal",
+    "name": "wall-side_14_zaun-pipe-metal.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_14_zaun-pipe-metal.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 15,
+    "nn": "15",
+    "slug": "ice-fortress-wall",
+    "name": "wall-side_15_ice-fortress-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_15_ice-fortress-wall.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 16,
+    "nn": "16",
+    "slug": "volcanic-basalt",
+    "name": "wall-side_16_volcanic-basalt.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_16_volcanic-basalt.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 17,
+    "nn": "17",
+    "slug": "marble-column-face",
+    "name": "wall-side_17_marble-column-face.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_17_marble-column-face.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 18,
+    "nn": "18",
+    "slug": "rune-etched-slab",
+    "name": "wall-side_18_rune-etched-slab.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_18_rune-etched-slab.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 19,
+    "nn": "19",
+    "slug": "bone-spire-wall",
+    "name": "wall-side_19_bone-spire-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_19_bone-spire-wall.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 20,
+    "nn": "20",
+    "slug": "copper-green-patina",
+    "name": "wall-side_20_copper-green-patina.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_20_copper-green-patina.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 21,
+    "nn": "21",
+    "slug": "black-steel-armor",
+    "name": "wall-side_21_black-steel-armor.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_21_black-steel-armor.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 22,
+    "nn": "22",
+    "slug": "jungle-ruin-stone",
+    "name": "wall-side_22_jungle-ruin-stone.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_22_jungle-ruin-stone.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 23,
+    "nn": "23",
+    "slug": "temple-relief-stone",
+    "name": "wall-side_23_temple-relief-stone.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_23_temple-relief-stone.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 24,
+    "nn": "24",
+    "slug": "concrete-bunker",
+    "name": "wall-side_24_concrete-bunker.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_24_concrete-bunker.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 25,
+    "nn": "25",
+    "slug": "neon-trim-metal",
+    "name": "wall-side_25_neon-trim-metal.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_25_neon-trim-metal.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 26,
+    "nn": "26",
+    "slug": "crystal-growth-wall",
+    "name": "wall-side_26_crystal-growth-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_26_crystal-growth-wall.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 27,
+    "nn": "27",
+    "slug": "gold-inlay-stone",
+    "name": "wall-side_27_gold-inlay-stone.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_27_gold-inlay-stone.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 28,
+    "nn": "28",
+    "slug": "ash-brick",
+    "name": "wall-side_28_ash-brick.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_28_ash-brick.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 29,
+    "nn": "29",
+    "slug": "coral-wall",
+    "name": "wall-side_29_coral-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_29_coral-wall.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 30,
+    "nn": "30",
+    "slug": "thorn-wood-wall",
+    "name": "wall-side_30_thorn-wood-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_30_thorn-wood-wall.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 31,
+    "nn": "31",
+    "slug": "shadow-isles-tomb",
+    "name": "wall-side_31_shadow-isles-tomb.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_31_shadow-isles-tomb.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 32,
+    "nn": "32",
+    "slug": "demacia-white-masonry",
+    "name": "wall-side_32_demacia-white-masonry.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_32_demacia-white-masonry.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 33,
+    "nn": "33",
+    "slug": "noxus-iron-blocks",
+    "name": "wall-side_33_noxus-iron-blocks.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_33_noxus-iron-blocks.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 34,
+    "nn": "34",
+    "slug": "ionia-painted-wood",
+    "name": "wall-side_34_ionia-painted-wood.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_34_ionia-painted-wood.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 35,
+    "nn": "35",
+    "slug": "shurima-sand-brick",
+    "name": "wall-side_35_shurima-sand-brick.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_35_shurima-sand-brick.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 36,
+    "nn": "36",
+    "slug": "targon-star-rock",
+    "name": "wall-side_36_targon-star-rock.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_36_targon-star-rock.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 37,
+    "nn": "37",
+    "slug": "freljord-ice-stone",
+    "name": "wall-side_37_freljord-ice-stone.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_37_freljord-ice-stone.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 38,
+    "nn": "38",
+    "slug": "bandle-mushroom-wood",
+    "name": "wall-side_38_bandle-mushroom-wood.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_38_bandle-mushroom-wood.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 39,
+    "nn": "39",
+    "slug": "hexgrid-armor",
+    "name": "wall-side_39_hexgrid-armor.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_39_hexgrid-armor.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 40,
+    "nn": "40",
+    "slug": "chevrons-military",
+    "name": "wall-side_40_chevrons-military.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_40_chevrons-military.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 41,
+    "nn": "41",
+    "slug": "rusted-scrap-wall",
+    "name": "wall-side_41_rusted-scrap-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_41_rusted-scrap-wall.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 42,
+    "nn": "42",
+    "slug": "polished-obsidian",
+    "name": "wall-side_42_polished-obsidian.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_42_polished-obsidian.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 43,
+    "nn": "43",
+    "slug": "limestone-blocks",
+    "name": "wall-side_43_limestone-blocks.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_43_limestone-blocks.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 44,
+    "nn": "44",
+    "slug": "slate-stacked",
+    "name": "wall-side_44_slate-stacked.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_44_slate-stacked.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 45,
+    "nn": "45",
+    "slug": "reinforced-concrete",
+    "name": "wall-side_45_reinforced-concrete.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_45_reinforced-concrete.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 46,
+    "nn": "46",
+    "slug": "arcane-purple-stone",
+    "name": "wall-side_46_arcane-purple-stone.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_46_arcane-purple-stone.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 47,
+    "nn": "47",
+    "slug": "emerald-jade-blocks",
+    "name": "wall-side_47_emerald-jade-blocks.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_47_emerald-jade-blocks.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 48,
+    "nn": "48",
+    "slug": "lava-rock-wall",
+    "name": "wall-side_48_lava-rock-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_48_lava-rock-wall.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 49,
+    "nn": "49",
+    "slug": "silk-wrapped-wood",
+    "name": "wall-side_49_silk-wrapped-wood.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_49_silk-wrapped-wood.jpg",
+    "aspect": "wall-side"
+  },
+  {
+    "i": 50,
+    "nn": "50",
+    "slug": "plated-champion-wall",
+    "name": "wall-side_50_plated-champion-wall.jpg",
+    "path": "grokimagineassets/wall-side/wall-side_50_plated-champion-wall.jpg",
+    "aspect": "wall-side"
+  }
+]

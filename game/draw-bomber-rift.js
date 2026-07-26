@@ -8,7 +8,7 @@
     const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const modelReviewTarget = new URLSearchParams(location.search).get("model") || "";
     const modelReviewPose = new URLSearchParams(location.search).get("pose") || "idle";
-    const modelReviewMode = ["ziggs", "katarina", "zed", "renekton", "vladimir", "minions", "herald", "baron"].includes(modelReviewTarget);
+    const modelReviewMode = ["ziggs", "katarina", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron"].includes(modelReviewTarget);
 
     const UI = {
       app: $("#app"),
@@ -21,6 +21,8 @@
       guideOpenIntro: $("#open-guide-intro"),
       guideClose: $("#close-guide"),
       championChoices: $$(".champion-choice"),
+      arenaChoices: $$(".arena-choice"),
+      soundtrackChoices: $$(".soundtrack-choice"),
       championPortrait: $("#champion-portrait"),
       playerName: $("#player-name"),
       matchSubtitle: $("#match-subtitle"),
@@ -88,6 +90,7 @@
       restart: $("#restart-game"),
       live: $("#live-status"),
       gpuLabel: $("#gpu-label"),
+      bpmLabel: $("#bpm-label"),
       fxLabel: $("#fx-label")
     };
 
@@ -129,6 +132,26 @@
       e: "data:image/webp;base64,",
       r: "data:image/webp;base64,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"
     };
+
+    const GANGPLANK_ASSETS = {
+      portrait: "data:image/webp;base64,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",
+      passive: "data:image/webp;base64,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",
+      q: "data:image/webp;base64,UklGRgIFAABXRUJQVlA4IPYEAABwFgCdASpAAEAAPm0skUWkIqGXDbY4QAbEtABZf/uDsklV1t5B7ITW3z58DzzN8l3myzx2w2fT6T7QMvaGY8y+YVu0+h92Ti50ik0/9jPQH9WewR+s/W79GZq6/TRN6aMhqw3h2bneyf8A0YgS6ymFWx2SMgKG1EWZ+WdaMsLDXfyTRkkKBf8aAcwOTu+oAQrkWpMDDefrA9AlKoo4G77IbUg85DsrbhMPfaYijvO1RXRwAhcv/TsOHtx6AAD+/7EiZzVFPswTe/X09zczEiEWk7lrUrA2DoF2elzCIiWy0pSShNw4Rr0tzvHKY9/LTCHFWppxP/O62VG5FX1xS9i+eDVOT6CJbBXy16EQc6DWukmdk+zv2Hm85IiTdWvEMdMb5I6cqIg06ZKAkCyb00YGM+yAkbBki59JWIUlm4CgO19jXcgEtPKaRAdhn96efwOwqZ4QzHIjsyVanl0zFuJmzjdUBE6XUKH584sDrqYCVcVsFhhNQWEse6OGk1wAov3aFihwcqXKEXAcwjLO0FOPXvAgYgQaHvyp1DMI7cD3pdJZlnYSfo3p3SLNfyNvXD1DPgCR4epiS6A217salk9caQpz9JGb+xHMmlUb+giaF/26X9G5cOGs13B+sBX5Nfsn45+ePEoB7MncNjH6oL1COZPTrxVyZ3OVWFg+EWjl7fv59L1Fs6W9iNEvn8K76D71T1L3qUnidopbuv4dT8IG5mfFa0zaZ72iH+tREpHoi8xNGOSmGvSTpbPFAvY9t2bcZLDJjj0L/rnp5DXyKwWr1/3Rk8iJ1r/JZ3zgOZIEGwfbd9gcvahktyvW8N5/O/yutGROd3fkrSf/7zPYpYCq3Q5AdYYsiqmIU4tjreVYEVykTwCmP5/ilLbGN4WHXJTtphjAkthTrVMq1VvKh+lZmPpC+5ijvZnfNJOL7605gGUv0RGUDmuRDMktZTleBTQLMR7as1h6qq+EinqinMjFqVvlMnPIVL+4X6LO5jBwILvmLQ2VcJN3+Daq06KzgUQOxXq2yLo73X9tS9nGMpOlOcLpiL19seRPVOSRG0sZuOObiYfa+YP+7OWM+UXJ4cOe8kWDxM+Est4O/+/bdJr9gXk4bfy+YVSYkXhGV38fxGVUkl01/F9FnPhaDSKD1dIyCfsGoJ4RGZ609OGijBWFG+QtfuGfpPp8jLPwdIb0jKyB9KK12mhsRpydg10IyXcSO/q6BL0Ys+Cjn7xmv5wtQ9bv4ffiBp4kDprHzMgEemKXiF8ceZixQt5p1Jetb7U6Fjt8HRfsFZM1t0tNITd045xzrITqbYLSbBqfe9n7gjd314nadW/aUzzbFrqRkRWr9DWBRe1V7B2EcikNpbxw/q7czSmfrJDDxKG3RT9HPjf/9pgseMx6u/icVr6fzzzQpS45S2cAwfZ+IVRGlauv6q8lVjR7nhHDuvyTjSVFcpgb6T+ESrlMflqUDCu5yYtrMyFuiNlGMxbMdZdM61vwO8DT+af9RLB2+U3LwWtNc1UvU3WQzPdSFKU5t0QHa0I1oFCGA1XQ9QyN2Nk9ic//Y/F/VKS7bBIh+NB3URml/b/Yod6OT5LxFRgBewQyF6qF6rZYxjdZUVsdq3z2w7M4KdAU9H25FhXDQ18/l9GGvq51xZqaSS4UELAAV+CnSQZo3arNfblt6WxpiACwDn65GGZVAAAA",
+      w: "data:image/webp;base64,UklGRvQEAABXRUJQVlA4IOgEAABwFgCdASpAAEAAPm0ukkakIqGhKhzMWIANiWwAnTLVQ3eieZFUP61+AOCsJZmS9sHb1+aHHQPQa6U/90vSkwOppPqy+l4lEQ51Yw5N2dFh7J/QAZuhWO9Rq69ZDCLovH8yNdjT7TDEM3hUnXCUMOq/P21xA5KVp/SYl+6S2YCCgMlDmG2dkc2KHGKCKKoN68QqvwO+0+A27wA14Apc+yETUZ0RCM0W0dbzIbOHcfnAaVI3l+DwtdgfT5TUwAD+/vWnaO3uEsdEM+ajFhcCa/4NMHGUdy/+Evrl/VYoO+erGNGBrSJek2DdstsWHzH2S+u6vp+6rjBdSGT/hBq71z5zki29DJcu+0fDiJT0WgUmrfjUpLWZvWXXvigGfvYWLf+GuBNr4kAjx1v52xGck+TBUsTlDHWv7lbuyveH31kLSb88ZEbMURTGf0j85FAGzZBPuJdfrNqmFfPfpuJ14x7LaAU+UcggnbE2C/4YUKM/Zf2Zn1Q/Y+Z+vrrjR8ZynVg6zhKdtrCG4CcHfZKBz0MTNd914ns1KVHcuoJdriM2uXpVWyFPwryLFSCOD1/WmKE5FmMtlPrWr2Rk8fhb0UM2xET+myFhhBzQzxlDrFRS3CiWUkWUbbKR+jnWLOWKEN5wtzPv/sDT0XAeH1+EDX2vDw8EOdQWc5V8zVJh9QrDEFQ42gglpIigyDfvdQ74iZJRTG4XHb7A39/lvHYU2vDty2NCSoQYiWQAX/vO++gWpe+Lyt4osl8W+zUhpMvq1ROddE76oxd2ZSayx0uim+2g2G51YQAX2hPKx3XxUAr6xHsN+YuD6PLzlj6yXKRJBjQxJV9vk1iBK+i5HIiIDN0A+dUP1Fm2ax7egP1uuzko7vtOS6+iLjhZbSdyzlINMif9RXfMl9HrUKy5GVSrQGf37//OpcSo7z2X3u8f9YzF3CxiftH/drOvMBHUYSdsLzosDekEoPvq80czr2pF9akjNkWcEVYdrFYgCRtSYOKGTovscDB3Yy4KeCx0Hc/Aps4Lg+W8k5gfeN8HYerCmaMeL3j3PQFId1+RPxZTrc+XWNJb8zUt3AZQYpQ4Dl8zekyINjTqJB028tEbDgR7muMNE9+C+6XDQVBWOoV1iEMrY6QLQmDmbYzh4OTHkv4T3T6S3STTqtg1UI6t0SBPweRgpatBN4Tbc1Dy7KIU2KYp2m7lwMwAZZj3TXPh10DAxgevNWHRtGWn8+R6zYQVH7wvQ1c4oYfQjhpqh/jLYMmihjheiRmxDKiUDG9pXyY/bCmmaJdiIA3JW3PKIf8+W+ZF++TL+XqeUecfPZbCE1figqVG3veilM0ROKy/wm+QS5OfD/+mGWHGaxyJW/l5Yx55tp/+md9/TzyPCeWRCeojmK7/q8/agQ0JKZ9AcqJXaagWrYJJwqlCh37oAK8aQKCpWSJ+yLteDItfX/Jry987jb3k0XHKHOK96etye+rUnBHGTml5hyeeq+5RYXEGX0VbKltgFYHksnZKo5oLH8TL+5vIYZCTB6J9JKP7aFvZpZ4kINybyN4vsRZmOWOglMWcyGBCBM0e5hEZHae1959QtIQhZ/jJaB3mj9yExhlX+1oCzjNFjfXQZETbCtwnvwS5hLGY5dIYGEOYVBfLwzlsl1w2lU9yoTao9NPZjVYUC3UJCffwzAAAAA==",
+      e: "data:image/webp;base64,UklGRnQFAABXRUJQVlA4IGgFAACQFwCdASpAAEAAPm0ukkYkIqGhLhkpyIANiWgApd+cxFe4eapZH8tuTJyIZeFZ9H/1M28q2YJtN+7+Bvji+K51OIO0f6o4wWVm2HvucJtLXNW8lWof0qv3AWNe1KUZOQqYEhO4Dv7y4A3k7Co9MbeLtPbLDvuTjPHcZkTkg+oYFCB//cRJZDvD8eYW6hyXaa8E6yD0XdJMl7neB5a/JhPLKlT5JPDEaJPnh16cQpVt+mvbadDz8IlNVkGzd60wJfsC7pA5UgD+/lK8Oa3z+d9/I3gHcwQFHtDHH8AAJb+A34tqqidFBZyGo5EmSgH0v/8W3GwLgBCYM90xAdfzgC9ihaCsuzhMOsd5fmz/ibfb/3ZPI+HWRoO4n4FZuYzcVv2/TvcPYql9qFQVlC1FH6spUCWdg5iwFz4KPSxe96LtwV7rX7VstHYgMG7oD2237jmYoNnbqcPaUCqcBxp9qJNXP+9z352hzlcyVXePWfLuawDoheTfpJke5eynYzYTJLX4RMwaQn1Jtm8TdyxX4/mmm6XpCMerIq+M4uJOdNV0LoQY9ZWkKr/Ef7P+eXTQ/QJxd8bSq8oLdUR5PLAo/iluB23I6X2bBFWL6h+voJChWQgy1yjNah+f0CB+EyiVb29tNsSX/mot01re2TwNm4tdKbA1sFrof4ppvie0jo50EEGxknfd7rr339YA9v/BTcXXTH69+6M+Z+atBNdC1ZRrYJfgB+Hdr6MlvVV7BFRwluxXTTjDUAEllbfpcTl/yaJm8boQ5yTYUZzF5z1dY1dXCHiAhVsKPUk3+baZ1/+Z2nI6jZo9AsfWEM2uWZRZXdd7vzPaoODtpEJxFyfxyO15177j+ADFlvbcpcaeK9XOqOUxj4BtpEsPVqcLugBy6b5YCDI8ytuhp/2lprL/CccNfuLOCCihuqEZp8B5TiM43PWW/Q00cS0S+OyudlIwh8LDZCnzY5s2Ery0yyDxiHzxPu7gsChnOqKUX4IHq4LjhB/wBApBSrEtIB1m13TPZ9LAcbedNVFg4k02sPfDDntm29uH7YguvDImgvmsJah+5leZIG3MMUCuRt1zAHDFMXVJTIS9nL/nGZNZhbrXE4h/QiWT2rx/bUHZLqDB+fnOuYlPxCtuS2oTiWuv+MpgQhAuepQ+4dCZb3zRsuK1p/9rW6WM3GYkkvuw2EjxqQ+hNHQX+LLQlM4TT25A6GwJHZZjVD+z7mXwJWk5GO+969c+kG7j5TgRwYXYggqftVoEp0I8T4AYw1cXBlpBw+KR5pn32yq8a1I6HP9/zAwmsYGuEJBfzZXVOWvtS9zKwJWLhfJup0HQhObN+mB+QdVsG8t7pbNb3nLOJEuJvNv9V4Q88xOT1hGM5It59hAqSOE9Oxedxe1lhwCcoilz8dRDEBjvAfZZLVJeDEqdbfLNYr3KkW2iSJp2vYhW05q+10kE+JgBa2TLsvy4G3D63cIb304h/E2uLlUWKpgKZYlVbJFAFlBpvAQp4Kz7anaIapIrkHucU7e5yJbLIRn5vnfc2a+JQxc6gseso4nVkqPstL/F1q7Vzbtsxrx2eE/qHLYkmZ2s4CvdQw0XTAg5BMW3eDDhRiuQ47EWJBFa6GEqnjmN69hWY/jZ187IO2PwMzs/8c7lJt06w7z22dws+AYY8RljxqqOwVvIR9JcTekgvv4BFLXZi1vo+X48mIKkkGyAKKa6uvnDxjs5N7xRN79iFg7RjzWqZYE3a25MMJkzYMg5/p9HaEVtptPdsM+eain/NCJDI6qwxSOlJXYlTcPrxVC6WdQGsehIPbx3bYurwYcgM9pmA/wmzdOR3ImTkVM68jFSboSAAAAA",
+      r: "data:image/webp;base64,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"
+    };
+
+    // Real LoL ability art for skill crate drops (DOM tokens + spawn metadata).
+    const RIFTBOMB_SKILL_ART = {
+      katarina: [KATARINA_ASSETS.q, KATARINA_ASSETS.w, KATARINA_ASSETS.e, KATARINA_ASSETS.r],
+      zed: [ZED_ASSETS.q, ZED_ASSETS.w, ZED_ASSETS.e, ZED_ASSETS.r],
+      renekton: [RENEKTON_ASSETS.q, RENEKTON_ASSETS.w, RENEKTON_ASSETS.e, RENEKTON_ASSETS.r],
+      vladimir: [VLADIMIR_ASSETS.q, VLADIMIR_ASSETS.w, VLADIMIR_ASSETS.e, VLADIMIR_ASSETS.r],
+      gangplank: [GANGPLANK_ASSETS.q, GANGPLANK_ASSETS.w, GANGPLANK_ASSETS.e, GANGPLANK_ASSETS.r]
+    };
+    const skillArtUrl = (champion, slot) =>
+      RIFTBOMB_SKILL_ART[champion]?.[slot] || null;
 
     for (let i = 0; i < 48; i++) {
       const bar = document.createElement("i");
@@ -317,17 +340,68 @@
       return new Float32Array(data);
     }
 
+    /**
+     * Circular skill-face disc (TOP only, +Y normals).
+     * Local x/z in [-1,1] on unit circle → UV = xz*0.5+0.5 for mapId 4.
+     * No side faces (sides were reading as black rectangles in iso view).
+     */
+    function buildSkillDisc(segments = 48) {
+      const data = [];
+      const up = [0, 1, 0];
+      const push = (p) => data.push(...p, ...up);
+      for (let i = 0; i < segments; i++) {
+        const a0 = (i / segments) * TAU;
+        const a1 = ((i + 1) / segments) * TAU;
+        const p0 = [Math.cos(a0), 0, Math.sin(a0)];
+        const p1 = [Math.cos(a1), 0, Math.sin(a1)];
+        push([0, 0, 0]);
+        push(p0);
+        push(p1);
+      }
+      return new Float32Array(data);
+    }
+
+    /** Thick coin body: top disc, bottom disc, cylindrical rim (true 3D token). */
+    function buildSkillCoin(segments = 40) {
+      const data = [];
+      const pushTri = (a, b, c) => {
+        const n = v3.norm(v3.cross(v3.sub(b, a), v3.sub(c, a)));
+        data.push(...a, ...n, ...b, ...n, ...c, ...n);
+      };
+      const yTop = 0.35;
+      const yBot = -0.35;
+      for (let i = 0; i < segments; i++) {
+        const a0 = (i / segments) * TAU;
+        const a1 = ((i + 1) / segments) * TAU;
+        const c0 = Math.cos(a0), s0 = Math.sin(a0);
+        const c1 = Math.cos(a1), s1 = Math.sin(a1);
+        const t0 = [c0, yTop, s0];
+        const t1 = [c1, yTop, s1];
+        const b0 = [c0, yBot, s0];
+        const b1 = [c1, yBot, s1];
+        // Top (for solid body — icon is separate disc above)
+        pushTri([0, yTop, 0], t0, t1);
+        // Bottom
+        pushTri([0, yBot, 0], b1, b0);
+        // Rim
+        pushTri(t0, b0, b1);
+        pushTri(t0, b1, t1);
+      }
+      return new Float32Array(data);
+    }
+
     // Riot Katarina game mesh, skinned into grounded gameplay poses and packed for this single-file build.
 
     class Renderer {
       constructor(canvas) {
         this.canvas = canvas;
+        // Opaque buffer: no page-grey bleed behind the arena void.
         const gl = canvas.getContext("webgl2", {
-          alpha: true,
+          alpha: false,
           antialias: false,
           depth: true,
           powerPreference: "high-performance",
-          premultipliedAlpha: false
+          premultipliedAlpha: true
         });
         if (!gl) throw new Error("WebGL2 is unavailable in this browser.");
         this.gl = gl;
@@ -344,7 +418,7 @@
         this.postProgram = this.createProgram(Renderer.postVertex, Renderer.postFragment);
         this.mainUniforms = this.uniforms(this.mainProgram, [
           "uModel", "uViewProjection", "uColor", "uCamera", "uTime", "uBeat",
-          "uEmissive", "uMaterial", "uAlpha"
+          "uEmissive", "uMaterial", "uAlpha", "uAlbedo", "uAlbedoTop", "uMapId"
         ]);
         this.particleUniforms = this.uniforms(this.particleProgram, [
           "uViewProjection", "uResolution", "uTime"
@@ -364,7 +438,9 @@
           crystal: this.createMesh(buildOctahedron()),
           cylinder: this.createMesh(buildCylinder()),
           cone: this.createMesh(buildCylinder(16, 0.06, 1)),
-          torus: this.createMesh(buildTorus())
+          torus: this.createMesh(buildTorus()),
+          skillDisc: this.createMesh(buildSkillDisc(56)),
+          skillCoin: this.createMesh(buildSkillCoin(48))
         };
         this.createKatarinaModel();
         this.createZedModel();
@@ -372,6 +448,10 @@
           PLAYABLE_CHAMPIONS.renekton.texture, [24, 26, 21, 255]);
         this.createPackedChampionModel("vladimir", PLAYABLE_CHAMPIONS.vladimir.vertices, PLAYABLE_CHAMPIONS.vladimir.indices,
           PLAYABLE_CHAMPIONS.vladimir.texture, [48, 5, 18, 255]);
+        this.createPackedChampionModel("gangplank", PLAYABLE_CHAMPIONS.gangplank.vertices, PLAYABLE_CHAMPIONS.gangplank.indices,
+          PLAYABLE_CHAMPIONS.gangplank.texture, [92, 58, 28, 255]);
+        this.createArenaTextures();
+        this.createSkillIconTextures();
         this.particleVao = gl.createVertexArray();
         this.particleBuffer = gl.createBuffer();
         gl.bindVertexArray(this.particleVao);
@@ -456,7 +536,7 @@
           gl.bindTexture(gl.TEXTURE_2D, this.katarinaTexture);
           gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
           gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
           gl.generateMipmap(gl.TEXTURE_2D);
           const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
@@ -522,7 +602,7 @@
           gl.bindTexture(gl.TEXTURE_2D, this.zedTexture);
           gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
           gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
           gl.generateMipmap(gl.TEXTURE_2D);
           const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
@@ -546,6 +626,13 @@
         };
         const vertexBytes = decode(encodedVertices);
         const indexBytes = decode(encodedIndices);
+        // Gangplank bake stored invertUvV while upload still UNPACK_FLIP_Y — double flip
+        // samples the wrong half of the atlas (dark leather blob instead of face/gold).
+        if (key === "gangplank") {
+          const floats = new Float32Array(
+            vertexBytes.buffer, vertexBytes.byteOffset, vertexBytes.byteLength / 4);
+          for (let i = 25; i < floats.length; i += 26) floats[i] = 1 - floats[i];
+        }
         const stride = 26 * 4;
         const attributes = [
           ["aIdleA", 3, 0], ["aIdleB", 3, 3],
@@ -572,8 +659,8 @@
 
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
@@ -591,7 +678,9 @@
           gl.bindTexture(gl.TEXTURE_2D, texture);
           gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
           gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.SRGB8_ALPHA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+          // RGBA8 display-referred (same as arena). SRGB8_ALPHA8 + no gamma out crushed
+          // dark leather/skin into a brown silhouette after the post rewrite.
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
           gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
           gl.generateMipmap(gl.TEXTURE_2D);
           const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
@@ -611,7 +700,10 @@
         gl.shaderSource(shader, source);
         gl.compileShader(shader);
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-          throw new Error(gl.getShaderInfoLog(shader));
+          const log = gl.getShaderInfoLog(shader) || "shader compile failed";
+          const kind = type === gl.VERTEX_SHADER ? "vertex" : "fragment";
+          console.error(`WebGL ${kind} shader error:\n`, log, "\n--- source head ---\n", source.slice(0, 400));
+          throw new Error(`${kind}: ${log}`);
         }
         return shader;
       }
@@ -649,6 +741,216 @@
         gl.vertexAttribPointer(nLoc, 3, gl.FLOAT, false, 6 * 4, 3 * 4);
         gl.bindVertexArray(null);
         return { vao, count: data.length / 6 };
+      }
+
+      createArenaTextures() {
+        const gl = this.gl;
+        const sources = (typeof ARENA_TEXTURES !== "undefined" && ARENA_TEXTURES) || {};
+
+        // Always-valid white so uAlbedo unit is never incomplete when mapId=0.
+        this.arenaWhiteTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.arenaWhiteTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
+          gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
+
+        const make = (key, aliases, fallbackRgba) => {
+          const texture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+          // LINEAR until mips exist — LINEAR_MIPMAP_LINEAR on incomplete tex blacks out draws
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          // Mid-brown fallback (not near-black) so missing load is still readable
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
+            gl.UNSIGNED_BYTE, new Uint8Array(fallbackRgba));
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+            // Linear RGBA — sRGB path crushed dark forest wood to pure black under fog
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
+            if (anisotropic) {
+              const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+              gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, max));
+            }
+            for (const alias of aliases) this.arenaTextureReady[alias] = true;
+          };
+          image.onerror = () => console.error(`Arena texture ${key} failed to decode.`);
+          if (sources[key]) image.src = sources[key];
+          else console.warn(`Arena texture source missing: ${key}`);
+          return texture;
+        };
+        const textureGroups = {
+          crate: ["crate"],
+          crateTop: ["crateTop"],
+          floorLattice: ["floorLattice", "floorClearing", "floorLabyrinth", "floorForts", "floorPit"],
+          wallLattice: ["wallLattice", "wallClearing", "wallLabyrinth", "wallForts", "wallPit"],
+          wallTopLattice: [
+            "wallTopLattice", "wallTopClearing", "wallTopLabyrinth", "wallTopForts", "wallTopPit",
+            "wallTopStone", "wallTopMetal"
+          ]
+        };
+        const keys = Object.values(textureGroups).flat();
+        const fallbacks = {
+          crate: [120, 82, 48, 255],
+          crateTop: [90, 62, 40, 255],
+          floorLattice: [28, 68, 58, 255],
+          floorClearing: [26, 58, 82, 255],
+          floorLabyrinth: [18, 48, 56, 255],
+          floorForts: [58, 40, 32, 255],
+          floorPit: [42, 24, 20, 255],
+          wallLattice: [74, 92, 100, 255],
+          wallClearing: [90, 122, 154, 255],
+          wallLabyrinth: [42, 58, 72, 255],
+          wallForts: [74, 64, 56, 255],
+          wallPit: [42, 36, 40, 255],
+          wallTopLattice: [48, 58, 64, 255],
+          wallTopClearing: [50, 70, 90, 255],
+          wallTopLabyrinth: [28, 40, 50, 255],
+          wallTopForts: [40, 36, 32, 255],
+          wallTopPit: [28, 26, 30, 255],
+          wallTopStone: [48, 52, 56, 255],
+          wallTopMetal: [50, 56, 62, 255]
+        };
+        this.arenaTextureReady = Object.fromEntries(keys.map((key) => [key, false]));
+        this.arenaTextures = {};
+        // Five authored sources, five GPU allocations. Theme names are aliases, not duplicate textures.
+        for (const [sourceKey, aliases] of Object.entries(textureGroups)) {
+          const texture = make(sourceKey, aliases, fallbacks[sourceKey] || [80, 80, 80, 255]);
+          for (const alias of aliases) this.arenaTextures[alias] = texture;
+        }
+        // Aliases used by draw path
+        this.arenaTextures.wall = this.arenaTextures.wallLattice;
+        this.arenaTextures.wallTop = this.arenaTextures.wallTopLattice;
+        // mapId 1 = floor plate. mapId 2 = crate multi-face. mapId 3 = wall multi-face.
+        // mapId 4 = skill icon plate (face UV, single albedo — bound per draw).
+        this.arenaMapTextures = [
+          null,
+          this.arenaTextures.floorLattice,
+          this.arenaTextures.crate,
+          this.arenaTextures.wallLattice,
+          null
+        ];
+      }
+
+      /** Bind floor/wall albedos for the active arena theme (layout + look). */
+      bindArenaTheme(theme) {
+        if (!theme || !this.arenaTextures) return;
+        const floor = this.arenaTextures[theme.floor] || this.arenaTextures.floorLattice;
+        const wall = this.arenaTextures[theme.wall] || this.arenaTextures.wallLattice;
+        const wallTop = this.arenaTextures[theme.wallTop]
+          || this.arenaTextures.wallTopLattice
+          || wall;
+        this.arenaMapTextures[1] = floor;
+        this.arenaMapTextures[3] = wall;
+        this.arenaTextures.wall = wall;
+        this.arenaTextures.wallTop = wallTop;
+      }
+
+      themeColor(theme, key, fallback) {
+        const hex = theme?.[key];
+        if (!hex || typeof hex !== "string") return fallback;
+        return hexToRgb(hex);
+      }
+
+      /**
+       * Skill drops: LoL-style circular skill tokens.
+       * Art is circular-cropped and shown flat/readable — no noisy heightfield.
+       */
+      createSkillIconTextures() {
+        const banks = {
+          katarina: [KATARINA_ASSETS.q, KATARINA_ASSETS.w, KATARINA_ASSETS.e, KATARINA_ASSETS.r],
+          zed: [ZED_ASSETS.q, ZED_ASSETS.w, ZED_ASSETS.e, ZED_ASSETS.r],
+          renekton: [RENEKTON_ASSETS.q, RENEKTON_ASSETS.w, RENEKTON_ASSETS.e, RENEKTON_ASSETS.r],
+          vladimir: [VLADIMIR_ASSETS.q, VLADIMIR_ASSETS.w, VLADIMIR_ASSETS.e, VLADIMIR_ASSETS.r],
+          gangplank: [GANGPLANK_ASSETS.q, GANGPLANK_ASSETS.w, GANGPLANK_ASSETS.e, GANGPLANK_ASSETS.r]
+        };
+        this.skillIconTextures = {};
+        this.skillIconReady = {};
+        for (const [champion, urls] of Object.entries(banks)) {
+          this.skillIconTextures[champion] = urls.map((src, slot) =>
+            this.loadSkillIconTexture(champion, slot, src)
+          );
+          this.skillIconReady[champion] = [false, false, false, false];
+        }
+      }
+
+      loadSkillIconTexture(champion, slot, src) {
+        const gl = this.gl;
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
+          gl.UNSIGNED_BYTE, new Uint8Array([40, 40, 40, 255]));
+        if (!src || typeof src !== "string" || src.length < 32) return texture;
+        const image = new Image();
+        image.decoding = "async";
+        image.onload = () => {
+          try {
+            // Circular LoL skill disc: crop art into a clean circle with dark ring
+            const size = 128;
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, size, size);
+            // Outer gold-ish ring baked into texture for sharp silhouette
+            const cx = size * 0.5, cy = size * 0.5, r = size * 0.48;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.fillStyle = "#1a1208";
+            ctx.fill();
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.9, 0, Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(image, 0, 0, size, size);
+            ctx.restore();
+            // Thin rim stroke
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.92, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(246, 207, 120, 0.95)";
+            ctx.lineWidth = size * 0.045;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * 0.98, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+            ctx.lineWidth = size * 0.02;
+            ctx.stroke();
+
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+            if (this.skillIconReady?.[champion]) this.skillIconReady[champion][slot] = true;
+          } catch (error) {
+            console.warn("[skills] icon bake failed", champion, slot, error);
+          }
+        };
+        image.onerror = () => console.warn("[skills] ability icon failed", champion, slot);
+        image.src = src;
+        return texture;
+      }
+
+      getSkillIconTexture(champion, slot) {
+        return this.skillIconTextures?.[champion]?.[slot] || null;
       }
 
       resize() {
@@ -705,7 +1007,7 @@
         this.hitPulse = Math.max(this.hitPulse, strength);
       }
 
-      draw(meshName, position, scale, color, material, emissive, rotation = 0, alpha = 1, rz = 0, rx = 0) {
+      draw(meshName, position, scale, color, material, emissive, rotation = 0, alpha = 1, rz = 0, rx = 0, mapId = 0, textureOverride = null) {
         const gl = this.gl;
         const mesh = this.meshes[meshName];
         gl.uniformMatrix4fv(this.mainUniforms.uModel, false,
@@ -714,8 +1016,197 @@
         gl.uniform1f(this.mainUniforms.uMaterial, material);
         gl.uniform1f(this.mainUniforms.uEmissive, emissive);
         gl.uniform1f(this.mainUniforms.uAlpha, alpha);
+        // mapId 4 = skill icon (textureOverride required); 2/3 = arena multi-face
+        const useMap = mapId === 4 && textureOverride
+          ? 4
+          : (mapId > 0 && this.arenaMapTextures?.[mapId] ? mapId : 0);
+        gl.uniform1f(this.mainUniforms.uMapId, useMap);
+        const white = this.arenaWhiteTexture;
+        let side = white;
+        let top = white;
+        if (useMap === 4 && textureOverride) {
+          side = textureOverride;
+          top = textureOverride;
+        } else if (useMap > 0) {
+          side = this.arenaMapTextures[useMap] || white;
+          top = side;
+          if (useMap === 2 && this.arenaTextures?.crateTop) top = this.arenaTextures.crateTop;
+          else if (useMap === 3 && this.arenaTextures?.wallTop) top = this.arenaTextures.wallTop;
+        }
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, side || white);
+        gl.uniform1i(this.mainUniforms.uAlbedo, 1);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, top || white);
+        gl.uniform1i(this.mainUniforms.uAlbedoTop, 2);
         gl.bindVertexArray(mesh.vao);
         gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+      }
+
+      drawMesh(mesh, position, scale, color, material, emissive, rotation = 0, alpha = 1, rz = 0, rx = 0, mapId = 0, textureOverride = null) {
+        if (!mesh) return;
+        const gl = this.gl;
+        gl.uniformMatrix4fv(this.mainUniforms.uModel, false,
+          modelMatrix(position[0], position[1], position[2], scale[0], scale[1], scale[2], rotation, rz, rx));
+        gl.uniform3fv(this.mainUniforms.uColor, color);
+        gl.uniform1f(this.mainUniforms.uMaterial, material);
+        gl.uniform1f(this.mainUniforms.uEmissive, emissive);
+        gl.uniform1f(this.mainUniforms.uAlpha, alpha);
+        const useMap = mapId === 4 && textureOverride
+          ? 4
+          : (mapId > 0 && this.arenaMapTextures?.[mapId] ? mapId : 0);
+        gl.uniform1f(this.mainUniforms.uMapId, useMap);
+        const white = this.arenaWhiteTexture;
+        let side = white;
+        let top = white;
+        if (useMap === 4 && textureOverride) {
+          side = textureOverride;
+          top = textureOverride;
+        } else if (useMap > 0) {
+          side = this.arenaMapTextures[useMap] || white;
+          top = side;
+          if (useMap === 2 && this.arenaTextures?.crateTop) top = this.arenaTextures.crateTop;
+          else if (useMap === 3 && this.arenaTextures?.wallTop) top = this.arenaTextures.wallTop;
+        }
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, side || white);
+        gl.uniform1i(this.mainUniforms.uAlbedo, 1);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, top || white);
+        gl.uniform1i(this.mainUniforms.uAlbedoTop, 2);
+        gl.bindVertexArray(mesh.vao);
+        gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+      }
+
+      /**
+       * Skill pickup pedestal in WebGL. Real ability art is a DOM disc projected over
+       * this coin (syncSkillTokenDom) — avoids broken mapId-4 white-blob path.
+       */
+      drawSkillPickup(pickup, t, beat) {
+        const C = Renderer.colors;
+        const phase = t * 2.2 + (pickup.slot || 0) * 1.1 + (pickup.r || 0) * 0.17;
+        const bob = 0.58 + Math.sin(phase) * 0.04;
+        const spin = t * 0.7 + (pickup.slot || 0);
+        const pulse = 1 + Math.sin(phase * 1.4) * 0.02;
+        // Hard industrial metal — hazard red rim only (no soft white/gold bloom)
+        const steel = [0.12, 0.12, 0.13];
+        const steelDeep = [0.06, 0.06, 0.07];
+        const hazard = C.ember || [0.9, 0.16, 0.16];
+        const x = pickup.x;
+        const z = pickup.z;
+        const R = 0.4 * pulse;
+
+        // Hard contact plate (no soft glowing disc)
+        this.draw("cylinder", [x, 0.02, z], [0.34, 0.018, 0.34], steelDeep, 0, 0.05, spin);
+        this.draw("cylinder", [x, 0.035, z], [0.3, 0.012, 0.3], steel, 0, 0.08, spin);
+
+        // Pedestal stack — machined cylinders
+        this.draw("cylinder", [x, 0.1, z], [0.1, 0.09, 0.1], steelDeep, 0, 0.1, spin);
+        this.draw("cylinder", [x, 0.22, z], [0.16, 0.035, 0.16], steel, 0, 0.12, spin);
+        this.draw("cylinder", [x, 0.27, z], [0.18, 0.02, 0.18], hazard, 2, 0.35, spin);
+
+        // Coin body under DOM skill art
+        this.draw("skillCoin", [x, bob, z], [R, R * 0.32, R], steelDeep, 0, 0.14, spin);
+        this.draw("torus", [x, bob + R * 0.12, z],
+          [R * 1.02, 0.04, R * 1.02], hazard, 2, 0.55 + beat * 0.15, spin, 1, 0, Math.PI * 0.5);
+        this.draw("torus", [x, bob - R * 0.1, z],
+          [R * 0.98, 0.03, R * 0.98], steel, 0, 0.12, -spin, 1, 0, Math.PI * 0.5);
+        // Dark face plate under icon (never white emissive)
+        this.draw("skillDisc", [x, bob + R * 0.34, z],
+          [R * 0.86, 1, R * 0.86], steel, 0, 0.08, spin * 0.15, 1);
+      }
+
+      /**
+       * Project skill pickups to screen and pin real ability art as circular DOM tokens.
+       * Uses the same data-URL art as the HUD ability dock (never a white WebGL blob).
+       */
+      syncSkillTokenDom(pickups, t) {
+        let layer = this.skillTokenLayer;
+        if (!layer) {
+          layer = document.getElementById("skill-token-layer");
+          this.skillTokenLayer = layer;
+        }
+        if (!layer) return;
+
+        const skills = (pickups || []).filter((p) => p.type === "skill");
+        while (layer.children.length > skills.length) layer.removeChild(layer.lastChild);
+        while (layer.children.length < skills.length) {
+          const el = document.createElement("div");
+          el.className = "skill-token";
+          layer.appendChild(el);
+        }
+
+        const vp = this.lastViewProjection;
+        const cam = this.lastCamera || [0, 12, 11];
+        for (let i = 0; i < skills.length; i++) {
+          const p = skills[i];
+          const el = layer.children[i];
+          const phase = t * 2.2 + (p.slot || 0) * 1.1 + (p.r || 0) * 0.17;
+          const bob = 0.58 + Math.sin(phase) * 0.04;
+          const R = 0.4 * (1 + Math.sin(phase * 1.4) * 0.02);
+          const worldY = bob + R * 0.36;
+          const uv = projectPoint(vp, [p.x, worldY, p.z]);
+          if (uv[0] < -0.08 || uv[0] > 1.08 || uv[1] < -0.08 || uv[1] > 1.08) {
+            el.style.visibility = "hidden";
+            continue;
+          }
+          el.style.visibility = "visible";
+          el.style.left = `${(uv[0] * 100).toFixed(2)}%`;
+          el.style.top = `${((1 - uv[1]) * 100).toFixed(2)}%`;
+          const art = p.art || skillArtUrl(p.champion, p.slot);
+          const artKey = `${p.champion || "?"}:${p.slot}`;
+          if (art && el.dataset.art !== artKey) {
+            el.dataset.art = artKey;
+            el.style.backgroundImage = `url("${art}")`;
+          } else if (!art) {
+            el.style.backgroundImage = "";
+          }
+          // Distance-based scale so near tokens read large and far ones stay tight
+          const dist = Math.hypot(p.x - cam[0], worldY - cam[1], p.z - cam[2]);
+          const distScale = clamp(8.4 / Math.max(dist, 4.5), 0.62, 1.38);
+          const pulse = 1 + Math.sin(phase * 1.6) * 0.045;
+          el.style.transform = `translate3d(0,0,0) scale(${(distScale * pulse).toFixed(3)})`;
+          el.title = p.label || "Skill unlock";
+        }
+      }
+
+      drawClassicPickup(pickup, t, beat) {
+        const C = Renderer.colors;
+        const phase = t * 2.5 + (pickup.r || 0) * 0.4 + (pickup.c || 0) * 0.3;
+        const bob = 0.42 + Math.sin(phase) * 0.07;
+        const spin = t * 1.4;
+        const x = pickup.x;
+        const z = pickup.z;
+        const type = pickup.type;
+
+        this.draw("sphere", [x, 0.03, z], [0.4, 0.025, 0.4],
+          type === "shield" ? C.ice : type === "range" ? C.gold : type === "bomb" ? C.violet : C.mint,
+          4, 1.2 + beat * 0.3, 0, 0.32);
+
+        if (type === "bomb") {
+          // Extra bomb capacity — mini bomb
+          this.draw("sphere", [x, bob, z], [0.22, 0.22, 0.22], C.bomb, 0, 0.15, spin);
+          this.draw("sphere", [x, bob, z], [0.2, 0.2, 0.2], C.violet, 3, 0.8 + beat, spin, 0.55);
+          this.draw("cylinder", [x, bob + 0.2, z], [0.06, 0.06, 0.06], C.bomb, 0, 0.2, spin);
+          this.draw("crystal", [x + 0.04, bob + 0.3, z], [0.04, 0.1, 0.04], C.gold, 3, 2.5 + beat, 0.4);
+        } else if (type === "range") {
+          // Blast range — expanding rings + core
+          this.draw("sphere", [x, bob, z], [0.12, 0.12, 0.12], C.gold, 3, 2 + beat, spin);
+          this.draw("torus", [x, bob, z], [0.22, 0.035, 0.22], C.whiteGold, 4, 1.8 + beat, spin, 0.85, 0, Math.PI * 0.5);
+          this.draw("torus", [x, bob, z], [0.32, 0.025, 0.32], C.gold, 4, 1.2 + beat, -spin, 0.55, 0, Math.PI * 0.5);
+        } else if (type === "speed") {
+          // Speed — chevron / wing
+          this.draw("cube", [x, bob, z], [0.1, 0.08, 0.28], C.mint, 2, 1.2 + beat, spin);
+          this.draw("cone", [x, bob, z + 0.18], [0.12, 0.16, 0.12], C.ice, 3, 1.6 + beat, spin + Math.PI);
+          this.draw("cone", [x, bob, z - 0.1], [0.1, 0.12, 0.1], C.mint, 2, 1 + beat, spin);
+        } else if (type === "shield") {
+          // Shield — bubble shell
+          this.draw("sphere", [x, bob, z], [0.24, 0.24, 0.24], C.ice, 4, 1.5 + beat, spin, 0.35);
+          this.draw("torus", [x, bob, z], [0.26, 0.04, 0.26], C.rift || C.ice, 4, 2 + beat, spin, 0.7, 0, Math.PI * 0.5);
+          this.draw("sphere", [x, bob + 0.02, z], [0.1, 0.1, 0.1], C.whiteGold, 3, 2.2 + beat, 0);
+        } else {
+          this.draw("crystal", [x, bob, z], [0.18, 0.32, 0.18], C.gold, 2, 2 + beat, spin);
+        }
       }
 
       drawPart(mesh, base, facing, local, scale, color, material = 0, emissive = 0,
@@ -1163,7 +1654,9 @@
       drawPackedChampion(player, t, beat, key, style, options = {}) {
         const C = Renderer.colors;
         if (!this[`${key}Ready`]) {
-          const color = key === "renekton" ? C.renektonBronze : C.vladimirCrimson;
+          const color = key === "renekton" ? C.renektonBronze
+            : key === "gangplank" ? C.gangplankBronze
+            : C.vladimirCrimson;
           this.draw("sphere", [player.x, 0.76, player.z], [0.4, 0.76, 0.34], color, 2, 0.3, player.facing);
           this.draw("crystal", [player.x, 1.45, player.z], [0.28, 0.4, 0.26], color, 3, 1.6 + beat, player.facing);
           return;
@@ -1177,11 +1670,11 @@
           ? clamp(1 - player.castAnim / castDuration, 0, 1)
           : 0;
         const cast = player.castAnim > 0 ? Math.sin(castProgress * Math.PI) : 0;
-        const idleMix = prefersReducedMotion ? 0.5 : 0.5 + Math.sin(t * (key === "renekton" ? 2.05 : 2.38) + player.id) * 0.5;
-        const runMix = prefersReducedMotion ? 0.5 : 0.5 + Math.sin(t * (key === "renekton" ? 10.8 : 9.6) + player.id) * 0.5;
+        const idleMix = prefersReducedMotion ? 0.5 : 0.5 + Math.sin(t * (key === "renekton" ? 2.05 : key === "gangplank" ? 2.15 : 2.38) + player.id) * 0.5;
+        const runMix = prefersReducedMotion ? 0.5 : 0.5 + Math.sin(t * (key === "renekton" ? 10.8 : key === "gangplank" ? 10.2 : 9.6) + player.id) * 0.5;
         const bob = prefersReducedMotion || options.pool ? 0 : Math.sin(t * (moving ? 11 : 2.2)) * (moving ? 0.016 : 0.009);
-        const accent = key === "renekton" ? C.renektonTeal : C.vladimirCrimson;
-        const dark = key === "renekton" ? C.renektonDark : C.vladimirBloodDark;
+        const accent = key === "renekton" ? C.renektonTeal : key === "gangplank" ? C.gangplankGold : C.vladimirCrimson;
+        const dark = key === "renekton" ? C.renektonDark : key === "gangplank" ? C.gangplankDark : C.vladimirBloodDark;
 
         if (!options.pool) {
           this.draw("sphere", [player.x, 0.035, player.z], [0.74, 0.035, 0.74],
@@ -1302,6 +1795,21 @@
           }
         }
         if (player.shield > 0) this.drawShieldField(player, t, beat, 1.02, 0.76, 1.1);
+      }
+
+      drawGangplank(player, t, beat) {
+        const C = Renderer.colors;
+        const ultProgress = player.gangplankUltAnim > 0
+          ? clamp(1 - player.gangplankUltAnim / 0.7, 0, 1)
+          : 0;
+        const ultPose = player.gangplankUltAnim > 0 ? Math.sin(ultProgress * Math.PI) : 0;
+        this.drawPackedChampion(player, t, beat, "gangplank", 4, {
+          scale: modelReviewMode ? 1.14 : 1.05,
+          ult: ultPose,
+          slash: player.gangplankShotAnim > 0 ? 1 : 0,
+          dash: player.gangplankKegAnim > 0 ? 0.55 : 0
+        });
+        if (player.shield > 0) this.drawShieldField(player, t, beat, 1.02, 0.8, 1.12);
       }
 
       drawMinion(enemy, t, beat, hurt) {
@@ -1450,7 +1958,7 @@
             ? { eye: [0, 2.8, 5.2], target: [0, 0.85, 0], fov: 0.62 }
             : modelReviewTarget === "minions"
               ? { eye: [0, 2.25, 4.35], target: [0, 0.55, 0], fov: 0.58 }
-              : modelReviewTarget === "renekton"
+              : modelReviewTarget === "renekton" || modelReviewTarget === "gangplank"
                 ? { eye: [0, 3.0, 7.25], target: [0, 1.28, 0], fov: 0.6 }
               : ["katarina", "zed", "vladimir"].includes(modelReviewTarget)
                 ? { eye: [0, 2.48, 5.65], target: [0, 1.2, 0], fov: 0.57 }
@@ -1479,7 +1987,13 @@
         gl.enable(gl.CULL_FACE);
         gl.cullFace(gl.BACK);
         gl.disable(gl.BLEND);
-        gl.clearColor(0.006, 0.012, 0.035, 0);
+        const C = Renderer.colors;
+        const theme = game.arenaTemplate ? game.arenaTemplate().theme : null;
+        this.bindArenaTheme(theme);
+        // Opaque tactical void from arena theme. Never transparent (was bleeding page grey).
+        // Never "punch" dark clears toward mid-grey — CRT cockpit wants deep ink.
+        const clear = this.themeColor(theme, "clear", [0.05, 0.08, 0.07]);
+        gl.clearColor(clear[0], clear[1], clear[2], 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.useProgram(this.mainProgram);
         gl.uniformMatrix4fv(this.mainUniforms.uViewProjection, false, vp);
@@ -1487,11 +2001,53 @@
         gl.uniform1f(this.mainUniforms.uTime, t);
         gl.uniform1f(this.mainUniforms.uBeat, beat);
 
-        const C = Renderer.colors;
-        this.draw("cube", [0, -0.42, 0], [9.55, 0.18, 8.15], C.floor, 1, 0.04);
-        this.draw("cube", [0, -0.205, 0], [10.4, 0.045, 1.38], C.lane, 1, 0.08, 0.69);
-        this.draw("cube", [0, -0.155, 0], [10.0, 0.04, 0.72], C.river, 4, 0.62 + beat * 0.16, -0.69);
-        this.draw("cube", [0, -0.105, 0], [0.75, 0.025, 0.75], C.riverLight, 4, 1.1 + beat * 0.2, Math.PI * 0.25);
+        const floorA = this.themeColor(theme, "floorA", C.arenaFloorA);
+        const accent = this.themeColor(theme, "accent", C.gold);
+        const textureTint = [1, 1, 1];
+
+        // Clean stage in deep tactical void (no outer tile mud)
+        const halfW = (game.cols * game.tile) * 0.5;
+        const halfD = (game.rows * game.tile) * 0.5;
+        // Hard stage plinth in tactical void — no soft cyan bloom disc
+        const plinth = [
+          clear[0] * 0.35 + 0.02,
+          clear[1] * 0.38 + 0.025,
+          clear[2] * 0.4 + 0.03
+        ];
+        const lip = [
+          Math.min(1, floorA[0] * 0.55 + 0.08),
+          Math.min(1, floorA[1] * 0.55 + 0.09),
+          Math.min(1, floorA[2] * 0.55 + 0.1)
+        ];
+        this.draw("cube", [0, -0.42, 0], [halfW + 0.85, 0.18, halfD + 0.85], plinth, 0, 0.02);
+        this.draw("cube", [0, -0.24, 0], [halfW + 0.52, 0.1, halfD + 0.52], lip, 0, 0.06);
+        this.draw("cube", [0, -0.12, 0], [halfW + 0.22, 0.07, halfD + 0.22], floorA, 0, 0.04);
+        // Hazard registration marks on stage corners (telemetry, not soft glow)
+        const mark = C.ember || [0.9, 0.16, 0.16];
+        for (const sx of [-1, 1]) {
+          for (const sz of [-1, 1]) {
+            this.draw("cube",
+              [sx * (halfW + 0.35), -0.02, sz * (halfD + 0.35)],
+              [0.14, 0.03, 0.04], mark, 2, 0.4, 0);
+            this.draw("cube",
+              [sx * (halfW + 0.35), -0.02, sz * (halfD + 0.35)],
+              [0.04, 0.03, 0.14], mark, 2, 0.4, 0);
+          }
+        }
+        // One authored steel plate per gameplay cell: the grid stays readable and quiet.
+        for (let r = 1; r < game.rows - 1; r++) {
+          for (let c = 1; c < game.cols - 1; c++) {
+            const [fx, fz] = game.worldFromCell(r, c);
+            this.draw("cube", [fx, -0.055, fz],
+              [game.tile * 0.5, 0.04, game.tile * 0.5],
+              textureTint, 0, 0.01, 0, 1, 0, 0, 1);
+          }
+        }
+        // Stage edge stripe — low emissive, hard edge (not toy glow)
+        this.draw("cube", [0, -0.02, halfD + 0.12], [halfW + 0.35, 0.04, 0.1], lip, 0, 0.12);
+        this.draw("cube", [0, -0.02, -(halfD + 0.12)], [halfW + 0.35, 0.04, 0.1], lip, 0, 0.12);
+        this.draw("cube", [halfW + 0.12, -0.02, 0], [0.1, 0.04, halfD + 0.35], lip, 0, 0.12);
+        this.draw("cube", [-(halfW + 0.12), -0.02, 0], [0.1, 0.04, halfD + 0.35], lip, 0, 0.12);
 
         const crystalPulse = 0.88 + beat * 0.16;
         const nexuses = [
@@ -1499,13 +2055,11 @@
           { x: 9.0, z: -7.15, color: C.redSide }
         ];
         nexuses.forEach((nexus, i) => {
-          this.draw("sphere", [nexus.x, 0.06, nexus.z], [1.18, 0.08, 1.18],
+          this.draw("sphere", [nexus.x, 0.04, nexus.z], [0.95, 0.05, 0.95],
             nexus.color, 4, 0.9 + beat * 0.25, t);
-          this.draw("crystal", [nexus.x, 0.82 + Math.sin(t * 1.7 + i) * 0.08, nexus.z],
-            [0.48 * crystalPulse, 1.25 * crystalPulse, 0.48 * crystalPulse],
+          this.draw("crystal", [nexus.x, 0.68 + Math.sin(t * 1.7 + i) * 0.06, nexus.z],
+            [0.38 * crystalPulse, 0.95 * crystalPulse, 0.38 * crystalPulse],
             nexus.color, 2, 2.2 + beat, t * (i ? -0.35 : 0.35));
-          this.draw("sphere", [nexus.x, 0.83, nexus.z], [0.7, 0.76, 0.7],
-            nexus.color, 4, 1 + beat * 0.35, t, 0.32);
         });
 
         const turrets = [
@@ -1515,44 +2069,37 @@
           { x: 9.05, z: -3.8, color: C.redSide }
         ];
         turrets.forEach((turret, i) => {
-          this.draw("cube", [turret.x, 0.36, turret.z], [0.44, 0.43, 0.44],
-            C.stone, 0, 0.18, Math.PI * 0.25);
-          this.draw("crystal", [turret.x, 0.98, turret.z], [0.27, 0.62, 0.27],
-            turret.color, 2, 1.8 + beat * 0.4, (i % 2 ? -1 : 1) * t * 0.22);
-          this.draw("sphere", [turret.x, 1.28, turret.z], [0.22, 0.22, 0.22],
-            turret.color, 4, 1.6 + beat, t);
+          this.draw("cube", [turret.x, 0.22, turret.z], [0.34, 0.28, 0.34], iceBody, 0, 0.15);
+          this.draw("crystal", [turret.x, 0.72, turret.z], [0.18, 0.4, 0.18],
+            turret.color, 2, 1.6 + beat * 0.3, (i % 2 ? -1 : 1) * t * 0.18);
         });
 
+        // Authored materials: cold indestructible stone vs warm destructible wood.
+        const half = game.tile * 0.5;
         for (let r = 0; r < game.rows; r++) {
           for (let c = 0; c < game.cols; c++) {
             const tile = game.grid[r][c];
             const [x, z] = game.worldFromCell(r, c);
             const edge = r === 0 || c === 0 || r === game.rows - 1 || c === game.cols - 1;
-            if (["katarina", "zed", "renekton", "vladimir"].includes(modelReviewTarget) && !edge) continue;
-            if (!edge) {
-              this.draw("cube", [x, -0.19, z], [game.tile * 0.475, 0.035, game.tile * 0.475],
-                (r + c) % 2 ? C.arenaFloorA : C.arenaFloorB, 1, 0.035 + beat * 0.025);
-            }
+            if (["katarina", "zed", "renekton", "vladimir", "gangplank"].includes(modelReviewTarget) && !edge) continue;
             if (!tile) continue;
             if (tile === 1) {
-              this.draw("cube", [x, edge ? 0.48 : 0.38, z],
-                [game.tile * 0.47, edge ? 0.55 : 0.43, game.tile * 0.47],
-                C.arenaStone, 0, 0.08, edge ? 0 : Math.PI * 0.25);
-              this.draw("cube", [x, edge ? 1.02 : 0.79, z],
-                [game.tile * 0.38, 0.06, game.tile * 0.38],
-                C.arenaStoneTop, 2, 0.18 + beat * 0.04, Math.PI * 0.25);
-              if (!edge) this.draw("crystal", [x, 0.96, z], [0.11, 0.22, 0.11],
-                (r + c) % 4 ? C.riverLight : C.gold, 3, 1.2 + beat, r + c);
+              const frontEdge = r === game.rows - 1;
+              const s = edge ? half * 0.96 : half * 0.82;
+              // The camera looks from +Z: lower the near wall so it frames instead of occluding P1.
+              const h = frontEdge ? 0.24 : (edge ? 0.4 : 0.34);
+              this.draw("cube", [x, 0.015, z], [s * 1.04, 0.018, s * 1.04],
+                [0.018, 0.024, 0.03], 0, 0, 0, 0.72);
+              this.draw("cube", [x, h + 0.035, z], [s, h, s],
+                textureTint, 0, 0.015, 0, 1, 0, 0, 3);
             } else if (tile === 2) {
-              const wobble = Math.sin(t * 2.1 + r * 0.7 + c) * 0.018;
-              this.draw("cube", [x, 0.37 + wobble, z],
-                [game.tile * 0.43, 0.42, game.tile * 0.43], C.crate, 0, 0.08, (r + c) % 2 ? 0.02 : -0.02);
-              this.draw("cube", [x, 0.39 + wobble, z],
-                [game.tile * 0.47, 0.055, 0.085], C.crateTrim, 2, 0.42 + beat * 0.08);
-              this.draw("cube", [x, 0.39 + wobble, z],
-                [0.085, 0.055, game.tile * 0.47], C.crateTrim, 2, 0.42 + beat * 0.08);
-              this.draw("crystal", [x, 0.88 + wobble, z], [0.1, 0.19, 0.1],
-                (r + c) % 2 ? C.gold : C.riverLight, 3, 1.45 + beat, t + r - c);
+              const s = half * 0.72;
+              this.draw("cube", [x, 0.012, z], [s * 1.08, 0.016, s * 1.08], [0.05, 0.03, 0.02], 0, 0, 0, 0.55);
+              this.draw("cube", [x, 0.33, z], [s, 0.31, s],
+                textureTint, 0, 0.02, 0, 1, 0, 0, 2);
+              // A shallow lid lip gives the authored top face a physical silhouette.
+              this.draw("cube", [x, 0.655, z], [s * 1.025, 0.025, s * 1.025],
+                textureTint, 0, 0.015, 0, 1, 0, 0, 2);
             }
           }
         }
@@ -1594,12 +2141,8 @@
         }
 
         for (const pickup of game.pickups) {
-          const color = pickup.type === "shield" ? C.ice :
-            pickup.type === "range" ? C.gold :
-            pickup.type === "bomb" ? C.violet : C.mint;
-          this.draw("crystal",
-            [pickup.x, 0.48 + Math.sin(t * 2.3 + pickup.r) * 0.1, pickup.z],
-            [0.2, 0.42, 0.2], color, 2, 2.4 + beat, t * 1.5 + pickup.c);
+          if (pickup.type === "skill") this.drawSkillPickup(pickup, t, beat);
+          else this.drawClassicPickup(pickup, t, beat);
         }
 
         for (const dagger of game.daggers || []) {
@@ -1628,6 +2171,12 @@
             }
             this.draw("sphere", [projectile.x, projectile.y, projectile.z], [0.22, 0.22, 0.22],
               C.zedCrimson, 4, 2.2 + beat, t, 0.2);
+          } else if (projectile.kind === "gangplank") {
+            const angle = Math.atan2(projectile.dx, projectile.dz);
+            this.draw("sphere", [projectile.x, projectile.y, projectile.z], [0.14, 0.14, 0.14],
+              C.gangplankGold, 4, 2.6 + beat, t, 0.35);
+            this.draw("crystal", [projectile.x, projectile.y, projectile.z], [0.06, 0.22, 0.06],
+              C.gangplankOrange, 3, 2.8 + beat, angle, 0.9, 0, Math.PI * 0.5);
           } else {
             this.draw("crystal", [projectile.x, projectile.y, projectile.z], [0.075, 0.38, 0.055],
               C.katBladeEdge, 3, 3.2 + beat, t * 11, 1, 1.12);
@@ -1644,8 +2193,10 @@
             const z = lerp(trail.z1, trail.z2, q);
             const side = i % 2 ? 1 : -1;
             const trailA = trail.vladimir ? C.vladimirCrimson :
+              trail.gangplank ? C.gangplankGold :
               trail.renekton ? C.renektonTeal : trail.zed ? C.zedCrimson : C.katCrimson;
             const trailB = trail.vladimir ? C.vladimirPale :
+              trail.gangplank ? C.gangplankOrange :
               trail.renekton ? C.renektonGold : trail.zed ? C.zedSteelLight : C.katBlade;
             this.draw("crystal", [x, 0.24 + q * 0.35, z], [0.045, 0.2 * life, 0.035],
               side > 0 ? trailA : trailB, 3, 2.8 * life, trail.angle + side * 0.72, life, 0.9);
@@ -1656,8 +2207,10 @@
           const life = clamp(1 - slash.age / slash.life, 0, 1);
           const radius = slash.radius * (1.1 - life * 0.16);
           const slashA = slash.vladimir ? C.vladimirCrimson :
+            slash.gangplank ? C.gangplankGold :
             slash.renekton ? C.renektonTeal : slash.zed ? C.zedCrimson : C.katCrimson;
           const slashB = slash.vladimir ? C.vladimirPale :
+            slash.gangplank ? C.gangplankOrange :
             slash.renekton ? C.renektonGold : slash.zed ? C.zedSteelLight : C.katBladeEdge;
           this.draw("torus", [slash.x, 0.28, slash.z], [radius, 0.075 * life, radius],
             slashA, 4, 3.8 * life + beat, t * 5, 0.72 * life, 0, Math.PI * 0.5);
@@ -1678,6 +2231,26 @@
             warning > 0.72 ? C.whiteGold : C.zedCrimson, 3, 2.4 + warning * 5, t * 3.6);
         }
 
+
+        for (const barrel of game.gangplankBarrels || []) {
+          if (barrel.exploded) continue;
+          const pulse = 0.92 + Math.sin(t * 5.5 + barrel.id) * 0.08;
+          this.draw("cylinder", [barrel.x, 0.28, barrel.z], [0.28 * pulse, 0.34, 0.28 * pulse],
+            C.gangplankBronze, 2, 0.4 + beat, t * 0.4);
+          this.draw("sphere", [barrel.x, 0.52, barrel.z], [0.16, 0.1, 0.16],
+            C.gangplankOrange, 4, 1.8 + beat, t, 0.7);
+          this.draw("torus", [barrel.x, 0.08, barrel.z], [0.38, 0.04, 0.38],
+            C.gangplankGold, 4, 1.2 + beat, -t * 2, 0.5, 0, Math.PI * 0.5);
+        }
+        for (const barrage of game.gangplankBarrages || []) {
+          if (barrage.detonated) continue;
+          const progress = clamp(barrage.age / barrage.fuse, 0, 1);
+          const pulse = 0.85 + Math.sin(t * 8) * 0.12 + progress * 0.2;
+          this.draw("torus", [barrage.x, 0.1, barrage.z], [barrage.radius * pulse, 0.07, barrage.radius * pulse],
+            C.gangplankOrange, 4, 2.4 + beat, -t * 2.4, 0.7, 0, Math.PI * 0.5);
+          this.draw("torus", [barrage.x, 0.14, barrage.z], [barrage.radius * 0.72 * pulse, 0.05, barrage.radius * 0.72 * pulse],
+            C.gangplankGold, 4, 1.6 + beat, t * 1.8, 0.55, 0, Math.PI * 0.5);
+        }
         for (const mark of game.vladimirMarks || []) {
           const pulse = 0.9 + Math.sin(t * 6.2 + mark.age * 5) * 0.08;
           const radius = mark.radius * (0.92 + clamp(mark.age / mark.fuse, 0, 1) * 0.12);
@@ -1770,6 +2343,22 @@
             castAnim: modelReviewPose === "cast" ? 0.28 : 0,
             castDuration: 0.55
           }, t, beat);
+        } else if (modelReviewMode && modelReviewTarget === "gangplank" && player) {
+          this.drawGangplank({
+            ...player,
+            champion: "gangplank",
+            x: 0,
+            z: 0,
+            facing: -0.34,
+            invulnerable: 0,
+            shield: modelReviewPose === "shield" ? 4 : 0,
+            moving: modelReviewPose === "run",
+            gangplankShotAnim: modelReviewPose === "slash" || modelReviewPose === "cast" ? 0.4 : 0,
+            gangplankKegAnim: modelReviewPose === "dash" ? 0.3 : 0,
+            gangplankUltAnim: modelReviewPose === "ult" ? 0.35 : 0,
+            castAnim: modelReviewPose === "cast" ? 0.28 : 0,
+            castDuration: 0.42
+          }, t, beat);
         } else if (!modelReviewMode) {
           for (const contestant of game.players || [player]) {
             if (contestant?.alive === false) continue;
@@ -1777,6 +2366,7 @@
             else if (contestant.champion === "zed") this.drawZed(contestant, t, beat);
             else if (contestant.champion === "renekton") this.drawRenekton(contestant, t, beat);
             else if (contestant.champion === "vladimir") this.drawVladimir(contestant, t, beat);
+            else if (contestant.champion === "gangplank") this.drawGangplank(contestant, t, beat);
             else this.drawZiggs(contestant, t, beat);
           }
         }
@@ -1813,6 +2403,9 @@
         }
         gl.drawArrays(gl.TRIANGLES, 0, 3);
         gl.bindVertexArray(null);
+
+        // Real skill icons as DOM discs over the WebGL pedestals
+        if (!modelReviewMode) this.syncSkillTokenDom(game.pickups, t);
 
         const frameMs = dt * 1000;
         this.frameSamples.push(frameMs);
@@ -1862,23 +2455,23 @@
     }
 
     Renderer.colors = {
-      floor: hexToRgb("#0d2a21"),
-      lane: hexToRgb("#6f725f"),
-      river: hexToRgb("#17666e"),
-      riverLight: hexToRgb("#41c1c2"),
-      forest: hexToRgb("#255a38"),
-      forestDark: hexToRgb("#173e2c"),
-      moss: hexToRgb("#3f6b3e"),
-      brushA: hexToRgb("#2f6a3e"),
-      brushB: hexToRgb("#497941"),
-      bark: hexToRgb("#4a3d2b"),
-      stone: hexToRgb("#55635d"),
-      arenaFloorA: hexToRgb("#17372f"),
-      arenaFloorB: hexToRgb("#122e29"),
-      arenaStone: hexToRgb("#405158"),
-      arenaStoneTop: hexToRgb("#71817c"),
-      crate: hexToRgb("#6c3e28"),
-      crateDark: hexToRgb("#351f1d"),
+      floor: hexToRgb("#14382c"),
+      lane: hexToRgb("#7a7d6a"),
+      river: hexToRgb("#1a757e"),
+      riverLight: hexToRgb("#4dcecf"),
+      forest: hexToRgb("#2c6a42"),
+      forestDark: hexToRgb("#1c4a34"),
+      moss: hexToRgb("#4a7a48"),
+      brushA: hexToRgb("#387848"),
+      brushB: hexToRgb("#54894a"),
+      bark: hexToRgb("#5a4a34"),
+      stone: hexToRgb("#62706a"),
+      arenaFloorA: hexToRgb("#1c443a"),
+      arenaFloorB: hexToRgb("#163830"),
+      arenaStone: hexToRgb("#4a5c64"),
+      arenaStoneTop: hexToRgb("#82928c"),
+      crate: hexToRgb("#5a3824"),
+      crateDark: hexToRgb("#2a1814"),
       crateTrim: hexToRgb("#c6954d"),
       bomb: hexToRgb("#20221e"),
       player: hexToRgb("#e2bf72"),
@@ -1913,6 +2506,11 @@
       vladimirBloodDark: hexToRgb("#160006"),
       vladimirPale: hexToRgb("#d8c1ba"),
       vladimirGold: hexToRgb("#b98c59"),
+      gangplankBronze: hexToRgb("#8a5a2b"),
+      gangplankGold: hexToRgb("#d4a84b"),
+      gangplankOrange: hexToRgb("#e07028"),
+      gangplankDark: hexToRgb("#1a120c"),
+      gangplankSea: hexToRgb("#2a6b7c"),
       ziggsFur: hexToRgb("#c58a45"),
       ziggsFurLight: hexToRgb("#f0d28a"),
       ziggsFace: hexToRgb("#7a3e2f"),
@@ -2018,6 +2616,9 @@
       uniform float uEmissive;
       uniform float uMaterial;
       uniform float uAlpha;
+      uniform sampler2D uAlbedo;
+      uniform sampler2D uAlbedoTop;
+      uniform float uMapId;
       out vec4 outColor;
 
       float hash21(vec2 p) {
@@ -2026,41 +2627,182 @@
         return fract(p.x * p.y);
       }
 
+      float lum(vec3 c) {
+        return dot(c, vec3(0.2126, 0.7152, 0.0722));
+      }
+
+      vec2 faceUv(vec3 local, vec3 n) {
+        vec3 a = abs(n);
+        if (a.y >= a.x && a.y >= a.z) return local.xz * 0.5 + 0.5;
+        if (a.x >= a.z) return local.zy * 0.5 + 0.5;
+        return local.xy * 0.5 + 0.5;
+      }
+
+      // Multi-scale albedo: base map + high-freq self-detail (breaks 512/1024 "sticker" look).
+      vec3 sampleAlbedoDetail(sampler2D map, vec2 uv, float detailScale, float detailMix) {
+        vec3 base = texture(map, uv).rgb;
+        vec3 detail = texture(map, uv * detailScale).rgb;
+        // Overlay blend keeps grain without washing midtones
+        vec3 over = mix(2.0 * base * detail, 1.0 - 2.0 * (1.0 - base) * (1.0 - detail), step(0.5, lum(base)));
+        return mix(base, over, detailMix);
+      }
+
+      // Fake surface normal from albedo luminance (cheap height-map relief).
+      vec3 bumpFromAlbedo(sampler2D map, vec2 uv, vec3 N, float strength) {
+        vec2 texel = vec2(1.0 / 512.0);
+        float hC = lum(texture(map, uv).rgb);
+        float hX = lum(texture(map, uv + vec2(texel.x * 2.0, 0.0)).rgb);
+        float hY = lum(texture(map, uv + vec2(0.0, texel.y * 2.0)).rgb);
+        vec3 T = normalize(cross(N, vec3(0.0, 1.0, 0.001)));
+        if (length(T) < 0.01) T = normalize(cross(N, vec3(1.0, 0.0, 0.0)));
+        vec3 B = normalize(cross(N, T));
+        vec3 bump = normalize(vec3((hC - hX) * strength, (hC - hY) * strength, 1.0));
+        return normalize(T * bump.x + B * bump.y + N * bump.z);
+      }
+
+      // Mild filmic compress — scene is display-referred; post must NOT re-tonemap.
+      vec3 tonemap(vec3 x) {
+        x = max(x, vec3(0.0));
+        return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+      }
+
       void main() {
         vec3 N = normalize(vNormal);
+        if (!gl_FrontFacing) N = -N;
         vec3 V = normalize(uCamera - vWorld);
-        vec3 L = normalize(vec3(-0.42, 0.82, 0.34));
-        float diffuse = max(dot(N, L), 0.0);
-        float halfLight = pow(max(dot(N, normalize(L + V)), 0.0), 46.0);
+        vec3 Lkey = normalize(vec3(-0.28, 0.92, 0.24));
+        vec3 Lfill = normalize(vec3(0.62, 0.42, -0.48));
+        float ndlKey = max(dot(N, Lkey), 0.0);
+        float ndlFill = max(dot(N, Lfill), 0.0);
+        float wrapKey = max(dot(N, Lkey) * 0.55 + 0.45, 0.0);
+        float hemi = N.y * 0.5 + 0.5;
         float rim = pow(1.0 - max(dot(N, V), 0.0), 2.6);
-        float edge = pow(max(max(abs(vLocal.x), abs(vLocal.y)), abs(vLocal.z)), 8.0);
-        vec3 color = uColor * (0.16 + diffuse * 0.82);
-        color += vec3(0.78, 0.9, 1.0) * halfLight * 0.55;
-        color += uColor * rim * (0.28 + uEmissive * 0.18);
-        color += uColor * edge * 0.18;
+        float edge = pow(max(max(abs(vLocal.x), abs(vLocal.y)), abs(vLocal.z)), 10.0);
+        float spec = pow(max(dot(N, normalize(Lkey + V)), 0.0), 42.0);
 
-        if (uMaterial > 0.5 && uMaterial < 1.5) {
-          vec2 g = abs(fract(vWorld.xz / 1.32 - 0.5) - 0.5) / fwidth(vWorld.xz / 1.32);
-          float grid = 1.0 - min(min(g.x, g.y), 1.0);
-          float diagonal = smoothstep(0.035, 0.0, abs(fract((vWorld.x + vWorld.z) * 0.19) - 0.5) - 0.47);
-          color += vec3(0.18, 0.56, 0.48) * grid * (0.12 + uBeat * 0.07);
-          color += vec3(0.24, 0.38, 0.25) * diagonal * 0.1;
-          color *= 0.82 + hash21(floor(vWorld.xz * 5.0)) * 0.06;
-        } else if (uMaterial > 1.5 && uMaterial < 2.5) {
-          float facets = 0.55 + 0.45 * sin((vWorld.x + vWorld.y * 1.7 + vWorld.z) * 12.0 + uTime * 1.4);
-          color += uColor * facets * (0.22 + uEmissive * 0.16);
-          color += vec3(0.65, 0.85, 1.0) * rim * 0.48;
-        } else if (uMaterial > 2.5 && uMaterial < 3.5) {
-          float bands = 0.5 + 0.5 * sin((vLocal.y + length(vLocal.xz)) * 18.0 - uTime * 10.0);
-          color += uColor * (uEmissive * (0.42 + bands * 0.34));
-          color += vec3(1.0, 0.86, 0.5) * rim * uEmissive * 0.38;
-        } else if (uMaterial > 3.5) {
-          color = uColor * (0.5 + uEmissive * 0.62);
-          color += uColor * (rim + edge) * (0.8 + uBeat * 0.5);
+        // mapped: texture is ground truth. solid: stylized uColor.
+        vec3 albedo = uColor;
+        float mapped = 0.0;
+        vec2 mapUv = vec2(0.0);
+        float topFace = step(0.55, abs(N.y));
+        if (uMapId > 0.5) {
+          vec2 uv;
+          if (uMapId > 3.5 && uMapId < 4.5) {
+            // skillDisc: unit circle in XZ, y=0, normals +Y — UV from xz covers full icon
+            uv = clamp(vLocal.xz * 0.5 + 0.5, 0.0, 1.0);
+            albedo = texture(uAlbedo, uv).rgb;
+            mapUv = uv;
+          } else if (uMapId > 1.5 && uMapId < 2.5) {
+            // CRATE: one full face of the X-panel art — never tile/fract or multi-scale
+            // (tiling turned the X into a pixel soup).
+            uv = clamp(faceUv(vLocal, N), 0.0, 1.0);
+            mapUv = uv;
+            vec3 sideAlbedo = texture(uAlbedo, uv).rgb;
+            vec3 topAlbedo = texture(uAlbedoTop, uv).rgb;
+            albedo = mix(sideAlbedo, topAlbedo, topFace);
+            // Soft wood bump only (low strength — high contrast braces otherwise noise)
+            vec3 NbSide = bumpFromAlbedo(uAlbedo, uv, N, 0.85);
+            vec3 NbTop = bumpFromAlbedo(uAlbedoTop, uv, N, 0.7);
+            vec3 Nb = mix(NbSide, NbTop, topFace);
+            N = normalize(mix(N, Nb, 0.28));
+          } else if (uMapId > 2.5 && uMapId < 3.5) {
+            // WALL: one authored material across each block; no micro-tiling.
+            uv = clamp(faceUv(vLocal, N), 0.0, 1.0);
+            mapUv = uv;
+            vec3 sideAlbedo = texture(uAlbedo, uv).rgb;
+            vec3 topAlbedo = texture(uAlbedoTop, uv).rgb;
+            albedo = mix(sideAlbedo, topAlbedo, topFace);
+            vec3 NbSide = bumpFromAlbedo(uAlbedo, uv, N, 1.15);
+            vec3 NbTop = bumpFromAlbedo(uAlbedoTop, uv, N, 0.95);
+            vec3 Nb = mix(NbSide, NbTop, topFace);
+            N = normalize(mix(N, Nb, 0.3));
+          } else {
+            // FLOOR: one plate per gameplay cell, aligned by the draw call.
+            uv = clamp(faceUv(vLocal, N), 0.0, 1.0);
+            mapUv = uv;
+            albedo = texture(uAlbedo, uv).rgb;
+            vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 0.8);
+            N = normalize(mix(N, Nb, 0.2));
+          }
+          mapped = 1.0;
+          // Recompute lighting terms after bump
+          ndlKey = max(dot(N, Lkey), 0.0);
+          ndlFill = max(dot(N, Lfill), 0.0);
+          wrapKey = max(dot(N, Lkey) * 0.55 + 0.45, 0.0);
+          hemi = N.y * 0.5 + 0.5;
+          rim = pow(1.0 - max(dot(N, V), 0.0), 2.6);
+          spec = pow(max(dot(N, normalize(Lkey + V)), 0.0), 48.0);
         }
 
-        float fog = smoothstep(9.0, 27.0, length(uCamera - vWorld));
-        color = mix(color, vec3(0.004, 0.025, 0.021), fog * 0.74);
+        // Crash N.Sane lighting: warm key, cool fill, soft half-lambert, readable ramps
+        vec3 sky = vec3(0.35, 0.55, 0.75);
+        vec3 groundAmb = vec3(0.22, 0.14, 0.08);
+        vec3 ambient = mix(groundAmb, sky, hemi);
+        float ao = mix(0.72, 1.0, smoothstep(0.4, 0.97, 1.0 - edge * 0.55));
+        ao *= mix(0.88, 1.0, smoothstep(-0.1, 0.55, vLocal.y));
+        float softLit = clamp(wrapKey * 0.72 + ndlKey * 0.38 + ndlFill * 0.22, 0.0, 1.0);
+        // Soft 3-band ramp (Crash toy-shading without hard toon edges)
+        float ramp = smoothstep(0.0, 0.35, softLit) * 0.42
+          + smoothstep(0.35, 0.7, softLit) * 0.38
+          + smoothstep(0.7, 1.0, softLit) * 0.2;
+
+        vec3 color;
+        if (mapped > 0.5) {
+          if (uMapId > 3.5 && uMapId < 4.5) {
+            float shade = 0.94 + wrapKey * 0.06;
+            color = albedo * shade;
+            color += albedo * uEmissive * 0.7;
+            color += vec3(1.0, 0.94, 0.78) * rim * 0.04;
+          } else {
+            // Authored albedo stays grounded; lighting adds form without bleaching it.
+            float shade = 0.5 + ramp * 0.62;
+            shade *= ao;
+            color = albedo * shade;
+            color += albedo * ambient * 0.1;
+            color += albedo * edge * 0.06;
+            color += vec3(1.0, 0.95, 0.85) * spec * 0.04;
+          }
+        } else {
+          // PRIMARY Crash solid path — saturated, chunky, readable
+          float shade = 0.34 + ramp * 0.78;
+          shade *= ao;
+          color = albedo * shade;
+          color += albedo * ambient * 0.22;
+          color += vec3(1.0, 0.92, 0.75) * ndlKey * 0.12 * albedo;
+          color += vec3(0.55, 0.75, 1.0) * ndlFill * 0.08 * albedo;
+          // Cartoon volume edge
+          color *= mix(0.78, 1.0, 1.0 - edge * 0.55);
+          color += albedo * rim * (0.12 + uEmissive * 0.15);
+          color += vec3(1.0, 0.96, 0.88) * spec * 0.22;
+          color += albedo * uEmissive * 0.35;
+          // Pop saturation (Crash toys are candy-colored)
+          float L = lum(color);
+          color = mix(vec3(L), color, 1.22);
+
+          if (uMaterial > 0.5 && uMaterial < 1.5) {
+            // subtle stage noise only
+            color *= 0.97 + hash21(floor(vWorld.xz * 3.0)) * 0.04;
+          } else if (uMaterial > 1.5 && uMaterial < 2.5) {
+            float facets = 0.6 + 0.4 * sin((vWorld.x + vWorld.y * 1.7 + vWorld.z) * 10.0 + uTime * 1.2);
+            color += albedo * facets * (0.1 + uEmissive * 0.08);
+            color += vec3(0.6, 0.85, 1.0) * rim * 0.35;
+          } else if (uMaterial > 2.5 && uMaterial < 3.5) {
+            float bands = 0.5 + 0.5 * sin((vLocal.y + length(vLocal.xz)) * 16.0 - uTime * 9.0);
+            color += albedo * (uEmissive * (0.3 + bands * 0.22));
+            color += vec3(1.0, 0.9, 0.55) * rim * uEmissive * 0.25;
+          } else if (uMaterial > 3.5) {
+            color = albedo * (0.58 + uEmissive * 0.52);
+            color += albedo * (rim + edge) * (0.5 + uBeat * 0.3);
+          }
+        }
+
+        // Restrained distance separation; never wash the material palette blue.
+        float dist = length(uCamera - vWorld);
+        float fog = smoothstep(11.0, 30.0, dist);
+        vec3 fogColor = vec3(0.055, 0.085, 0.11);
+        color = mix(color, fogColor, fog * 0.16);
+
+        color = tonemap(color * 1.12);
         outColor = vec4(color, uAlpha);
       }
     `;
@@ -2134,33 +2876,45 @@
       uniform float uAlpha;
       out vec4 outColor;
 
+      vec3 tonemap(vec3 x) {
+        x = max(x, vec3(0.0));
+        return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+      }
+
       void main() {
         vec3 normal = normalize(vNormal);
         if (!gl_FrontFacing) normal = -normal;
         vec3 view = normalize(uCamera - vWorld);
-        vec3 light = normalize(vec3(-0.5, 0.76, 0.42));
-        vec3 fillLight = normalize(vec3(0.62, 0.28, -0.74));
-        float wrapped = smoothstep(-0.24, 0.86, dot(normal, light));
-        float fill = smoothstep(-0.5, 0.72, dot(normal, fillLight));
+        // Same key/fill as main arena so champions share world light
+        vec3 light = normalize(vec3(-0.28, 0.92, 0.24));
+        vec3 fillLight = normalize(vec3(0.62, 0.42, -0.48));
+        float wrapped = smoothstep(-0.18, 0.88, dot(normal, light));
+        float fill = smoothstep(-0.4, 0.75, dot(normal, fillLight));
         float hemisphere = normal.y * 0.5 + 0.5;
-        float rim = pow(1.0 - max(dot(normal, view), 0.0), 2.7);
-        float specular = pow(max(dot(normal, normalize(light + view)), 0.0), 54.0);
+        float rim = pow(1.0 - max(dot(normal, view), 0.0), 2.5);
+        float specular = pow(max(dot(normal, normalize(light + view)), 0.0), 48.0);
 
         vec4 texel = texture(uChampion, vUv);
         if (texel.a < 0.08) discard;
+        // Display-referred albedo (RGBA8 atlas) — keep hue/contrast of the bake texture
         vec3 albedo = texel.rgb;
         float luminance = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
-        albedo = max(vec3(0.0), mix(vec3(luminance), albedo, 1.14));
+        albedo = max(vec3(0.0), mix(vec3(luminance), albedo, 1.06));
         float chroma = max(albedo.r, max(albedo.g, albedo.b)) -
           min(albedo.r, min(albedo.g, albedo.b));
         float metal = smoothstep(0.18, 0.03, chroma) * smoothstep(0.28, 0.66, luminance);
-        vec3 ambient = mix(vec3(0.045, 0.065, 0.12), vec3(0.2, 0.15, 0.2), hemisphere);
-        vec3 color = albedo * (ambient + vec3(1.16, 0.88, 0.7) * wrapped * 1.08 +
-          vec3(0.12, 0.22, 0.42) * fill * 0.48);
-        color += vec3(1.0, 0.82, 0.64) * specular * (0.06 + metal * 0.9);
+        // Soft key wrap so dark leather/cloth still reads (GP coat was pure silhouette)
+        vec3 ambient = mix(vec3(0.14, 0.13, 0.12), vec3(0.32, 0.30, 0.34), hemisphere);
+        float shade = 0.34 + wrapped * 0.88 + fill * 0.38 + hemisphere * 0.1;
+        vec3 color = albedo * shade * 1.18;
+        color += albedo * ambient * 0.28;
+        color += vec3(1.0, 0.92, 0.8) * specular * (0.06 + metal * 0.85);
         vec3 skillAccent = vec3(0.95, 0.018, 0.065);
         vec3 lowAccent = vec3(0.07, 0.16, 0.34);
-        if (uStyle > 2.5) {
+        if (uStyle > 3.5) {
+          skillAccent = vec3(0.95, 0.55, 0.12);
+          lowAccent = vec3(0.18, 0.1, 0.04);
+        } else if (uStyle > 2.5) {
           skillAccent = vec3(0.98, 0.045, 0.16);
           lowAccent = vec3(0.25, 0.008, 0.035);
         } else if (uStyle > 1.5) {
@@ -2170,29 +2924,31 @@
           skillAccent = vec3(0.9, 0.012, 0.075);
           lowAccent = vec3(0.025, 0.015, 0.055);
         }
+        // Skill rim only when actually casting — idle lowAccent was muddying GP brown
         color += mix(lowAccent, skillAccent, vSkill) *
-          rim * (0.16 + vSkill * 0.76 + uBeat * 0.1);
+          rim * (0.06 + vSkill * 0.78 + uBeat * 0.06);
 
         float pulse = 0.5 + 0.5 * sin(uTime * 13.0 + vLocal.y * 8.0);
-        color += vec3(0.52, 0.012, 0.035) * uLotus * (0.08 + pulse * 0.12);
-        color += vec3(0.72, 0.025, 0.07) * uVoracity * rim * (0.2 + pulse * 0.18);
-        color += vec3(0.08, 0.17, 0.22) * uDash * rim * 0.34;
-        if (uStyle > 2.5) {
-          color += vec3(0.58, 0.008, 0.055) * (uLotus * 0.2 + uVoracity * rim * 0.26);
+        color += vec3(0.52, 0.012, 0.035) * uLotus * (0.07 + pulse * 0.1);
+        color += vec3(0.72, 0.025, 0.07) * uVoracity * rim * (0.18 + pulse * 0.15);
+        color += vec3(0.08, 0.17, 0.22) * uDash * rim * 0.3;
+        if (uStyle > 3.5) {
+          color += vec3(0.72, 0.32, 0.04) * (uLotus * 0.16 + uVoracity * rim * 0.2);
+        } else if (uStyle > 2.5) {
+          color += vec3(0.58, 0.008, 0.055) * (uLotus * 0.18 + uVoracity * rim * 0.22);
         } else if (uStyle > 1.5) {
-          color += vec3(0.05, 0.48, 0.38) * (uLotus * 0.15 + uVoracity * rim * 0.2);
+          color += vec3(0.05, 0.48, 0.38) * (uLotus * 0.14 + uVoracity * rim * 0.18);
         }
-        vec3 shadowInk = vec3(0.004, 0.0003, 0.0015) +
-          vec3(0.32, 0.0015, 0.008) * (rim * 0.82 + pulse * 0.045);
+        vec3 shadowInk = vec3(0.01, 0.006, 0.012) +
+          vec3(0.28, 0.004, 0.01) * (rim * 0.7 + pulse * 0.04);
         color = mix(color, shadowInk, uShadow);
-        color = mix(color, vec3(1.0, 0.9, 0.86), uHurt * 0.7);
-        color += vec3(0.12, 0.22, 0.25) * uInvulnerable * rim * 0.35;
+        color = mix(color, vec3(1.0, 0.9, 0.86), uHurt * 0.65);
+        color += vec3(0.12, 0.22, 0.25) * uInvulnerable * rim * 0.3;
 
-        float fog = smoothstep(9.0, 27.0, length(uCamera - vWorld));
-        color = mix(color, vec3(0.004, 0.025, 0.021), fog * 0.72);
-        color = clamp((color * (2.51 * color + 0.03)) /
-          (color * (2.43 * color + 0.59) + 0.14), 0.0, 1.0);
-        color = pow(color, vec3(1.0 / 2.2));
+        // Match main fog — old path crushed champions into black-green
+        float fog = smoothstep(16.0, 40.0, length(uCamera - vWorld));
+        color = mix(color, vec3(0.055, 0.085, 0.10), fog * 0.22);
+        color = tonemap(color);
         outColor = vec4(color, uAlpha * mix(1.0, 0.9, uShadow));
       }
     `;
@@ -2266,19 +3022,22 @@
         float wave = exp(-pow((d - radius) * 52.0, 2.0)) * (1.0 - smoothstep(0.0, 1.1, s.z)) * s.w;
         ring += wave;
         vec2 dir = normalize(uv - s.xy + vec2(0.0001));
-        return uv - dir * wave * 0.012 * (1.0 - uReduced);
+        return uv - dir * wave * 0.01 * (1.0 - uReduced);
       }
 
       vec3 sampleScene(vec2 uv) {
         vec2 px = 1.0 / uResolution;
-        float aberr = (uHit * 1.2 + uEnergy * 0.35) * 1.4 * px.x * (1.0 - uReduced);
-        float r = texture(uScene, uv + vec2(aberr, 0)).r;
+        // Aberration only on hit — not constant wash
+        float aberr = (uHit * 1.1 + uEnergy * 0.18) * px.x * (1.0 - uReduced);
+        float r = texture(uScene, uv + vec2(aberr, 0.0)).r;
         float g = texture(uScene, uv).g;
-        float b = texture(uScene, uv - vec2(aberr, 0)).b;
+        float b = texture(uScene, uv - vec2(aberr, 0.0)).b;
         return vec3(r, g, b);
       }
 
       void main() {
+        // Scene is already tonemapped (display-referred). Post only grades FX.
+        // Never reinhard/ACES again — that was bleaching albedos and crushing grain.
         vec2 uv = vUv;
         float ring = 0.0;
         uv = shockWarp(uv, uShock0, ring);
@@ -2289,6 +3048,8 @@
         vec4 baseTex = texture(uScene, uv);
         vec3 color = sampleScene(uv);
         vec2 px = 1.0 / uResolution;
+
+        // Bloom only true highlights (crystals, FX) — threshold high so wood never blooms
         vec3 bloom = vec3(0.0);
         float weights = 0.0;
         for (int i = 0; i < 8; i++) {
@@ -2296,31 +3057,33 @@
           vec2 dir = vec2(cos(a), sin(a));
           for (int j = 1; j <= 2; j++) {
             float fj = float(j);
-            vec3 s = texture(uScene, uv + dir * px * fj * (2.0 + uEnergy * 2.0)).rgb;
-            float lum = max(max(s.r, s.g), s.b);
-            bloom += s * smoothstep(0.72, 2.1, lum);
+            vec3 s = texture(uScene, uv + dir * px * fj * (1.6 + uEnergy * 1.4)).rgb;
+            float lum = dot(s, vec3(0.2126, 0.7152, 0.0722));
+            bloom += s * smoothstep(0.78, 1.05, lum);
             weights += 1.0;
           }
         }
-        color += bloom / max(weights, 1.0) * (0.72 + uEnergy * 0.75);
-        color += vec3(1.0, 0.72, 0.25) * ring * 1.7;
+        color += bloom / max(weights, 1.0) * (0.28 + uEnergy * 0.35);
+        color += vec3(1.0, 0.78, 0.35) * ring * 1.15;
 
-        color = color / (color + vec3(0.86));
-        color = pow(max(color, 0.0), vec3(0.91));
-        float gradedLuma = dot(color, vec3(0.2126, 0.7152, 0.0722));
-        color = mix(vec3(gradedLuma), color, 1.26);
-        color.r *= 1.04;
-        color.b *= 1.09;
-        float vignette = smoothstep(0.86, 0.2, length(vUv - 0.5));
-        color *= 0.58 + vignette * 0.66;
+        // Soft grade only — preserve midtone chroma of mapped materials
+        float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+        color = mix(vec3(luma), color, 1.08);
+        color *= vec3(1.02, 1.0, 1.03);
+        color *= 1.04;
+
+        // CRT cockpit vignette — frames the board, kills edge wash
+        float vignette = smoothstep(1.12, 0.22, length(vUv - 0.5));
+        color *= 0.82 + vignette * 0.22;
+
         float lowHealth = 1.0 - uHealth;
-        color += vec3(0.42, 0.01, 0.025) * lowHealth * lowHealth * (1.0 - vignette) * (0.5 + uBeat * 0.5);
-        float scan = sin(vUv.y * uResolution.y * 1.4) * 0.008;
-        float grain = (hash21(vUv * uResolution + fract(uTime) * 71.0) - 0.5) * 0.025;
-        color += (scan + grain) * (1.0 - uReduced);
-        color += vec3(0.04, 0.08, 0.19) * uBeat * 0.035;
-        float alpha = clamp(baseTex.a + max(max(bloom.r, bloom.g), bloom.b) * 0.1, 0.22, 0.97);
-        outColor = vec4(color, alpha);
+        color += vec3(0.38, 0.02, 0.03) * lowHealth * lowHealth * (1.0 - vignette) * (0.45 + uBeat * 0.4);
+        float grain = (hash21(vUv * uResolution + fract(uTime) * 71.0) - 0.5) * 0.016;
+        color += grain * (1.0 - uReduced);
+        color += vec3(0.03, 0.06, 0.12) * uBeat * 0.02;
+
+        color = clamp(color, 0.0, 1.0);
+        // Opaque composite — transparent post was the mid-grey page bleed
+        outColor = vec4(color, 1.0);
       }
     `;
-

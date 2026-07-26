@@ -1,0 +1,13 @@
+{
+  "id": "ground",
+  "displayName": "Arena floor",
+  "maps": {
+    "albedo": "textures/ground/floor-lattice.webp"
+  },
+  "tint": [0.08, 0.12, 0.14],
+  "metallic": 0.15,
+  "roughness": 0.72,
+  "tileScale": 1.0,
+  "source": "raw-imagine/05-ground-B-grid-steel-native.png",
+  "notes": "One cropped native steel plate per gameplay cell. Dark, matte and secondary to characters and crates."
+}

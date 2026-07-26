@@ -1,0 +1,306 @@
+[
+  {
+    "i": 13,
+    "nn": "13",
+    "slug": "cobble-worn",
+    "name": "ground_13_cobble-worn.jpg",
+    "path": "grokimagineassets/ground/ground_13_cobble-worn.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 14,
+    "nn": "14",
+    "slug": "rune-etched-stone",
+    "name": "ground_14_rune-etched-stone.jpg",
+    "path": "grokimagineassets/ground/ground_14_rune-etched-stone.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 15,
+    "nn": "15",
+    "slug": "mud-tire-tracks-abstract",
+    "name": "ground_15_mud-tire-tracks-abstract.jpg",
+    "path": "grokimagineassets/ground/ground_15_mud-tire-tracks-abstract.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 16,
+    "nn": "16",
+    "slug": "desert-sand-grit",
+    "name": "ground_16_desert-sand-grit.jpg",
+    "path": "grokimagineassets/ground/ground_16_desert-sand-grit.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 17,
+    "nn": "17",
+    "slug": "swamp-wet-soil",
+    "name": "ground_17_swamp-wet-soil.jpg",
+    "path": "grokimagineassets/ground/ground_17_swamp-wet-soil.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 18,
+    "nn": "18",
+    "slug": "crystal-shard-floor",
+    "name": "ground_18_crystal-shard-floor.jpg",
+    "path": "grokimagineassets/ground/ground_18_crystal-shard-floor.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 19,
+    "nn": "19",
+    "slug": "iron-plate-floor",
+    "name": "ground_19_iron-plate-floor.jpg",
+    "path": "grokimagineassets/ground/ground_19_iron-plate-floor.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 20,
+    "nn": "20",
+    "slug": "ancient-mosaic-worn",
+    "name": "ground_20_ancient-mosaic-worn.jpg",
+    "path": "grokimagineassets/ground/ground_20_ancient-mosaic-worn.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 21,
+    "nn": "21",
+    "slug": "snow-dirt-patchy",
+    "name": "ground_21_snow-dirt-patchy.jpg",
+    "path": "grokimagineassets/ground/ground_21_snow-dirt-patchy.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 22,
+    "nn": "22",
+    "slug": "toxic-green-soil",
+    "name": "ground_22_toxic-green-soil.jpg",
+    "path": "grokimagineassets/ground/ground_22_toxic-green-soil.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 23,
+    "nn": "23",
+    "slug": "bilgewater-plank-floor",
+    "name": "ground_23_bilgewater-plank-floor.jpg",
+    "path": "grokimagineassets/ground/ground_23_bilgewater-plank-floor.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 24,
+    "nn": "24",
+    "slug": "void-purple-cracks",
+    "name": "ground_24_void-purple-cracks.jpg",
+    "path": "grokimagineassets/ground/ground_24_void-purple-cracks.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 25,
+    "nn": "25",
+    "slug": "piltover-brass-tiles",
+    "name": "ground_25_piltover-brass-tiles.jpg",
+    "path": "grokimagineassets/ground/ground_25_piltover-brass-tiles.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 26,
+    "nn": "26",
+    "slug": "shadow-isles-fog-dirt",
+    "name": "ground_26_shadow-isles-fog-dirt.jpg",
+    "path": "grokimagineassets/ground/ground_26_shadow-isles-fog-dirt.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 27,
+    "nn": "27",
+    "slug": "ionia-blossom-dirt",
+    "name": "ground_27_ionia-blossom-dirt.jpg",
+    "path": "grokimagineassets/ground/ground_27_ionia-blossom-dirt.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 28,
+    "nn": "28",
+    "slug": "demacia-white-stone",
+    "name": "ground_28_demacia-white-stone.jpg",
+    "path": "grokimagineassets/ground/ground_28_demacia-white-stone.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 29,
+    "nn": "29",
+    "slug": "noxus-iron-gravel",
+    "name": "ground_29_noxus-iron-gravel.jpg",
+    "path": "grokimagineassets/ground/ground_29_noxus-iron-gravel.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 30,
+    "nn": "30",
+    "slug": "freljord-ice-dirt",
+    "name": "ground_30_freljord-ice-dirt.jpg",
+    "path": "grokimagineassets/ground/ground_30_freljord-ice-dirt.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 31,
+    "nn": "31",
+    "slug": "targon-star-stone",
+    "name": "ground_31_targon-star-stone.jpg",
+    "path": "grokimagineassets/ground/ground_31_targon-star-stone.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 32,
+    "nn": "32",
+    "slug": "zaun-chem-stain",
+    "name": "ground_32_zaun-chem-stain.jpg",
+    "path": "grokimagineassets/ground/ground_32_zaun-chem-stain.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 33,
+    "nn": "33",
+    "slug": "shurima-sandstone",
+    "name": "ground_33_shurima-sandstone.jpg",
+    "path": "grokimagineassets/ground/ground_33_shurima-sandstone.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 34,
+    "nn": "34",
+    "slug": "bandle-mushroom-soil",
+    "name": "ground_34_bandle-mushroom-soil.jpg",
+    "path": "grokimagineassets/ground/ground_34_bandle-mushroom-soil.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 35,
+    "nn": "35",
+    "slug": "hexgrid-cyan-dark",
+    "name": "ground_35_hexgrid-cyan-dark.jpg",
+    "path": "grokimagineassets/ground/ground_35_hexgrid-cyan-dark.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 36,
+    "nn": "36",
+    "slug": "checker-dark-light-stone",
+    "name": "ground_36_checker-dark-light-stone.jpg",
+    "path": "grokimagineassets/ground/ground_36_checker-dark-light-stone.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 37,
+    "nn": "37",
+    "slug": "wet-asphalt-grit",
+    "name": "ground_37_wet-asphalt-grit.jpg",
+    "path": "grokimagineassets/ground/ground_37_wet-asphalt-grit.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 38,
+    "nn": "38",
+    "slug": "lava-cooled-basalt",
+    "name": "ground_38_lava-cooled-basalt.jpg",
+    "path": "grokimagineassets/ground/ground_38_lava-cooled-basalt.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 39,
+    "nn": "39",
+    "slug": "coral-reef-dry",
+    "name": "ground_39_coral-reef-dry.jpg",
+    "path": "grokimagineassets/ground/ground_39_coral-reef-dry.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 40,
+    "nn": "40",
+    "slug": "bone-dust-ground",
+    "name": "ground_40_bone-dust-ground.jpg",
+    "path": "grokimagineassets/ground/ground_40_bone-dust-ground.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 41,
+    "nn": "41",
+    "slug": "copper-patina-tiles",
+    "name": "ground_41_copper-patina-tiles.jpg",
+    "path": "grokimagineassets/ground/ground_41_copper-patina-tiles.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 42,
+    "nn": "42",
+    "slug": "obsidian-mirror-cracks",
+    "name": "ground_42_obsidian-mirror-cracks.jpg",
+    "path": "grokimagineassets/ground/ground_42_obsidian-mirror-cracks.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 43,
+    "nn": "43",
+    "slug": "farm-soil-furrows",
+    "name": "ground_43_farm-soil-furrows.jpg",
+    "path": "grokimagineassets/ground/ground_43_farm-soil-furrows.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 44,
+    "nn": "44",
+    "slug": "battlefield-scarred",
+    "name": "ground_44_battlefield-scarred.jpg",
+    "path": "grokimagineassets/ground/ground_44_battlefield-scarred.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 45,
+    "nn": "45",
+    "slug": "temple-flagstone",
+    "name": "ground_45_temple-flagstone.jpg",
+    "path": "grokimagineassets/ground/ground_45_temple-flagstone.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 46,
+    "nn": "46",
+    "slug": "underwater-silt",
+    "name": "ground_46_underwater-silt.jpg",
+    "path": "grokimagineassets/ground/ground_46_underwater-silt.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 47,
+    "nn": "47",
+    "slug": "neon-grid-black",
+    "name": "ground_47_neon-grid-black.jpg",
+    "path": "grokimagineassets/ground/ground_47_neon-grid-black.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 48,
+    "nn": "48",
+    "slug": "woodchip-arena",
+    "name": "ground_48_woodchip-arena.jpg",
+    "path": "grokimagineassets/ground/ground_48_woodchip-arena.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 49,
+    "nn": "49",
+    "slug": "marble-green-veins",
+    "name": "ground_49_marble-green-veins.jpg",
+    "path": "grokimagineassets/ground/ground_49_marble-green-veins.jpg",
+    "aspect": "ground"
+  },
+  {
+    "i": 50,
+    "nn": "50",
+    "slug": "ashphalt-yellow-lines-abstract",
+    "name": "ground_50_ashphalt-yellow-lines-abstract.jpg",
+    "path": "grokimagineassets/ground/ground_50_ashphalt-yellow-lines-abstract.jpg",
+    "aspect": "ground"
+  }
+]

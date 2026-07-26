@@ -1,0 +1,20 @@
+{
+  "id": "wall",
+  "displayName": "Indestructible fixed block",
+  "maps": {
+    "albedoSide": "textures/walls/wall-albedo.webp",
+    "albedoTop": "textures/walls/wall-top-albedo.webp"
+  },
+  "tint": [1.0, 1.0, 1.0],
+  "mapId": 3,
+  "source": {
+    "side": "raw-imagine/06-wall-B-side-slate-native.png",
+    "top": "raw-imagine/06-wall-B-top-cap-native.png",
+    "raw": [
+      "raw-imagine/06-wall-B-side-slate-native.png",
+      "raw-imagine/06-wall-B-top-cap-native.png"
+    ]
+  },
+  "qualityBar": "ART-QUALITY.md — readable stone seams at gameplay distance",
+  "notes": "Dark slate side + matching carved cap. Shader picks by face normal; front perimeter is lower for champion visibility."
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "aspect": "floor-tile",
+    "i": 3,
+    "nn": "03",
+    "slug": "stone-tile-worn",
+    "name": "floor-tile_03_stone-tile-worn.jpg",
+    "dest": "grokimagineassets\\floor-tile\\floor-tile_03_stone-tile-worn.jpg",
+    "prompt": "Square seamless game albedo texture, flat even lighting for PBR, edge-to-edge fill, dense micro material detail, clear tonal separation between surface parts, no characters no props no UI text, orthographic top-down or face-on as appropriate. Single bomberman floor cell tile themed as \"stone tile worn\"."
+  },
+  {
+    "aspect": "floor-tile",
+    "i": 4,
+    "nn": "04",
+    "slug": "metal-plate-bolts",
+    "name": "floor-tile_04_metal-plate-bolts.jpg",
+    "dest": "grokimagineassets\\floor-tile\\floor-tile_04_metal-plate-bolts.jpg",
+    "prompt": "Square seamless game albedo texture, flat even lighting for PBR, edge-to-edge fill, dense micro material detail, clear tonal separation between surface parts, no characters no props no UI text, orthographic top-down or face-on as appropriate. Single bomberman floor cell tile themed as \"metal plate bolts\"."
+  },
+  {
+    "aspect": "floor-tile",
+    "i": 5,
+    "nn": "05",
+    "slug": "dirt-tile-compact",
+    "name": "floor-tile_05_dirt-tile-compact.jpg",
+    "dest": "grokimagineassets\\floor-tile\\floor-tile_05_dirt-tile-compact.jpg",
+    "prompt": "Square seamless game albedo texture, flat even lighting for PBR, edge-to-edge fill, dense micro material detail, clear tonal separation between surface parts, no characters no props no UI text, orthographic top-down or face-on as appropriate. Single bomberman floor cell tile themed as \"dirt tile compact\"."
+  },
+  {
+    "aspect": "floor-tile",
+    "i": 6,
+    "nn": "06",
+    "slug": "wood-platform-planks",
+    "name": "floor-tile_06_wood-platform-planks.jpg",
+    "dest": "grokimagineassets\\floor-tile\\floor-tile_06_wood-platform-planks.jpg",
+    "prompt": "Square seamless game albedo texture, flat even lighting for PBR, edge-to-edge fill, dense micro material detail, clear tonal separation between surface parts, no characters no props no UI text, orthographic top-down or face-on as appropriate. Single bomberman floor cell tile themed as \"wood platform planks\"."
+  }
+]

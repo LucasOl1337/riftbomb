@@ -1,0 +1,351 @@
+{
+  "champion": "gangplank",
+  "displayName": "Gangplank",
+  "source": "Khada modelviewer.lol CDN",
+  "fetchedAt": "2026-07-26T12:12:33.436Z",
+  "baseSkin": {
+    "id": 41000,
+    "alias": "gangplank",
+    "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41000/model.glb",
+    "viewerUrl": "https://modelviewer.lol/model-viewer?id=41000",
+    "localGlb": "gangplank-base-animated.glb",
+    "bytes": 3896372,
+    "generator": "glTF-Transform v3.10.0",
+    "gltfVersion": "2.0",
+    "nodes": 84,
+    "meshes": 1,
+    "skins": 1,
+    "materials": 2,
+    "textures": 2,
+    "images": 2,
+    "animationCount": 32,
+    "animations": [
+      {
+        "index": 0,
+        "name": "Attack1",
+        "channels": 237,
+        "samplers": 237,
+        "role": "attack"
+      },
+      {
+        "index": 1,
+        "name": "Attack2",
+        "channels": 237,
+        "samplers": 237,
+        "role": "attack"
+      },
+      {
+        "index": 2,
+        "name": "Channel_Loop",
+        "channels": 240,
+        "samplers": 240,
+        "role": "channel"
+      },
+      {
+        "index": 3,
+        "name": "Channel_Wndup",
+        "channels": 240,
+        "samplers": 240,
+        "role": "channel"
+      },
+      {
+        "index": 4,
+        "name": "Crit",
+        "channels": 237,
+        "samplers": 237,
+        "role": "attack"
+      },
+      {
+        "index": 5,
+        "name": "Dance",
+        "channels": 243,
+        "samplers": 243,
+        "role": "dance"
+      },
+      {
+        "index": 6,
+        "name": "Death",
+        "channels": 243,
+        "samplers": 243,
+        "role": "death"
+      },
+      {
+        "index": 7,
+        "name": "Idle1",
+        "channels": 246,
+        "samplers": 246,
+        "role": "idle"
+      },
+      {
+        "index": 8,
+        "name": "Laugh",
+        "channels": 243,
+        "samplers": 243,
+        "role": "laugh"
+      },
+      {
+        "index": 9,
+        "name": "Run_Base",
+        "channels": 243,
+        "samplers": 243,
+        "role": "run"
+      },
+      {
+        "index": 10,
+        "name": "Gangplank_spell1.anm",
+        "channels": 243,
+        "samplers": 243,
+        "role": "spell1"
+      },
+      {
+        "index": 11,
+        "name": "Gangplank_Spell2.anm",
+        "channels": 243,
+        "samplers": 243,
+        "role": "spell2"
+      },
+      {
+        "index": 12,
+        "name": "Spell3_Upper",
+        "channels": 243,
+        "samplers": 243,
+        "role": "spell3"
+      },
+      {
+        "index": 13,
+        "name": "Spell4_Upper",
+        "channels": 243,
+        "samplers": 243,
+        "role": "spell4"
+      },
+      {
+        "index": 14,
+        "name": "Taunt",
+        "channels": 243,
+        "samplers": 243,
+        "role": "taunt"
+      },
+      {
+        "index": 15,
+        "name": "IdleIn",
+        "channels": 246,
+        "samplers": 246,
+        "role": "idle"
+      },
+      {
+        "index": 16,
+        "name": "Crit2",
+        "channels": 237,
+        "samplers": 237,
+        "role": "attack"
+      },
+      {
+        "index": 17,
+        "name": "Passive_Attack",
+        "channels": 243,
+        "samplers": 243,
+        "role": "attack"
+      },
+      {
+        "index": 18,
+        "name": "Channel_In",
+        "channels": 240,
+        "samplers": 240,
+        "role": "channel"
+      },
+      {
+        "index": 19,
+        "name": "Recall",
+        "channels": 246,
+        "samplers": 246,
+        "role": "recall"
+      },
+      {
+        "index": 20,
+        "name": "RunIn",
+        "channels": 213,
+        "samplers": 213,
+        "role": "run"
+      },
+      {
+        "index": 21,
+        "name": "RunIN2",
+        "channels": 213,
+        "samplers": 213,
+        "role": "run"
+      },
+      {
+        "index": 22,
+        "name": "Spell1_Alt",
+        "channels": 243,
+        "samplers": 243,
+        "role": "spell1"
+      },
+      {
+        "index": 23,
+        "name": "Spell1_Alt2",
+        "channels": 243,
+        "samplers": 243,
+        "role": "spell1"
+      },
+      {
+        "index": 24,
+        "name": "Joke_In",
+        "channels": 243,
+        "samplers": 243,
+        "role": "joke"
+      },
+      {
+        "index": 25,
+        "name": "Joke_Loop",
+        "channels": 243,
+        "samplers": 243,
+        "role": "joke"
+      },
+      {
+        "index": 26,
+        "name": "Gangplank_spell3.anm",
+        "channels": 243,
+        "samplers": 243,
+        "role": "spell3"
+      },
+      {
+        "index": 27,
+        "name": "Recall_Winddown",
+        "channels": 246,
+        "samplers": 246,
+        "role": "recall"
+      },
+      {
+        "index": 28,
+        "name": "Gangplank_spell4.anm",
+        "channels": 243,
+        "samplers": 243,
+        "role": "spell4"
+      },
+      {
+        "index": 29,
+        "name": "Spell2_Idle_TRA",
+        "channels": 243,
+        "samplers": 243,
+        "role": "idle"
+      },
+      {
+        "index": 30,
+        "name": "Run_Haste",
+        "channels": 243,
+        "samplers": 243,
+        "role": "run"
+      },
+      {
+        "index": 31,
+        "name": "Respawn",
+        "channels": 246,
+        "samplers": 246,
+        "role": "spawn"
+      }
+    ],
+    "extensionsUsed": [
+      "KHR_materials_unlit"
+    ]
+  },
+  "layout": {
+    "gangplank-base-animated.glb": "Base skin GLB: mesh + skeleton + 32 animation clips",
+    "kit-manifest.json": "Inventory, animation roles, skin catalog",
+    "khada-kit/": "Raw CDN viewer pack (compressed wasm)",
+    "references/": "Circle + tiles for all known skins"
+  },
+  "skins": [
+    {
+      "id": 41000,
+      "name": "Gangplank",
+      "tile": "references/skins/41000.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41000",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41000/model.glb"
+    },
+    {
+      "id": 41001,
+      "name": "Spooky Gangplank",
+      "tile": "references/skins/41001.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41001",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41001/model.glb"
+    },
+    {
+      "id": 41002,
+      "name": "Minuteman Gangplank",
+      "tile": "references/skins/41002.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41002",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41002/model.glb"
+    },
+    {
+      "id": 41003,
+      "name": "Sailor Gangplank",
+      "tile": "references/skins/41003.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41003",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41003/model.glb"
+    },
+    {
+      "id": 41004,
+      "name": "Toy Soldier Gangplank",
+      "tile": "references/skins/41004.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41004",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41004/model.glb"
+    },
+    {
+      "id": 41005,
+      "name": "Special Forces Gangplank",
+      "tile": "references/skins/41005.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41005",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41005/model.glb"
+    },
+    {
+      "id": 41006,
+      "name": "Sultan Gangplank",
+      "tile": "references/skins/41006.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41006",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41006/model.glb"
+    },
+    {
+      "id": 41007,
+      "name": "Captain Gangplank",
+      "tile": "references/skins/41007.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41007",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41007/model.glb"
+    },
+    {
+      "id": 41008,
+      "name": "Dreadnova Gangplank",
+      "tile": "references/skins/41008.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41008",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41008/model.glb"
+    },
+    {
+      "id": 41014,
+      "name": "Pool Party Gangplank",
+      "tile": "references/skins/41014.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41014",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41014/model.glb"
+    },
+    {
+      "id": 41021,
+      "name": "FPX Gangplank",
+      "tile": "references/skins/41021.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41021",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41021/model.glb"
+    },
+    {
+      "id": 41023,
+      "name": "Gangplank the Betrayer",
+      "tile": "references/skins/41023.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41023",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41023/model.glb"
+    },
+    {
+      "id": 41033,
+      "name": "PROJECT: Gangplank",
+      "tile": "references/skins/41033.webp",
+      "viewerUrl": "https://modelviewer.lol/model-viewer?id=41033",
+      "modelUrl": "https://cdn.modelviewer.lol/lol/models/gangplank/41033/model.glb"
+    }
+  ]
+}

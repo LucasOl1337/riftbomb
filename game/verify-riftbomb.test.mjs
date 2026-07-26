@@ -103,10 +103,23 @@ test("playable model bytes stay out of the renderer implementation", async () =>
   assert.ok(renderer.length < 1_000_000, "renderer should not carry packaged model bytes");
 });
 
-test("the build retains the five playable champions and duel rules", async () => {
+test("arena themes share five GPU texture allocations", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const packedTextures = await readFile(path.join(gameDirectory, "load-arena-textures.js"), "utf8");
+
+  assert.match(renderer, /const textureGroups = \{/);
+  assert.match(renderer, /for \(const \[sourceKey, aliases\] of Object\.entries\(textureGroups\)\)/);
+  assert.equal(
+    [...packedTextures.matchAll(/data:image\/webp;base64,/g)].length,
+    5,
+    "the offline build must embed each authored arena source once"
+  );
+});
+
+test("the build retains the six playable champions and duel rules", async () => {
   const document = await readFile(releasePath, "utf8");
 
-  for (const champion of ["Katarina", "Zed", "Renekton", "Vladimir", "Ziggs"]) {
+  for (const champion of ["Katarina", "Zed", "Renekton", "Vladimir", "Gangplank", "Ziggs"]) {
     assert.ok(document.includes(champion), `${champion} must remain in the build`);
   }
 

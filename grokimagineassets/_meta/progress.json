@@ -1,0 +1,35 @@
+{
+  "aspects": {
+    "ground": {
+      "done": 50,
+      "target": 50
+    },
+    "floor-tile": {
+      "done": 6,
+      "target": 50
+    },
+    "wall-side": {
+      "done": 5,
+      "target": 50
+    },
+    "wall-top": {
+      "done": 1,
+      "target": 50
+    },
+    "lane": {
+      "done": 0,
+      "target": 50
+    },
+    "river": {
+      "done": 0,
+      "target": 50
+    },
+    "stone-turret": {
+      "done": 0,
+      "target": 50
+    }
+  },
+  "totalDone": 62,
+  "totalPlanned": 350,
+  "updated": "2026-07-26T13:26:43.383Z"
+}

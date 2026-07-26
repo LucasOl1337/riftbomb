@@ -3,9 +3,23 @@ import path from "node:path";
 import { AnimationMixer, Vector3 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
+// Node bake has no DOM Image; stub enough for GLTFLoader to finish mesh/skin/anim parse.
+globalThis.self ??= globalThis;
+if (typeof globalThis.Image === "undefined") {
+  globalThis.Image = class Image {
+    set src(_value) {
+      queueMicrotask(() => {
+        this.width = 1;
+        this.height = 1;
+        this.onload?.();
+      });
+    }
+  };
+}
+
 const [requestedChampion, inputPath, outputDirectory] = process.argv.slice(2);
 if (!requestedChampion || !inputPath || !outputDirectory) {
-  throw new Error("Usage: node bake-playable-champion.mjs <katarina|zed|renekton|vladimir> <animated.glb> <output-directory>");
+  throw new Error("Usage: node bake-playable-champion.mjs <katarina|zed|renekton|vladimir|gangplank> <animated.glb> <output-directory>");
 }
 
 const champion = requestedChampion.toLowerCase();
@@ -42,6 +56,24 @@ const fixedConfigs = {
     ],
     normalIdle: ["vladimir_idle1", 0.0],
     normalSkill: ["vladimir_spell4", 0.48]
+  },
+  gangplank: {
+    displayName: "Gangplank",
+    targetHeight: 2.12,
+    // Khada glTF clip names. Prefer standing-height frames (Idle has deep outlier verts).
+    poses: [
+      ["Idle1", 0.0], ["Idle1", 0.55],
+      ["Run_Haste", 0.12], ["Run_Haste", 0.4],
+      ["Gangplank_spell1.anm", 0.55], ["Gangplank_spell4.anm", 0.35]
+    ],
+    normalIdle: ["Idle1", 0.0],
+    normalSkill: ["Gangplank_spell4.anm", 0.35],
+    // Do NOT invertUvV: upload already uses UNPACK_FLIP_Y (same as Katarina/Renekton).
+    // invertUvV + flip double-samples the atlas and turns GP into a dark leather blob.
+    invertUvV: false,
+    // Absolute minY on Idle includes skinned outliers ~1.7u under the feet — use percentiles.
+    robustGround: true,
+    sourceLabel: "Khada Gangplank GLB (Skin07 body mesh + clips; crate mesh excluded)"
   }
 };
 
@@ -72,9 +104,12 @@ const config = champion === "katarina" ? {
 const meshes = [];
 gltf.scene.traverse((node) => {
   if (!node.isSkinnedMesh) return;
-  const materialName = node.material?.name ?? "";
+  const materialList = Array.isArray(node.material) ? node.material : [node.material];
+  const materialName = materialList[0]?.name ?? "";
   if (champion === "katarina" &&
       (["Recall", "Lizard", "Joke"].includes(materialName) || /^(Blade|Gem)[2-6]$/.test(materialName))) return;
+  // Drop pure crate props from Khada packs when they arrive as separate skinned meshes.
+  if (champion === "gangplank" && materialList.every((material) => material?.name === "Crate_Mat")) return;
   const geometry = node.geometry;
   if (!geometry.attributes.position || !geometry.attributes.normal ||
       !geometry.attributes.uv || !geometry.index) return;
@@ -85,12 +120,26 @@ if (!meshes.length) throw new Error(`No playable ${config.displayName} skinned m
 const usesBattleQueenAtlas = champion === "katarina" &&
   meshes.some((mesh) => mesh.material?.name === "Main_Mat");
 const resolveClipName = (name) => {
-  if (champion !== "katarina") return name;
-  return [name, name.replace(/^katarina_/, "")].find((candidate) => clips.has(candidate));
+  if (champion === "katarina") {
+    return [name, name.replace(/^katarina_/, "")].find((candidate) => clips.has(candidate));
+  }
+  if (champion === "gangplank") {
+    const aliases = {
+      Idle1: ["Idle1", "IdleIn", "idle1"],
+      Run_Base: ["Run_Base", "Run_Haste", "RunIn", "run"],
+      Run_Haste: ["Run_Haste", "Run_Base", "RunIn"],
+      "Gangplank_spell1.anm": ["Gangplank_spell1.anm", "Spell1_Alt", "Attack1"],
+      "Gangplank_spell4.anm": ["Gangplank_spell4.anm", "Spell4_Upper", "Gangplank_spell3.anm"]
+    };
+    return (aliases[name] || [name]).find((candidate) => clips.has(candidate));
+  }
+  return name;
 };
 const resolvePose = (name, time) => name === "grounded_cast_from_idle_b"
   ? ["katarina_idle1", 0.47]
   : [name, time];
+
+const percentile = (sorted, q) => sorted[Math.max(0, Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * q)))];
 
 const mixer = new AnimationMixer(gltf.scene);
 const applyPose = (requestedName, requestedTime) => {
@@ -109,7 +158,7 @@ const applyPose = (requestedName, requestedTime) => {
 const samplePose = (name, time) => {
   applyPose(name, time);
   const positions = [];
-  let minimumY = Infinity;
+  const allY = [];
   for (const mesh of meshes) {
     const source = mesh.geometry.attributes.position;
     const values = new Float32Array(source.count * 3);
@@ -121,12 +170,25 @@ const samplePose = (name, time) => {
       values[index * 3] = point.x;
       values[index * 3 + 1] = point.y;
       values[index * 3 + 2] = point.z;
-      minimumY = Math.min(minimumY, point.y);
+      allY.push(point.y);
     }
     positions.push(values);
   }
+  // Khada Idle has skinned outlier verts deep under the feet; grounding on absolute min
+  // inflates height ~2x and makes run/spell poses look like a crushed blob after scale.
+  let groundY;
+  if (config.robustGround) {
+    allY.sort((a, b) => a - b);
+    groundY = percentile(allY, 0.02);
+  } else {
+    groundY = Math.min(...allY);
+  }
   for (const values of positions) {
-    for (let index = 1; index < values.length; index += 3) values[index] -= minimumY;
+    for (let index = 1; index < values.length; index += 3) {
+      values[index] -= groundY;
+      // Collapse skinned garbage under the soles so it cannot inflate scale or silhouette.
+      if (config.robustGround) values[index] = Math.max(0, values[index]);
+    }
   }
   return positions;
 };
@@ -161,8 +223,18 @@ const sampleSmoothNormals = (name, time) => {
 
 const posesByMesh = config.poses.map(([name, time]) => samplePose(name, time));
 let sourceHeight = 0;
-for (const positions of posesByMesh[0]) {
-  for (let index = 1; index < positions.length; index += 3) sourceHeight = Math.max(sourceHeight, positions[index]);
+if (config.robustGround) {
+  const heights = [];
+  for (const positions of posesByMesh[0]) {
+    for (let index = 1; index < positions.length; index += 3) heights.push(positions[index]);
+  }
+  heights.sort((a, b) => a - b);
+  // Floor is already 0 after clamp; p99 is the standing crown (ignore rare max spikes).
+  sourceHeight = Math.max(1e-4, percentile(heights, 0.995));
+} else {
+  for (const positions of posesByMesh[0]) {
+    for (let index = 1; index < positions.length; index += 3) sourceHeight = Math.max(sourceHeight, positions[index]);
+  }
 }
 const unitScale = config.targetHeight / sourceHeight;
 for (const pose of posesByMesh) {
@@ -202,11 +274,13 @@ for (let meshIndex = 0; meshIndex < meshes.length; meshIndex += 1) {
     vertices[target + 22] = normalSkill[meshIndex][vertexIndex * 3 + 1];
     vertices[target + 23] = normalSkill[meshIndex][vertexIndex * 3 + 2];
     const sourceU = uv.getX(vertexIndex);
+    const sourceV = uv.getY(vertexIndex);
     const weaponAtlasSide = /^(Blade1|Gem1)$/.test(mesh.material?.name ?? "");
     vertices[target + 24] = usesBattleQueenAtlas
       ? sourceU * (weaponAtlasSide ? 0.2 : 0.8) + (weaponAtlasSide ? 0.8 : 0)
       : sourceU;
-    vertices[target + 25] = uv.getY(vertexIndex);
+    // glTF textures are V-top; game atlases + UNPACK_FLIP_Y expect the opposite for our shader path.
+    vertices[target + 25] = config.invertUvV ? 1 - sourceV : sourceV;
   }
   const sourceIndices = mesh.geometry.index.array;
   for (let sourceIndex = 0; sourceIndex < sourceIndices.length; sourceIndex += 1) {
@@ -252,7 +326,7 @@ await Promise.all([
   fs.writeFile(path.join(outputDirectory, `${champion}-model-metadata.json`), JSON.stringify({
     source: usesBattleQueenAtlas
       ? "Battle Queen Katarina (skin29)"
-      : `Classic ${config.displayName} game mesh and matching base rig`,
+      : (config.sourceLabel || `Classic ${config.displayName} game mesh and matching base rig`),
     unitScale,
     vertexCount,
     indexCount,

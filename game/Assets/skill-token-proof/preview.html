@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Skill token proof — real ability art</title>
+  <style>
+    body { margin: 0; background: #0a0a0a; color: #eaeaea; font: 14px/1.4 Consolas, monospace; padding: 1.5rem; }
+    h1 { font: 700 1.1rem/1 Arial Black, sans-serif; letter-spacing: 0.08em; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: 1.25rem; margin-top: 1.25rem; }
+    figure { margin: 0; text-align: center; }
+    .token {
+      width: 3.6rem; height: 3.6rem; margin: 0 auto 0.5rem;
+      border-radius: 50%; border: 3px solid #f6cf78;
+      background: #120c08 center / cover no-repeat;
+      box-shadow: 0 0 0 2px #1a1208, 0 0 1.1rem rgb(246 207 120 / 55%);
+    }
+    figcaption { font-size: 0.72rem; opacity: 0.75; }
+  </style>
+</head>
+<body>
+  <h1>RIFTBOMB // SKILL TOKEN PROOF</h1>
+  <p>Same circular crop style as in-game DOM tokens. Source: champion ability data-URLs.</p>
+  <div class="grid" id="grid"></div>
+  <script>
+    const files = [
+      "katarina-q.png","katarina-w.png","katarina-e.png","katarina-r.png",
+      "zed-q.webp","zed-w.webp","zed-e.webp","zed-r.webp",
+      "renekton-q.webp","renekton-w.webp","renekton-e.webp","renekton-r.webp",
+      "vladimir-q.webp","vladimir-w.webp","vladimir-e.webp","vladimir-r.webp",
+      "gangplank-q.webp","gangplank-w.webp","gangplank-e.webp","gangplank-r.webp"
+    ];
+    const grid = document.getElementById("grid");
+    for (const f of files) {
+      const fig = document.createElement("figure");
+      const d = document.createElement("div");
+      d.className = "token";
+      d.style.backgroundImage = `url("./${f}")`;
+      const cap = document.createElement("figcaption");
+      cap.textContent = f.replace(/\.(png|webp)$/, "");
+      fig.append(d, cap);
+      grid.append(fig);
+    }
+  </script>
+</body>
+</html>

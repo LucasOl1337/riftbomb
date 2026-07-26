@@ -1,0 +1,402 @@
+[
+  {
+    "i": 1,
+    "nn": "01",
+    "slug": "blue-crystal-stone",
+    "name": "stone-turret_01_blue-crystal-stone.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_01_blue-crystal-stone.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 2,
+    "nn": "02",
+    "slug": "red-crystal-stone",
+    "name": "stone-turret_02_red-crystal-stone.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_02_red-crystal-stone.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 3,
+    "nn": "03",
+    "slug": "gray-granite-blocks",
+    "name": "stone-turret_03_gray-granite-blocks.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_03_gray-granite-blocks.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 4,
+    "nn": "04",
+    "slug": "hextech-turret-metal",
+    "name": "stone-turret_04_hextech-turret-metal.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_04_hextech-turret-metal.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 5,
+    "nn": "05",
+    "slug": "ancient-ruin-stone",
+    "name": "stone-turret_05_ancient-ruin-stone.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_05_ancient-ruin-stone.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 6,
+    "nn": "06",
+    "slug": "obsidian-base",
+    "name": "stone-turret_06_obsidian-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_06_obsidian-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 7,
+    "nn": "07",
+    "slug": "marble-base",
+    "name": "stone-turret_07_marble-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_07_marble-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 8,
+    "nn": "08",
+    "slug": "iron-plated-base",
+    "name": "stone-turret_08_iron-plated-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_08_iron-plated-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 9,
+    "nn": "09",
+    "slug": "brass-turret-base",
+    "name": "stone-turret_09_brass-turret-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_09_brass-turret-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 10,
+    "nn": "10",
+    "slug": "rune-carved-base",
+    "name": "stone-turret_10_rune-carved-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_10_rune-carved-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 11,
+    "nn": "11",
+    "slug": "moss-stone-base",
+    "name": "stone-turret_11_moss-stone-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_11_moss-stone-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 12,
+    "nn": "12",
+    "slug": "sandstone-base",
+    "name": "stone-turret_12_sandstone-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_12_sandstone-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 13,
+    "nn": "13",
+    "slug": "ice-crystal-base",
+    "name": "stone-turret_13_ice-crystal-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_13_ice-crystal-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 14,
+    "nn": "14",
+    "slug": "void-stone-base",
+    "name": "stone-turret_14_void-stone-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_14_void-stone-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 15,
+    "nn": "15",
+    "slug": "gold-trim-base",
+    "name": "stone-turret_15_gold-trim-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_15_gold-trim-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 16,
+    "nn": "16",
+    "slug": "bone-base",
+    "name": "stone-turret_16_bone-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_16_bone-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 17,
+    "nn": "17",
+    "slug": "copper-base",
+    "name": "stone-turret_17_copper-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_17_copper-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 18,
+    "nn": "18",
+    "slug": "jade-base",
+    "name": "stone-turret_18_jade-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_18_jade-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 19,
+    "nn": "19",
+    "slug": "volcanic-base",
+    "name": "stone-turret_19_volcanic-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_19_volcanic-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 20,
+    "nn": "20",
+    "slug": "piltover-base",
+    "name": "stone-turret_20_piltover-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_20_piltover-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 21,
+    "nn": "21",
+    "slug": "zaun-base",
+    "name": "stone-turret_21_zaun-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_21_zaun-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 22,
+    "nn": "22",
+    "slug": "demacia-base",
+    "name": "stone-turret_22_demacia-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_22_demacia-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 23,
+    "nn": "23",
+    "slug": "noxus-base",
+    "name": "stone-turret_23_noxus-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_23_noxus-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 24,
+    "nn": "24",
+    "slug": "ionia-base",
+    "name": "stone-turret_24_ionia-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_24_ionia-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 25,
+    "nn": "25",
+    "slug": "shurima-base",
+    "name": "stone-turret_25_shurima-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_25_shurima-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 26,
+    "nn": "26",
+    "slug": "freljord-base",
+    "name": "stone-turret_26_freljord-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_26_freljord-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 27,
+    "nn": "27",
+    "slug": "targon-base",
+    "name": "stone-turret_27_targon-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_27_targon-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 28,
+    "nn": "28",
+    "slug": "bilgewater-base",
+    "name": "stone-turret_28_bilgewater-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_28_bilgewater-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 29,
+    "nn": "29",
+    "slug": "shadow-isles-base",
+    "name": "stone-turret_29_shadow-isles-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_29_shadow-isles-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 30,
+    "nn": "30",
+    "slug": "bandle-base",
+    "name": "stone-turret_30_bandle-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_30_bandle-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 31,
+    "nn": "31",
+    "slug": "hexgrid-base",
+    "name": "stone-turret_31_hexgrid-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_31_hexgrid-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 32,
+    "nn": "32",
+    "slug": "reinforced-concrete",
+    "name": "stone-turret_32_reinforced-concrete.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_32_reinforced-concrete.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 33,
+    "nn": "33",
+    "slug": "crystal-growth-base",
+    "name": "stone-turret_33_crystal-growth-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_33_crystal-growth-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 34,
+    "nn": "34",
+    "slug": "arcane-purple-base",
+    "name": "stone-turret_34_arcane-purple-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_34_arcane-purple-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 35,
+    "nn": "35",
+    "slug": "emerald-base",
+    "name": "stone-turret_35_emerald-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_35_emerald-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 36,
+    "nn": "36",
+    "slug": "obsidian-gold-base",
+    "name": "stone-turret_36_obsidian-gold-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_36_obsidian-gold-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 37,
+    "nn": "37",
+    "slug": "steel-rivet-base",
+    "name": "stone-turret_37_steel-rivet-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_37_steel-rivet-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 38,
+    "nn": "38",
+    "slug": "wood-fort-base",
+    "name": "stone-turret_38_wood-fort-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_38_wood-fort-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 39,
+    "nn": "39",
+    "slug": "temple-base",
+    "name": "stone-turret_39_temple-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_39_temple-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 40,
+    "nn": "40",
+    "slug": "battlefield-scarred-base",
+    "name": "stone-turret_40_battlefield-scarred-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_40_battlefield-scarred-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 41,
+    "nn": "41",
+    "slug": "neon-trim-base",
+    "name": "stone-turret_41_neon-trim-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_41_neon-trim-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 42,
+    "nn": "42",
+    "slug": "rust-scrap-base",
+    "name": "stone-turret_42_rust-scrap-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_42_rust-scrap-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 43,
+    "nn": "43",
+    "slug": "limestone-base",
+    "name": "stone-turret_43_limestone-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_43_limestone-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 44,
+    "nn": "44",
+    "slug": "slate-base",
+    "name": "stone-turret_44_slate-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_44_slate-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 45,
+    "nn": "45",
+    "slug": "plated-champion-base",
+    "name": "stone-turret_45_plated-champion-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_45_plated-champion-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 46,
+    "nn": "46",
+    "slug": "chevrons-base",
+    "name": "stone-turret_46_chevrons-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_46_chevrons-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 47,
+    "nn": "47",
+    "slug": "mosaic-base",
+    "name": "stone-turret_47_mosaic-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_47_mosaic-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 48,
+    "nn": "48",
+    "slug": "lead-base",
+    "name": "stone-turret_48_lead-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_48_lead-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 49,
+    "nn": "49",
+    "slug": "silk-wrapped-base",
+    "name": "stone-turret_49_silk-wrapped-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_49_silk-wrapped-base.jpg",
+    "aspect": "stone-turret"
+  },
+  {
+    "i": 50,
+    "nn": "50",
+    "slug": "lava-rock-base",
+    "name": "stone-turret_50_lava-rock-base.jpg",
+    "path": "grokimagineassets/stone-turret/stone-turret_50_lava-rock-base.jpg",
+    "aspect": "stone-turret"
+  }
+]

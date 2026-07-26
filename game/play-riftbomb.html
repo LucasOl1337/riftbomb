@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#050a18">
+  <meta name="theme-color" content="#0A0A0A">
   <meta name="description" content="League of Legends: Riftbomb — an unofficial Katarina, Zed, Renekton, Vladimir and Ziggs Bomber PvP arena with champion kits, breakable blocks, power-ups, music, and WebGL effects in one HTML file.">
-  <title>League of Legends: Riftbomb — Champions PvP Bomber Arena</title>
+  <title>RIFTBOMB // UNIT D-01 — Champions PvP Bomber Arena</title>
   <link rel="stylesheet" href="./show-champion-duel.css">
 </head>
 <body>
@@ -19,21 +19,22 @@
   <a class="skip-link" href="#start-game">Skip to game controls</a>
 
   <main id="app">
-    <canvas id="arena" role="img" aria-label="A top-down 3D League of Legends inspired Bomberman arena. Player 1 can choose Katarina, Zed, Renekton, Vladimir or Ziggs; Red Ziggs uses arrow keys and Enter."></canvas>
+    <canvas id="arena" role="img" aria-label="A top-down 3D League of Legends inspired Bomberman arena. Player 1 can choose Katarina, Zed, Renekton, Vladimir, Gangplank or Ziggs; Red Ziggs uses arrow keys and Enter."></canvas>
+    <div id="skill-token-layer" class="skill-token-layer" aria-hidden="true"></div>
     <div class="fx-grain" aria-hidden="true"></div>
     <div class="frame" aria-hidden="true"></div>
 
     <section class="intro" id="intro" aria-labelledby="title">
       <div class="intro-content">
-        <div class="season-tag micro">Unofficial League of Legends fan game</div>
-        <div class="lol-wordmark" aria-hidden="true">League <small>of</small> Legends</div>
-        <h1 id="title"><span>Riftbomb</span><em>Champions of the Bomber Rift</em></h1>
+        <div class="season-tag micro">[ UNOFFICIAL FAN PROTOTYPE · REV 2.6 ]</div>
+        <div class="lol-wordmark" aria-hidden="true">LEAGUE <small>/</small> LEGENDS</div>
+        <h1 id="title"><span>RIFTBOMB</span><em>/// Champions of the Bomber Rift</em></h1>
         <p class="intro-lede">
-          Choose Katarina, Zed, Renekton, Vladimir or Ziggs for Player 1. Bomb through Hextech crates, collect power-ups,
-          then combine authentic champion silhouettes with a lethal Bomber Rift ruleset.
+          Select unit for Player 1. Clear Hextech crates. Collect power-ups.
+          Deploy champion kits under Bomber Rift rules. Local versus · adaptive CPU.
         </p>
         <div class="champion-select" role="group" aria-label="Choose Player 1 champion">
-          <span class="micro">P1 champion</span>
+          <span class="micro">P1 / UNIT</span>
           <button class="champion-choice" data-champion="katarina" aria-pressed="true">
             <span class="champion-glyph" aria-hidden="true">⚔</span>
             <strong>Katarina</strong>
@@ -54,26 +55,39 @@
             <strong>Vladimir</strong>
             <small>Crimson Reaper · Q F E R</small>
           </button>
+          <button class="champion-choice" data-champion="gangplank" aria-pressed="false">
+            <span class="champion-glyph" aria-hidden="true">⚓</span>
+            <strong>Gangplank</strong>
+            <small>Saltwater Scourge · Q F E R</small>
+          </button>
           <button class="champion-choice" data-champion="ziggs" aria-pressed="false">
             <span class="champion-glyph" aria-hidden="true">✦</span>
             <strong>Ziggs</strong>
             <small>Bomber · Q Shift</small>
           </button>
         </div>
+        <div class="arena-select" id="arena-select" role="radiogroup" aria-label="Choose arena layout template">
+          <span class="micro">[ ARENA TEMPLATE ] · 5 layouts</span>
+          <!-- Choices filled from Game.listArenas() at boot -->
+        </div>
+        <div class="soundtrack-select" id="soundtrack-select" role="radiogroup" aria-label="Choose soundtrack style — click a track to preview">
+          <span class="micro">[ AUDIO BANK ] · click to preview</span>
+          <!-- Choices filled from MusicEngine.listStyles() at boot -->
+        </div>
         <div class="intro-actions">
-          <button class="primary" id="start-game">Play Katarina + music</button>
-          <button class="secondary" id="open-guide-intro">Read arena rules</button>
+          <button class="primary" id="start-game">>>> DEPLOY KATARINA</button>
+          <button class="secondary" id="open-guide-intro">[ ARENA RULES ]</button>
         </div>
         <div class="intro-notes micro" aria-label="Game features">
           <span>Best of five</span>
           <span>Breakable Hextech blocks</span>
-          <span>Five playable champions</span>
+          <span>Six playable champions</span>
           <span>Local PvP · adaptive CPU</span>
         </div>
+        <p class="legal">
+          Unofficial, non-commercial fan prototype; not endorsed by Riot Games. League of Legends, Katarina, Zed, Renekton, Vladimir, Gangplank, Ziggs, Summoner’s Rift and related marks belong to Riot Games. Champion meshes, textures and animation data are derived from locally installed Riot game assets; code, arena geometry, visual systems, and synthesized audio are original to this prototype.
+        </p>
       </div>
-      <p class="legal">
-        Unofficial, non-commercial fan prototype; not endorsed by Riot Games. League of Legends, Katarina, Zed, Renekton, Vladimir, Ziggs, Summoner’s Rift and related marks belong to Riot Games. Champion meshes, textures and animation data are derived from locally installed Riot game assets; code, arena geometry, visual systems, and synthesized audio are original to this prototype.
-      </p>
     </section>
 
     <div class="chrome is-hidden" id="chrome" aria-hidden="true" inert>
@@ -81,7 +95,7 @@
         <div class="brand" aria-label="Riftbomb Symphony">
           <div class="brand-mark" aria-hidden="true"></div>
           <div class="brand-copy">
-            <strong>RIFT BOMBER ARENA</strong>
+            <strong>RIFT BOMBER // ARENA</strong>
             <span class="micro" id="match-subtitle">Katarina vs Ziggs · first to 3</span>
           </div>
         </div>
@@ -127,7 +141,7 @@
 
       <div class="system-stack micro" aria-hidden="true">
         <span id="gpu-label">WebGL2 · adaptive</span>
-        <span>Rift mix · 128 BPM</span>
+        <span id="bpm-label">Real samples · cello · violin · piano · organ</span>
         <span id="fx-label">Bloom · reactive</span>
       </div>
 
@@ -140,7 +154,7 @@
           <div class="album-glyph" aria-hidden="true"></div>
           <div class="track-main">
             <div class="track-heading">
-              <strong id="track-title">RIFT MIX · ORIGINAL</strong>
+              <strong id="track-title">REAL STRINGS · SAMPLED</strong>
               <span class="micro"><span id="track-time">00:00</span> / 04:00</span>
             </div>
             <div class="timeline" aria-hidden="true">
@@ -148,7 +162,7 @@
               <i class="playhead" id="playhead"></i>
             </div>
             <div class="section-line micro">
-              <span id="music-section">Oracle prelude</span>
+              <span id="music-section">Low strings</span>
               <span class="beat-dots" id="beat-dots" aria-hidden="true">
                 <i></i><i></i><i></i><i></i>
               </span>
@@ -283,9 +297,11 @@
       <section class="guide-section wide">
         <h3>The symphony system</h3>
         <p>
-          “Welcome to the Rift” is a four-minute, 128 BPM soundtrack synthesized live in your browser.
-          Its eight sections share one sample-accurate clock with bomb glow, interface meters,
-          post-processing, enemy aggression, and camera impact. No audio file is streamed or embedded.
+          The adaptive score plays <strong>real multipiano samples</strong> (cello, violin, piano,
+          organ, contrabass) from the tonejs-instruments collection (CC BY 3.0), not toy oscillators.
+          Arrangement is dark and slow (modal minor, ~68 BPM, rising with arena heat): cello ostinato
+          + low contrabass weight, sparse piano, organ pad, violin only as tension. Attribution lives
+          in <code>audio/ATTRIBUTION.md</code>. The same clock still drives bomb glow and bloom.
         </p>
       </section>
       <section class="guide-section">
@@ -331,7 +347,9 @@
   </dialog>
   <script src="./animate-bomber-rift-background.js"></script>
   <script src="./load-playable-champion-models.js"></script>
+  <script src="./load-arena-textures.js"></script>
   <script src="./draw-bomber-rift.js"></script>
+  <script src="./load-sample-bank-data.js"></script>
   <script src="./play-rift-soundtrack.js"></script>
   <script src="./present-champion-bomb-duel.js"></script>
   <script src="./run-champion-bomb-duel.js"></script>

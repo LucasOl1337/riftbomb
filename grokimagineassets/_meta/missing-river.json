@@ -1,0 +1,402 @@
+[
+  {
+    "i": 1,
+    "nn": "01",
+    "slug": "clear-water-ripples",
+    "name": "river_01_clear-water-ripples.jpg",
+    "path": "grokimagineassets/river/river_01_clear-water-ripples.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 2,
+    "nn": "02",
+    "slug": "teal-magical-river",
+    "name": "river_02_teal-magical-river.jpg",
+    "path": "grokimagineassets/river/river_02_teal-magical-river.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 3,
+    "nn": "03",
+    "slug": "dark-deep-water",
+    "name": "river_03_dark-deep-water.jpg",
+    "path": "grokimagineassets/river/river_03_dark-deep-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 4,
+    "nn": "04",
+    "slug": "toxic-green-flow",
+    "name": "river_04_toxic-green-flow.jpg",
+    "path": "grokimagineassets/river/river_04_toxic-green-flow.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 5,
+    "nn": "05",
+    "slug": "icy-blue-flow",
+    "name": "river_05_icy-blue-flow.jpg",
+    "path": "grokimagineassets/river/river_05_icy-blue-flow.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 6,
+    "nn": "06",
+    "slug": "lava-river-abstract",
+    "name": "river_06_lava-river-abstract.jpg",
+    "path": "grokimagineassets/river/river_06_lava-river-abstract.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 7,
+    "nn": "07",
+    "slug": "void-purple-flow",
+    "name": "river_07_void-purple-flow.jpg",
+    "path": "grokimagineassets/river/river_07_void-purple-flow.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 8,
+    "nn": "08",
+    "slug": "gold-sparkle-water",
+    "name": "river_08_gold-sparkle-water.jpg",
+    "path": "grokimagineassets/river/river_08_gold-sparkle-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 9,
+    "nn": "09",
+    "slug": "muddy-brown-water",
+    "name": "river_09_muddy-brown-water.jpg",
+    "path": "grokimagineassets/river/river_09_muddy-brown-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 10,
+    "nn": "10",
+    "slug": "crystal-clear-pool",
+    "name": "river_10_crystal-clear-pool.jpg",
+    "path": "grokimagineassets/river/river_10_crystal-clear-pool.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 11,
+    "nn": "11",
+    "slug": "hextech-liquid-cyan",
+    "name": "river_11_hextech-liquid-cyan.jpg",
+    "path": "grokimagineassets/river/river_11_hextech-liquid-cyan.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 12,
+    "nn": "12",
+    "slug": "chemtech-green",
+    "name": "river_12_chemtech-green.jpg",
+    "path": "grokimagineassets/river/river_12_chemtech-green.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 13,
+    "nn": "13",
+    "slug": "bilgewater-harbor",
+    "name": "river_13_bilgewater-harbor.jpg",
+    "path": "grokimagineassets/river/river_13_bilgewater-harbor.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 14,
+    "nn": "14",
+    "slug": "shadow-black-water",
+    "name": "river_14_shadow-black-water.jpg",
+    "path": "grokimagineassets/river/river_14_shadow-black-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 15,
+    "nn": "15",
+    "slug": "ionia-spirit-water",
+    "name": "river_15_ionia-spirit-water.jpg",
+    "path": "grokimagineassets/river/river_15_ionia-spirit-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 16,
+    "nn": "16",
+    "slug": "freljord-melt",
+    "name": "river_16_freljord-melt.jpg",
+    "path": "grokimagineassets/river/river_16_freljord-melt.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 17,
+    "nn": "17",
+    "slug": "shurima-oasis",
+    "name": "river_17_shurima-oasis.jpg",
+    "path": "grokimagineassets/river/river_17_shurima-oasis.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 18,
+    "nn": "18",
+    "slug": "targon-star-water",
+    "name": "river_18_targon-star-water.jpg",
+    "path": "grokimagineassets/river/river_18_targon-star-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 19,
+    "nn": "19",
+    "slug": "neon-cyan-flow",
+    "name": "river_19_neon-cyan-flow.jpg",
+    "path": "grokimagineassets/river/river_19_neon-cyan-flow.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 20,
+    "nn": "20",
+    "slug": "oil-slick-water",
+    "name": "river_20_oil-slick-water.jpg",
+    "path": "grokimagineassets/river/river_20_oil-slick-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 21,
+    "nn": "21",
+    "slug": "foam-whitewater",
+    "name": "river_21_foam-whitewater.jpg",
+    "path": "grokimagineassets/river/river_21_foam-whitewater.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 22,
+    "nn": "22",
+    "slug": "algae-green-stream",
+    "name": "river_22_algae-green-stream.jpg",
+    "path": "grokimagineassets/river/river_22_algae-green-stream.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 23,
+    "nn": "23",
+    "slug": "salt-flat-water",
+    "name": "river_23_salt-flat-water.jpg",
+    "path": "grokimagineassets/river/river_23_salt-flat-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 24,
+    "nn": "24",
+    "slug": "mercury-metal-flow",
+    "name": "river_24_mercury-metal-flow.jpg",
+    "path": "grokimagineassets/river/river_24_mercury-metal-flow.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 25,
+    "nn": "25",
+    "slug": "blood-red-flow-abstract",
+    "name": "river_25_blood-red-flow-abstract.jpg",
+    "path": "grokimagineassets/river/river_25_blood-red-flow-abstract.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 26,
+    "nn": "26",
+    "slug": "emerald-water",
+    "name": "river_26_emerald-water.jpg",
+    "path": "grokimagineassets/river/river_26_emerald-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 27,
+    "nn": "27",
+    "slug": "sapphire-water",
+    "name": "river_27_sapphire-water.jpg",
+    "path": "grokimagineassets/river/river_27_sapphire-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 28,
+    "nn": "28",
+    "slug": "misty-gray-water",
+    "name": "river_28_misty-gray-water.jpg",
+    "path": "grokimagineassets/river/river_28_misty-gray-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 29,
+    "nn": "29",
+    "slug": "glowing-rune-water",
+    "name": "river_29_glowing-rune-water.jpg",
+    "path": "grokimagineassets/river/river_29_glowing-rune-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 30,
+    "nn": "30",
+    "slug": "storm-dark-water",
+    "name": "river_30_storm-dark-water.jpg",
+    "path": "grokimagineassets/river/river_30_storm-dark-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 31,
+    "nn": "31",
+    "slug": "shallow-pebbles-under",
+    "name": "river_31_shallow-pebbles-under.jpg",
+    "path": "grokimagineassets/river/river_31_shallow-pebbles-under.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 32,
+    "nn": "32",
+    "slug": "deep-abyss-water",
+    "name": "river_32_deep-abyss-water.jpg",
+    "path": "grokimagineassets/river/river_32_deep-abyss-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 33,
+    "nn": "33",
+    "slug": "coral-reef-water",
+    "name": "river_33_coral-reef-water.jpg",
+    "path": "grokimagineassets/river/river_33_coral-reef-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 34,
+    "nn": "34",
+    "slug": "swamp-murk",
+    "name": "river_34_swamp-murk.jpg",
+    "path": "grokimagineassets/river/river_34_swamp-murk.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 35,
+    "nn": "35",
+    "slug": "acid-yellow-flow",
+    "name": "river_35_acid-yellow-flow.jpg",
+    "path": "grokimagineassets/river/river_35_acid-yellow-flow.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 36,
+    "nn": "36",
+    "slug": "plasma-blue-flow",
+    "name": "river_36_plasma-blue-flow.jpg",
+    "path": "grokimagineassets/river/river_36_plasma-blue-flow.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 37,
+    "nn": "37",
+    "slug": "ink-black-flow",
+    "name": "river_37_ink-black-flow.jpg",
+    "path": "grokimagineassets/river/river_37_ink-black-flow.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 38,
+    "nn": "38",
+    "slug": "champagne-gold-water",
+    "name": "river_38_champagne-gold-water.jpg",
+    "path": "grokimagineassets/river/river_38_champagne-gold-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 39,
+    "nn": "39",
+    "slug": "mint-fresh-water",
+    "name": "river_39_mint-fresh-water.jpg",
+    "path": "grokimagineassets/river/river_39_mint-fresh-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 40,
+    "nn": "40",
+    "slug": "ultramarine-flow",
+    "name": "river_40_ultramarine-flow.jpg",
+    "path": "grokimagineassets/river/river_40_ultramarine-flow.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 41,
+    "nn": "41",
+    "slug": "turquoise-lagoon",
+    "name": "river_41_turquoise-lagoon.jpg",
+    "path": "grokimagineassets/river/river_41_turquoise-lagoon.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 42,
+    "nn": "42",
+    "slug": "slate-blue-river",
+    "name": "river_42_slate-blue-river.jpg",
+    "path": "grokimagineassets/river/river_42_slate-blue-river.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 43,
+    "nn": "43",
+    "slug": "indigo-night-water",
+    "name": "river_43_indigo-night-water.jpg",
+    "path": "grokimagineassets/river/river_43_indigo-night-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 44,
+    "nn": "44",
+    "slug": "pearl-white-water",
+    "name": "river_44_pearl-white-water.jpg",
+    "path": "grokimagineassets/river/river_44_pearl-white-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 45,
+    "nn": "45",
+    "slug": "copper-sulfate-blue",
+    "name": "river_45_copper-sulfate-blue.jpg",
+    "path": "grokimagineassets/river/river_45_copper-sulfate-blue.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 46,
+    "nn": "46",
+    "slug": "radioactive-lime",
+    "name": "river_46_radioactive-lime.jpg",
+    "path": "grokimagineassets/river/river_46_radioactive-lime.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 47,
+    "nn": "47",
+    "slug": "frost-glass-water",
+    "name": "river_47_frost-glass-water.jpg",
+    "path": "grokimagineassets/river/river_47_frost-glass-water.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 48,
+    "nn": "48",
+    "slug": "smoke-gray-liquid",
+    "name": "river_48_smoke-gray-liquid.jpg",
+    "path": "grokimagineassets/river/river_48_smoke-gray-liquid.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 49,
+    "nn": "49",
+    "slug": "aurora-green-blue",
+    "name": "river_49_aurora-green-blue.jpg",
+    "path": "grokimagineassets/river/river_49_aurora-green-blue.jpg",
+    "aspect": "river"
+  },
+  {
+    "i": 50,
+    "nn": "50",
+    "slug": "champion-river-teal",
+    "name": "river_50_champion-river-teal.jpg",
+    "path": "grokimagineassets/river/river_50_champion-river-teal.jpg",
+    "aspect": "river"
+  }
+]

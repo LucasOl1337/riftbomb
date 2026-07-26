@@ -1,0 +1,13 @@
+{
+  "id": "crate",
+  "displayName": "Shipping crate (multi-face)",
+  "maps": {
+    "albedoSide": "textures/crates/crate-albedo.webp",
+    "albedoTop": "textures/crates/crate-top-albedo.webp",
+    "planksSeamless": "textures/crates/crate-planks-seamless.webp"
+  },
+  "tint": [1.0, 1.0, 1.0],
+  "mapId": 2,
+  "qualityBar": "ART-QUALITY.md — part color separation required",
+  "notes": "crate-F native Imagine set: warm X-braced side + matching plank lid. Shader picks by face normal."
+}

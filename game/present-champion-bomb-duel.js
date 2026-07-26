@@ -27,6 +27,12 @@
             art: [VLADIMIR_ASSETS.q, VLADIMIR_ASSETS.w, VLADIMIR_ASSETS.e, VLADIMIR_ASSETS.r],
             abilities: ["Transfusion", "Sanguine Pool", "Tides of Blood", "Hemoplague"]
           },
+          gangplank: {
+            name: "Gangplank", alt: "Gangplank, o Flagelo das Águas Salgadas", portrait: GANGPLANK_ASSETS.portrait,
+            passive: GANGPLANK_ASSETS.passive,
+            art: [GANGPLANK_ASSETS.q, GANGPLANK_ASSETS.w, GANGPLANK_ASSETS.e, GANGPLANK_ASSETS.r],
+            abilities: ["Parrrley", "Remove Scurvy", "Powder Keg", "Cannon Barrage"]
+          },
           ziggs: {
             name: "Blue Ziggs", alt: "Ziggs, o Especialista em Hexplosivos", portrait: ZIGGS_PORTRAIT,
             passive: null, art: null, abilities: ["Place bomb", "Satchel burst", "Current blast range", "Current speed and shield"]
@@ -41,12 +47,12 @@
         );
         UI.championPortrait.src = presentation.portrait;
         UI.championPortrait.alt = presentation.alt;
-        UI.playerName.textContent = `P1 · ${championName}`;
+        UI.playerName.textContent = `P1 / ${championName.toUpperCase()}`;
         UI.matchSubtitle.textContent = skillChampion
           ? `${championName} vs Ziggs · first to 3`
           : "Ziggs mirror match · first to 3";
         UI.abilityDock.setAttribute("aria-label", skillChampion ? `${championName} abilities` : "Blue Ziggs arena stats");
-        UI.start.textContent = `Play ${championName} + music`;
+        UI.start.textContent = `>>> DEPLOY ${championName.toUpperCase()}`;
 
         const icons = [UI.bombIcon, UI.dashIcon, UI.mineIcon, UI.ultIcon];
         const art = presentation.art;
@@ -106,6 +112,10 @@
         UI.score.textContent = String(crates).padStart(3, "0");
         UI.waveNumber.textContent = String(match.round);
         UI.enemyCount.textContent = String(Math.ceil(match.roundTime)).padStart(2, "0");
+        const arenaLabel = match.arenaTemplate ? match.arenaTemplate().label : "Arena";
+        UI.matchSubtitle.textContent = p1.champion !== "ziggs"
+          ? `${p1.name} vs Ziggs · ${arenaLabel} · first to 3`
+          : `Ziggs mirror · ${arenaLabel} · first to 3`;
         UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · Red Ziggs`;
         UI.waveLabel.textContent = match.roundLocked
           ? (match.pendingMatchWinner ? "Match point converted" : `Round ${String(match.round).padStart(2, "0")} complete`)
@@ -133,28 +143,50 @@
         UI.comboLabel.textContent = `P2 · ${match.p2Human ? "LOCAL" : "CPU"}`;
         const available = Math.max(0, p1.maxBombs - match.activeBombsFor(p1));
         const locked = !p1.alive || match.roundLocked || p1.ultChannel > 0 || p1.vladimirPool > 0;
+        const unlocked = p1.skillsUnlocked || [true, true, true, true];
+        const skillLabel = (name, value, isUnlocked) => {
+          // LOCK badge is visual; keep name short so the dock stays readable
+          if (!isUnlocked) return name;
+          return value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
+        };
+        const gateSkill = (button, slot, cooldownBlocked) => {
+          const isUnlocked = Boolean(unlocked[slot]);
+          button.classList.toggle("is-locked", !isUnlocked);
+          button.disabled = locked || !isUnlocked || cooldownBlocked;
+          button.setAttribute("data-lock", isUnlocked ? "open" : "crate");
+          if (!isUnlocked) {
+            button.setAttribute("aria-disabled", "true");
+            button.title = "Break Hextech crates — skill drops unlock this slot";
+          } else {
+            button.removeAttribute("title");
+          }
+        };
         UI.arenaBombLabel.textContent = available > 0 ? `Arena bomb · ${available}` : "Arena bomb · planted";
         UI.arenaBombFill.style.transform = `scaleX(${available > 0 ? 1 : 0.18})`;
         UI.arenaBombAction.disabled = locked || available <= 0;
+        UI.arenaBombAction.classList.remove("is-locked");
         if (p1.champion === "katarina") {
           UI.resourceFill.style.transform = "scaleX(0.82)";
-          const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
-          UI.bombLabel.textContent = cooldownLabel("Bouncing Blade", p1.qCooldown);
-          UI.dashLabel.textContent = p1.speedBoost > 0
-            ? `Preparation · haste ${p1.speedBoost.toFixed(1)}s`
-            : cooldownLabel("Preparation", p1.wCooldown);
-          UI.rangeLabel.textContent = cooldownLabel("Shunpo", p1.eCooldown);
-          UI.shieldLabel.textContent = p1.ultChannel > 0
-            ? `Death Lotus · ${p1.ultChannel.toFixed(1)}s`
-            : cooldownLabel("Death Lotus", p1.rCooldown);
-          UI.bombFill.style.transform = `scaleX(${1 - clamp(p1.qCooldown / 4.5, 0, 1)})`;
-          UI.dashFill.style.transform = `scaleX(${1 - clamp(p1.wCooldown / 8, 0, 1)})`;
-          UI.mineFill.style.transform = `scaleX(${1 - clamp(p1.eCooldown / 8, 0, 1)})`;
-          UI.ultFill.style.transform = `scaleX(${p1.ultChannel > 0 ? p1.ultChannel / 1.65 : 1 - clamp(p1.rCooldown / 28, 0, 1)})`;
-          UI.bombAction.disabled = locked || p1.qCooldown > 0;
-          UI.dashAction.disabled = locked || p1.wCooldown > 0;
-          UI.mineAction.disabled = locked || p1.eCooldown > 0;
-          UI.ultAction.disabled = locked || p1.rCooldown > 0;
+          UI.bombLabel.textContent = skillLabel("Bouncing Blade", p1.qCooldown, unlocked[0]);
+          UI.dashLabel.textContent = !unlocked[1]
+            ? "Preparation"
+            : p1.speedBoost > 0
+              ? `Preparation · haste ${p1.speedBoost.toFixed(1)}s`
+              : skillLabel("Preparation", p1.wCooldown, true);
+          UI.rangeLabel.textContent = skillLabel("Shunpo", p1.eCooldown, unlocked[2]);
+          UI.shieldLabel.textContent = !unlocked[3]
+            ? "Death Lotus"
+            : p1.ultChannel > 0
+              ? `Death Lotus · ${p1.ultChannel.toFixed(1)}s`
+              : skillLabel("Death Lotus", p1.rCooldown, true);
+          UI.bombFill.style.transform = `scaleX(${unlocked[0] ? 1 - clamp(p1.qCooldown / 4.5, 0, 1) : 0})`;
+          UI.dashFill.style.transform = `scaleX(${unlocked[1] ? 1 - clamp(p1.wCooldown / 8, 0, 1) : 0})`;
+          UI.mineFill.style.transform = `scaleX(${unlocked[2] ? 1 - clamp(p1.eCooldown / 8, 0, 1) : 0})`;
+          UI.ultFill.style.transform = `scaleX(${unlocked[3] ? (p1.ultChannel > 0 ? p1.ultChannel / 1.65 : 1 - clamp(p1.rCooldown / 28, 0, 1)) : 0})`;
+          gateSkill(UI.bombAction, 0, p1.qCooldown > 0);
+          gateSkill(UI.dashAction, 1, p1.wCooldown > 0);
+          gateSkill(UI.mineAction, 2, p1.eCooldown > 0);
+          gateSkill(UI.ultAction, 3, p1.rCooldown > 0);
           UI.playerCard.dataset.qCooldown = p1.qCooldown.toFixed(3);
           UI.playerCard.dataset.wCooldown = p1.wCooldown.toFixed(3);
           UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
@@ -168,22 +200,26 @@
             shadow.ownerId === p1.id && shadow.kind === "living" && shadow.swapAvailable && shadow.age < shadow.life
           );
           const deathMark = match.zedMarks.find((mark) => mark.ownerId === p1.id && !mark.detonated);
-          UI.bombLabel.textContent = cooldownLabel("Razor Shuriken", p1.qCooldown);
-          UI.dashLabel.textContent = livingShadow && p1.zedSwapWindow > 0
-            ? `Living Shadow · F exchange ${p1.zedSwapWindow.toFixed(1)}s`
-            : cooldownLabel("Living Shadow", p1.wCooldown);
-          UI.rangeLabel.textContent = cooldownLabel("Shadow Slash", p1.eCooldown);
-          UI.shieldLabel.textContent = deathMark
-            ? `Death Mark · detonates ${Math.max(0, deathMark.fuse - deathMark.age).toFixed(1)}s`
-            : cooldownLabel("Death Mark", p1.rCooldown);
-          UI.bombFill.style.transform = `scaleX(${1 - clamp(p1.qCooldown / 5.6, 0, 1)})`;
-          UI.dashFill.style.transform = `scaleX(${livingShadow && p1.zedSwapWindow > 0 ? 1 : 1 - clamp(p1.wCooldown / 14, 0, 1)})`;
-          UI.mineFill.style.transform = `scaleX(${1 - clamp(p1.eCooldown / 5.2, 0, 1)})`;
-          UI.ultFill.style.transform = `scaleX(${deathMark ? 1 - deathMark.age / deathMark.fuse : 1 - clamp(p1.rCooldown / 30, 0, 1)})`;
-          UI.bombAction.disabled = locked || p1.qCooldown > 0;
-          UI.dashAction.disabled = locked || (p1.wCooldown > 0 && !(livingShadow && p1.zedSwapWindow > 0));
-          UI.mineAction.disabled = locked || p1.eCooldown > 0;
-          UI.ultAction.disabled = locked || p1.rCooldown > 0;
+          UI.bombLabel.textContent = skillLabel("Razor Shuriken", p1.qCooldown, unlocked[0]);
+          UI.dashLabel.textContent = !unlocked[1]
+            ? "Living Shadow"
+            : livingShadow && p1.zedSwapWindow > 0
+              ? `Living Shadow · F exchange ${p1.zedSwapWindow.toFixed(1)}s`
+              : skillLabel("Living Shadow", p1.wCooldown, true);
+          UI.rangeLabel.textContent = skillLabel("Shadow Slash", p1.eCooldown, unlocked[2]);
+          UI.shieldLabel.textContent = !unlocked[3]
+            ? "Death Mark"
+            : deathMark
+              ? `Death Mark · detonates ${Math.max(0, deathMark.fuse - deathMark.age).toFixed(1)}s`
+              : skillLabel("Death Mark", p1.rCooldown, true);
+          UI.bombFill.style.transform = `scaleX(${unlocked[0] ? 1 - clamp(p1.qCooldown / 5.6, 0, 1) : 0})`;
+          UI.dashFill.style.transform = `scaleX(${unlocked[1] ? (livingShadow && p1.zedSwapWindow > 0 ? 1 : 1 - clamp(p1.wCooldown / 14, 0, 1)) : 0})`;
+          UI.mineFill.style.transform = `scaleX(${unlocked[2] ? 1 - clamp(p1.eCooldown / 5.2, 0, 1) : 0})`;
+          UI.ultFill.style.transform = `scaleX(${unlocked[3] ? (deathMark ? 1 - deathMark.age / deathMark.fuse : 1 - clamp(p1.rCooldown / 30, 0, 1)) : 0})`;
+          gateSkill(UI.bombAction, 0, p1.qCooldown > 0);
+          gateSkill(UI.dashAction, 1, p1.wCooldown > 0 && !(livingShadow && p1.zedSwapWindow > 0));
+          gateSkill(UI.mineAction, 2, p1.eCooldown > 0);
+          gateSkill(UI.ultAction, 3, p1.rCooldown > 0);
           UI.playerCard.dataset.qCooldown = p1.qCooldown.toFixed(3);
           UI.playerCard.dataset.wCooldown = p1.wCooldown.toFixed(3);
           UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
@@ -193,23 +229,27 @@
         } else if (p1.champion === "renekton") {
           const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
           const empowered = p1.fury >= 50;
-          UI.bombLabel.textContent = `${cooldownLabel("Cull the Meek", p1.qCooldown)}${empowered ? " · empowered" : ""}`;
-          UI.dashLabel.textContent = `${cooldownLabel("Ruthless Predator", p1.wCooldown)}${empowered ? " · empowered" : ""}`;
-          UI.rangeLabel.textContent = p1.renektonDashRecast > 0
-            ? `Slice and Dice · E again ${p1.renektonDashRecast.toFixed(1)}s`
-            : cooldownLabel("Slice and Dice", p1.eCooldown);
-          UI.shieldLabel.textContent = p1.renektonDominus > 0
-            ? `Dominus · ${p1.renektonDominus.toFixed(1)}s`
-            : cooldownLabel("Dominus", p1.rCooldown);
-          UI.bombFill.style.transform = `scaleX(${1 - clamp(p1.qCooldown / 5.8, 0, 1)})`;
-          UI.dashFill.style.transform = `scaleX(${1 - clamp(p1.wCooldown / 9.5, 0, 1)})`;
-          UI.mineFill.style.transform = `scaleX(${p1.renektonDashRecast > 0 ? 1 : 1 - clamp(p1.eCooldown / 11.5, 0, 1)})`;
-          UI.ultFill.style.transform = `scaleX(${p1.renektonDominus > 0 ? p1.renektonDominus / 7.2 : 1 - clamp(p1.rCooldown / 31, 0, 1)})`;
+          UI.bombLabel.textContent = `${skillLabel("Cull the Meek", p1.qCooldown, unlocked[0])}${unlocked[0] && empowered ? " · empowered" : ""}`;
+          UI.dashLabel.textContent = `${skillLabel("Ruthless Predator", p1.wCooldown, unlocked[1])}${unlocked[1] && empowered ? " · empowered" : ""}`;
+          UI.rangeLabel.textContent = !unlocked[2]
+            ? "Slice and Dice"
+            : p1.renektonDashRecast > 0
+              ? `Slice and Dice · E again ${p1.renektonDashRecast.toFixed(1)}s`
+              : skillLabel("Slice and Dice", p1.eCooldown, true);
+          UI.shieldLabel.textContent = !unlocked[3]
+            ? "Dominus"
+            : p1.renektonDominus > 0
+              ? `Dominus · ${p1.renektonDominus.toFixed(1)}s`
+              : skillLabel("Dominus", p1.rCooldown, true);
+          UI.bombFill.style.transform = `scaleX(${unlocked[0] ? 1 - clamp(p1.qCooldown / 5.8, 0, 1) : 0})`;
+          UI.dashFill.style.transform = `scaleX(${unlocked[1] ? 1 - clamp(p1.wCooldown / 9.5, 0, 1) : 0})`;
+          UI.mineFill.style.transform = `scaleX(${unlocked[2] ? (p1.renektonDashRecast > 0 ? 1 : 1 - clamp(p1.eCooldown / 11.5, 0, 1)) : 0})`;
+          UI.ultFill.style.transform = `scaleX(${unlocked[3] ? (p1.renektonDominus > 0 ? p1.renektonDominus / 7.2 : 1 - clamp(p1.rCooldown / 31, 0, 1)) : 0})`;
           UI.resourceFill.style.transform = `scaleX(${clamp(p1.fury / 100, 0, 1)})`;
-          UI.bombAction.disabled = locked || p1.qCooldown > 0;
-          UI.dashAction.disabled = locked || p1.wCooldown > 0;
-          UI.mineAction.disabled = locked || (p1.eCooldown > 0 && p1.renektonDashRecast <= 0);
-          UI.ultAction.disabled = locked || p1.rCooldown > 0;
+          gateSkill(UI.bombAction, 0, p1.qCooldown > 0);
+          gateSkill(UI.dashAction, 1, p1.wCooldown > 0);
+          gateSkill(UI.mineAction, 2, p1.eCooldown > 0 && p1.renektonDashRecast <= 0);
+          gateSkill(UI.ultAction, 3, p1.rCooldown > 0);
           UI.playerCard.dataset.qCooldown = p1.qCooldown.toFixed(3);
           UI.playerCard.dataset.wCooldown = p1.wCooldown.toFixed(3);
           UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
@@ -220,23 +260,29 @@
         } else if (p1.champion === "vladimir") {
           const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
           const mark = match.vladimirMarks.find((candidate) => candidate.ownerId === p1.id && !candidate.detonated);
-          UI.bombLabel.textContent = `${cooldownLabel("Transfusion", p1.qCooldown)} · crimson ${p1.vladimirQStacks}/2`;
-          UI.dashLabel.textContent = p1.vladimirPool > 0
-            ? `Sanguine Pool · ${p1.vladimirPool.toFixed(1)}s`
-            : cooldownLabel("Sanguine Pool", p1.wCooldown);
-          UI.rangeLabel.textContent = cooldownLabel("Tides of Blood", p1.eCooldown);
-          UI.shieldLabel.textContent = mark
-            ? `Hemoplague · detonates ${Math.max(0, mark.fuse - mark.age).toFixed(1)}s`
-            : cooldownLabel("Hemoplague", p1.rCooldown);
-          UI.bombFill.style.transform = `scaleX(${1 - clamp(p1.qCooldown / 4.4, 0, 1)})`;
-          UI.dashFill.style.transform = `scaleX(${p1.vladimirPool > 0 ? p1.vladimirPool / 1.45 : 1 - clamp(p1.wCooldown / 15, 0, 1)})`;
-          UI.mineFill.style.transform = `scaleX(${1 - clamp(p1.eCooldown / 7.6, 0, 1)})`;
-          UI.ultFill.style.transform = `scaleX(${mark ? 1 - mark.age / mark.fuse : 1 - clamp(p1.rCooldown / 30, 0, 1)})`;
+          UI.bombLabel.textContent = !unlocked[0]
+            ? "Transfusion"
+            : `${skillLabel("Transfusion", p1.qCooldown, true)} · crimson ${p1.vladimirQStacks}/2`;
+          UI.dashLabel.textContent = !unlocked[1]
+            ? "Sanguine Pool"
+            : p1.vladimirPool > 0
+              ? `Sanguine Pool · ${p1.vladimirPool.toFixed(1)}s`
+              : skillLabel("Sanguine Pool", p1.wCooldown, true);
+          UI.rangeLabel.textContent = skillLabel("Tides of Blood", p1.eCooldown, unlocked[2]);
+          UI.shieldLabel.textContent = !unlocked[3]
+            ? "Hemoplague"
+            : mark
+              ? `Hemoplague · detonates ${Math.max(0, mark.fuse - mark.age).toFixed(1)}s`
+              : skillLabel("Hemoplague", p1.rCooldown, true);
+          UI.bombFill.style.transform = `scaleX(${unlocked[0] ? 1 - clamp(p1.qCooldown / 4.4, 0, 1) : 0})`;
+          UI.dashFill.style.transform = `scaleX(${unlocked[1] ? (p1.vladimirPool > 0 ? p1.vladimirPool / 1.45 : 1 - clamp(p1.wCooldown / 15, 0, 1)) : 0})`;
+          UI.mineFill.style.transform = `scaleX(${unlocked[2] ? 1 - clamp(p1.eCooldown / 7.6, 0, 1) : 0})`;
+          UI.ultFill.style.transform = `scaleX(${unlocked[3] ? (mark ? 1 - mark.age / mark.fuse : 1 - clamp(p1.rCooldown / 30, 0, 1)) : 0})`;
           UI.resourceFill.style.transform = `scaleX(${clamp(p1.vladimirQStacks / 2, 0, 1)})`;
-          UI.bombAction.disabled = locked || p1.qCooldown > 0;
-          UI.dashAction.disabled = locked || p1.wCooldown > 0;
-          UI.mineAction.disabled = locked || p1.eCooldown > 0;
-          UI.ultAction.disabled = locked || p1.rCooldown > 0;
+          gateSkill(UI.bombAction, 0, p1.qCooldown > 0);
+          gateSkill(UI.dashAction, 1, p1.wCooldown > 0);
+          gateSkill(UI.mineAction, 2, p1.eCooldown > 0);
+          gateSkill(UI.ultAction, 3, p1.rCooldown > 0);
           UI.playerCard.dataset.qCooldown = p1.qCooldown.toFixed(3);
           UI.playerCard.dataset.wCooldown = p1.wCooldown.toFixed(3);
           UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
@@ -244,12 +290,44 @@
           UI.playerCard.dataset.crimsonRush = String(p1.vladimirQStacks);
           UI.playerCard.dataset.pool = p1.vladimirPool.toFixed(3);
           UI.playerCard.dataset.hemoplague = String(match.vladimirMarks.filter((candidate) => candidate.ownerId === p1.id).length);
+        } else if (p1.champion === "gangplank") {
+          const cooldownLabel = (name, value) => value > 0 ? `${name} · ${value.toFixed(1)}s` : `${name} · ready`;
+          const barrels = (match.gangplankBarrels || []).filter((b) => b.ownerId === p1.id && !b.exploded).length;
+          const barrage = (match.gangplankBarrages || []).find((b) => b.ownerId === p1.id && !b.detonated);
+          UI.bombLabel.textContent = skillLabel("Parrrley", p1.qCooldown, unlocked[0]);
+          UI.dashLabel.textContent = skillLabel("Remove Scurvy", p1.wCooldown, unlocked[1]);
+          UI.rangeLabel.textContent = !unlocked[2]
+            ? "Powder Keg"
+            : barrels > 0
+              ? `Powder Keg · ${barrels}/3 planted`
+              : skillLabel("Powder Keg", p1.eCooldown, true);
+          UI.shieldLabel.textContent = !unlocked[3]
+            ? "Cannon Barrage"
+            : barrage
+              ? `Cannon Barrage · ${Math.max(0, barrage.fuse - barrage.age).toFixed(1)}s`
+              : skillLabel("Cannon Barrage", p1.rCooldown, true);
+          UI.bombFill.style.transform = `scaleX(${unlocked[0] ? 1 - clamp(p1.qCooldown / 4.8, 0, 1) : 0})`;
+          UI.dashFill.style.transform = `scaleX(${unlocked[1] ? 1 - clamp(p1.wCooldown / 12, 0, 1) : 0})`;
+          UI.mineFill.style.transform = `scaleX(${unlocked[2] ? (barrels > 0 ? clamp(barrels / 3, 0, 1) : 1 - clamp(p1.eCooldown / 7.5, 0, 1)) : 0})`;
+          UI.ultFill.style.transform = `scaleX(${unlocked[3] ? (barrage ? 1 - barrage.age / barrage.fuse : 1 - clamp(p1.rCooldown / 32, 0, 1)) : 0})`;
+          UI.resourceFill.style.transform = `scaleX(${clamp(barrels / 3, 0, 1)})`;
+          gateSkill(UI.bombAction, 0, p1.qCooldown > 0);
+          gateSkill(UI.dashAction, 1, p1.wCooldown > 0);
+          gateSkill(UI.mineAction, 2, p1.eCooldown > 0 || barrels >= 3);
+          gateSkill(UI.ultAction, 3, p1.rCooldown > 0);
+          UI.playerCard.dataset.qCooldown = p1.qCooldown.toFixed(3);
+          UI.playerCard.dataset.wCooldown = p1.wCooldown.toFixed(3);
+          UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
+          UI.playerCard.dataset.rCooldown = p1.rCooldown.toFixed(3);
+          UI.playerCard.dataset.barrels = String(barrels);
         } else {
           UI.resourceFill.style.transform = "scaleX(0.82)";
           UI.bombLabel.textContent = `Bomb · ${available}/${p1.maxBombs} ready`;
-          UI.dashLabel.textContent = p1.dashCooldown > 0 ? `Satchel · ${p1.dashCooldown.toFixed(1)}s` : "Satchel · ready";
+          UI.dashLabel.textContent = !unlocked[1]
+            ? "Satchel"
+            : p1.dashCooldown > 0 ? `Satchel · ${p1.dashCooldown.toFixed(1)}s` : "Satchel · ready";
           UI.bombFill.style.transform = `scaleX(${available > 0 ? 1 : 0})`;
-          UI.dashFill.style.transform = `scaleX(${1 - clamp(p1.dashCooldown / 5, 0, 1)})`;
+          UI.dashFill.style.transform = `scaleX(${unlocked[1] ? 1 - clamp(p1.dashCooldown / 5, 0, 1) : 0})`;
           UI.rangeLabel.textContent = `Blast · ${p1.range} tiles`;
           UI.mineFill.style.transform = `scaleX(${clamp(p1.range / 6, 0, 1)})`;
           UI.shieldLabel.textContent = p1.shield > 0
@@ -257,9 +335,12 @@
             : `Speed · ${(p1.speed / 3.45).toFixed(1)}×`;
           UI.ultFill.style.transform = `scaleX(${p1.shield > 0 ? p1.shield / 2 : clamp((p1.speed - 3.2) / 1.55, 0.12, 1)})`;
           UI.bombAction.disabled = available <= 0 || locked;
-          UI.dashAction.disabled = p1.dashCooldown > 0 || locked;
+          UI.bombAction.classList.remove("is-locked");
+          gateSkill(UI.dashAction, 1, p1.dashCooldown > 0);
           UI.mineAction.disabled = true;
           UI.ultAction.disabled = true;
+          UI.mineAction.classList.add("is-locked");
+          UI.ultAction.classList.add("is-locked");
         }
 
         const maxX = match.tile * (match.cols - 1) / 2;
