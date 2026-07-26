@@ -12,6 +12,10 @@ fluidpkg/
 *.tmp
 *.bak
 
+# Heavy hostile-UI capture dumps (keep curated breaks + docs in-repo)
+learning-records/hostile-ui/videos/
+learning-records/hostile-ui/videos-raw/
+
 # Operating-system files
 Thumbs.db
 .DS_Store

@@ -1,0 +1,1 @@
+HOSTILE-UI PLAYWRIGHT DISABLED by user request. Scripts are in C:\Projetos\riftbomb\learning-records\hostile-ui\_DISABLED_20260725-231835. Do not recreate or re-run without explicit permission.

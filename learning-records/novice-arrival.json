@@ -1,0 +1,32 @@
+{
+  "t_load_s": 3.67,
+  "t_play_click_s": 12.33,
+  "title": "League of Legends: Riftbomb — Champions PvP Bomber Arena",
+  "start_label": "PLAY KATARINA + MUSIC",
+  "choices": [
+    "KATARINA\nBATTLE QUEEN · Q F E R",
+    "ZED\nMASTER OF SHADOWS · Q F E R",
+    "RENEKTON\nBUTCHER OF THE SANDS · Q F E R",
+    "VLADIMIR\nCRIMSON REAPER · Q F E R",
+    "✦\nZIGGS\nBOMBER · Q SHIFT"
+  ],
+  "intro_text": "UNOFFICIAL LEAGUE OF LEGENDS FAN GAME\nLEAGUE OF LEGENDS\nRiftbomb\nCHAMPIONS OF THE BOMBER RIFT\n\nChoose Katarina, Zed, Renekton, Vladimir or Ziggs for Player 1. Bomb through Hextech crates, collect power-ups, then combine authentic champion silhouettes with a lethal Bomber Rift ruleset.\n\nP1 CHAMPION\nKATARINA\nBATTLE QUEEN · Q F E R\nZED\nMASTER OF SHADOWS · Q F E R\nRENEKTON\nBUTCHER OF THE SANDS · Q F E R\nVLADIMIR\nCRIMSON REAPER · Q F E R\n✦\nZIGGS\nBOMBER · Q SHIFT\nPLAY KATARINA + MUSIC\nREAD ARENA RULES\nBEST OF FIVE\nBREAKABLE HEXTECH BLOCKS\nFIVE PLAYABLE CHAMPIONS\nLOCAL PVP · ADAPTIVE CPU\n\nUnofficial, non-commercial fan prototype; not endorsed by Riot Games. League of Legends, Katarina, Zed, Renekton, Vladimir, Ziggs, Summoner’s Rift and related marks belong to Riot Games. Champion meshes, textures and animation data are derived from locally installed Riot game assets; code, arena geometry, visual systems, and synthesized audio are original to this prototype.",
+  "intro_gone_after_play": true,
+  "chrome_hidden_after_play": false,
+  "live": "",
+  "wave": "Round 01 · CPU controls Red",
+  "scoreline": "KATARINA · 0 — 0 · RED ZIGGS",
+  "ability_labels": [
+    "BOUNCING BLADE · READY",
+    "PREPARATION · READY",
+    "SHUNPO · READY",
+    "DEATH LOTUS · READY"
+  ],
+  "live_after_input": "",
+  "event_kicker": "ROUND 1 · KATARINA ENTERS THE ARENA",
+  "guide_open": true,
+  "guide_text": "RIFT BOMBER · LOCAL VERSUS\nArena rules\nControls\nP1 · WASD\nMove your selected champion. Space always plants the arena bomb.\nKatarina · Q/F/E/R\nBouncing Blade, Preparation, Shunpo and Death Lotus. F replaces W because W is forward movement.\nVoracity\nWalk over a grounded dagger to spin, slash nearby targets and heavily reduce Shunpo’s cooldown.\nZed · Q/F/E/R\nRazor Shuriken, Living Shadow, Shadow Slash and Death Mark. Press F again to exchange places with the living shadow.\nRenekton · Q/F/E/R\nCull the Meek, Ruthless Predator, Slice and Dice, and Dominus. Fury empowers Q or F at 50.\nVladimir · Q/F/E/R\nTransfusion, Sanguine Pool, Tides of Blood and Hemoplague. F replaces W because W moves the champion.\nZiggs · Q/Shift\nQ plants a bomb and Left Shift triggers Satchel burst.\nP2 · Arrows\nMove Red Ziggs. Enter or Numpad 0 plants a bomb; Right Shift triggers Satchel burst.\nSolo play\nThe CPU controls Red until Player 2 presses an arrow key or Enter.\nM\nMute or restore the original soundtrack.\nP\nPaus",
+  "root_title": "Directory listing for /",
+  "root_text": "Directory listing for /\n.git/\n.gitignore\nAGENTS.md\narchitecture-course/\nart/\nassets/\nchampions/\nCONTEXT.md\nfluid-bg-0.2.0.tgz\ngame/\nlearning-records/\nlessons/\npackage.json\nREADME.md\nreference/\nreferences/\nresearch/\nriftbomb-server-error.log\nriftbomb-server.log\nriftbomb.html\ntools/\nverify-repository-geography.test.mjs",
+  "canvas_ok": true
+}

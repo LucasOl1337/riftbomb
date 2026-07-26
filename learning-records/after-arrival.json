@@ -1,0 +1,51 @@
+{
+  "dock": {
+    "btns": [
+      {
+        "id": "arena-bomb-action",
+        "kbd": "Space",
+        "name": "Arena bomb · 1",
+        "disabled": false
+      },
+      {
+        "id": "bomb-action",
+        "kbd": "Q",
+        "name": "Bouncing Blade · ready",
+        "disabled": false
+      },
+      {
+        "id": "dash-action",
+        "kbd": "F",
+        "name": "Preparation · ready",
+        "disabled": false
+      },
+      {
+        "id": "mine-action",
+        "kbd": "E",
+        "name": "Shunpo · ready",
+        "disabled": false
+      },
+      {
+        "id": "ult-action",
+        "kbd": "R",
+        "name": "Death Lotus · ready",
+        "disabled": false
+      }
+    ],
+    "score": "054",
+    "event": "Round 1 · Katarina enters the arena"
+  },
+  "after_click": {
+    "bombs": null,
+    "label": "Arena bomb · planted",
+    "disabled": true,
+    "score": "054"
+  },
+  "after_fuse": {
+    "bombs": null,
+    "label": "Arena bomb · 1",
+    "score": "048",
+    "hearts": "Katarina has 100 percent health"
+  },
+  "elapsed_s": 58.55
+}

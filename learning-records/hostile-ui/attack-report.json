@@ -1,0 +1,38 @@
+{
+  "product": "Riftbomb",
+  "attackedAt": "2026-07-26T02:20:00.000Z",
+  "baseUrl": "http://127.0.0.1:4177/riftbomb.html",
+  "timeToFirstBreakMinutes": 5,
+  "breakCount": 5,
+  "breaks": [
+    {
+      "symptom": "page-crash-under-input-storm",
+      "kind": "silent-session-death",
+      "video": "learning-records/hostile-ui/breaks/page-crash-under-input-storm.webm"
+    },
+    {
+      "symptom": "scenario-hang-no-feedback",
+      "kind": "silent-freeze",
+      "video": "learning-records/hostile-ui/breaks/scenario-hang-no-feedback.webm"
+    },
+    {
+      "symptom": "scenario-hang-no-feedback-two-tabs",
+      "kind": "silent-freeze",
+      "video": "learning-records/hostile-ui/breaks/scenario-hang-no-feedback-two-tabs.webm"
+    },
+    {
+      "symptom": "grace-window-steals-first-kill-win",
+      "kind": "score-erased",
+      "video": null,
+      "proof": "game/hostile-ui-breaks.test.mjs + probe-grace-window.mjs"
+    },
+    {
+      "symptom": "start-stays-armed-after-play",
+      "kind": "destructive-control-rearmed",
+      "video": null,
+      "proof": "game/hostile-ui-breaks.test.mjs (beginGame re-enables #start-game)"
+    }
+  ],
+  "automatedTests": "game/hostile-ui-breaks.test.mjs",
+  "testsFailToday": true
+}
