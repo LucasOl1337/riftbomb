@@ -323,6 +323,16 @@
         UI.championChoices.forEach((button) =>
           button.addEventListener("click", () => game.selectChampion(button.dataset.champion))
         );
+        if (UI.championChoicesP2) {
+          UI.championChoicesP2.forEach((button) =>
+            button.addEventListener("click", () => {
+              game.selectChampionP2(button.dataset.champion);
+              UI.championChoicesP2.forEach((b) =>
+                b.setAttribute("aria-pressed", String(b.dataset.champion === button.dataset.champion))
+              );
+            })
+          );
+        }
         buildArenaPicker();
         buildSoundtrackPicker();
         UI.start.addEventListener("click", beginGame);

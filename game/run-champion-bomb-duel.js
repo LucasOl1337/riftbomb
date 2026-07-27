@@ -212,6 +212,7 @@
         this.daggerId = 0;
         this.shadowId = 0;
         this.selectedChampion = "katarina";
+        this.selectedChampionP2 = "ziggs";
         this.selectedArena = ARENA_TEMPLATES[0].id;
         this.round = 0;
         this.wave = 1;
@@ -348,14 +349,16 @@
         const r = id === 1 ? this.rows - 2 : 1;
         const c = id === 1 ? 1 : this.cols - 2;
         const [x, z] = this.worldFromCell(r, c);
-        const champion = id === 1 ? this.selectedChampion : "ziggs";
+        const champion = id === 1 ? this.selectedChampion : this.selectedChampionP2;
+        const championName = ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir", gangplank: "Gangplank" }[champion] || "Ziggs");
+        const name = champion === "ziggs"
+          ? (id === 1 ? "Blue Ziggs" : "Red Ziggs")
+          : (id === 1 ? championName : `Red ${championName}`);
         return {
           id,
           champion,
           side: id === 1 ? "blue" : "red",
-          name: id === 1
-            ? ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir", gangplank: "Gangplank" }[champion] || "Blue Ziggs")
-            : "Red Ziggs",
+          name,
           x, z,
           health: 1,
           maxHealth: 1,
@@ -422,6 +425,13 @@
       selectChampion(champion) {
         if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;
         this.selectedChampion = champion;
+        this.resetPlayers();
+        this.presentation.update(this);
+      }
+
+      selectChampionP2(champion) {
+        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;
+        this.selectedChampionP2 = champion;
         this.resetPlayers();
         this.presentation.update(this);
       }
@@ -1540,7 +1550,14 @@
       movementFor(player) {
         let dx = 0;
         let dz = 0;
-        if (player.id === 1) {
+        const keys = player.keys || this.keys;
+        if (keys !== this.keys) {
+          // Online per-player keys are already normalized to WASD.
+          if (keys.has("KeyA")) dx -= 1;
+          if (keys.has("KeyD")) dx += 1;
+          if (keys.has("KeyW")) dz -= 1;
+          if (keys.has("KeyS")) dz += 1;
+        } else if (player.id === 1) {
           if (this.keys.has("KeyA") || this.touchDirs.has("left")) dx -= 1;
           if (this.keys.has("KeyD") || this.touchDirs.has("right")) dx += 1;
           if (this.keys.has("KeyW") || this.touchDirs.has("up")) dz -= 1;

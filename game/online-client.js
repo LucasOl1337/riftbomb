@@ -1,18 +1,38 @@
 "use strict";
 
-document.title = "RIFTBOMB // ONLINE LOADING";
+document.title = "RIFTBOMB // ONLINE";
+
+const CHAMPIONS = [
+  { id: "katarina", name: "Katarina", glyph: "⚔" },
+  { id: "zed", name: "Zed", glyph: "◈" },
+  { id: "renekton", name: "Renekton", glyph: "☀" },
+  { id: "vladimir", name: "Vladimir", glyph: "◆" },
+  { id: "gangplank", name: "Gangplank", glyph: "⚓" },
+  { id: "ziggs", name: "Ziggs", glyph: "✦" }
+];
+
+const MOVEMENT_MAP = {
+  KeyW: "KeyW", ArrowUp: "KeyW",
+  KeyA: "KeyA", ArrowLeft: "KeyA",
+  KeyS: "KeyS", ArrowDown: "KeyS",
+  KeyD: "KeyD", ArrowRight: "KeyD"
+};
 
 let onlineMusic;
 let onlineRenderer;
 let onlinePresentation = null;
 let remoteGame = null;
+let predictedGame = null;
 let playerId = null;
 let ws = null;
 let playing = false;
 let onlineLastFrame = performance.now();
 let lobbyHost = null;
-let predictedGame = null;
 const pendingMovement = new Set();
+let selectedChampion = null;
+let remoteChampion = null;
+let inputSeq = 0;
+const inputHistory = [];
 
 const onlineFormatTime = (seconds) => {
   seconds = Math.max(0, Math.floor(seconds));
@@ -36,6 +56,15 @@ function onlineFormatBeat() {
   }
 }
 
+function buildChampionButton(champion) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "champion-choice";
+  button.dataset.champion = champion.id;
+  button.innerHTML = `<span class="champion-glyph" aria-hidden="true">${champion.glyph}</span><strong>${champion.name}</strong>`;
+  return button;
+}
+
 function setupLobby() {
   const existing = document.getElementById("online-lobby");
   if (existing) existing.remove();
@@ -50,7 +79,9 @@ function setupLobby() {
       <h2>Quick Duel Lobby</h2>
       <p id="online-lobby-status">Connecting...</p>
       <div class="online-lobby-count" id="online-lobby-count">Players 0 / 2</div>
-      <button class="primary" id="online-lobby-ready" disabled>Waiting for rival</button>
+      <div class="online-champion-select" id="online-champion-select" role="group" aria-label="Choose your champion"></div>
+      <div class="online-rival-choice micro" id="online-rival-choice"></div>
+      <button class="primary" id="online-lobby-ready" disabled>Choose a champion</button>
     </div>
   `;
   document.body.appendChild(lobby);
@@ -59,31 +90,60 @@ function setupLobby() {
   style.textContent = `
     #online-lobby { position: fixed; inset: 0; display: grid; place-items: center; z-index: 100; background: rgba(10,10,10,0.92); }
     #online-lobby[hidden] { display: none !important; }
-    .online-lobby-card { text-align: center; max-width: 360px; padding: 2rem; border: 1px solid #2a3a2a; background: #0e1612; }
+    .online-lobby-card { text-align: center; max-width: 420px; padding: 2rem; border: 1px solid #2a3a2a; background: #0e1612; }
     .online-lobby-card h2 { margin: 0.5rem 0; color: #e2bf72; }
     .online-lobby-count { font-size: 1.5rem; margin: 1rem 0; color: #9ebf9e; }
+    .online-champion-select { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin: 1rem 0; }
+    .online-champion-select button { padding: 0.75rem; background: #1a2420; border: 1px solid #2a3a2a; color: #c9d8c9; cursor: pointer; }
+    .online-champion-select button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .online-champion-select button.selected { border-color: #e2bf72; background: #2a3020; }
+    .online-rival-choice { margin: 0.5rem 0; color: #9ebf9e; min-height: 1.2em; }
   `;
   document.head.appendChild(style);
+
+  const selectHost = document.getElementById("online-champion-select");
+  for (const champion of CHAMPIONS) {
+    const button = buildChampionButton(champion);
+    button.addEventListener("click", () => chooseChampion(champion.id));
+    selectHost.appendChild(button);
+  }
 
   lobbyHost = lobby;
   connect();
 }
 
-function setLobbyStatus(text, ready = false, players = null) {
+function setLobbyStatus(text, ready = false, players = null, choices = null) {
   const status = document.getElementById("online-lobby-status");
   const count = document.getElementById("online-lobby-count");
   const button = document.getElementById("online-lobby-ready");
+  const rival = document.getElementById("online-rival-choice");
   const room = players ?? (ws && ws.readyState === 1 ? 1 : 0);
   if (status) status.textContent = text;
   if (count) count.textContent = `Players ${room} / 2`;
   if (button) {
     button.disabled = !ready;
-    button.textContent = ready ? "Match running" : (room < 2 ? "Waiting for rival" : "Match running");
+    button.textContent = ready ? "Waiting for rival" : (selectedChampion ? "Waiting for rival" : "Choose a champion");
+  }
+  if (rival && choices) {
+    const other = choices.find((c) => c.playerId !== playerId);
+    if (other && other.champion) {
+      const name = CHAMPIONS.find((c) => c.id === other.champion)?.name || other.champion;
+      rival.textContent = `Rival picked ${name}`;
+    } else {
+      rival.textContent = "Rival choosing...";
+    }
   }
 }
 
-function clientsInRoom() {
-  return ws && ws.readyState === 1 ? 1 : 0;
+function chooseChampion(champion) {
+  if (selectedChampion) return;
+  selectedChampion = champion;
+  sendInput({ type: "champion", champion });
+  document.querySelectorAll(".online-champion-select button").forEach((button) => {
+    button.disabled = true;
+    button.classList.toggle("selected", button.dataset.champion === champion);
+  });
+  setLobbyStatus("Champion locked · waiting for rival", false, null, null);
 }
 
 function connect() {
@@ -111,6 +171,8 @@ function connect() {
 
   ws.onclose = () => {
     playing = false;
+    selectedChampion = null;
+    remoteChampion = null;
     if (lobbyHost) lobbyHost.hidden = false;
     if (UI.live) UI.live.textContent = "Online mode";
     setLobbyStatus("Disconnected");
@@ -120,20 +182,29 @@ function connect() {
 }
 
 function handleServerMessage(message) {
-  if (message.type === "lobby") {
-    const ready = message.players === 2;
-    const status = ready ? "Rival found · starting" : `Players ${message.players} / ${message.max}`;
-    if (!ready && playing) {
+  if (message.type === "welcome") {
+    playerId = message.playerId;
+  } else if (message.type === "lobby") {
+    if (message.choices) {
+      const mine = message.choices.find((c) => c.playerId === playerId);
+      const rival = message.choices.find((c) => c.playerId !== playerId);
+      if (!selectedChampion && mine?.champion) selectedChampion = mine.champion;
+      remoteChampion = rival?.champion || null;
+    }
+    const readyCount = message.choices?.filter((c) => c.ready).length ?? message.players;
+    const status = readyCount === 2 ? "Rival found · starting" : `Players ${message.players} / ${message.max}`;
+    if (readyCount < 2 && playing) {
       playing = false;
       if (lobbyHost) lobbyHost.hidden = false;
       if (UI.live) UI.live.textContent = "Online mode";
     }
-    setLobbyStatus(status, ready, message.players);
+    setLobbyStatus(status, readyCount === 2, message.players, message.choices);
   } else if (message.type === "start") {
     playerId = message.playerId;
     remoteGame = Object.create(Game.prototype);
     Object.assign(remoteGame, message.snapshot);
-    if (onlinePresentation && remoteGame.players[0]) onlinePresentation.selectChampion(remoteGame.players[0].champion);
+    predictedGame = null;
+    inputHistory.length = 0;
     startOnlineMatch();
   } else if (message.type === "snapshot") {
     if (!remoteGame) {
@@ -156,6 +227,8 @@ function startOnlineMatch() {
   UI.chrome.setAttribute("aria-hidden", "false");
   UI.chrome.removeAttribute("inert");
   if (onlinePresentation) {
+    const localChampion = remoteGame?.players?.[playerId - 1]?.champion;
+    if (localChampion) onlinePresentation.selectChampion(localChampion);
     onlinePresentation.prepareRound();
     onlinePresentation.announce("Online match connected");
   } else if (UI.live) {
@@ -167,75 +240,75 @@ function startOnlineMatch() {
 
 function sendInput(message) {
   if (ws && ws.readyState === 1) {
+    if (message.seq === undefined) message.seq = ++inputSeq;
+    else inputSeq = Math.max(inputSeq, message.seq);
     ws.send(JSON.stringify(message));
+    if (message.type === "input" && message.dx !== undefined) {
+      inputHistory.push(message);
+    }
   }
 }
 
 function setupOnlineInput() {
-  const actionKeys = new Set(["Space", "Enter", "Numpad0", "ShiftLeft", "ShiftRight", "KeyQ", "KeyF", "KeyE", "KeyR"]);
+  const abilitySlots = {
+    KeyQ: 0,
+    KeyF: 1,
+    KeyE: 2,
+    KeyR: 3,
+    ShiftLeft: 1,
+    ShiftRight: 1
+  };
 
   addEventListener("keydown", (event) => {
     if (onlineMusic?.ctx?.state === "suspended") onlineMusic.ctx.resume().catch(() => {});
     if (!playing || !playerId) return;
     const code = event.code;
-    if (actionKeys.has(code)) {
+
+    const moveKey = MOVEMENT_MAP[code];
+    if (moveKey) {
       event.preventDefault();
-      if (event.repeat) return;
-      if (code === "Space") sendInput({ type: "action", action: "bomb" });
-      else if (code === "Enter" || code === "Numpad0") sendInput({ type: "action", action: "bomb" });
-      else if (code === "ShiftRight") sendInput({ type: "action", action: "satchel" });
-      else if (code === "ShiftLeft") sendInput({ type: "action", action: "ability", slot: 1 });
-      else if (code === "KeyQ") sendInput({ type: "action", action: "ability", slot: 0 });
-      else if (code === "KeyF") sendInput({ type: "action", action: "ability", slot: 1 });
-      else if (code === "KeyE") sendInput({ type: "action", action: "ability", slot: 2 });
-      else if (code === "KeyR") sendInput({ type: "action", action: "ability", slot: 3 });
-    }
-    if (isMovement(code)) {
-      event.preventDefault();
-      if (!pendingMovement.has(code)) {
-        pendingMovement.add(code);
-        sendInput({ type: "keydown", key: code });
+      if (!pendingMovement.has(moveKey)) {
+        pendingMovement.add(moveKey);
+        sendInput({ type: "keydown", key: moveKey });
       }
+      return;
+    }
+
+    if (event.repeat) return;
+
+    if (code === "Space") {
+      event.preventDefault();
+      sendInput({ type: "action", action: "bomb" });
+    } else if (abilitySlots[code] !== undefined) {
+      event.preventDefault();
+      sendInput({ type: "action", action: "ability", slot: abilitySlots[code] });
     }
   });
 
   addEventListener("keyup", (event) => {
     if (!playing || !playerId) return;
     const code = event.code;
-    if (pendingMovement.has(code)) {
-      pendingMovement.delete(code);
-      sendInput({ type: "keyup", key: code });
+    const moveKey = MOVEMENT_MAP[code];
+    if (moveKey && pendingMovement.has(moveKey)) {
+      pendingMovement.delete(moveKey);
+      sendInput({ type: "keyup", key: moveKey });
     }
   });
 
   addEventListener("blur", () => {
-    for (const code of pendingMovement) sendInput({ type: "keyup", key: code });
+    for (const key of pendingMovement) sendInput({ type: "keyup", key });
     pendingMovement.clear();
   });
-}
-
-function isMovement(code) {
-  if (playerId === 1) {
-    return ["KeyW", "KeyA", "KeyS", "KeyD"].includes(code);
-  }
-  return ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(code);
 }
 
 function predictMovement(game, player, dt) {
   if (!player || !player.alive) return;
   let dx = 0;
   let dz = 0;
-  if (playerId === 1) {
-    if (pendingMovement.has("KeyA")) dx -= 1;
-    if (pendingMovement.has("KeyD")) dx += 1;
-    if (pendingMovement.has("KeyW")) dz -= 1;
-    if (pendingMovement.has("KeyS")) dz += 1;
-  } else {
-    if (pendingMovement.has("ArrowLeft")) dx -= 1;
-    if (pendingMovement.has("ArrowRight")) dx += 1;
-    if (pendingMovement.has("ArrowUp")) dz -= 1;
-    if (pendingMovement.has("ArrowDown")) dz += 1;
-  }
+  if (pendingMovement.has("KeyA")) dx -= 1;
+  if (pendingMovement.has("KeyD")) dx += 1;
+  if (pendingMovement.has("KeyW")) dz -= 1;
+  if (pendingMovement.has("KeyS")) dz += 1;
   if (dx === 0 && dz === 0) return;
   const passableBombs = (game.bombs || []).filter(
     (bomb) => !bomb.exploded && Array.isArray(bomb.passOwners) && bomb.passOwners.includes(player.id)
@@ -255,20 +328,29 @@ function onlineFrame(now) {
 
     let renderGame = remoteGame;
     if (playerId) {
-      const localPlayer = remoteGame.players[playerId - 1];
+      const localIndex = playerId - 1;
+      const localPlayer = remoteGame.players[localIndex];
       if (localPlayer && localPlayer.alive) {
         if (!predictedGame) {
           predictedGame = Object.create(Game.prototype);
           Object.assign(predictedGame, remoteGame);
           predictedGame.players = remoteGame.players.map((p) => ({ ...p }));
         }
-        predictMovement(predictedGame, predictedGame.players[playerId - 1], dt);
+        predictMovement(predictedGame, predictedGame.players[localIndex], dt);
         renderGame = predictedGame;
       }
     }
 
     onlineRenderer.render(renderGame, onlineMusic, dt, now);
-    if (onlinePresentation) onlinePresentation.update(renderGame);
+
+    if (onlinePresentation) {
+      const otherId = playerId === 1 ? 2 : 1;
+      const localMatch = Object.create(renderGame);
+      localMatch.players = [renderGame.players[playerId - 1], renderGame.players[otherId - 1]];
+      localMatch.p2Human = true;
+      onlinePresentation.update(localMatch);
+    }
+
     onlineFormatBeat();
   }
 

@@ -113,10 +113,11 @@
         UI.waveNumber.textContent = String(match.round);
         UI.enemyCount.textContent = String(Math.ceil(match.roundTime)).padStart(2, "0");
         const arenaLabel = match.arenaTemplate ? match.arenaTemplate().label : "Arena";
-        UI.matchSubtitle.textContent = p1.champion !== "ziggs"
-          ? `${p1.name} vs Ziggs · ${arenaLabel} · first to 3`
+        const p2Name = p2.name || "Red";
+        UI.matchSubtitle.textContent = p1.champion !== "ziggs" || p2.champion !== "ziggs"
+          ? `${p1.name} vs ${p2Name} · ${arenaLabel} · first to 3`
           : `Ziggs mirror · ${arenaLabel} · first to 3`;
-        UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · Red Ziggs`;
+        UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · ${p2Name}`;
         UI.waveLabel.textContent = match.roundLocked
           ? (match.pendingMatchWinner ? "Match point converted" : `Round ${String(match.round).padStart(2, "0")} complete`)
           : `Round ${String(match.round).padStart(2, "0")} · ${match.p2Human ? "Local versus" : "CPU controls Red"}`;

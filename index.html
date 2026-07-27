@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0A0A0A">
+  <title>RIFTBOMB // Choose mode</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; background: #0a0a0a; color: #c9d8c9; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { display: grid; place-items: center; padding: 1rem; }
+    .launcher { text-align: center; max-width: 420px; width: 100%; padding: 2rem; border: 1px solid #2a3a2a; background: #0e1612; }
+    .wordmark { font-size: 0.7rem; letter-spacing: 0.15em; color: #9ebf9e; margin-bottom: 0.5rem; }
+    h1 { margin: 0; font-size: 2.2rem; color: #e2bf72; }
+    h1 em { display: block; font-size: 0.55em; color: #9ebf9e; font-style: normal; margin-top: 0.25rem; }
+    p { color: #9ebf9e; margin: 1.25rem 0 1.5rem; line-height: 1.5; }
+    .actions { display: flex; flex-direction: column; gap: 0.75rem; }
+    a { display: block; padding: 0.9rem 1rem; border: 1px solid #2a3a2a; background: #1a2420; color: #c9d8c9; text-decoration: none; font-weight: 600; transition: background 0.15s, border-color 0.15s; }
+    a:hover, a:focus { background: #2a3020; border-color: #e2bf72; }
+    a.primary { background: #e2bf72; color: #0a0a0a; border-color: #e2bf72; }
+    a.primary:hover, a.primary:focus { background: #f0d990; }
+    .micro { font-size: 0.7rem; letter-spacing: 0.08em; color: #7a8a7a; margin-top: 1.25rem; }
+  </style>
+</head>
+<body>
+  <main class="launcher">
+    <div class="wordmark">[ UNOFFICIAL FAN PROTOTYPE ]</div>
+    <h1>RIFTBOMB <em>Champions of the Bomber Rift</em></h1>
+    <p>Choose how you want to play. Both players pick a champion and share the same controls.</p>
+    <nav class="actions" aria-label="Choose game mode">
+      <a class="primary" href="./online.html">[ Online 1v1 ]</a>
+      <a href="./riftbomb.html">[ Local / Solo ]</a>
+    </nav>
+    <div class="micro">Online requires the server. Local runs offline in one file.</div>
+  </main>
+</body>
+</html>

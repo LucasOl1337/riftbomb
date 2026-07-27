@@ -21,6 +21,7 @@
       guideOpenIntro: $("#open-guide-intro"),
       guideClose: $("#close-guide"),
       championChoices: $$(".champion-choice"),
+      championChoicesP2: $$(".champion-choice-p2"),
       arenaChoices: $$(".arena-choice"),
       soundtrackChoices: $$(".soundtrack-choice"),
       championPortrait: $("#champion-portrait"),

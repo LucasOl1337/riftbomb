@@ -23,9 +23,12 @@ const MIME = {
   ".woff2": "font/woff2"
 };
 
+const CHAMPIONS = new Set(["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"]);
+
 const clients = [];
 let game = null;
 let gameInterval = null;
+let serverTick = 0;
 
 const noOp = () => {};
 
@@ -49,7 +52,12 @@ function broadcast(message) {
 }
 
 function broadcastLobby() {
-  broadcast({ type: "lobby", players: clients.length, max: 2 });
+  broadcast({
+    type: "lobby",
+    players: clients.length,
+    max: 2,
+    choices: clients.map((c) => ({ playerId: c.playerId, champion: c.champion, ready: Boolean(c.champion) }))
+  });
 }
 
 function stopGame() {
@@ -58,20 +66,21 @@ function stopGame() {
     gameInterval = null;
   }
   game = null;
+  serverTick = 0;
   for (const client of clients) client.keys.clear();
 }
 
 function applyInputs() {
   if (!game) return;
-  game.keys.clear();
-  game.touchDirs.clear();
   for (const client of clients) {
-    for (const key of client.keys) game.keys.add(key);
+    const player = game.players[client.playerId - 1];
+    if (player) player.keys = client.keys;
   }
 }
 
 function tick() {
   if (!game) return;
+  serverTick += 1;
   applyInputs();
   try {
     game.update(1 / 30);
@@ -81,7 +90,7 @@ function tick() {
     stopGame();
     return;
   }
-  broadcast({ type: "snapshot", snapshot: createSnapshot(game) });
+  broadcast({ type: "snapshot", tick: serverTick, snapshot: createSnapshot(game) });
   if (game.mode === "matchover") {
     broadcast({ type: "finish", wins: game.roundWins });
     stopGame();
@@ -104,7 +113,8 @@ function startGame() {
   game = new Game(renderer, music, presentation);
   game.p2Human = true;
   game.selectedArena = "lattice";
-  game.selectedChampion = "katarina";
+  game.selectedChampion = clients[0]?.champion || "katarina";
+  game.selectedChampionP2 = clients[1]?.champion || "ziggs";
   game.start();
 
   for (const client of clients) {
@@ -118,15 +128,29 @@ function startGame() {
   gameInterval = setInterval(tick, TICK);
 }
 
+function maybeStart() {
+  if (clients.length < 2) return;
+  if (clients.every((c) => c.champion)) startGame();
+}
+
 function handleInput(playerId, message) {
   const client = clients.find((c) => c.playerId === playerId);
-  if (!client || !game) return;
+  if (!client) return;
+
+  if (message.type === "champion") {
+    if (CHAMPIONS.has(message.champion) && !client.champion) {
+      client.champion = message.champion;
+      broadcastLobby();
+      maybeStart();
+    }
+    return;
+  }
 
   if (message.type === "keydown") {
     client.keys.add(message.key);
   } else if (message.type === "keyup") {
     client.keys.delete(message.key);
-  } else if (message.type === "action") {
+  } else if (message.type === "action" && game) {
     const player = game.players[playerId - 1];
     if (!player?.alive) return;
     if (message.action === "bomb") {
@@ -141,7 +165,7 @@ function handleInput(playerId, message) {
 
 const httpServer = createServer((request, response) => {
   let url = decodeURIComponent(request.url);
-  if (url === "/") url = "/online.html";
+  if (url === "/") url = "/index.html";
   if (url.includes("..")) {
     response.writeHead(403);
     response.end();
@@ -175,11 +199,10 @@ wss.on("connection", (ws, request) => {
   }
 
   const playerId = clients.length + 1;
-  const client = { ws, playerId, keys: new Set() };
+  const client = { ws, playerId, keys: new Set(), champion: null };
   clients.push(client);
+  ws.send(JSON.stringify({ type: "welcome", playerId }));
   broadcastLobby();
-
-  if (clients.length === 2) startGame();
 
   ws.on("message", (data) => {
     try {
