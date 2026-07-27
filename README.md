@@ -14,6 +14,25 @@ python -m http.server 4177 --bind 127.0.0.1
 
 Depois acesse `http://127.0.0.1:4177/riftbomb.html`.
 
+## PvP online
+
+A versão publicada com lobby por código, seleção independente de campeão,
+mapa e trilha fica em `online/`. O host controla a simulação e os navegadores
+trocam comandos e snapshots por WebRTC; a API mantém apenas a sinalização
+temporária das salas.
+
+Jogue em:
+
+https://riftbomb-online.juliherreiro.chatgpt.site
+
+Para validar a aplicação hospedável:
+
+```powershell
+cd online
+npm ci
+npm test
+```
+
 ## Mudar o jogo
 
 `game/play-riftbomb.html` é a entrada editável. Ela declara a ordem dos módulos; o build
