@@ -4,12 +4,15 @@ document.title = "RIFTBOMB // ONLINE LOADING";
 
 let onlineMusic;
 let onlineRenderer;
+let onlinePresentation = null;
 let remoteGame = null;
 let playerId = null;
 let ws = null;
 let playing = false;
 let onlineLastFrame = performance.now();
 let lobbyHost = null;
+let predictedGame = null;
+const pendingMovement = new Set();
 
 const onlineFormatTime = (seconds) => {
   seconds = Math.max(0, Math.floor(seconds));
@@ -130,12 +133,15 @@ function handleServerMessage(message) {
     playerId = message.playerId;
     remoteGame = Object.create(Game.prototype);
     Object.assign(remoteGame, message.snapshot);
+    if (onlinePresentation && remoteGame.players[0]) onlinePresentation.selectChampion(remoteGame.players[0].champion);
     startOnlineMatch();
   } else if (message.type === "snapshot") {
     if (!remoteGame) {
       remoteGame = Object.create(Game.prototype);
+      predictedGame = null;
     }
     Object.assign(remoteGame, message.snapshot);
+    predictedGame = null;
   } else if (message.type === "finish") {
     playing = false;
     if (lobbyHost) lobbyHost.hidden = false;
@@ -149,7 +155,12 @@ function startOnlineMatch() {
   UI.chrome.classList.remove("is-hidden");
   UI.chrome.setAttribute("aria-hidden", "false");
   UI.chrome.removeAttribute("inert");
-  if (UI.live) UI.live.textContent = "Online match connected";
+  if (onlinePresentation) {
+    onlinePresentation.prepareRound();
+    onlinePresentation.announce("Online match connected");
+  } else if (UI.live) {
+    UI.live.textContent = "Online match connected";
+  }
   onlineMusic.start().catch(() => {});
   playing = true;
 }
@@ -161,7 +172,6 @@ function sendInput(message) {
 }
 
 function setupOnlineInput() {
-  const movement = new Set();
   const actionKeys = new Set(["Space", "Enter", "Numpad0", "ShiftLeft", "ShiftRight", "KeyQ", "KeyF", "KeyE", "KeyR"]);
 
   addEventListener("keydown", (event) => {
@@ -182,8 +192,8 @@ function setupOnlineInput() {
     }
     if (isMovement(code)) {
       event.preventDefault();
-      if (!movement.has(code)) {
-        movement.add(code);
+      if (!pendingMovement.has(code)) {
+        pendingMovement.add(code);
         sendInput({ type: "keydown", key: code });
       }
     }
@@ -192,15 +202,15 @@ function setupOnlineInput() {
   addEventListener("keyup", (event) => {
     if (!playing || !playerId) return;
     const code = event.code;
-    if (movement.has(code)) {
-      movement.delete(code);
+    if (pendingMovement.has(code)) {
+      pendingMovement.delete(code);
       sendInput({ type: "keyup", key: code });
     }
   });
 
   addEventListener("blur", () => {
-    for (const code of movement) sendInput({ type: "keyup", key: code });
-    movement.clear();
+    for (const code of pendingMovement) sendInput({ type: "keyup", key: code });
+    pendingMovement.clear();
   });
 }
 
@@ -211,6 +221,30 @@ function isMovement(code) {
   return ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(code);
 }
 
+function predictMovement(game, player, dt) {
+  if (!player || !player.alive) return;
+  let dx = 0;
+  let dz = 0;
+  if (playerId === 1) {
+    if (pendingMovement.has("KeyA")) dx -= 1;
+    if (pendingMovement.has("KeyD")) dx += 1;
+    if (pendingMovement.has("KeyW")) dz -= 1;
+    if (pendingMovement.has("KeyS")) dz += 1;
+  } else {
+    if (pendingMovement.has("ArrowLeft")) dx -= 1;
+    if (pendingMovement.has("ArrowRight")) dx += 1;
+    if (pendingMovement.has("ArrowUp")) dz -= 1;
+    if (pendingMovement.has("ArrowDown")) dz += 1;
+  }
+  if (dx === 0 && dz === 0) return;
+  const passableBombs = (game.bombs || []).filter(
+    (bomb) => !bomb.exploded && Array.isArray(bomb.passOwners) && bomb.passOwners.includes(player.id)
+  );
+  const preparation = player.speedBoost > 0 ? 1.3 : 1;
+  const speed = player.speed * preparation * (player.dashing > 0 ? 2.7 : 1);
+  game.moveEntity(player, dx, dz, speed, dt, 0.3, passableBombs);
+}
+
 function onlineFrame(now) {
   const dt = Math.min(0.05, Math.max(0.001, (now - onlineLastFrame) / 1000));
   onlineLastFrame = now;
@@ -218,7 +252,23 @@ function onlineFrame(now) {
   if (playing && remoteGame) {
     onlineMusic.syncFromGame(remoteGame, dt);
     onlineMusic.updateEnergy();
-    onlineRenderer.render(remoteGame, onlineMusic, dt, now);
+
+    let renderGame = remoteGame;
+    if (playerId) {
+      const localPlayer = remoteGame.players[playerId - 1];
+      if (localPlayer && localPlayer.alive) {
+        if (!predictedGame) {
+          predictedGame = Object.create(Game.prototype);
+          Object.assign(predictedGame, remoteGame);
+          predictedGame.players = remoteGame.players.map((p) => ({ ...p }));
+        }
+        predictMovement(predictedGame, predictedGame.players[playerId - 1], dt);
+        renderGame = predictedGame;
+      }
+    }
+
+    onlineRenderer.render(renderGame, onlineMusic, dt, now);
+    if (onlinePresentation) onlinePresentation.update(renderGame);
     onlineFormatBeat();
   }
 
@@ -234,6 +284,7 @@ function bootOnline() {
     UI.live.textContent = "Online mode booting...";
     onlineMusic = new MusicEngine();
     onlineRenderer = new Renderer(UI.canvas);
+    if (typeof BrowserMatchPresentation !== "undefined") onlinePresentation = new BrowserMatchPresentation();
     UI.gpuLabel.textContent = `WebGL2 · ${onlineRenderer.ext ? "HDR" : "adaptive"}`;
     setupLobby();
     setupOnlineInput();
