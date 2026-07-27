@@ -195,7 +195,8 @@ function handleServerMessage(message) {
     let status;
     if (readyCount === 2) status = "Rival found · starting";
     else if (message.players < 2) status = "Connected · waiting for rival";
-    else status = "Choose your champion";
+    else if (!selectedChampion) status = "Choose your champion";
+    else status = "Waiting for rival";
     if (readyCount < 2 && playing) {
       playing = false;
       if (lobbyHost) lobbyHost.hidden = false;
