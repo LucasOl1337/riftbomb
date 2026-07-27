@@ -24,4 +24,4 @@ Generated as native sources with the built-in image generation workflow. No upsc
 
 The built-in generator did not return 4K despite the 4K prompt. These files intentionally remain at their native generated resolution: the project quality policy forbids synthetic upscale.
 
-The images are raw source assets. Promote selected versions to `textures/` and wire them into the arena loader only after an in-game readability check.
+The images are raw source assets. Promote selected versions to `art/crates/`, `art/walls/` or `art/ground/` and wire them into the arena loader only after an in-game readability check.

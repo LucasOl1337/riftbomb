@@ -20,4 +20,4 @@ O prefixo (`ground_`, `wall-side_`, `wall-top_`, `floor-tile_`, `lane_`, `river_
 
 ## Qualidade
 
-Régua: `game/Assets/ART-QUALITY.md`. Native Imagine, sem upscale. Nada daqui entra no jogo até você promover.
+Régua: `game/art/ART-QUALITY.md`. Native Imagine, sem upscale. Nada daqui entra no jogo até você promover.

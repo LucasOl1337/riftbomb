@@ -8,7 +8,7 @@ Planejamento e política do oponente AI: **`BOTS/`**. Bot emite intenções; `ga
 
 ## Art / Imagine (user 2026-07-26)
 
-Arena textures: **`game/Assets/ART-QUALITY.md`**. Bar = product-photo crate detail (planks, grain, braces, nails). Native Imagine only — no upscale. Reference: `game/Assets/raw-imagine/_ref-crate-detail-level.png`. Same bar for ground, walls, props.
+Arena textures: **`game/art/ART-QUALITY.md`**. Bar = product-photo crate detail (planks, grain, braces, nails). Native Imagine only — no upscale. Reference: `game/art/raw-imagine/_ref-crate-detail-level.png`. Same bar for ground, walls, props.
 
 ## STOP: headless Playwright (user 2026-07-25)
 

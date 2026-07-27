@@ -2,7 +2,7 @@
   "id": "ground",
   "displayName": "Arena floor",
   "maps": {
-    "albedo": "textures/ground/floor-lattice.webp"
+    "albedo": "ground/floor-lattice.webp"
   },
   "tint": [0.08, 0.12, 0.14],
   "metallic": 0.15,

@@ -36,4 +36,4 @@ See **`../ART-QUALITY.md`**. Reference level:
 1. Imagine (prefer `image_edit` from `_ref-crate-detail-level` or last approved)  
 2. Save here  
 3. Review against ART-QUALITY  
-4. Promote → `textures/…` + embed in `load-arena-textures.js` + assemble  
+4. Promote → `../crates/`, `../walls/` or `../ground/` + embed in `load-arena-textures.js` + assemble  

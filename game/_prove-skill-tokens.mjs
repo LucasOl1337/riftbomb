@@ -7,7 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
-const outDir = path.join(dir, "Assets", "skill-token-proof");
+const outDir = path.join(dir, "art", "skill-token-proof");
 mkdirSync(outDir, { recursive: true });
 
 const src = readFileSync(path.join(dir, "draw-bomber-rift.js"), "utf8");

@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
-const assetsDirectory = path.join(gameDirectory, "Assets", "textures");
+const assetsDirectory = path.join(gameDirectory, "art");
 const outputPath = path.join(gameDirectory, "load-arena-textures.js");
 
 const sources = {

@@ -2,8 +2,8 @@
   "id": "wall",
   "displayName": "Indestructible fixed block",
   "maps": {
-    "albedoSide": "textures/walls/wall-albedo.webp",
-    "albedoTop": "textures/walls/wall-top-albedo.webp"
+    "albedoSide": "walls/wall-albedo.webp",
+    "albedoTop": "walls/wall-top-albedo.webp"
   },
   "tint": [1.0, 1.0, 1.0],
   "mapId": 3,

@@ -32,7 +32,7 @@ Same bar: **one level of material read at gameplay distance** — you should be 
 
 1. Generate with Imagine (edit-chain from a quality reference when possible)
 2. Drop under `raw-imagine/` with a clear name
-3. User or agent promotes → `textures/...` + wire `load-arena-textures.js` / materials
+3. User or agent promotes → `crates/`, `walls/` or `ground/` + wire `load-arena-textures.js` / materials
 4. Reject soft, muddy, poster-flat, or wrong construction
 
 ## Anti-patterns (reject)

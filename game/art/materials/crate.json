@@ -2,9 +2,9 @@
   "id": "crate",
   "displayName": "Shipping crate (multi-face)",
   "maps": {
-    "albedoSide": "textures/crates/crate-albedo.webp",
-    "albedoTop": "textures/crates/crate-top-albedo.webp",
-    "planksSeamless": "textures/crates/crate-planks-seamless.webp"
+    "albedoSide": "crates/crate-albedo.webp",
+    "albedoTop": "crates/crate-top-albedo.webp",
+    "planksSeamless": "crates/crate-planks-seamless.webp"
   },
   "tint": [1.0, 1.0, 1.0],
   "mapId": 2,

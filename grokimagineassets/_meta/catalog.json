@@ -1,5 +1,5 @@
 {
-  "qualityBar": "game/Assets/ART-QUALITY.md",
+  "qualityBar": "game/art/ART-QUALITY.md",
   "nativeImagineOnly": true,
   "aspects": {
     "ground": {

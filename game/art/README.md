@@ -1,4 +1,4 @@
-# game/Assets
+# game/art
 
 Shared **arena / chrome** art for Riftbomb. Not champion kits.
 
@@ -12,18 +12,12 @@ nails; no soft blobs, no upscale.
 
 | Path | Use |
 |------|-----|
-| `textures/ground/` | Floor tiles, hex grid, dirt/metal |
-| `textures/crates/` | Breakable Hextech crate albedo / normal / emissive |
-| `textures/walls/` | Indestructible wall segments |
-| `textures/props/` | Side crystals, orbs, towers |
-| `textures/fx/` | Blast masks, trails, shield soft maps |
-| `textures/ui/` | Optional HUD bitmaps (prefer CSS when enough) |
-| `tiles/` | Atlases (ground/crate sheets) |
+| `ground/` | Floor tiles, hex grid, dirt/metal |
+| `crates/` | Breakable Hextech crate albedo / normal / emissive |
+| `walls/` | Indestructible wall segments |
+| `raw-imagine/` | Native Imagine sources and quality reference |
+| `skill-token-proof/` | Extracted skill-token sanity checks |
 | `materials/` | JSON material specs (tint, metal, roughness) |
-| `meshes/` | Small arena GLBs (crate, wall, prop) — not champions |
-| `audio/` | Arena SFX if not pure synth |
-| `fonts/` | Game typefaces if extracted from CSS |
-| `lut/` | Optional color-grade LUT for post |
 
 ## Do not put here
 
