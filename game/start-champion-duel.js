@@ -360,4 +360,4 @@
       }
     }
 
-    boot();
+    if (!window.RIFTBOMB_ONLINE) boot();
