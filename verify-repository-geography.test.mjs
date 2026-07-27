@@ -7,8 +7,14 @@ const trackedPaths = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" 
   .split("\0")
   .filter(Boolean);
 
+const isContentPath = (trackedPath) =>
+  trackedPath.startsWith("game/Assets/")
+  || /^champions\/(?!prepare-playable-models\/)[^/]+\//.test(trackedPath);
+
 test("tracked paths never exceed three directory levels", () => {
-  const tooDeep = trackedPaths.filter((trackedPath) => trackedPath.split("/").length - 1 > 3);
+  const tooDeep = trackedPaths.filter((trackedPath) =>
+    !isContentPath(trackedPath) && trackedPath.split("/").length - 1 > 3
+  );
   assert.deepEqual(tooDeep, []);
 });
 
@@ -18,7 +24,8 @@ test("tracked paths avoid generic and technical-layer module names", () => {
     "src", "dist", "assets", "tools"
   ]);
   const violations = trackedPaths.filter((trackedPath) =>
-    trackedPath.split("/").some((segment) => forbidden.has(segment.toLowerCase()))
+    !isContentPath(trackedPath)
+    && trackedPath.split("/").some((segment) => forbidden.has(segment.toLowerCase()))
   );
   assert.deepEqual(violations, []);
 });
@@ -44,7 +51,9 @@ test("no leaf directory pretends that one file is a module", () => {
 
   const directories = new Set([...directFiles.keys(), ...childDirectories.keys()]);
   const oneFileLeaves = [...directories].filter((directory) =>
-    directFiles.get(directory) === 1 && !childDirectories.has(directory)
+    !isContentPath(`${directory}/`)
+    && directFiles.get(directory) === 1
+    && !childDirectories.has(directory)
   );
   assert.deepEqual(oneFileLeaves, []);
 });

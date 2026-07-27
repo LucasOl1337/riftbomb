@@ -116,6 +116,13 @@ test("arena themes share five GPU texture allocations", async () => {
   );
 });
 
+test("arena render does not reference an undeclared turret color", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+
+  assert.doesNotMatch(renderer, /\biceBody\b/);
+  assert.match(renderer, /\[turret\.x, 0\.22, turret\.z\][\s\S]{0,100}C\.arenaStone/);
+});
+
 test("the build retains the six playable champions and duel rules", async () => {
   const document = await readFile(releasePath, "utf8");
 

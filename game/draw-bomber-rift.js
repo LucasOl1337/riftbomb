@@ -2069,7 +2069,7 @@
           { x: 9.05, z: -3.8, color: C.redSide }
         ];
         turrets.forEach((turret, i) => {
-          this.draw("cube", [turret.x, 0.22, turret.z], [0.34, 0.28, 0.34], iceBody, 0, 0.15);
+          this.draw("cube", [turret.x, 0.22, turret.z], [0.34, 0.28, 0.34], C.arenaStone, 0, 0.15);
           this.draw("crystal", [turret.x, 0.72, turret.z], [0.18, 0.4, 0.18],
             turret.color, 2, 1.6 + beat * 0.3, (i % 2 ? -1 : 1) * t * 0.18);
         });
