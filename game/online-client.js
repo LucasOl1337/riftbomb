@@ -192,7 +192,10 @@ function handleServerMessage(message) {
       remoteChampion = rival?.champion || null;
     }
     const readyCount = message.choices?.filter((c) => c.ready).length ?? message.players;
-    const status = readyCount === 2 ? "Rival found · starting" : `Players ${message.players} / ${message.max}`;
+    let status;
+    if (readyCount === 2) status = "Rival found · starting";
+    else if (message.players < 2) status = "Connected · waiting for rival";
+    else status = "Choose your champion";
     if (readyCount < 2 && playing) {
       playing = false;
       if (lobbyHost) lobbyHost.hidden = false;
