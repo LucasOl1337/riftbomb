@@ -56,13 +56,18 @@
     async function beginGame() {
       UI.start.disabled = true;
       const alreadyAudible = Boolean(music.ctx);
-      UI.start.textContent = alreadyAudible ? "Starting match…" : "Loading cello / piano samples…";
-      try {
-        await music.start();
-        UI.start.textContent = music.samplesReady ? "Samples ready" : "Synth fallback";
-      } catch (error) {
-        console.warn("Audio could not start:", error);
+      UI.start.textContent = alreadyAudible ? "Starting match…" : "Loading selected arena…";
+      const assetResults = await Promise.allSettled([
+        music.start(),
+        renderer.ensureChampionModels(game.players.map((player) => player.champion)),
+        renderer.arenaTexturesReady
+      ]);
+      for (const result of assetResults) {
+        if (result.status === "rejected") {
+          console.warn("A match asset could not fully load:", result.reason);
+        }
       }
+      UI.start.textContent = music.samplesReady ? "Samples ready" : "Synth fallback";
       game.start();
       UI.intro.classList.add("is-gone");
       UI.chrome.classList.remove("is-hidden");
@@ -292,6 +297,10 @@
         music = new MusicEngine();
         renderer = new Renderer(UI.canvas);
         game = new Game(renderer, music, new BrowserMatchPresentation());
+        const embeddedModels = game.players
+          .map((player) => player.champion)
+          .filter((champion) => PLAYABLE_CHAMPIONS[champion]);
+        void renderer.ensureChampionModels(embeddedModels);
         if (modelReviewMode) {
           UI.intro.classList.add("is-gone");
           game.enemies = [];

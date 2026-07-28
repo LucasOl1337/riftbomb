@@ -5,6 +5,6 @@
   "scripts": {
     "build:arena-textures": "node game/pack-arena-textures.mjs",
     "build": "npm run build:arena-textures && node game/assemble-riftbomb.mjs",
-    "test": "npm run build && node --test game/verify-riftbomb.test.mjs champions/prepare-playable-models/verify-playable-models.test.mjs architecture-course/verify-course-links.test.mjs verify-repository-geography.test.mjs BOTS/verify-perception.test.mjs"
+    "test": "npm run build && node --test game/verify-riftbomb.test.mjs champions/prepare-playable-models/verify-playable-models.test.mjs architecture-course/verify-course-links.test.mjs verify-repository-geography.test.mjs BOTS/verify-perception.test.mjs BOTS/verify-world-view.test.mjs BOTS/verify-baseline-policy.test.mjs"
   }
 }

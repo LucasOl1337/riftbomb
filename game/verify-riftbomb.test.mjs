@@ -103,7 +103,7 @@ test("playable model bytes stay out of the renderer implementation", async () =>
   assert.ok(renderer.length < 1_000_000, "renderer should not carry packaged model bytes");
 });
 
-test("arena themes share five GPU texture allocations", async () => {
+test("arena themes share seven GPU texture allocations", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
   const packedTextures = await readFile(path.join(gameDirectory, "load-arena-textures.js"), "utf8");
 
@@ -111,7 +111,7 @@ test("arena themes share five GPU texture allocations", async () => {
   assert.match(renderer, /for \(const \[sourceKey, aliases\] of Object\.entries\(textureGroups\)\)/);
   assert.equal(
     [...packedTextures.matchAll(/data:image\/webp;base64,/g)].length,
-    5,
+    7,
     "the offline build must embed each authored arena source once"
   );
 });
@@ -121,6 +121,119 @@ test("arena render does not reference an undeclared turret color", async () => {
 
   assert.doesNotMatch(renderer, /\biceBody\b/);
   assert.match(renderer, /\[turret\.x, 0\.22, turret\.z\][\s\S]{0,100}C\.arenaStone/);
+});
+
+test("music loads only the exact samples its selected style can play", async () => {
+  const musicSource = await readFile(
+    path.join(gameDirectory, "play-rift-soundtrack.js"),
+    "utf8",
+  );
+  const manifest = JSON.parse(
+    await readFile(path.join(gameDirectory, "audio", "sample-manifest.json"), "utf8"),
+  );
+  const context = vm.createContext({
+    console,
+    performance,
+    Uint8Array,
+    window: { RIFTBOMB_SAMPLE_MANIFEST: manifest },
+    clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
+  });
+  vm.runInContext(
+    `${musicSource}\nglobalThis.MusicEngine = MusicEngine;`,
+    context,
+  );
+  const music = new context.MusicEngine();
+
+  for (const styleId of Object.keys(music.styles)) {
+    const plan = music.samplePlanForStyle(styleId);
+    const plannedKeys = new Set(plan.map(({ key }) => key));
+    const partialBanks = Object.create(null);
+    for (const { instrument, midi } of plan) {
+      partialBanks[instrument] ||= Object.create(null);
+      partialBanks[instrument][midi] = true;
+    }
+
+    music.applyStyle(styleId, { silent: true });
+    music.ctx = {};
+    const tracedKeys = new Set();
+    const record = (instrument, midi) => {
+      const expected = music.nearestManifestSample(instrument, midi);
+      if (!expected) return false;
+      tracedKeys.add(expected.key);
+      const partialNearest = music.nearestSampleMidi(
+        partialBanks[instrument] || {},
+        midi,
+      );
+      assert.equal(
+        partialNearest,
+        expected.midi,
+        `${styleId} must preserve the full-bank source pitch for ${instrument}/${midi}`,
+      );
+      return true;
+    };
+    music.playSample = record;
+    music.cello = (_time, note) => {
+      const hit = record("cello", note);
+      if (hit && (music.density?.subBass ?? 1) > 0.15 && note >= 36) {
+        record("contrabass", note - 12);
+      }
+    };
+    music.violin = (_time, note) => {
+      if (!record("violin", note)) record("cello", note);
+    };
+    music.organPad = (_time, notes) => {
+      for (const note of notes) {
+        record("organ", note);
+        record("organ", note - 12);
+      }
+    };
+    music.stonePiano = (_time, note) => {
+      if (!record("piano", note)) record("piano", Math.max(21, note - 12));
+    };
+
+    for (const heat of [0, 0.25, 0.5, 0.75, 1]) {
+      music.heat = heat;
+      for (let index = 0; index < music.totalSteps; index++) {
+        music.scheduleStep(index, 0);
+      }
+    }
+
+    assert.deepEqual(
+      [...tracedKeys].sort(),
+      [...plannedKeys].sort(),
+      `${styleId} plan must equal the scheduler's full-loop sample trace`,
+    );
+  }
+
+  const allSampleKeys = Object.entries(manifest).flatMap(([instrument, names]) =>
+    names.map((name) => `${instrument}/${name}`)
+  );
+  const gravesongPlan = music.samplePlanForStyle("gravesong");
+  const bytesFor = async (keys) => {
+    let bytes = 0;
+    for (const key of keys) {
+      const info = await stat(path.join(gameDirectory, "audio", `${key}.ogg`));
+      bytes += info.size;
+    }
+    return bytes;
+  };
+  assert.equal(allSampleKeys.length, 111);
+  assert.equal(await bytesFor(allSampleKeys), 23_422_499);
+  assert.equal(gravesongPlan.length, 33);
+  assert.equal(
+    await bytesFor(gravesongPlan.map(({ key }) => key)),
+    7_590_339,
+  );
+
+  let fetches = 0;
+  music.ctx = {};
+  music.fetchAndDecodeSample = async () => {
+    fetches += 1;
+    return { duration: 1 };
+  };
+  await music.loadSampleBanks("gravesong");
+  await music.loadSampleBanks("gravesong");
+  assert.equal(fetches, 33, "repeated previews must reuse every decoded sample");
 });
 
 test("the build retains the six playable champions and duel rules", async () => {

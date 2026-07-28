@@ -9,7 +9,9 @@ const outputPath = path.join(gameDirectory, "load-arena-textures.js");
 const sources = {
   crateSide: "crates/crate-albedo.webp",
   crateTop: "crates/crate-top-albedo.webp",
-  floor: "ground/floor-lattice.webp",
+  floorLattice: "ground/floor-lattice.webp",
+  floorClearing: "ground/floor-clearing.webp",
+  floorLabyrinth: "ground/floor-labyrinth.webp",
   wallSide: "walls/wall-lattice.webp",
   wallTop: "walls/wall-top-lattice.webp"
 };
@@ -31,11 +33,11 @@ const ARENA_TEXTURE_SOURCE = Object.freeze(${JSON.stringify(packed)});
 const ARENA_TEXTURES = Object.freeze({
   crate: ARENA_TEXTURE_SOURCE.crateSide,
   crateTop: ARENA_TEXTURE_SOURCE.crateTop,
-  floorLattice: ARENA_TEXTURE_SOURCE.floor,
-  floorClearing: ARENA_TEXTURE_SOURCE.floor,
-  floorLabyrinth: ARENA_TEXTURE_SOURCE.floor,
-  floorForts: ARENA_TEXTURE_SOURCE.floor,
-  floorPit: ARENA_TEXTURE_SOURCE.floor,
+  floorLattice: ARENA_TEXTURE_SOURCE.floorLattice,
+  floorClearing: ARENA_TEXTURE_SOURCE.floorClearing,
+  floorLabyrinth: ARENA_TEXTURE_SOURCE.floorLabyrinth,
+  floorForts: ARENA_TEXTURE_SOURCE.floorLabyrinth,
+  floorPit: ARENA_TEXTURE_SOURCE.floorLattice,
   wallLattice: ARENA_TEXTURE_SOURCE.wallSide,
   wallClearing: ARENA_TEXTURE_SOURCE.wallSide,
   wallLabyrinth: ARENA_TEXTURE_SOURCE.wallSide,

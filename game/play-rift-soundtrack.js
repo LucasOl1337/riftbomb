@@ -63,15 +63,21 @@
           forgeglow: Object.freeze({"id":"forgeglow","label":"Forge Glow","blurb":"Warm low · soft organ","baseBpm":74,"minBpm":64,"maxBpm":90,"swing":0,"mix":{"string":1.1,"keys":0.7,"low":2,"dark":4200,"reverb":0.5},"sections":[{"bar":0,"name":"Coal bed","intensity":0.18},{"bar":8,"name":"Heat","intensity":0.36},{"bar":20,"name":"Hammer hush","intensity":0.54},{"bar":36,"name":"Glow","intensity":0.7},{"bar":50,"name":"Metal song","intensity":0.86},{"bar":60,"name":"Cool","intensity":0.4}],"chords":[[45,48,52],[40,43,47],[48,52,55],[43,47,50]],"bassRoots":[33,28,36,31],"celloOstinato":[0,0,7,0,5,0,7,5],"celloMelody":[45,47,48,50,48,47,45,43,45,48,50,52,50,48,45,43],"violinMelody":[57,59,60,62,60,59,57,55,57,60,62,64,62,60,57,55],"density":{"organ":0.85,"piano":0.35,"celloOst":0.85,"celloMel":0.8,"violin":0.45,"halfViolin":0.45,"subBass":0.65,"harp":0.05,"flute":0,"horn":0.45,"drive":0}}),
           skyglass: Object.freeze({"id":"skyglass","label":"Skyglass","blurb":"Airy violin · flute color","baseBpm":70,"minBpm":62,"maxBpm":86,"swing":0.05,"mix":{"string":1.05,"keys":0.45,"low":0.35,"dark":6200,"reverb":0.6},"sections":[{"bar":0,"name":"Sky open","intensity":0.16},{"bar":8,"name":"Glass air","intensity":0.32},{"bar":20,"name":"Float","intensity":0.5},{"bar":36,"name":"Arc","intensity":0.66},{"bar":50,"name":"Sun line","intensity":0.82},{"bar":60,"name":"Clear","intensity":0.38}],"chords":[[50,53,57],[52,55,59],[48,52,55],[47,50,54]],"bassRoots":[50,52,48,47],"celloOstinato":[0,0,5,0,0,7,5,12],"celloMelody":[57,59,60,59,57,55,57,59,60,62,60,57,55,52,55,57],"violinMelody":[69,71,72,71,69,67,69,71,72,74,72,69,67,64,67,69],"density":{"organ":0.2,"piano":0.25,"celloOst":0.35,"celloMel":0.6,"violin":1.15,"halfViolin":1.05,"subBass":0,"harp":0.4,"flute":0.85,"horn":0.1,"drive":0}}),
         });
+        // Real multipiano banks are decoded incrementally per selected style.
+        this.sampleBanks = Object.create(null);
+        this.sampleJobs = new Map();
+        this.samplePlanCache = new Map();
+        this.sampleManifestMidi = new Map();
+        this.readyStyleIds = new Set();
+        this.samplesReady = false;
+        this.sampleLoadPromise = null;
+        this.schedulingPaused = false;
         this.styleId = "gravesong";
         this.applyStyle(this.styleId, { silent: true });
         this.heat = 0.12;
         this.targetHeat = 0.12;
         this.actionPulse = 0;
         this.fallbackStart = performance.now() / 1000;
-        // Real multipiano banks (tonejs-instruments, CC-BY 3.0) under ./audio/
-        this.sampleBanks = null;
-        this.samplesReady = false;
         // Prefer packed manifest (all downloaded free samples); fallback to core set.
         this.sampleManifest = (typeof window !== "undefined" && window.RIFTBOMB_SAMPLE_MANIFEST)
           ? window.RIFTBOMB_SAMPLE_MANIFEST
@@ -111,6 +117,7 @@
         this.violinMelody = style.violinMelody;
         this.density = style.density;
         this.mix = style.mix;
+        this.samplesReady = this.readyStyleIds?.has(style.id) ?? false;
         this.totalBars = 68;
         this.totalSteps = this.totalBars * 16;
         this.bpm = this.baseBpm;
@@ -140,6 +147,7 @@
       async previewStyle(styleId) {
         const gen = ++this.styleChangeGen;
         // Cut immediately so rapid clicks never stack previous styles.
+        this.schedulingPaused = true;
         this.cutMusicVoices();
         const style = this.applyStyle(styleId, { silent: true });
         await this.start();
@@ -158,6 +166,7 @@
         this.stepDuration = 60 / this.bpm / 4;
         this.liveSectionName = style.sections[0].name;
         this.applyMixGraph();
+        this.schedulingPaused = false;
         if (this.ctx) {
           this.nextStepTime = this.ctx.currentTime + 0.06;
           this.startedAt = this.nextStepTime;
@@ -358,43 +367,238 @@
         return this.ctx.decodeAudioData(bytes.buffer.slice(0));
       }
 
-      async loadSampleBanks() {
-        if (typeof window !== "undefined" && window.RIFTBOMB_SAMPLE_MANIFEST) {
-          this.sampleManifest = window.RIFTBOMB_SAMPLE_MANIFEST;
+      async fetchAndDecodeSample(instrument, name) {
+        const base = this.resolveSampleBase();
+        const path = `${encodeURIComponent(instrument)}/${encodeURIComponent(name)}.ogg`;
+        const request = window.fetch.bind(window);
+        const response = await request(new URL(path, base));
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return this.ctx.decodeAudioData(await response.arrayBuffer());
+      }
+
+      syncSampleManifest() {
+        const packed = typeof window !== "undefined"
+          ? window.RIFTBOMB_SAMPLE_MANIFEST
+          : null;
+        if (packed && packed !== this.sampleManifest) {
+          this.sampleManifest = packed;
+          this.sampleManifestMidi.clear();
+          this.samplePlanCache.clear();
         }
-        this.sampleBanks = {};
         for (const instrument of Object.keys(this.sampleManifest)) {
-          this.sampleBanks[instrument] = {};
+          if (!this.sampleBanks[instrument]) {
+            this.sampleBanks[instrument] = Object.create(null);
+          }
         }
-        const embedded = typeof window !== "undefined" ? window.RIFTBOMB_SAMPLE_BANK : null;
-        if (!embedded) {
-          console.warn("[music] RIFTBOMB_SAMPLE_BANK missing — run node game/pack-sample-bank.mjs");
-          this.samplesReady = false;
-          return;
+      }
+
+      manifestSamples(instrument) {
+        this.syncSampleManifest();
+        if (!this.sampleManifestMidi.has(instrument)) {
+          const samples = (this.sampleManifest[instrument] || [])
+            .map((name) => ({ name, midi: this.noteNameToMidi(name) }))
+            .filter(({ midi }) => midi != null)
+            .sort((a, b) => a.midi - b.midi);
+          this.sampleManifestMidi.set(instrument, samples);
+        }
+        return this.sampleManifestMidi.get(instrument);
+      }
+
+      nearestManifestSample(instrument, midi) {
+        const samples = this.manifestSamples(instrument);
+        if (!samples.length) return null;
+        let best = samples[0];
+        let bestDist = Math.abs(midi - best.midi);
+        for (const sample of samples) {
+          const dist = Math.abs(midi - sample.midi);
+          if (dist < bestDist) {
+            best = sample;
+            bestDist = dist;
+          }
+        }
+        if (bestDist > 7) return null;
+        return {
+          instrument,
+          name: best.name,
+          midi: best.midi,
+          key: `${instrument}/${best.name}`
+        };
+      }
+
+      /**
+       * Enumerate the exact real samples a style can request across its loop.
+       * `intense = 1` keeps the plan safe for every reachable combat heat.
+       */
+      samplePlanForStyle(styleId = this.styleId, barCount = this.totalBars || 68) {
+        this.syncSampleManifest();
+        const style = this.styles[styleId] || this.styles.gravesong;
+        const bars = Math.max(0, Math.min(this.totalBars || 68, Math.floor(barCount)));
+        const cacheKey = `${style.id}:${bars}`;
+        if (this.samplePlanCache.has(cacheKey)) {
+          return this.samplePlanCache.get(cacheKey);
         }
 
-        const jobs = [];
-        for (const [instrument, names] of Object.entries(this.sampleManifest)) {
-          for (const name of names) {
-            const key = `${instrument}/${name}`;
-            const dataUrl = embedded[key];
-            if (!dataUrl) continue;
-            jobs.push((async () => {
-              try {
-                const buffer = await this.decodeSampleDataUrl(dataUrl);
-                const midi = this.noteNameToMidi(name);
-                if (midi != null) this.sampleBanks[instrument][midi] = buffer;
-              } catch (error) {
-                console.warn("[music] sample decode fail", key, error);
+        const dens = style.density;
+        const drive = dens.drive ?? 0;
+        const planned = new Map();
+        const add = (instrument, midi) => {
+          const sample = this.nearestManifestSample(instrument, midi);
+          if (sample && !planned.has(sample.key)) planned.set(sample.key, sample);
+          return sample;
+        };
+        const addCello = (note) => {
+          const sample = add("cello", note);
+          if (sample && (dens.subBass ?? 1) > 0.15 && note >= 36) {
+            add("contrabass", note - 12);
+          }
+        };
+        const addViolin = (note) => {
+          if (!add("violin", note)) add("cello", note);
+        };
+        const addPiano = (note) => {
+          if (!add("piano", note)) add("piano", Math.max(21, note - 12));
+        };
+        const steps = drive >= 0.8
+          ? [0, 4, 8, 12]
+          : drive >= 0.4
+            ? [0, 4, 8]
+            : [0, 8];
+
+        for (let bar = 0; bar < bars; bar++) {
+          const chordIndex = Math.floor(bar / 2) % style.chords.length;
+          const chord = style.chords[chordIndex];
+          const root = style.bassRoots[chordIndex];
+
+          for (const step of steps) {
+            const quarter = step / 4;
+            const isDown = step === 0;
+
+            if (isDown && dens.organ > 0.35) {
+              for (const note of chord) {
+                add("organ", note);
+                add("organ", note - 12);
               }
-            })());
+            }
+
+            if (drive >= 0.8 && dens.piano > 0.3 && step % 4 === 0) {
+              const degree = [0, 7, 12, 7][quarter % 4];
+              addPiano(chord[0] + degree);
+              if (isDown) addPiano(root);
+            } else if (isDown && dens.piano > 0.2) {
+              const every = dens.piano < 0.38 ? 4 : dens.piano > 0.9 ? 1 : 2;
+              if (bar % every === 0) {
+                addPiano(root);
+                addPiano(chord[0]);
+                if (dens.piano >= 0.4) addPiano(chord[2]);
+              }
+            }
+
+            const ostinate =
+              dens.celloOst > 0 &&
+              (step === 0 || step === 8 || (drive >= 0.8 && dens.celloOst >= 0.9 && step % 4 === 0));
+            if (ostinate) {
+              const slot =
+                (bar * 2 + (step >= 8 ? 1 : 0) + Math.floor(quarter / 2)) %
+                style.celloOstinato.length;
+              const note = root + style.celloOstinato[slot];
+              addCello(note);
+              if ((isDown || step === 8) && (dens.subBass ?? 0) > 0.2) {
+                addCello(note - 12);
+              }
+            }
+
+            if (isDown && dens.celloMel > 0.3) {
+              addCello(style.celloMelody[bar % style.celloMelody.length]);
+            }
+
+            const violinOn =
+              (1 > dens.violin * 0.55 && isDown) ||
+              (1 > dens.halfViolin && (step === 8 || (drive >= 0.8 && step === 4)));
+            if (violinOn) {
+              addViolin(
+                style.violinMelody[
+                  (bar + (step >= 8 ? 4 : 0)) % style.violinMelody.length
+                ]
+              );
+            }
+
+            if (isDown) {
+              const harp = dens.harp ?? 0;
+              const flute = dens.flute ?? 0;
+              const horn = dens.horn ?? 0;
+              if (harp > 0.2) {
+                const every = Math.max(2, Math.round(6 - harp * 4));
+                if (bar % every === 0) add("harp", chord[1] + 12);
+              }
+              if (flute > 0.25) {
+                const every = Math.max(2, Math.round(5 - flute * 3));
+                if (bar % every === 1) {
+                  add("flute", style.violinMelody[bar % style.violinMelody.length]);
+                }
+              }
+              if (horn > 0.25) {
+                const every = Math.max(2, Math.round(5 - horn * 2.5));
+                if (bar % every === 2) add("french-horn", root + 12);
+              }
+            }
           }
         }
 
-        await Promise.all(jobs);
-        const loaded = Object.values(this.sampleBanks).reduce((n, bank) => n + Object.keys(bank).length, 0);
-        this.samplesReady = loaded > 0;
-        console.info(`[music] loaded ${loaded} real samples (${Object.keys(this.sampleBanks).join(", ")})`);
+        const plan = Object.freeze([...planned.values()]);
+        this.samplePlanCache.set(cacheKey, plan);
+        return plan;
+      }
+
+      ensureSample(sample) {
+        this.syncSampleManifest();
+        const bank = this.sampleBanks[sample.instrument];
+        if (bank[sample.midi]) return Promise.resolve(bank[sample.midi]);
+        if (this.sampleJobs.has(sample.key)) return this.sampleJobs.get(sample.key);
+
+        const embedded = typeof window !== "undefined"
+          ? window.RIFTBOMB_SAMPLE_BANK
+          : null;
+        const dataUrl = embedded?.[sample.key];
+        const job = (async () => {
+          try {
+            const buffer = dataUrl
+              ? await this.decodeSampleDataUrl(dataUrl)
+              : await this.fetchAndDecodeSample(sample.instrument, sample.name);
+            bank[sample.midi] = buffer;
+            return buffer;
+          } catch (error) {
+            console.warn("[music] sample decode fail", sample.key, error);
+            return null;
+          }
+        })();
+        this.sampleJobs.set(sample.key, job);
+        return job;
+      }
+
+      async loadSampleBanks(styleId = this.styleId) {
+        const plan = this.samplePlanForStyle(styleId);
+        const embedded = typeof window !== "undefined"
+          ? window.RIFTBOMB_SAMPLE_BANK
+          : null;
+        if (!embedded) {
+          console.info(`[music] streaming ${plan.length} samples for ${styleId}`);
+        }
+        const results = await Promise.all(plan.map((sample) => this.ensureSample(sample)));
+        const loaded = results.filter(Boolean).length;
+        this.readyStyleIds.add(styleId);
+        if (styleId === this.styleId) this.samplesReady = loaded > 0;
+        console.info(`[music] ${styleId} ready: ${loaded}/${plan.length} real samples`);
+        return { styleId, requested: plan.length, loaded };
+      }
+
+      async ensureCurrentStyleSamples() {
+        let requestedStyle;
+        do {
+          requestedStyle = this.styleId;
+          const promise = this.loadSampleBanks(requestedStyle);
+          this.sampleLoadPromise = promise;
+          await promise;
+        } while (requestedStyle !== this.styleId);
       }
 
       nearestSampleMidi(bank, midi) {
@@ -423,14 +627,13 @@
         release = 0.4,
         filterHz = 0
       } = {}) {
-        if (!this.samplesReady || !this.ctx || !this.sampleBanks?.[instrument]) return false;
-        const bank = this.sampleBanks[instrument];
-        const nearest = this.nearestSampleMidi(bank, midi);
-        if (nearest == null) return false;
-        const buffer = bank[nearest];
+        if (!this.ctx) return false;
+        const sourceSample = this.nearestManifestSample(instrument, midi);
+        if (!sourceSample) return false;
+        const buffer = this.sampleBanks[sourceSample.instrument]?.[sourceSample.midi];
         if (!buffer) return false;
 
-        const rate = clamp(Math.pow(2, (midi - nearest) / 12), 0.5, 1.9);
+        const rate = clamp(Math.pow(2, (midi - sourceSample.midi) / 12), 0.5, 1.9);
         const source = this.ctx.createBufferSource();
         source.buffer = buffer;
         source.playbackRate.value = rate;
@@ -472,6 +675,7 @@
       async start() {
         if (this.ctx) {
           if (this.ctx.state === "suspended") await this.ctx.resume();
+          await this.ensureCurrentStyleSamples();
           return;
         }
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -543,7 +747,7 @@
         this.analyser.connect(this.ctx.destination);
         this.noiseBuffer = this.createNoise(3.2);
 
-        await this.loadSampleBanks();
+        await this.ensureCurrentStyleSamples();
         this.applyMixGraph();
 
         this.nextStepTime = this.ctx.currentTime + 0.12;
@@ -610,7 +814,7 @@
       }
 
       scheduler() {
-        if (!this.ctx || this.ctx.state !== "running") return;
+        if (this.schedulingPaused || !this.ctx || this.ctx.state !== "running") return;
         while (this.nextStepTime < this.ctx.currentTime + 0.2) {
           this.scheduleStep(this.stepIndex, this.nextStepTime);
           this.nextStepTime += this.stepDuration;
@@ -1564,4 +1768,3 @@
         this.energy = lerp(this.energy, value * 0.55 + heatGlow * 0.55, 0.16);
       }
     }
-

@@ -6,25 +6,33 @@
     const ARENA_TEMPLATES = Object.freeze([
       {
         id: "lattice",
-        label: "Summoner's Lattice",
-        blurb: "Classic pillars · balanced lanes",
+        label: "Salt Lens Array",
+        blurb: "Black-salt observatory · balanced lanes",
         crateChance: 0.73,
         powerupChance: 0.48,
         theme: Object.freeze({
           floor: "floorLattice",
           wall: "wallLattice",
           wallTop: "wallTopLattice",
-          clear: "#0c1412",
-          base: "#14382c",
-          floorA: "#1c443a",
-          floorB: "#163830",
-          lane: "#7a7d6a",
-          river: "#1a757e",
-          riverLight: "#4dcecf",
-          stone: "#4a5a62",
-          stoneTop: "#3a4a52",
-          crystal: "#4dcecf",
-          accent: "#c9a227"
+          clear: "#07090b",
+          base: "#171b1e",
+          floorA: "#2c302f",
+          floorB: "#202524",
+          lane: "#aaa497",
+          river: "#176c70",
+          riverLight: "#3ed6c5",
+          stone: "#252a2d",
+          stoneTop: "#4f5554",
+          crystal: "#3ed6c5",
+          accent: "#ff8a3d",
+          fx: Object.freeze({
+            motif: 0,
+            primary: "#3ed6c5",
+            secondary: "#ff8a3d",
+            intensity: 0.82,
+            speed: 0.42,
+            density: 1.05
+          })
         }),
         placeHard(grid, rows, cols) {
           for (let r = 2; r < rows - 1; r += 2) {
@@ -34,25 +42,33 @@
       },
       {
         id: "clearing",
-        label: "Crystal Clearing",
-        blurb: "Open mid · sparse pillars · chaos fights",
+        label: "Nacre Hollow",
+        blurb: "Sunken shell-garden · open center",
         crateChance: 0.58,
         powerupChance: 0.52,
         theme: Object.freeze({
           floor: "floorClearing",
           wall: "wallClearing",
           wallTop: "wallTopClearing",
-          clear: "#0a1220",
-          base: "#142838",
-          floorA: "#1a3a52",
-          floorB: "#122a40",
-          lane: "#6a8aaa",
-          river: "#2a88c8",
-          riverLight: "#7ad4ff",
-          stone: "#4a6a88",
-          stoneTop: "#3a5a72",
-          crystal: "#7ad4ff",
-          accent: "#9ad4ff"
+          clear: "#041014",
+          base: "#082c31",
+          floorA: "#12373a",
+          floorB: "#0a292d",
+          lane: "#9eb6aa",
+          river: "#126c72",
+          riverLight: "#4cced3",
+          stone: "#5f716c",
+          stoneTop: "#d8e6d8",
+          crystal: "#4cced3",
+          accent: "#ff6b58",
+          fx: Object.freeze({
+            motif: 1,
+            primary: "#4cced3",
+            secondary: "#ff6b58",
+            intensity: 0.74,
+            speed: 0.32,
+            density: 0.82
+          })
         }),
         placeHard(grid, rows, cols) {
           const pillars = [
@@ -65,25 +81,33 @@
       },
       {
         id: "labyrinth",
-        label: "Hextech Labyrinth",
-        blurb: "Long corridors · choke points",
+        label: "Cinderfrost Works",
+        blurb: "Polar foundry · long thermal corridors",
         crateChance: 0.68,
         powerupChance: 0.45,
         theme: Object.freeze({
           floor: "floorLabyrinth",
           wall: "wallLabyrinth",
           wallTop: "wallTopLabyrinth",
-          clear: "#080e14",
-          base: "#0e1c24",
-          floorA: "#123038",
-          floorB: "#0c242c",
-          lane: "#3a6a72",
-          river: "#0a8a8a",
-          riverLight: "#2ef0e0",
-          stone: "#243442",
-          stoneTop: "#1c2a36",
-          crystal: "#2ef0e0",
-          accent: "#f0c040"
+          clear: "#070a0e",
+          base: "#11161c",
+          floorA: "#20262d",
+          floorB: "#151b21",
+          lane: "#69747e",
+          river: "#70371f",
+          riverLight: "#ff7a2e",
+          stone: "#202932",
+          stoneTop: "#d6f1f5",
+          crystal: "#52a9c9",
+          accent: "#ff7a2e",
+          fx: Object.freeze({
+            motif: 2,
+            primary: "#52a9c9",
+            secondary: "#ff7a2e",
+            intensity: 0.88,
+            speed: 0.48,
+            density: 1.22
+          })
         }),
         placeHard(grid, rows, cols) {
           for (let r = 1; r < rows - 1; r++) {
@@ -102,25 +126,33 @@
       },
       {
         id: "forts",
-        label: "Nexus Forts",
-        blurb: "Twin bastions · open kill lane",
+        label: "Aeolian Bastions",
+        blurb: "Storm archive · open kill lane",
         crateChance: 0.70,
         powerupChance: 0.50,
         theme: Object.freeze({
           floor: "floorForts",
           wall: "wallForts",
           wallTop: "wallTopForts",
-          clear: "#120c0a",
-          base: "#2a1c14",
-          floorA: "#3a2820",
-          floorB: "#2a1c18",
-          lane: "#8a7060",
-          river: "#6a4030",
-          riverLight: "#d08050",
-          stone: "#3a322c",
-          stoneTop: "#2a2420",
-          crystal: "#e8a050",
-          accent: "#e04040"
+          clear: "#07101d",
+          base: "#0f2340",
+          floorA: "#203858",
+          floorB: "#142a46",
+          lane: "#9d9b91",
+          river: "#2c788c",
+          riverLight: "#5ad0e6",
+          stone: "#b8b5aa",
+          stoneTop: "#e9e4d5",
+          crystal: "#5ad0e6",
+          accent: "#c46d38",
+          fx: Object.freeze({
+            motif: 3,
+            primary: "#5ad0e6",
+            secondary: "#c44972",
+            intensity: 0.72,
+            speed: 0.56,
+            density: 0.92
+          })
         }),
         placeHard(grid, rows, cols) {
           const blue = [
@@ -139,25 +171,33 @@
       },
       {
         id: "pit",
-        label: "Baron Pit",
-        blurb: "Ring of stone · center pit · outer lane",
+        label: "Storm-Eye Basin",
+        blurb: "Charged ring · calm center · outer lane",
         crateChance: 0.76,
         powerupChance: 0.46,
         theme: Object.freeze({
           floor: "floorPit",
           wall: "wallPit",
           wallTop: "wallTopPit",
-          clear: "#0c0808",
-          base: "#1a1010",
-          floorA: "#2a1814",
-          floorB: "#1e100e",
-          lane: "#5a4038",
-          river: "#6a1818",
-          riverLight: "#e04030",
-          stone: "#222028",
-          stoneTop: "#18161c",
-          crystal: "#c03040",
-          accent: "#ff6040"
+          clear: "#050a13",
+          base: "#101b2f",
+          floorA: "#1b2c45",
+          floorB: "#111f35",
+          lane: "#6d7480",
+          river: "#183d59",
+          riverLight: "#5ad0e6",
+          stone: "#263349",
+          stoneTop: "#9fa9b8",
+          crystal: "#5ad0e6",
+          accent: "#c44972",
+          fx: Object.freeze({
+            motif: 4,
+            primary: "#5ad0e6",
+            secondary: "#c44972",
+            intensity: 0.92,
+            speed: 0.68,
+            density: 1.12
+          })
         }),
         placeHard(grid, rows, cols) {
           for (let c = 3; c <= 9; c++) {
@@ -422,6 +462,7 @@
       selectChampion(champion) {
         if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;
         this.selectedChampion = champion;
+        void this.renderer.ensureChampionModel?.(champion);
         this.resetPlayers();
         this.presentation.update(this);
       }
