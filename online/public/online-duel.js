@@ -408,6 +408,7 @@
     if (typeof message.musicStyle === "string") state.musicStyle = message.musicStyle;
     state.musicEnabled = message.musicEnabled !== false;
     state.guestReady = Boolean(message.guestReady);
+    void renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
     if (game.mode === "intro") {
       game.selectedChampion = state.hostChampion;
       game.selectedChampion2 = state.guestChampion;
@@ -809,6 +810,7 @@
       event.preventDefault(); event.stopImmediatePropagation();
       if (!validChampion(button.dataset.champion)) return;
       state.guestChampion = button.dataset.champion;
+      void renderer.ensureChampionModel(state.guestChampion);
       state.guestReady = false;
       setChampionButtons(state.guestChampion);
       sendGuestConfig();
@@ -935,4 +937,7 @@
   const feature = [...document.querySelectorAll(".intro-notes span")]
     .find((item) => item.textContent.includes("Local PvP") || item.textContent.includes("Online PvP"));
   if (feature) feature.textContent = "Online PvP · independent controls";
+  setTimeout(() => {
+    void renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
+  });
 })();

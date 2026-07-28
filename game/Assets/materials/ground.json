@@ -2,12 +2,14 @@
   "id": "ground",
   "displayName": "Arena floor",
   "maps": {
-    "albedo": "textures/ground/floor-lattice.webp"
+    "saltLens": "textures/ground/floor-lattice.webp",
+    "nacreHollow": "textures/ground/floor-clearing.webp",
+    "cinderfrost": "textures/ground/floor-labyrinth.webp"
   },
   "tint": [0.08, 0.12, 0.14],
   "metallic": 0.15,
   "roughness": 0.72,
-  "tileScale": 1.0,
-  "source": "raw-imagine/05-ground-B-grid-steel-native.png",
-  "notes": "One cropped native steel plate per gameplay cell. Dark, matte and secondary to characters and crates."
+  "tileScale": 0.066,
+  "source": "raw-imagine/07-salt-lens-array-keyframe.png",
+  "notes": "Three authored world-continuous albedos. Gameplay cells stay geometric and readable while macro material shapes span the whole board."
 }

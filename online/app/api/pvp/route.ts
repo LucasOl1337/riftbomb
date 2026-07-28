@@ -19,6 +19,7 @@ type SessionDescription = {
 const ROOM_LIFETIME_MS = 10 * 60 * 1000;
 const MAX_SDP_LENGTH = 32_000;
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+let schemaReady: Promise<void> | null = null;
 
 function response(data: unknown, status = 200): Response {
   return Response.json(data, {
@@ -36,22 +37,28 @@ async function getDatabase(): Promise<D1Database | null> {
 }
 
 async function ensureSchema(db: D1Database): Promise<void> {
-  await db.batch([
-    db.prepare(`
-      CREATE TABLE IF NOT EXISTS pvp_rooms (
-        code TEXT PRIMARY KEY NOT NULL,
-        host_token TEXT NOT NULL,
-        offer TEXT NOT NULL,
-        answer TEXT,
-        created_at INTEGER NOT NULL,
-        expires_at INTEGER NOT NULL,
-        guest_joined_at INTEGER
-      )
-    `),
-    db.prepare(
-      "CREATE INDEX IF NOT EXISTS pvp_rooms_expires_at_idx ON pvp_rooms (expires_at)",
-    ),
-  ]);
+  if (!schemaReady) {
+    schemaReady = db.batch([
+      db.prepare(`
+        CREATE TABLE IF NOT EXISTS pvp_rooms (
+          code TEXT PRIMARY KEY NOT NULL,
+          host_token TEXT NOT NULL,
+          offer TEXT NOT NULL,
+          answer TEXT,
+          created_at INTEGER NOT NULL,
+          expires_at INTEGER NOT NULL,
+          guest_joined_at INTEGER
+        )
+      `),
+      db.prepare(
+        "CREATE INDEX IF NOT EXISTS pvp_rooms_expires_at_idx ON pvp_rooms (expires_at)",
+      ),
+    ]).then(() => undefined).catch((error) => {
+      schemaReady = null;
+      throw error;
+    });
+  }
+  await schemaReady;
 }
 
 async function readBody(request: Request): Promise<Record<string, unknown>> {
@@ -114,13 +121,13 @@ export async function POST(request: Request): Promise<Response> {
     const body = await readBody(request);
     const action = body.action;
     const now = Date.now();
-    await deleteExpiredRooms(db, now);
 
     if (action === "create") {
       if (!validDescription(body.offer, "offer")) {
         return response({ error: "invalid_offer" }, 400);
       }
 
+      await deleteExpiredRooms(db, now);
       const offer = JSON.stringify(body.offer);
       const hostToken = createHostToken();
       const expiresAt = now + ROOM_LIFETIME_MS;
@@ -196,7 +203,6 @@ export async function GET(request: Request): Promise<Response> {
     if (!validCode(code)) return response({ error: "invalid_room" }, 400);
 
     const now = Date.now();
-    await deleteExpiredRooms(db, now);
     const room = await db
       .prepare(
         "SELECT host_token, offer, answer, expires_at FROM pvp_rooms WHERE code = ? AND expires_at >= ?",

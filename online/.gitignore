@@ -41,3 +41,6 @@ next-env.d.ts
 /outputs/
 /work/
 /public/riftbomb-parts/
+/public/audio/
+/public/arena-textures/
+/public/champion-models/

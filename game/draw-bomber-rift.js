@@ -413,12 +413,17 @@
         this.cameraShake = 0;
         this.lastViewProjection = new Float32Array(16);
         this.mainProgram = this.createProgram(Renderer.mainVertex, Renderer.mainFragment);
+        this.arenaFxProgram = this.createProgram(Renderer.arenaFxVertex, Renderer.arenaFxFragment);
         this.katarinaProgram = this.createProgram(Renderer.katarinaVertex, Renderer.katarinaFragment);
         this.particleProgram = this.createProgram(Renderer.particleVertex, Renderer.particleFragment);
         this.postProgram = this.createProgram(Renderer.postVertex, Renderer.postFragment);
         this.mainUniforms = this.uniforms(this.mainProgram, [
           "uModel", "uViewProjection", "uColor", "uCamera", "uTime", "uBeat",
           "uEmissive", "uMaterial", "uAlpha", "uAlbedo", "uAlbedoTop", "uMapId"
+        ]);
+        this.arenaFxUniforms = this.uniforms(this.arenaFxProgram, [
+          "uModel", "uViewProjection", "uTime", "uBeat", "uPrimary", "uSecondary",
+          "uMotif", "uIntensity", "uSpeed", "uDensity", "uReduced"
         ]);
         this.particleUniforms = this.uniforms(this.particleProgram, [
           "uViewProjection", "uResolution", "uTime"
@@ -442,14 +447,11 @@
           skillDisc: this.createMesh(buildSkillDisc(56)),
           skillCoin: this.createMesh(buildSkillCoin(48))
         };
-        this.createKatarinaModel();
-        this.createZedModel();
-        this.createPackedChampionModel("renekton", PLAYABLE_CHAMPIONS.renekton.vertices, PLAYABLE_CHAMPIONS.renekton.indices,
-          PLAYABLE_CHAMPIONS.renekton.texture, [24, 26, 21, 255]);
-        this.createPackedChampionModel("vladimir", PLAYABLE_CHAMPIONS.vladimir.vertices, PLAYABLE_CHAMPIONS.vladimir.indices,
-          PLAYABLE_CHAMPIONS.vladimir.texture, [48, 5, 18, 255]);
-        this.createPackedChampionModel("gangplank", PLAYABLE_CHAMPIONS.gangplank.vertices, PLAYABLE_CHAMPIONS.gangplank.indices,
-          PLAYABLE_CHAMPIONS.gangplank.texture, [92, 58, 28, 255]);
+        this.championModelInitialised = new Set();
+        this.championModelLoadPromises = {};
+        for (const champion of ["katarina", "zed", "renekton", "vladimir", "gangplank"]) {
+          if (PLAYABLE_CHAMPIONS[champion]) this.initialiseChampionModel(champion);
+        }
         this.createArenaTextures();
         this.createSkillIconTextures();
         this.particleVao = gl.createVertexArray();
@@ -482,6 +484,75 @@
           this.lost = true;
         });
         canvas.addEventListener("webglcontextrestored", () => location.reload());
+      }
+
+      initialiseChampionModel(champion) {
+        if (champion === "ziggs") return Promise.resolve(true);
+        if (this.championModelInitialised.has(champion)) {
+          return this[`${champion}ModelReadyPromise`] || Promise.resolve(Boolean(this[`${champion}Ready`]));
+        }
+        const packed = PLAYABLE_CHAMPIONS[champion];
+        if (!packed) return Promise.resolve(false);
+        this.championModelInitialised.add(champion);
+        if (champion === "katarina") return this.createKatarinaModel();
+        if (champion === "zed") return this.createZedModel();
+        const fallbackColors = {
+          renekton: [24, 26, 21, 255],
+          vladimir: [48, 5, 18, 255],
+          gangplank: [92, 58, 28, 255]
+        };
+        return this.createPackedChampionModel(
+          champion,
+          packed.vertices,
+          packed.indices,
+          packed.texture,
+          fallbackColors[champion] || [24, 24, 24, 255]
+        );
+      }
+
+      ensureChampionModel(champion) {
+        if (champion === "ziggs") return Promise.resolve(true);
+        if (!["katarina", "zed", "renekton", "vladimir", "gangplank"].includes(champion)) {
+          return Promise.resolve(false);
+        }
+        if (PLAYABLE_CHAMPIONS[champion]) return this.initialiseChampionModel(champion);
+        if (this.championModelLoadPromises[champion]) {
+          return this.championModelLoadPromises[champion];
+        }
+        const sources = typeof PLAYABLE_CHAMPION_MODEL_SOURCES !== "undefined"
+          ? PLAYABLE_CHAMPION_MODEL_SOURCES
+          : {};
+        const source = sources[champion];
+        if (!source) {
+          console.warn(`Playable model source missing: ${champion}`);
+          return Promise.resolve(false);
+        }
+
+        this.championModelLoadPromises[champion] = new Promise((resolve) => {
+          const script = document.createElement("script");
+          script.src = source;
+          script.async = true;
+          script.onload = () => {
+            try {
+              resolve(this.initialiseChampionModel(champion));
+            } catch (error) {
+              console.error(`Playable model ${champion} failed to initialise.`, error);
+              resolve(false);
+            }
+          };
+          script.onerror = () => {
+            console.error(`Playable model ${champion} failed to load.`);
+            resolve(false);
+          };
+          document.head.appendChild(script);
+        });
+        return this.championModelLoadPromises[champion];
+      }
+
+      ensureChampionModels(champions) {
+        return Promise.all(
+          [...new Set(champions)].map((champion) => this.ensureChampionModel(champion))
+        );
       }
 
       createKatarinaModel() {
@@ -530,24 +601,31 @@
           gl.UNSIGNED_BYTE, new Uint8Array([18, 12, 16, 255]));
 
         this.katarinaReady = false;
-        const image = new Image();
-        image.decoding = "async";
-        image.onload = () => {
-          gl.bindTexture(gl.TEXTURE_2D, this.katarinaTexture);
-          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-          gl.generateMipmap(gl.TEXTURE_2D);
-          const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
-          if (anisotropic) {
-            const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-            gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, max));
-          }
-          this.katarinaReady = true;
-        };
-        image.onerror = () => console.error("Katarina game texture failed to decode.");
-        image.src = PLAYABLE_CHAMPIONS.katarina.texture;
+        this.katarinaModelReadyPromise = new Promise((resolve) => {
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, this.katarinaTexture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
+            if (anisotropic) {
+              const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+              gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, max));
+            }
+            this.katarinaReady = true;
+            resolve(true);
+          };
+          image.onerror = () => {
+            console.error("Katarina game texture failed to decode.");
+            resolve(false);
+          };
+          image.src = PLAYABLE_CHAMPIONS.katarina.texture;
+        });
+        return this.katarinaModelReadyPromise;
       }
 
       createZedModel() {
@@ -596,24 +674,31 @@
           gl.UNSIGNED_BYTE, new Uint8Array([14, 13, 17, 255]));
 
         this.zedReady = false;
-        const image = new Image();
-        image.decoding = "async";
-        image.onload = () => {
-          gl.bindTexture(gl.TEXTURE_2D, this.zedTexture);
-          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-          gl.generateMipmap(gl.TEXTURE_2D);
-          const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
-          if (anisotropic) {
-            const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-            gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, max));
-          }
-          this.zedReady = true;
-        };
-        image.onerror = () => console.error("Zed game texture failed to decode.");
-        image.src = PLAYABLE_CHAMPIONS.zed.texture;
+        this.zedModelReadyPromise = new Promise((resolve) => {
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, this.zedTexture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
+            if (anisotropic) {
+              const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+              gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, max));
+            }
+            this.zedReady = true;
+            resolve(true);
+          };
+          image.onerror = () => {
+            console.error("Zed game texture failed to decode.");
+            resolve(false);
+          };
+          image.src = PLAYABLE_CHAMPIONS.zed.texture;
+        });
+        return this.zedModelReadyPromise;
       }
 
       createPackedChampionModel(key, encodedVertices, encodedIndices, textureSource, fallbackRgba) {
@@ -672,26 +757,33 @@
         this[`${key}IndexCount`] = indexBytes.byteLength / 2;
         this[`${key}Texture`] = texture;
         this[`${key}Ready`] = false;
-        const image = new Image();
-        image.decoding = "async";
-        image.onload = () => {
-          gl.bindTexture(gl.TEXTURE_2D, texture);
-          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-          // RGBA8 display-referred (same as arena). SRGB8_ALPHA8 + no gamma out crushed
-          // dark leather/skin into a brown silhouette after the post rewrite.
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
-          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-          gl.generateMipmap(gl.TEXTURE_2D);
-          const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
-          if (anisotropic) {
-            const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-            gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, max));
-          }
-          this[`${key}Ready`] = true;
-        };
-        image.onerror = () => console.error(`${key} game texture failed to decode.`);
-        image.src = textureSource;
+        this[`${key}ModelReadyPromise`] = new Promise((resolve) => {
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            // RGBA8 display-referred (same as arena). SRGB8_ALPHA8 + no gamma out crushed
+            // dark leather/skin into a brown silhouette after the post rewrite.
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
+            if (anisotropic) {
+              const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+              gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, max));
+            }
+            this[`${key}Ready`] = true;
+            resolve(true);
+          };
+          image.onerror = () => {
+            console.error(`${key} game texture failed to decode.`);
+            resolve(false);
+          };
+          image.src = textureSource;
+        });
+        return this[`${key}ModelReadyPromise`];
       }
 
       createShader(type, source) {
@@ -757,6 +849,7 @@
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
           gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
 
+        const textureLoads = [];
         const make = (key, aliases, fallbackRgba) => {
           const texture = gl.createTexture();
           gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -768,31 +861,42 @@
           // Mid-brown fallback (not near-black) so missing load is still readable
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
             gl.UNSIGNED_BYTE, new Uint8Array(fallbackRgba));
-          const image = new Image();
-          image.decoding = "async";
-          image.onload = () => {
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-            // Linear RGBA — sRGB path crushed dark forest wood to pure black under fog
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
-            gl.generateMipmap(gl.TEXTURE_2D);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-            const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
-            if (anisotropic) {
-              const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-              gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, max));
+          textureLoads.push(new Promise((resolve) => {
+            const image = new Image();
+            image.decoding = "async";
+            image.onload = () => {
+              gl.bindTexture(gl.TEXTURE_2D, texture);
+              gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+              // Linear RGBA — sRGB path crushed dark forest wood to pure black under fog
+              gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+              gl.generateMipmap(gl.TEXTURE_2D);
+              gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+              const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
+              if (anisotropic) {
+                const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+                gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, max));
+              }
+              for (const alias of aliases) this.arenaTextureReady[alias] = true;
+              resolve(true);
+            };
+            image.onerror = () => {
+              console.error(`Arena texture ${key} failed to decode.`);
+              resolve(false);
+            };
+            if (sources[key]) image.src = sources[key];
+            else {
+              console.warn(`Arena texture source missing: ${key}`);
+              resolve(false);
             }
-            for (const alias of aliases) this.arenaTextureReady[alias] = true;
-          };
-          image.onerror = () => console.error(`Arena texture ${key} failed to decode.`);
-          if (sources[key]) image.src = sources[key];
-          else console.warn(`Arena texture source missing: ${key}`);
+          }));
           return texture;
         };
         const textureGroups = {
           crate: ["crate"],
           crateTop: ["crateTop"],
-          floorLattice: ["floorLattice", "floorClearing", "floorLabyrinth", "floorForts", "floorPit"],
+          floorLattice: ["floorLattice", "floorPit"],
+          floorClearing: ["floorClearing"],
+          floorLabyrinth: ["floorLabyrinth", "floorForts"],
           wallLattice: ["wallLattice", "wallClearing", "wallLabyrinth", "wallForts", "wallPit"],
           wallTopLattice: [
             "wallTopLattice", "wallTopClearing", "wallTopLabyrinth", "wallTopForts", "wallTopPit",
@@ -823,11 +927,12 @@
         };
         this.arenaTextureReady = Object.fromEntries(keys.map((key) => [key, false]));
         this.arenaTextures = {};
-        // Five authored sources, five GPU allocations. Theme names are aliases, not duplicate textures.
+        // Seven authored sources, seven GPU allocations. Shared theme names remain aliases.
         for (const [sourceKey, aliases] of Object.entries(textureGroups)) {
           const texture = make(sourceKey, aliases, fallbacks[sourceKey] || [80, 80, 80, 255]);
           for (const alias of aliases) this.arenaTextures[alias] = texture;
         }
+        this.arenaTexturesReady = Promise.all(textureLoads);
         // Aliases used by draw path
         this.arenaTextures.wall = this.arenaTextures.wallLattice;
         this.arenaTextures.wallTop = this.arenaTextures.wallTopLattice;
@@ -860,6 +965,43 @@
         const hex = theme?.[key];
         if (!hex || typeof hex !== "string") return fallback;
         return hexToRgb(hex);
+      }
+
+      /**
+       * One gameplay-safe environmental pass for all arena ambience.
+       * A single additive top face replaces hundreds of decorative sprites/draws.
+       */
+      drawArenaSurfaceFx(theme, halfW, halfD, vp, t, beat) {
+        const fx = theme?.fx;
+        if (!fx || modelReviewMode || this.scale < 0.82) return;
+        const gl = this.gl;
+        const primary = typeof fx.primary === "string" ? hexToRgb(fx.primary) : [0.3, 0.8, 0.85];
+        const secondary = typeof fx.secondary === "string" ? hexToRgb(fx.secondary) : [1, 0.45, 0.25];
+
+        gl.useProgram(this.arenaFxProgram);
+        gl.uniformMatrix4fv(this.arenaFxUniforms.uModel, false,
+          modelMatrix(0, -0.011, 0, halfW, 0.002, halfD, 0));
+        gl.uniformMatrix4fv(this.arenaFxUniforms.uViewProjection, false, vp);
+        gl.uniform1f(this.arenaFxUniforms.uTime, t);
+        gl.uniform1f(this.arenaFxUniforms.uBeat, beat);
+        gl.uniform3fv(this.arenaFxUniforms.uPrimary, primary);
+        gl.uniform3fv(this.arenaFxUniforms.uSecondary, secondary);
+        gl.uniform1f(this.arenaFxUniforms.uMotif, fx.motif ?? 0);
+        gl.uniform1f(this.arenaFxUniforms.uIntensity, fx.intensity ?? 0.7);
+        gl.uniform1f(this.arenaFxUniforms.uSpeed, fx.speed ?? 0.45);
+        gl.uniform1f(this.arenaFxUniforms.uDensity, fx.density ?? 1);
+        gl.uniform1f(this.arenaFxUniforms.uReduced, prefersReducedMotion ? 1 : 0);
+
+        // Opaque-stage helper: later walls/crates restore normal depth occlusion.
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+        gl.depthMask(false);
+        gl.bindVertexArray(this.meshes.cube.vao);
+        gl.drawArrays(gl.TRIANGLES, 0, this.meshes.cube.count);
+        gl.bindVertexArray(null);
+        gl.depthMask(true);
+        gl.disable(gl.BLEND);
+        gl.useProgram(this.mainProgram);
       }
 
       /**
@@ -2034,7 +2176,7 @@
               [0.04, 0.03, 0.14], mark, 2, 0.4, 0);
           }
         }
-        // One authored steel plate per gameplay cell: the grid stays readable and quiet.
+        // Cell geometry preserves the grid; world-continuous albedo avoids micro-tile repetition.
         for (let r = 1; r < game.rows - 1; r++) {
           for (let c = 1; c < game.cols - 1; c++) {
             const [fx, fz] = game.worldFromCell(r, c);
@@ -2043,6 +2185,7 @@
               textureTint, 0, 0.01, 0, 1, 0, 0, 1);
           }
         }
+        this.drawArenaSurfaceFx(theme, halfW, halfD, vp, t, beat);
         // Stage edge stripe — low emissive, hard edge (not toy glow)
         this.draw("cube", [0, -0.02, halfD + 0.12], [halfW + 0.35, 0.04, 0.1], lip, 0, 0.12);
         this.draw("cube", [0, -0.02, -(halfD + 0.12)], [halfW + 0.35, 0.04, 0.1], lip, 0, 0.12);
@@ -2389,7 +2532,6 @@
         gl.uniform1f(this.postUniforms.uHit, this.hitPulse);
         gl.uniform1f(this.postUniforms.uHealth, player ? player.health / player.maxHealth : 1);
         gl.uniform1f(this.postUniforms.uReduced, prefersReducedMotion ? 1 : 0);
-
         const shocks = this.shocks.slice(0, 4);
         for (let i = 0; i < 4; i++) {
           const s = shocks[i];
@@ -2588,8 +2730,8 @@
 
     Renderer.mainVertex = `#version 300 es
       precision highp float;
-      in vec3 aPosition;
-      in vec3 aNormal;
+      layout(location = 0) in vec3 aPosition;
+      layout(location = 1) in vec3 aNormal;
       uniform mat4 uModel;
       uniform mat4 uViewProjection;
       out vec3 vWorld;
@@ -2717,8 +2859,9 @@
             vec3 Nb = mix(NbSide, NbTop, topFace);
             N = normalize(mix(N, Nb, 0.3));
           } else {
-            // FLOOR: one plate per gameplay cell, aligned by the draw call.
-            uv = clamp(faceUv(vLocal, N), 0.0, 1.0);
+            // FLOOR: one continuous material field across the board. Geometry still
+            // registers every gameplay cell, but authored macro-shapes do not repeat.
+            uv = clamp(vWorld.xz * 0.066 + 0.5, 0.0, 1.0);
             mapUv = uv;
             albedo = texture(uAlbedo, uv).rgb;
             vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 0.8);
@@ -2804,6 +2947,114 @@
 
         color = tonemap(color * 1.12);
         outColor = vec4(color, uAlpha);
+      }
+    `;
+
+    Renderer.arenaFxVertex = `#version 300 es
+      precision highp float;
+      layout(location = 0) in vec3 aPosition;
+      layout(location = 1) in vec3 aNormal;
+      uniform mat4 uModel;
+      uniform mat4 uViewProjection;
+      out vec3 vWorld;
+      out vec3 vLocal;
+      out float vTop;
+      void main() {
+        vec4 world = uModel * vec4(aPosition, 1.0);
+        vWorld = world.xyz;
+        vLocal = aPosition;
+        vTop = aNormal.y;
+        gl_Position = uViewProjection * world;
+      }
+    `;
+
+    Renderer.arenaFxFragment = `#version 300 es
+      precision highp float;
+      in vec3 vWorld;
+      in vec3 vLocal;
+      in float vTop;
+      uniform float uTime;
+      uniform float uBeat;
+      uniform vec3 uPrimary;
+      uniform vec3 uSecondary;
+      uniform float uMotif;
+      uniform float uIntensity;
+      uniform float uSpeed;
+      uniform float uDensity;
+      uniform float uReduced;
+      out vec4 outColor;
+
+      float hash21(vec2 p) {
+        p = fract(p * vec2(123.34, 456.21));
+        p += dot(p, p + 45.32);
+        return fract(p.x * p.y);
+      }
+
+      float lineAA(float value, float width) {
+        float d = abs(fract(value) - 0.5);
+        float aa = max(fwidth(value) * 1.35, 0.001);
+        return 1.0 - smoothstep(width, width + aa, d);
+      }
+
+      void main() {
+        if (vTop < 0.5) discard;
+        vec2 w = vWorld.xz * uDensity;
+        float motion = uTime * uSpeed * (1.0 - uReduced);
+        float safeBeat = uBeat * (1.0 - uReduced);
+        float signal = 0.0;
+        float accent = 0.0;
+
+        if (uMotif < 0.5) {
+          // Salt Lens Array: optical contours cross sparse mineral survey lines.
+          float lens = lineAA(length(w * vec2(0.72, 0.94)) * 0.42 - motion * 0.025, 0.028);
+          float survey = lineAA((w.x + w.y) * 0.19 + sin(w.y * 0.55) * 0.05, 0.016);
+          float sparse = smoothstep(0.76, 0.96, hash21(floor(w * 0.72)));
+          signal = lens * (0.42 + sparse * 0.38) + survey * 0.16;
+          accent = lineAA(length(w - vec2(2.2, -1.1)) * 0.66 + motion * 0.035, 0.018) * sparse;
+        } else if (uMotif < 1.5) {
+          // Nacre Hollow: two slow interference pools create shell-like iridescence.
+          float shellA = lineAA(length(w - vec2(-1.7, 0.8)) * 0.48 - motion * 0.025, 0.025);
+          float shellB = lineAA(length(w - vec2(2.1, -1.4)) * 0.44 + motion * 0.018, 0.022);
+          float pearl = pow(0.5 + 0.5 * sin(w.x * 0.55 - w.y * 0.37 + motion * 0.32), 8.0);
+          signal = max(shellA, shellB) * 0.48 + pearl * 0.12;
+          accent = min(shellA, shellB) * 0.74;
+        } else if (uMotif < 2.5) {
+          // Cinderfrost Works: cold conduits with rare hot pulses at intersections.
+          float railX = lineAA(w.x * 0.32, 0.018);
+          float railY = lineAA(w.y * 0.27, 0.018);
+          float conduit = max(railX, railY);
+          float thermal = pow(0.5 + 0.5 * sin((w.x + w.y) * 1.25 - motion * 2.2), 10.0);
+          signal = conduit * (0.18 + thermal * 0.5);
+          accent = railX * railY * (0.55 + thermal * 0.45);
+        } else if (uMotif < 3.5) {
+          // Aeolian Bastions: long directional ribbons reveal the storm flow.
+          float wind = pow(0.5 + 0.5 * sin(
+            w.x * 0.58 + w.y * 0.83 - motion * 1.25 + sin(w.y * 0.31) * 0.7
+          ), 12.0);
+          float vane = lineAA(w.x * 0.22 + w.y * 0.36 - motion * 0.055, 0.014);
+          float gust = smoothstep(0.62, 0.98, hash21(floor(w * vec2(0.34, 0.72))));
+          signal = wind * (0.22 + gust * 0.36) + vane * 0.12;
+          accent = wind * vane * 0.62;
+        } else {
+          // Storm-Eye Basin: concentric charge bands spiral around a calm center.
+          float radius = length(w);
+          float angle = atan(w.y, w.x);
+          float ring = lineAA(radius * 0.34 - motion * 0.07, 0.026);
+          float spiral = pow(0.5 + 0.5 * sin(angle * 5.0 - radius * 1.5 - motion * 1.3), 11.0);
+          float eye = 1.0 - smoothstep(0.6, 2.5, radius);
+          signal = ring * (0.34 + spiral * 0.42) * (1.0 - eye * 0.72);
+          accent = spiral * smoothstep(2.0, 5.5, radius) * 0.28;
+        }
+
+        float edge = 1.0 - smoothstep(0.82, 0.985, max(abs(vLocal.x), abs(vLocal.z)));
+        float reducedGain = mix(1.0, 0.58, uReduced);
+        float alpha = clamp(
+          (signal * 0.58 + accent * 0.62) * uIntensity * (0.115 + safeBeat * 0.035),
+          0.0,
+          0.22
+        ) * edge * reducedGain;
+        vec3 color = mix(uPrimary, uSecondary, clamp(accent * 1.4, 0.0, 1.0));
+        outColor = vec4(color, alpha);
       }
     `;
 
@@ -3048,6 +3299,7 @@
         vec4 baseTex = texture(uScene, uv);
         vec3 color = sampleScene(uv);
         vec2 px = 1.0 / uResolution;
+        float safeBeat = uBeat * (1.0 - uReduced);
 
         // Bloom only true highlights (crystals, FX) — threshold high so wood never blooms
         vec3 bloom = vec3(0.0);
@@ -3077,10 +3329,11 @@
         color *= 0.82 + vignette * 0.22;
 
         float lowHealth = 1.0 - uHealth;
-        color += vec3(0.38, 0.02, 0.03) * lowHealth * lowHealth * (1.0 - vignette) * (0.45 + uBeat * 0.4);
+        color += vec3(0.38, 0.02, 0.03) * lowHealth * lowHealth
+          * (1.0 - vignette) * (0.45 + safeBeat * 0.4);
         float grain = (hash21(vUv * uResolution + fract(uTime) * 71.0) - 0.5) * 0.016;
         color += grain * (1.0 - uReduced);
-        color += vec3(0.03, 0.06, 0.12) * uBeat * 0.02;
+        color += vec3(0.03, 0.06, 0.12) * safeBeat * 0.02;
 
         color = clamp(color, 0.0, 1.0);
         // Opaque composite — transparent post was the mid-grey page bleed
