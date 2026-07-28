@@ -221,9 +221,9 @@
     ]);
 
     class Game {
-      constructor(renderer, music, presentation) {
+      constructor(renderer, sfx, presentation) {
         this.renderer = renderer;
-        this.music = music;
+        this.sfx = sfx;
         this.presentation = presentation;
         this.cols = 13;
         this.rows = 11;
@@ -437,6 +437,8 @@
           renektonUltTick: 0,
           vladimirPool: 0,
           vladimirPoolTick: 0,
+          vladimirAttackAnim: 0,
+          vladimirQAnim: 0,
           vladimirEAnim: 0,
           vladimirUltAnim: 0,
           vladimirQStacks: 0,
@@ -573,7 +575,8 @@
           passOwners: new Set([player.id])
         };
         this.bombs.push(bomb);
-        this.music.effect("bomb");
+        if (player.champion === "vladimir") player.vladimirAttackAnim = 0.42;
+        this.sfx.effect("bomb");
         this.spawnParticles(x, 0.45, z,
           player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 9, 0.6, 0.08);
         this.presentation.update(this);
@@ -592,7 +595,7 @@
         player.dashCooldown = 5;
         player.invulnerable = Math.max(player.invulnerable, 0.22);
         this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.14);
-        this.music.effect("dash");
+        this.sfx.effect("dash");
         this.spawnParticles(player.x, 0.5, player.z,
           player.id === 1 ? Renderer.colors.rift : Renderer.colors.ember, 18, 0.48, 0.1);
       }
@@ -733,7 +736,7 @@
           age: 0,
           duration: clamp(distance / 12, 0.28, 0.52)
         });
-        this.music.effect("katQ");
+        this.sfx.effect("katQ");
         this.presentation.announce("Katarina · Bouncing Blade");
         this.presentation.update(this);
         return true;
@@ -746,7 +749,7 @@
         player.speedBoost = 1.5;
         this.dropDagger(player.x, player.z, 0.48);
         this.spawnParticles(player.x, 0.72, player.z, Renderer.colors.katCrimson, 18, 0.75, 0.1);
-        this.music.effect("katW");
+        this.sfx.effect("katW");
         this.presentation.announce("Katarina · Preparation");
         this.presentation.update(this);
         return true;
@@ -785,7 +788,7 @@
         if (rival && Math.hypot(rival.x - player.x, rival.z - player.z) < 1.15) {
           this.hitSkill(rival, 0.18, player, "Shunpo");
         }
-        this.music.effect("shunpo");
+        this.sfx.effect("shunpo");
         this.presentation.announce("Katarina · Shunpo");
         this.presentation.update(this);
         return true;
@@ -802,7 +805,7 @@
         player.ultChannel = 1.65;
         player.ultTick = 0;
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 2.75, age: 0, life: 1.65, lotus: true });
-        this.music.effect("deathLotus");
+        this.sfx.effect("deathLotus");
         this.renderer.addShock(player.x, player.z, 0.8);
         this.presentation.announce("Katarina · Death Lotus");
         this.presentation.update(this);
@@ -872,7 +875,7 @@
             resolved: false
           });
         }
-        this.music.effect("zedQ");
+        this.sfx.effect("zedQ");
         this.presentation.announce(`Zed · Razor Shuriken ×${origins.length}`);
         this.presentation.update(this);
         return true;
@@ -901,7 +904,7 @@
           this.renderer.addShock(player.x, player.z, 0.54);
           this.spawnParticles(fromX, 0.52, fromZ, Renderer.colors.zedCrimson, 24, 0.62, 0.1);
           this.spawnParticles(player.x, 0.52, player.z, Renderer.colors.zedShadow, 28, 0.66, 0.12);
-          this.music.effect("zedSwap");
+          this.sfx.effect("zedSwap");
           this.presentation.announce("Zed · Living Shadow exchange");
           return true;
         }
@@ -937,7 +940,7 @@
         });
         this.spawnParticles(shadow.x, 0.48, shadow.z, Renderer.colors.zedCrimson, 28, 0.72, 0.11);
         this.renderer.addShock(shadow.x, shadow.z, 0.42);
-        this.music.effect("zedW");
+        this.sfx.effect("zedW");
         this.presentation.announce("Zed · Living Shadow · F again to exchange");
         this.presentation.update(this);
         return true;
@@ -974,7 +977,7 @@
         }
         if (hitRival) player.wCooldown = Math.max(0, player.wCooldown - 2.2);
         this.renderer.addShock(player.x, player.z, 0.5);
-        this.music.effect("zedE");
+        this.sfx.effect("zedE");
         this.presentation.announce(hitRival ? "Shadow Slash · Living Shadow cooldown reduced" : `Zed · Shadow Slash ×${origins.length}`);
         this.presentation.update(this);
         return true;
@@ -1023,7 +1026,7 @@
         this.renderer.addShock(player.x, player.z, 0.76);
         this.spawnParticles(fromX, 0.58, fromZ, Renderer.colors.zedShadow, 34, 0.86, 0.13);
         this.spawnParticles(player.x, 0.58, player.z, Renderer.colors.zedCrimson, 34, 0.86, 0.13);
-        this.music.effect("deathMark");
+        this.sfx.effect("deathMark");
         this.presentation.announce("Zed · Death Mark");
         this.presentation.update(this);
         return true;
@@ -1078,7 +1081,7 @@
         this.renderer.addShock(player.x, player.z, empowered ? 0.72 : 0.5);
         this.spawnParticles(player.x, 0.56, player.z, Renderer.colors.renektonTeal,
           empowered ? 38 : 26, 0.82, 0.11);
-        this.music.effect(empowered ? "renektonQEmpowered" : "renektonQ");
+        this.sfx.effect(empowered ? "renektonQEmpowered" : "renektonQ");
         this.presentation.announce(`Renekton · ${empowered ? "Empowered " : ""}Cull the Meek${healing > 0 ? " · healed" : ""}`);
         this.presentation.update(this);
         return true;
@@ -1119,7 +1122,7 @@
         });
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 0.82, age: 0, life: 0.42, renekton: true });
         this.renderer.addShock(player.x, player.z, empowered ? 0.78 : 0.54);
-        this.music.effect(empowered ? "renektonWEmpowered" : "renektonW");
+        this.sfx.effect(empowered ? "renektonWEmpowered" : "renektonW");
         this.presentation.announce(`Renekton · ${empowered ? "Empowered " : ""}Ruthless Predator`);
         this.presentation.update(this);
         return true;
@@ -1187,7 +1190,7 @@
         });
         this.renderer.addShock(player.x, player.z, recast ? 0.58 : 0.42);
         this.spawnParticles(player.x, 0.42, player.z, Renderer.colors.renektonTeal, 24, 0.66, 0.1);
-        this.music.effect(recast ? "renektonDice" : "renektonE");
+        this.sfx.effect(recast ? "renektonDice" : "renektonE");
         this.presentation.announce(recast ? "Renekton · Dice" : `Renekton · Slice${hitUnit ? " · E again" : ""}`);
         this.presentation.update(this);
         return true;
@@ -1204,7 +1207,7 @@
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 2.05, age: 0, life: 1.1, renekton: true });
         this.renderer.addShock(player.x, player.z, 1.05);
         this.spawnParticles(player.x, 0.75, player.z, Renderer.colors.renektonTeal, 52, 1.15, 0.14);
-        this.music.effect("dominus");
+        this.sfx.effect("dominus");
         this.presentation.announce("Renekton · Dominus");
         this.presentation.update(this);
         return true;
@@ -1220,6 +1223,7 @@
         const empowered = player.vladimirQStacks >= 2;
         player.vladimirQStacks = empowered ? 0 : player.vladimirQStacks + 1;
         player.qCooldown = empowered ? 3.4 : 4.4;
+        player.vladimirQAnim = 0.56;
         player.castAnim = 0.56;
         player.castDuration = 0.56;
         let connected = false;
@@ -1237,7 +1241,7 @@
         this.spawnParticles(target.x, 0.62, target.z, Renderer.colors.vladimirCrimson,
           empowered ? 34 : 22, 0.74, 0.1);
         this.renderer.addShock(target.x, target.z, empowered ? 0.62 : 0.38);
-        this.music.effect(empowered ? "vladimirQEmpowered" : "vladimirQ");
+        this.sfx.effect(empowered ? "vladimirQEmpowered" : "vladimirQ");
         this.presentation.announce(`Vladimir · ${empowered ? "Empowered " : ""}Transfusion`);
         this.presentation.update(this);
         return true;
@@ -1253,7 +1257,7 @@
         player.health = Math.max(0.06, player.health - Math.min(0.08, player.health * 0.12));
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 1.38, age: 0, life: 1.45, vladimir: true });
         this.renderer.addShock(player.x, player.z, 0.64);
-        this.music.effect("sanguinePool");
+        this.sfx.effect("sanguinePool");
         this.presentation.announce("Vladimir · Sanguine Pool");
         this.presentation.update(this);
         return true;
@@ -1283,7 +1287,7 @@
         this.slashes.push({ x: player.x, z: player.z, radius, age: 0, life: 0.66, vladimir: true });
         this.spawnParticles(player.x, 0.68, player.z, Renderer.colors.vladimirCrimson, 42, 0.96, 0.12);
         this.renderer.addShock(player.x, player.z, 0.72);
-        this.music.effect("tidesOfBlood");
+        this.sfx.effect("tidesOfBlood");
         this.presentation.announce(`Vladimir · Tides of Blood${destroyed ? ` · ${destroyed} crates` : ""}`);
         this.presentation.update(this);
         return true;
@@ -1310,7 +1314,7 @@
         this.slashes.push({ x: landing.x, z: landing.z, radius, age: 0, life: 0.82, vladimir: true });
         this.renderer.addShock(landing.x, landing.z, 0.84);
         this.spawnParticles(landing.x, 0.58, landing.z, Renderer.colors.vladimirCrimson, 38, 0.92, 0.12);
-        this.music.effect("hemoplague");
+        this.sfx.effect("hemoplague");
         this.presentation.announce("Vladimir · Hemoplague");
         this.presentation.update(this);
         return true;
@@ -1341,7 +1345,7 @@
           life: this.tile * 7.2 / 14.2,
           resolved: false
         });
-        this.music.effect("gangplankQ");
+        this.sfx.effect("gangplankQ");
         this.presentation.announce("Gangplank · Parrrley");
         this.presentation.update(this);
         return true;
@@ -1358,7 +1362,7 @@
         this.healChampion(player, 0.28);
         this.spawnParticles(player.x, 0.7, player.z, Renderer.colors.gangplankGold, 28, 0.7, 0.1);
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 0.95, age: 0, life: 0.45, gangplank: true });
-        this.music.effect("removeScurvy");
+        this.sfx.effect("removeScurvy");
         this.presentation.announce("Gangplank · Remove Scurvy");
         this.presentation.update(this);
         return true;
@@ -1394,7 +1398,7 @@
           exploded: false
         });
         this.spawnParticles(x, 0.4, z, Renderer.colors.gangplankOrange, 18, 0.5, 0.08);
-        this.music.effect("powderKeg");
+        this.sfx.effect("powderKeg");
         this.presentation.announce("Gangplank · Powder Keg");
         this.presentation.update(this);
         return true;
@@ -1419,7 +1423,7 @@
         });
         this.slashes.push({ x: target.x, z: target.z, radius: this.tile * 2.35, age: 0, life: 2.5, gangplank: true });
         this.spawnParticles(target.x, 0.6, target.z, Renderer.colors.gangplankOrange, 36, 0.9, 0.12);
-        this.music.effect("cannonBarrage");
+        this.sfx.effect("cannonBarrage");
         this.presentation.announce("Gangplank · Cannon Barrage");
         this.presentation.update(this);
         return true;
@@ -1450,7 +1454,7 @@
         this.renderer.addShock(barrel.x, barrel.z, 0.85);
         this.slashes.push({ x: barrel.x, z: barrel.z, radius, age: 0, life: 0.55, gangplank: true });
         this.spawnParticles(barrel.x, 0.55, barrel.z, Renderer.colors.gangplankOrange, 42, 0.95, 0.13);
-        this.music.effect("barrelBoom");
+        this.sfx.effect("barrelBoom");
         for (const other of this.gangplankBarrels) {
           if (other.exploded || other.id === barrel.id) continue;
           if (Math.hypot(other.x - barrel.x, other.z - barrel.z) <= this.tile * 1.85) {
@@ -1618,6 +1622,8 @@
         player.renektonSlashAnim = Math.max(0, player.renektonSlashAnim - dt);
         player.renektonDashAnim = Math.max(0, player.renektonDashAnim - dt);
         player.renektonDashRecast = Math.max(0, player.renektonDashRecast - dt);
+        player.vladimirAttackAnim = Math.max(0, player.vladimirAttackAnim - dt);
+        player.vladimirQAnim = Math.max(0, player.vladimirQAnim - dt);
         player.vladimirEAnim = Math.max(0, player.vladimirEAnim - dt);
         player.vladimirUltAnim = Math.max(0, player.vladimirUltAnim - dt);
         player.moving = false;
@@ -1749,7 +1755,7 @@
         this.dropDagger(hitX + vx / length * 0.68, hitZ + vz / length * 0.68, 0.32, owner);
         this.slashes.push({ x: hitX, z: hitZ, radius: this.tile * 0.72, age: 0, life: 0.34 });
         this.spawnParticles(hitX, 0.7, hitZ, Renderer.colors.katBladeEdge, 18, 0.6, 0.09);
-        this.music.effect("daggerLand");
+        this.sfx.effect("daggerLand");
       }
 
       triggerVoracity(player, dagger) {
@@ -1758,7 +1764,7 @@
         const radius = this.tile * 1.42;
         this.slashes.push({ x: dagger.x, z: dagger.z, radius, age: 0, life: 0.55, voracity: true });
         this.renderer.addShock(dagger.x, dagger.z, 0.64);
-        this.music.effect("voracity");
+        this.sfx.effect("voracity");
         this.spawnParticles(dagger.x, 0.48, dagger.z, Renderer.colors.katCrimson, 34, 0.82, 0.12);
 
         const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
@@ -1893,7 +1899,7 @@
             this.renderer.addShock(target.x, target.z, 0.92);
             this.slashes.push({ x: target.x, z: target.z, radius: this.tile * 1.08, age: 0, life: 0.68, zed: true });
             this.spawnParticles(target.x, 0.68, target.z, Renderer.colors.zedCrimson, 46, 0.94, 0.14);
-            this.music.effect("markPop");
+            this.sfx.effect("markPop");
             this.hitSkill(target, damage, owner, "Death Mark");
           }
         }
@@ -1974,7 +1980,7 @@
           this.slashes.push({ x: mark.x, z: mark.z, radius: mark.radius * 1.05, age: 0, life: 0.82, vladimir: true });
           this.spawnParticles(mark.x, 0.64, mark.z, Renderer.colors.vladimirCrimson, 58, 1.18, 0.15);
           this.renderer.addShock(mark.x, mark.z, 1.08);
-          this.music.effect("hemoplaguePop");
+          this.sfx.effect("hemoplaguePop");
         }
         this.vladimirMarks = this.vladimirMarks.filter((mark) => !mark.detonated);
       }
@@ -2110,7 +2116,7 @@
           }
         }
         this.renderer.addShock(bomb.x, bomb.z, 0.78 + bomb.range * 0.12);
-        this.music.explosion(clamp(0.7 + bomb.range * 0.08, 0.7, 1.12));
+        this.sfx.explosion(clamp(0.7 + bomb.range * 0.08, 0.7, 1.12));
         this.damageAtCells(cells, bomb);
       }
 
@@ -2132,7 +2138,7 @@
         if (player.shield > 0) {
           player.shield -= 1;
           player.invulnerable = 0.72;
-          this.music.effect("shield");
+          this.sfx.effect("shield");
           this.presentation.announce(`${player.name} shield shattered`);
           this.spawnParticles(player.x, 0.55, player.z, Renderer.colors.ice, 28, 0.8, 0.13);
           this.renderer.addShock(player.x, player.z, 0.45);
@@ -2142,7 +2148,7 @@
         player.health = 0;
         this.renderer.hitPulse = player.id === 1 ? 1.25 : 0.75;
         this.renderer.cameraShake = 0.82;
-        this.music.effect("hit");
+        this.sfx.effect("hit");
         this.spawnParticles(player.x, 0.58, player.z,
           player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 54, 1.1, 0.15);
         const owner = this.players.find((candidate) => candidate.id === bomb.ownerId);
@@ -2159,7 +2165,7 @@
         if (player.shield > 0) {
           player.shield -= 1;
           player.invulnerable = 0.48;
-          this.music.effect("shield");
+          this.sfx.effect("shield");
           this.presentation.announce(`${player.name} blocked ${label}`);
           this.spawnParticles(player.x, 0.55, player.z, Renderer.colors.ice, 26, 0.75, 0.12);
           this.renderer.addShock(player.x, player.z, 0.4);
@@ -2181,14 +2187,14 @@
         this.spawnParticles(player.x, 0.58, player.z,
           player.id === 1 ? Renderer.colors.blueSide : impactColor,
           label === "Death Lotus" ? 9 : 20, 0.58, 0.09);
-        if (!quiet) this.music.effect("bladeHit", label === "Voracity" ? 1.12 : 0.9);
+        if (!quiet) this.sfx.effect("bladeHit", label === "Voracity" ? 1.12 : 0.9);
 
         if (player.health <= 0) {
           player.alive = false;
           player.ultChannel = 0;
           this.renderer.hitPulse = player.id === 1 ? 1.25 : 0.82;
           this.renderer.cameraShake = 0.86;
-          this.music.effect("kill");
+          this.sfx.effect("kill");
           this.spawnParticles(player.x, 0.62, player.z,
             player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 58, 1.12, 0.15);
           this.presentation.announce(`${source?.name || "Katarina"} eliminated ${player.name} with ${label}`);
@@ -2273,7 +2279,7 @@
             player.skillsUnlocked[item.slot] = true;
             const skillName = item.label || this.skillSlotLabel(player, item.slot);
             this.presentation.announce(`${player.name} unlocked ${skillName}`);
-            this.music.effect("pickup");
+            this.sfx.effect("pickup");
             this.spawnParticles(item.x, 0.5, item.z,
               player.id === 1 ? Renderer.colors.gold : Renderer.colors.ember, 28, 0.95, 0.12);
             this.pickups.splice(i, 1);
@@ -2291,7 +2297,7 @@
             shield: "spell shield acquired"
           };
           this.presentation.announce(`${player.name} · ${labels[item.type]}`);
-          this.music.effect("pickup");
+          this.sfx.effect("pickup");
           this.spawnParticles(item.x, 0.5, item.z,
             player.id === 1 ? Renderer.colors.ice : Renderer.colors.ember, 24, 0.85, 0.11);
           this.pickups.splice(i, 1);
@@ -2394,7 +2400,7 @@
         if (this.mode !== "playing") return false;
         this.paused = typeof force === "boolean" ? force : !this.paused;
         this.presentation.setPaused(this.paused);
-        this.music.togglePause(this.paused);
+        this.sfx.togglePause(this.paused);
         this.presentation.announce(this.paused ? "Game paused" : "Game resumed");
         return this.paused;
       }

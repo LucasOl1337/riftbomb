@@ -49,6 +49,17 @@ const fixedConfigs = {
   vladimir: {
     displayName: "Vladimir",
     targetHeight: 2.08,
+    runtime: "vat-v1",
+    animations: [
+      { key: "idle", name: "vladimir_idle1", frameCount: 8, loop: true },
+      { key: "run", name: "vladimir_run", frameCount: 10, loop: true },
+      { key: "attack", name: "vladimir_attack1", frameCount: 6, loop: false },
+      { key: "q", name: "vladimir_spell1", frameCount: 8, loop: false },
+      { key: "poolDown", name: "vladimir_spell2_down", frameCount: 6, loop: false },
+      { key: "poolUp", name: "vladimir_spell2_up", frameCount: 6, loop: false },
+      { key: "e", name: "vladimir_spell3_cast", frameCount: 8, loop: false },
+      { key: "r", name: "vladimir_spell4", frameCount: 8, loop: false }
+    ],
     poses: [
       ["vladimir_idle1", 0.0], ["vladimir_idle1", 0.74],
       ["vladimir_run", 0.0], ["vladimir_run", 0.62],
@@ -220,6 +231,176 @@ const sampleSmoothNormals = (name, time) => {
   }
   return normals;
 };
+
+if (config.runtime === "vat-v1") {
+  const animationSpecs = config.animations.map((spec) => {
+    const actualName = resolveClipName(spec.name);
+    const clip = clips.get(actualName);
+    if (!clip) throw new Error(`Missing animation clip: ${spec.name}`);
+    return { ...spec, actualName, clip };
+  });
+  const referencePositions = samplePose(animationSpecs[0].name, 0);
+  let sourceHeight = 0;
+  for (const positions of referencePositions) {
+    for (let index = 1; index < positions.length; index += 3) {
+      sourceHeight = Math.max(sourceHeight, positions[index]);
+    }
+  }
+  const unitScale = config.targetHeight / Math.max(1e-4, sourceHeight);
+  const positionFrames = [];
+  const normalFrames = [];
+  const animationClips = {};
+
+  for (const spec of animationSpecs) {
+    const startFrame = positionFrames.length;
+    for (let frameIndex = 0; frameIndex < spec.frameCount; frameIndex += 1) {
+      const denominator = spec.loop ? spec.frameCount : Math.max(1, spec.frameCount - 1);
+      const sampleTime = spec.clip.duration * frameIndex / denominator;
+      const positions = samplePose(spec.name, sampleTime);
+      for (const meshPositions of positions) {
+        for (let index = 0; index < meshPositions.length; index += 1) {
+          meshPositions[index] *= unitScale;
+        }
+      }
+      positionFrames.push(positions);
+      normalFrames.push(sampleSmoothNormals(spec.name, sampleTime));
+    }
+    animationClips[spec.key] = {
+      source: spec.actualName,
+      startFrame,
+      frameCount: spec.frameCount,
+      duration: spec.clip.duration,
+      loop: spec.loop
+    };
+  }
+
+  const vertexCount = meshes.reduce(
+    (sum, mesh) => sum + mesh.geometry.attributes.position.count,
+    0
+  );
+  const indexCount = meshes.reduce((sum, mesh) => sum + mesh.geometry.index.count, 0);
+  if (vertexCount >= 65536) throw new Error("Model exceeds Uint16 index range");
+
+  const positionMin = [Infinity, Infinity, Infinity];
+  const positionMax = [-Infinity, -Infinity, -Infinity];
+  for (const frame of positionFrames) {
+    for (const meshPositions of frame) {
+      for (let index = 0; index < meshPositions.length; index += 3) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          positionMin[axis] = Math.min(positionMin[axis], meshPositions[index + axis]);
+          positionMax[axis] = Math.max(positionMax[axis], meshPositions[index + axis]);
+        }
+      }
+    }
+  }
+  const positionRange = positionMax.map((maximum, axis) =>
+    Math.max(1e-6, maximum - positionMin[axis])
+  );
+
+  const frameCount = positionFrames.length;
+  const quantizedPositions = new Uint16Array(frameCount * vertexCount * 4);
+  const quantizedNormals = new Uint8Array(frameCount * vertexCount * 4);
+  for (let frameIndex = 0; frameIndex < frameCount; frameIndex += 1) {
+    let frameVertexOffset = 0;
+    for (let meshIndex = 0; meshIndex < meshes.length; meshIndex += 1) {
+      const positions = positionFrames[frameIndex][meshIndex];
+      const normals = normalFrames[frameIndex][meshIndex];
+      const meshVertexCount = positions.length / 3;
+      for (let vertexIndex = 0; vertexIndex < meshVertexCount; vertexIndex += 1) {
+        const source = vertexIndex * 3;
+        const target = (frameIndex * vertexCount + frameVertexOffset + vertexIndex) * 4;
+        for (let axis = 0; axis < 3; axis += 1) {
+          const normalizedPosition = (positions[source + axis] - positionMin[axis]) /
+            positionRange[axis];
+          quantizedPositions[target + axis] = Math.round(
+            Math.max(0, Math.min(1, normalizedPosition)) * 65535
+          );
+          quantizedNormals[target + axis] = Math.round(
+            (Math.max(-1, Math.min(1, normals[source + axis])) * 0.5 + 0.5) * 255
+          );
+        }
+        quantizedPositions[target + 3] = 65535;
+        quantizedNormals[target + 3] = 255;
+      }
+      frameVertexOffset += meshVertexCount;
+    }
+  }
+
+  const vertices = new Float32Array(vertexCount * 2);
+  const indices = new Uint16Array(indexCount);
+  let vertexOffset = 0;
+  let indexOffset = 0;
+  for (const mesh of meshes) {
+    const uv = mesh.geometry.attributes.uv;
+    for (let vertexIndex = 0; vertexIndex < uv.count; vertexIndex += 1) {
+      const target = (vertexOffset + vertexIndex) * 2;
+      vertices[target] = uv.getX(vertexIndex);
+      vertices[target + 1] = config.invertUvV ? 1 - uv.getY(vertexIndex) : uv.getY(vertexIndex);
+    }
+    const sourceIndices = mesh.geometry.index.array;
+    for (let sourceIndex = 0; sourceIndex < sourceIndices.length; sourceIndex += 1) {
+      indices[indexOffset + sourceIndex] = sourceIndices[sourceIndex] + vertexOffset;
+    }
+    vertexOffset += uv.count;
+    indexOffset += sourceIndices.length;
+  }
+
+  const skeletonBoneCount = Math.max(...meshes.map((mesh) => mesh.skeleton.bones.length));
+  const animationDiagnostics = animationSpecs.map((spec) => ({
+    requestedName: spec.name,
+    actualName: spec.actualName,
+    duration: spec.clip.duration,
+    trackCount: spec.clip.tracks.length,
+    coverage: spec.clip.tracks.length / Math.max(1, skeletonBoneCount * 3)
+  }));
+  const source = config.sourceLabel ||
+    `Classic ${config.displayName} game mesh and matching base rig`;
+
+  await fs.mkdir(outputDirectory, { recursive: true });
+  await Promise.all([
+    fs.writeFile(
+      path.join(outputDirectory, `${champion}-model-vertices.bin`),
+      Buffer.from(vertices.buffer)
+    ),
+    fs.writeFile(
+      path.join(outputDirectory, `${champion}-model-indices.bin`),
+      Buffer.from(indices.buffer)
+    ),
+    fs.writeFile(
+      path.join(outputDirectory, `${champion}-model-frames.bin`),
+      Buffer.from(quantizedPositions.buffer)
+    ),
+    fs.writeFile(
+      path.join(outputDirectory, `${champion}-model-normals.bin`),
+      Buffer.from(quantizedNormals.buffer)
+    ),
+    fs.writeFile(path.join(outputDirectory, `${champion}-model-metadata.json`), JSON.stringify({
+      runtime: config.runtime,
+      source,
+      unitScale,
+      vertexCount,
+      indexCount,
+      strideFloats: 2,
+      frameCount,
+      textureDimensions: [vertexCount, frameCount],
+      positionBounds: { min: positionMin, max: positionMax, range: positionRange },
+      materials: meshes.map((mesh) => mesh.material?.name ?? "unknown"),
+      skeletonBoneCount,
+      animationDiagnostics,
+      animationClips
+    }, null, 2))
+  ]);
+
+  console.log(JSON.stringify({
+    champion,
+    runtime: config.runtime,
+    vertexCount,
+    indexCount,
+    frameCount,
+    animations: Object.keys(animationClips)
+  }, null, 2));
+  process.exit(0);
+}
 
 const posesByMesh = config.poses.map(([name, time]) => samplePose(name, time));
 let sourceHeight = 0;

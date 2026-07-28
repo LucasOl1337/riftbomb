@@ -579,147 +579,10 @@
       color: var(--line);
     }
 
-    .music-console {
-      position: absolute;
-      left: clamp(1rem, 2.5vw, 2.2rem);
-      bottom: clamp(1rem, 2.5vh, 1.65rem);
-      width: min(15.5rem, 20vw);
-      transform: none;
-      pointer-events: auto;
-      opacity: 0.92;
-    }
-
-    .music-shell {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      gap: 0.55rem;
-      align-items: center;
-      padding: 0.48rem 0.55rem 0.52rem;
-      border: 1px solid var(--line);
-      /* brutalist: 90° only */
-      background: var(--panel);
-      box-shadow: none;
-      /* brutalist: no translucency */
-    }
-
-    .album-glyph {
-      position: relative;
-      display: grid;
-      place-items: center;
-      width: 2.55rem;
-      aspect-ratio: 1;
-      overflow: hidden;
-      background:
-        var(--hazard);
-      /* brutalist: 90° only */
-      box-shadow: none;
-    }
-
-    .album-glyph::after {
-      content: "";
-      width: 0.95rem;
-      aspect-ratio: 1;
-      border: 2px solid white;
-      border-radius: 0;
-      box-shadow: none;
-    }
-
-    .track-main {
-      min-width: 0;
-    }
-
-    .track-heading {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.7rem;
-      align-items: baseline;
-    }
-
-    .track-heading strong {
-      overflow: hidden;
-      font-family: var(--display);
-      font-size: 0.68rem;
-      letter-spacing: 0.06em;
-      color: white;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .track-heading span {
-      color: var(--line);
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    .timeline {
-      position: relative;
-      height: 1.4rem;
-      margin-top: 0.4rem;
-      overflow: hidden;
-    }
-
-    .waveform {
-      display: grid;
-      grid-template-columns: repeat(48, 1fr);
-      align-items: center;
-      gap: 2px;
-      height: 100%;
-      opacity: 0.35;
-    }
-
-    .waveform i {
-      display: block;
-      height: calc(18% + var(--h) * 1%);
-      min-height: 2px;
-      background: var(--phosphor), var(--violet) calc(var(--h) * 1%));
-      transform-origin: center;
-      transition: transform 70ms linear;
-    }
-
-    .playhead {
-      position: absolute;
-      inset: 0 auto 0 0;
-      width: 2px;
-      background: white;
-      transform: translateX(calc(var(--progress, 0) * (100% - 2px)));
-      box-shadow: none;
-    }
-
-    .section-line {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 0.18rem;
-      color: var(--phosphor);
-    }
-
-    .beat-dots {
-      display: flex;
-      gap: 0.25rem;
-    }
-
-    .beat-dots i {
-      width: 0.3rem;
-      height: 0.3rem;
-      border-radius: 0;
-      background: var(--line);
-      transition: background 70ms linear, transform 70ms linear, box-shadow 70ms linear;
-    }
-
-    .beat-dots i.is-on {
-      transform: scale(1.55);
-      background: var(--gold);
-      box-shadow: none;
-    }
-
-    .transport {
-      display: flex;
-      gap: 0.35rem;
-    }
-
     .icon-button,
     .ability,
     .guide-button,
+    .pause-button,
     .primary,
     .secondary,
     .touch-key {
@@ -951,6 +814,32 @@
     .guide-button:hover {
       color: white;
       border-color: var(--line);
+    }
+
+    .pause-button {
+      position: absolute;
+      left: clamp(1rem, 2.5vw, 2.2rem);
+      bottom: clamp(2.9rem, 7vh, 3.8rem);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      min-height: 2.7rem;
+      padding: 0 0.9rem;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--phosphor);
+      transition: color 160ms ease, border-color 160ms ease;
+    }
+
+    .pause-button svg {
+      width: 1rem;
+      height: 1rem;
+      fill: currentColor;
+    }
+
+    .pause-button:hover {
+      color: white;
+      border-color: var(--hazard);
     }
 
     .event-feed {
@@ -1322,67 +1211,36 @@
     }
 
     .arena-mini {
-      display: grid;
-      grid-template-columns: repeat(13, 1fr);
-      grid-template-rows: repeat(11, 1fr);
-      gap: 1px;
-      aspect-ratio: 13 / 11;
-      width: 100%;
-      max-height: 5.5rem;
-      padding: 2px;
-      border: 1px solid var(--line);
-      background: #06110e;
-    }
-
-    .arena-mini i {
       display: block;
-      min-width: 0;
-      min-height: 0;
-      background: #0f2a22;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 360 / 178;
+      border: 0;
+      background: var(--void);
     }
 
-    .arena-mini i[data-t="1"] {
-      background: #6a7a82;
+    .arena-preview-shell {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--void);
     }
 
-    .arena-mini i[data-t="2"] {
-      background: #8a5a32;
+    .arena-preview-label {
+      position: absolute;
+      right: 0.35rem;
+      bottom: 0.28rem;
+      padding: 0.18rem 0.28rem;
+      border: 1px solid rgb(255 255 255 / 18%);
+      background: rgb(3 5 7 / 78%);
+      color: rgb(255 255 255 / 74%);
+      font-size: 0.39rem;
+      letter-spacing: 0.12em;
     }
 
-    .arena-mini i[data-t="s"] {
-      background: #2a9d8f;
+    .arena-choice[aria-checked="true"] .arena-preview-shell {
+      border-color: var(--hazard);
     }
-
-    /* Mini preview tint per arena theme */
-    .arena-mini[data-arena="lattice"] { background: #07090b; }
-    .arena-mini[data-arena="lattice"] i { background: #202524; }
-    .arena-mini[data-arena="lattice"] i[data-t="1"] { background: #4f5554; }
-    .arena-mini[data-arena="lattice"] i[data-t="2"] { background: #8a5a32; }
-    .arena-mini[data-arena="lattice"] i[data-t="s"] { background: #3ed6c5; }
-
-    .arena-mini[data-arena="clearing"] { background: #041014; }
-    .arena-mini[data-arena="clearing"] i { background: #0a292d; }
-    .arena-mini[data-arena="clearing"] i[data-t="1"] { background: #9eb6aa; }
-    .arena-mini[data-arena="clearing"] i[data-t="2"] { background: #8a5a32; }
-    .arena-mini[data-arena="clearing"] i[data-t="s"] { background: #4cced3; }
-
-    .arena-mini[data-arena="labyrinth"] { background: #070a0e; }
-    .arena-mini[data-arena="labyrinth"] i { background: #151b21; }
-    .arena-mini[data-arena="labyrinth"] i[data-t="1"] { background: #69747e; }
-    .arena-mini[data-arena="labyrinth"] i[data-t="2"] { background: #8a4a2b; }
-    .arena-mini[data-arena="labyrinth"] i[data-t="s"] { background: #52a9c9; }
-
-    .arena-mini[data-arena="forts"] { background: #07101d; }
-    .arena-mini[data-arena="forts"] i { background: #142a46; }
-    .arena-mini[data-arena="forts"] i[data-t="1"] { background: #b8b5aa; }
-    .arena-mini[data-arena="forts"] i[data-t="2"] { background: #8a5a32; }
-    .arena-mini[data-arena="forts"] i[data-t="s"] { background: #5ad0e6; }
-
-    .arena-mini[data-arena="pit"] { background: #050a13; }
-    .arena-mini[data-arena="pit"] i { background: #111f35; }
-    .arena-mini[data-arena="pit"] i[data-t="1"] { background: #9fa9b8; }
-    .arena-mini[data-arena="pit"] i[data-t="2"] { background: #7a4532; }
-    .arena-mini[data-arena="pit"] i[data-t="s"] { background: #c44972; }
 
     .arena-choice strong {
       font-family: var(--display);
@@ -1398,84 +1256,6 @@
       text-transform: uppercase;
       color: var(--line);
       line-height: 1.25;
-    }
-
-    .soundtrack-select {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(7.8rem, 1fr));
-      gap: 0.35rem;
-      margin-top: 0.85rem;
-      width: min(56rem, 100%);
-      max-width: none;
-      max-height: min(22vh, 11.5rem);
-      overflow-y: auto;
-      padding: 0.15rem 0.15rem 0.25rem;
-      margin-inline: auto;
-      scrollbar-width: thin;
-      scrollbar-color: var(--line) transparent;
-    }
-
-    .soundtrack-select > .micro {
-      grid-column: 1 / -1;
-      color: var(--line);
-      letter-spacing: 0.18em;
-    }
-
-    .soundtrack-choice {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.2rem;
-      min-height: 3.4rem;
-      padding: 0.65rem 0.85rem;
-      text-align: left;
-      border: 1px solid var(--line);
-      /* brutalist: 90° only */
-      background: var(--panel);
-      cursor: pointer;
-      transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, translate 160ms ease;
-    }
-
-    .soundtrack-choice:hover {
-      translate: none;
-      border-color: var(--line);
-    }
-
-    .soundtrack-choice[aria-checked="true"] {
-      border-color: var(--hazard);
-      background: var(--panel);
-      box-shadow: none;
-    }
-
-    .soundtrack-choice.is-loading {
-      opacity: 0.72;
-      pointer-events: none;
-    }
-
-    .soundtrack-choice.is-previewing {
-      border-color: var(--term);
-      box-shadow: none;
-    }
-
-    .soundtrack-choice.is-previewing strong::before {
-      content: "[ LIVE ] ";
-      color: var(--term);
-      font-size: 0.62em;
-      letter-spacing: 0.08em;
-    }
-
-    .soundtrack-choice strong {
-      font-family: var(--display);
-      font-size: 0.78rem;
-      letter-spacing: 0.04em;
-      color: white;
-    }
-
-    .soundtrack-choice small {
-      font: 600 0.5rem var(--data);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--line);
     }
 
     .intro-actions {
@@ -1736,7 +1516,6 @@
       .wave-ribbon { display: none; }
       .player-card { width: 11.5rem; transform: translateX(-18rem); }
       .system-stack { display: none; }
-      .music-console { width: min(14rem, 22vw); }
       .score { font-size: clamp(2rem, 8vw, 3.4rem); }
       .ability-dock {
         grid-template-columns: repeat(5, minmax(3.7rem, 4.1rem));
@@ -1781,20 +1560,6 @@
         padding: 0.4rem;
       }
 
-      .arena-mini {
-        max-height: 4.6rem;
-      }
-
-      .soundtrack-select {
-        width: 100%;
-        max-height: min(26vh, 12rem);
-      }
-
-      .soundtrack-choice {
-        min-height: 2.5rem;
-        padding: 0.4rem 0.5rem;
-      }
-
       .topbar {
         top: 0.75rem;
         left: 0.75rem;
@@ -1823,26 +1588,9 @@
       .score-stack { top: 4.5rem; left: 0.85rem; width: 8rem; }
       .score-meta { display: grid; gap: 0.18rem; }
       .boss-panel { top: 4.55rem; width: min(22rem, 62vw); }
-      .music-console {
-        left: 0.7rem;
-        right: 0.7rem;
-        bottom: 0.7rem;
-        width: auto;
-        transform: none;
-      }
-
-      .music-shell {
-        grid-template-columns: 2.1rem 1fr auto;
-        gap: 0.5rem;
-        padding: 0.48rem;
-      }
-
-      .album-glyph { width: 2.05rem; }
-      .timeline { height: 0.95rem; }
-      .section-line { display: none; }
-      .transport .icon-button { width: 2.15rem; }
       .ability-dock,
       .guide-button,
+      .pause-button,
       .minimap { display: none; }
       .event-feed { top: 16%; }
 
@@ -1934,8 +1682,6 @@
       .intro-lede { margin-top: 0.5rem; line-height: 1.4; }
       .champion-select { margin-top: 0.65rem; }
       .arena-select { margin-top: 0.6rem; }
-      .arena-mini { max-height: 4.2rem; }
-      .soundtrack-select { margin-top: 0.55rem; max-height: min(18vh, 9.5rem); }
       .intro-actions { margin-top: 0.55rem; padding-top: 0.55rem; }
       .intro-notes { margin-top: 0.45rem; }
       .score-stack { top: 4.7rem; }
@@ -1984,6 +1730,7 @@
       .icon-button,
       .ability,
       .guide-button,
+      .pause-button,
       .touch-key {
         border: 1px solid ButtonText;
       }

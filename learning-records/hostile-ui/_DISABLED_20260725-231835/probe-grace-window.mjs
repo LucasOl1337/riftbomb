@@ -53,10 +53,10 @@ const presentation = {
   finish: (w, scores) => events.push(["finish", w?.name, scores]),
   setPaused: () => {},
 };
-const music = { effect: () => {}, explosion: () => {}, togglePause: () => {} };
+const sfx = { effect: () => {}, explosion: () => {}, togglePause: () => {} };
 const renderer = { cameraShake: 0, hitPulse: 0, addShock: () => {} };
 
-const match = new context.Game(renderer, music, presentation);
+const match = new context.Game(renderer, sfx, presentation);
 match.start();
 // burn spawn invulnerability
 match.update(1.3);

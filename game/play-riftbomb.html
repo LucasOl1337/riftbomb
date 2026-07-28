@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0A0A0A">
-  <meta name="description" content="League of Legends: Riftbomb — an unofficial Katarina, Zed, Renekton, Vladimir and Ziggs Bomber PvP arena with champion kits, breakable blocks, power-ups, music, and WebGL effects in one HTML file.">
+  <meta name="description" content="League of Legends: Riftbomb — an unofficial Katarina, Zed, Renekton, Vladimir, Gangplank and Ziggs Bomber PvP arena with champion kits, breakable blocks, power-ups and WebGL effects.">
   <title>RIFTBOMB // UNIT D-01 — Champions PvP Bomber Arena</title>
   <link rel="stylesheet" href="./show-champion-duel.css">
 </head>
@@ -70,10 +70,6 @@
           <span class="micro">[ ARENA TEMPLATE ] · 5 layouts</span>
           <!-- Choices filled from Game.listArenas() at boot -->
         </div>
-        <div class="soundtrack-select" id="soundtrack-select" role="radiogroup" aria-label="Choose soundtrack style — click a track to preview">
-          <span class="micro">[ AUDIO BANK ] · click to preview</span>
-          <!-- Choices filled from MusicEngine.listStyles() at boot -->
-        </div>
         <div class="intro-actions">
           <button class="primary" id="start-game">>>> DEPLOY KATARINA</button>
           <button class="secondary" id="open-guide-intro">[ ARENA RULES ]</button>
@@ -85,14 +81,14 @@
           <span>Local PvP · adaptive CPU</span>
         </div>
         <p class="legal">
-          Unofficial, non-commercial fan prototype; not endorsed by Riot Games. League of Legends, Katarina, Zed, Renekton, Vladimir, Gangplank, Ziggs, Summoner’s Rift and related marks belong to Riot Games. Champion meshes, textures and animation data are derived from locally installed Riot game assets; code, arena geometry, visual systems, and synthesized audio are original to this prototype.
+          Unofficial, non-commercial fan prototype; not endorsed by Riot Games. League of Legends, Katarina, Zed, Renekton, Vladimir, Gangplank, Ziggs, Summoner’s Rift and related marks belong to Riot Games. Champion meshes, textures and animation data are derived from locally installed Riot game assets; code, arena geometry, visual systems, and procedural combat effects are original to this prototype.
         </p>
       </div>
     </section>
 
     <div class="chrome is-hidden" id="chrome" aria-hidden="true" inert>
       <header class="topbar">
-        <div class="brand" aria-label="Riftbomb Symphony">
+        <div class="brand" aria-label="Riftbomb Arena">
           <div class="brand-mark" aria-hidden="true"></div>
           <div class="brand-copy">
             <strong>RIFT BOMBER // ARENA</strong>
@@ -141,43 +137,13 @@
 
       <div class="system-stack micro" aria-hidden="true">
         <span id="gpu-label">WebGL2 · adaptive</span>
-        <span id="bpm-label">Real samples · cello · violin · piano · organ</span>
-        <span id="fx-label">Bloom · reactive</span>
+          <span id="bpm-label">Procedural combat SFX</span>
+          <span id="fx-label">Bloom · combat reactive</span>
       </div>
 
       <div class="event-feed" aria-hidden="true">
         <div class="event-kicker micro" id="event-kicker">Round incoming</div>
       </div>
-
-      <section class="music-console" aria-label="Soundtrack player">
-        <div class="music-shell">
-          <div class="album-glyph" aria-hidden="true"></div>
-          <div class="track-main">
-            <div class="track-heading">
-              <strong id="track-title">REAL STRINGS · SAMPLED</strong>
-              <span class="micro"><span id="track-time">00:00</span> / 04:00</span>
-            </div>
-            <div class="timeline" aria-hidden="true">
-              <div class="waveform" id="waveform"></div>
-              <i class="playhead" id="playhead"></i>
-            </div>
-            <div class="section-line micro">
-              <span id="music-section">Low strings</span>
-              <span class="beat-dots" id="beat-dots" aria-hidden="true">
-                <i></i><i></i><i></i><i></i>
-              </span>
-            </div>
-          </div>
-          <div class="transport">
-            <button class="icon-button" id="sound-toggle" aria-label="Mute soundtrack" aria-pressed="false">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4zm12.2 3a4.2 4.2 0 0 0-2.2-3.7v7.4a4.2 4.2 0 0 0 2.2-3.7zm-2.2-8v2.1a6.5 6.5 0 0 1 0 11.8V20a8.5 8.5 0 0 0 0-16z"/></svg>
-            </button>
-            <button class="icon-button" id="pause-toggle" aria-label="Pause game" aria-pressed="false">
-              <svg id="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
-            </button>
-          </div>
-        </div>
-      </section>
 
       <section class="ability-dock" id="ability-dock" aria-label="Katarina abilities">
         <button class="ability arena-bomb" id="arena-bomb-action" aria-label="Plant arena bomb. Space key.">
@@ -222,6 +188,10 @@
       </aside>
 
       <button class="guide-button micro" id="open-guide">H · Arena rules</button>
+      <button class="pause-button micro" id="pause-toggle" aria-label="Pause game" aria-pressed="false">
+        <svg id="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
+        P · Pause
+      </button>
     </div>
 
     <div class="touch-controls" id="touch-controls" aria-label="Touch controls">
@@ -279,8 +249,7 @@
           <dt>Ziggs · Q/Shift</dt><dd>Q plants a bomb and Left Shift triggers Satchel burst.</dd>
           <dt>P2 · Arrows</dt><dd>Move Red Ziggs. Enter or Numpad 0 plants a bomb; Right Shift triggers Satchel burst.</dd>
           <dt>Solo play</dt><dd>The CPU controls Red until Player 2 presses an arrow key or Enter.</dd>
-          <dt>M</dt><dd>Mute or restore the original soundtrack.</dd>
-          <dt>P</dt><dd>Pause the game and audio clock.</dd>
+          <dt>P</dt><dd>Pause a solo or local match.</dd>
           <dt>H</dt><dd>Open or close this guide.</dd>
         </dl>
       </section>
@@ -293,16 +262,6 @@
           <li>One blast can trigger another bomb. Every explosion—including your own—can eliminate you.</li>
           <li>Win three rounds before the rival. A double knockout replays the round without a point.</li>
         </ul>
-      </section>
-      <section class="guide-section wide">
-        <h3>The symphony system</h3>
-        <p>
-          The adaptive score plays <strong>real multipiano samples</strong> (cello, violin, piano,
-          organ, contrabass) from the tonejs-instruments collection (CC BY 3.0), not toy oscillators.
-          Arrangement is dark and slow (modal minor, ~68 BPM, rising with arena heat): cello ostinato
-          + low contrabass weight, sparse piano, organ pad, violin only as tension. Attribution lives
-          in <code>audio/ATTRIBUTION.md</code>. The same clock still drives bomb glow and bloom.
-        </p>
       </section>
       <section class="guide-section">
         <h3>Classic arena contract</h3>
@@ -349,8 +308,7 @@
   <script src="./load-playable-champion-models.js"></script>
   <script src="./load-arena-textures.js"></script>
   <script src="./draw-bomber-rift.js"></script>
-  <script src="./load-sample-bank-data.js"></script>
-  <script src="./play-rift-soundtrack.js"></script>
+  <script src="./play-rift-sfx.js"></script>
   <script src="./present-champion-bomb-duel.js"></script>
   <script src="./run-champion-bomb-duel.js"></script>
   <script src="./start-champion-duel.js"></script>

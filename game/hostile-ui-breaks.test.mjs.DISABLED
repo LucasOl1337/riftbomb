@@ -63,9 +63,9 @@ function makeMatch(Game) {
     finish() {},
     setPaused() {},
   };
-  const music = { effect() {}, explosion() {}, togglePause() {} };
+  const sfx = { effect() {}, explosion() {}, togglePause() {} };
   const renderer = { cameraShake: 0, hitPulse: 0, addShock() {} };
-  return new Game(renderer, music, presentation);
+  return new Game(renderer, sfx, presentation);
 }
 
 test("BREAK grace-window-steals-first-kill-win: first elimination must keep the round even if killer dies before lock", async () => {

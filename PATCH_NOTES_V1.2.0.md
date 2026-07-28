@@ -15,13 +15,13 @@ package, six measured performance rounds and the modular bot foundation.
   reduced-motion preferences.
 - Online matches keep independent champion selection and controls for both
   players, with no pause during PvP.
-- The host still chooses arena and soundtrack, including the no-music option;
-  the guest chooses a champion and confirms readiness.
+- The host chooses the arena; the guest chooses a champion and confirms
+  readiness.
 
 ## Speed
 
 - Initial download and parse-to-boot attempt: **2,052.7 ms → 87.7 ms**.
-- First soundtrack preview: **1,512.3 ms → 327.7 ms**.
+- The former 23 MB media bank is no longer part of the game.
 - Create room: **128.7 ms → 28.0 ms**.
 - Open room: **66.3 ms → 16.4 ms**.
 - Join room: **57.0 ms → 14.4 ms**.
@@ -31,7 +31,7 @@ package, six measured performance rounds and the modular bot foundation.
 ## Technical changes
 
 - Game parts load in parallel behind a dynamic, hashed manifest.
-- Soundtrack samples load per selected style and reuse the decoded cache.
+- Combat feedback uses lightweight procedural effects with no media bank.
 - Arena WebP materials stream separately from the initial game document.
 - Only the champion models selected for the match load.
 - D1 schema setup is cached per worker; expired-room cleanup runs only when a

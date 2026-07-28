@@ -1,64 +1,27 @@
 "use strict";
 
-    const formatTime = (seconds) => {
-      seconds = Math.max(0, Math.floor(seconds));
-      return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-    };
-
     let renderer;
-    let music;
+    let sfx;
     let game;
     let lastFrame = performance.now();
     let guidePausedGame = false;
 
-    function updateMusicUI() {
-      const position = music.position();
-      const progress = position / music.duration;
-      const beat = music.stepIndex % 4;
-      const bar = Math.floor(music.stepIndex / 16) % music.totalBars;
-      const section = music.sectionForBar(bar);
-      document.documentElement.style.setProperty("--beat", music.visualBeat().toFixed(3));
-      UI.playhead.style.setProperty("--progress", progress.toFixed(5));
-      UI.trackTime.textContent = formatTime(position);
-      UI.musicSection.textContent = section.name;
-      const style = music.styles[music.styleId] || music.styles.gravesong;
-      if (UI.trackTitle) {
-        UI.trackTitle.textContent = music.samplesReady
-          ? `${style.label.toUpperCase()} · ${Math.round(music.bpm)} BPM`
-          : `SYNTH · ${style.label.toUpperCase()} · ${Math.round(music.bpm)} BPM`;
-      }
-      if (UI.bpmLabel) {
-        UI.bpmLabel.textContent = music.samplesReady
-          ? `${style.label} · ${Math.round(music.bpm)} BPM · heat ${Math.round(music.heat * 100)}%`
-          : `No samples · ${style.label} · ${Math.round(music.bpm)} BPM`;
-      }
-      UI.beatDots.forEach((dot, i) => dot.classList.toggle("is-on", i === beat));
-      const bars = UI.waveform.children;
-      const energy = music.energy;
-      for (let i = 0; i < bars.length; i++) {
-        const pulse = 1 + energy * (0.25 + ((i * 13) % 11) / 10) * 0.9;
-        bars[i].style.transform = `scaleY(${pulse.toFixed(2)})`;
-      }
-      UI.fxLabel.textContent = `Bloom · ${Math.round(energy * 100)}%`;
-    }
-
     function frame(now) {
       const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
       lastFrame = now;
-      music.syncFromGame(game, dt);
-      music.updateEnergy();
       game.update(dt);
-      renderer.render(game, music, dt, now);
-      updateMusicUI();
+      sfx.update(game, dt);
+      renderer.render(game, sfx, dt, now);
+      document.documentElement.style.setProperty("--beat", sfx.visualPulse().toFixed(3));
+      UI.fxLabel.textContent = `Bloom · ${Math.round(sfx.intensity * 100)}%`;
       requestAnimationFrame(frame);
     }
 
     async function beginGame() {
       UI.start.disabled = true;
-      const alreadyAudible = Boolean(music.ctx);
-      UI.start.textContent = alreadyAudible ? "Starting match…" : "Loading selected arena…";
+      UI.start.textContent = "Loading selected arena…";
       const assetResults = await Promise.allSettled([
-        music.start(),
+        sfx.start(),
         renderer.ensureChampionModels(game.players.map((player) => player.champion)),
         renderer.arenaTexturesReady
       ]);
@@ -67,7 +30,7 @@
           console.warn("A match asset could not fully load:", result.reason);
         }
       }
-      UI.start.textContent = music.samplesReady ? "Samples ready" : "Synth fallback";
+      UI.start.textContent = "Arena ready";
       game.start();
       UI.intro.classList.add("is-gone");
       UI.chrome.classList.remove("is-hidden");
@@ -99,9 +62,14 @@
           if (event.code === "KeyH") closeGuide();
           return;
         }
-        const gameKeys = ["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyF", "KeyE", "KeyR", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter", "Numpad0", "ShiftLeft", "ShiftRight"];
+        const gameKeys = [
+          "KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyF", "KeyE", "KeyR",
+          "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter",
+          "Numpad0", "ShiftLeft", "ShiftRight"
+        ];
         if (gameKeys.includes(event.code) && game.mode === "playing") event.preventDefault();
-        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Numpad0", "ShiftRight"].includes(event.code) && game.mode === "playing") {
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Numpad0", "ShiftRight"].includes(event.code)
+          && game.mode === "playing") {
           game.activatePlayerTwo();
         }
         game.keys.add(event.code);
@@ -114,7 +82,6 @@
         else if (event.code === "ShiftLeft") game.castAbility(1);
         else if (event.code === "Enter" || event.code === "Numpad0") game.placeBomb(game.players[1]);
         else if (event.code === "ShiftRight") game.requestDash(game.players[1]);
-        else if (event.code === "KeyM") toggleSound();
         else if (event.code === "KeyP") game.togglePause();
         else if (event.code === "KeyH") openGuide();
       });
@@ -159,31 +126,148 @@
       });
     }
 
-    function toggleSound() {
-      const muted = music.toggleMute();
-      UI.sound.setAttribute("aria-pressed", String(muted));
-      UI.sound.setAttribute("aria-label", muted ? "Restore soundtrack" : "Mute soundtrack");
-      UI.sound.style.color = muted ? "var(--ember)" : "";
-      UI.live.textContent = muted ? "Soundtrack muted" : "Soundtrack restored";
+    const arenaPreviewTextures = new Map();
+
+    function loadArenaPreviewTexture(source) {
+      if (!source) return Promise.resolve(null);
+      if (!arenaPreviewTextures.has(source)) {
+        arenaPreviewTextures.set(source, new Promise((resolve) => {
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = () => resolve(image);
+          image.onerror = () => resolve(null);
+          image.src = source;
+        }));
+      }
+      return arenaPreviewTextures.get(source);
     }
 
-    function paintArenaMini(host, grid, arenaId) {
-      host.replaceChildren();
+    function fillPolygon(context, points, fill, texture = null, alpha = 1) {
+      context.save();
+      context.beginPath();
+      context.moveTo(points[0][0], points[0][1]);
+      for (let index = 1; index < points.length; index++) {
+        context.lineTo(points[index][0], points[index][1]);
+      }
+      context.closePath();
+      context.fillStyle = fill;
+      context.fill();
+      if (texture) {
+        const pattern = context.createPattern(texture, "repeat");
+        if (pattern) {
+          context.globalAlpha = alpha;
+          context.fillStyle = pattern;
+          context.fill();
+        }
+      }
+      context.restore();
+    }
+
+    async function paintArenaPreview(canvas, grid, arena) {
+      const theme = game.arenaTemplate(arena.id).theme;
+      const sources = {
+        floor: ARENA_TEXTURES[theme.floor],
+        wall: ARENA_TEXTURES[theme.wall],
+        wallTop: ARENA_TEXTURES[theme.wallTop],
+        crate: ARENA_TEXTURES.crate,
+        crateTop: ARENA_TEXTURES.crateTop
+      };
+      const textureEntries = await Promise.all(
+        Object.entries(sources).map(async ([key, source]) => [key, await loadArenaPreviewTexture(source)])
+      );
+      if (!canvas.isConnected) return;
+      const textures = Object.fromEntries(textureEntries);
+      const dpr = Math.min(devicePixelRatio || 1, 2);
+      const width = 360;
+      const height = 178;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      const context = canvas.getContext("2d");
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.imageSmoothingEnabled = true;
+
+      const backdrop = context.createLinearGradient(0, 0, 0, height);
+      backdrop.addColorStop(0, theme.clear);
+      backdrop.addColorStop(1, theme.base);
+      context.fillStyle = backdrop;
+      context.fillRect(0, 0, width, height);
+
+      const halfW = 10.8;
+      const halfH = 5.25;
+      const originX = width / 2;
+      const originY = 16;
       const safe = new Set([
         `${grid.length - 2},1`, `${grid.length - 3},1`, `${grid.length - 2},2`,
         `1,${grid[0].length - 2}`, `2,${grid[0].length - 2}`, `1,${grid[0].length - 3}`
       ]);
-      host.dataset.arena = arenaId || "";
+      const diamond = (x, y) => [
+        [x, y - halfH],
+        [x + halfW, y],
+        [x, y + halfH],
+        [x - halfW, y]
+      ];
+
       for (let r = 0; r < grid.length; r++) {
         for (let c = 0; c < grid[r].length; c++) {
-          const cell = document.createElement("i");
-          const key = `${r},${c}`;
-          if (safe.has(key)) cell.dataset.t = "s";
-          else if (grid[r][c] === 1) cell.dataset.t = "1";
-          else if (grid[r][c] === 2) cell.dataset.t = "2";
-          host.appendChild(cell);
+          const x = originX + (c - r) * halfW;
+          const y = originY + (c + r) * halfH;
+          fillPolygon(context, diamond(x, y), theme.floorB, textures.floor, 0.78);
+          if (safe.has(`${r},${c}`)) {
+            const glow = context.createRadialGradient(x, y, 0, x, y, halfW * 1.15);
+            glow.addColorStop(0, `${theme.crystal}e6`);
+            glow.addColorStop(0.5, `${theme.crystal}55`);
+            glow.addColorStop(1, `${theme.crystal}00`);
+            context.fillStyle = glow;
+            context.beginPath();
+            context.ellipse(x, y, halfW * 1.25, halfH * 1.55, 0, 0, Math.PI * 2);
+            context.fill();
+          }
         }
       }
+
+      for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          const type = grid[r][c];
+          if (!type) continue;
+          const x = originX + (c - r) * halfW;
+          const y = originY + (c + r) * halfH;
+          const rise = type === 1 ? 12.5 : 9.2;
+          const top = diamond(x, y - rise);
+          const base = diamond(x, y);
+          const side = type === 1 ? theme.stone : "#59331e";
+          const sideTexture = type === 1 ? textures.wall : textures.crate;
+          const topTexture = type === 1 ? textures.wallTop : textures.crateTop;
+          fillPolygon(context, [top[3], top[2], base[2], base[3]], side, sideTexture, 0.72);
+          fillPolygon(context, [top[1], top[2], base[2], base[1]], theme.base, sideTexture, 0.58);
+          fillPolygon(context, top, type === 1 ? theme.stoneTop : "#9b6337", topTexture, 0.86);
+          context.strokeStyle = type === 1 ? `${theme.crystal}38` : "#d49a5b45";
+          context.lineWidth = 0.6;
+          context.beginPath();
+          context.moveTo(top[0][0], top[0][1]);
+          for (let index = 1; index < top.length; index++) context.lineTo(top[index][0], top[index][1]);
+          context.closePath();
+          context.stroke();
+        }
+      }
+
+      const shade = context.createLinearGradient(0, 0, width, height);
+      shade.addColorStop(0, "rgb(0 0 0 / 34%)");
+      shade.addColorStop(0.5, "rgb(0 0 0 / 0%)");
+      shade.addColorStop(1, "rgb(0 0 0 / 44%)");
+      context.fillStyle = shade;
+      context.fillRect(0, 0, width, height);
+      context.strokeStyle = `${theme.crystal}70`;
+      context.lineWidth = 1;
+      context.strokeRect(0.5, 0.5, width - 1, height - 1);
+    }
+
+    function createArenaPreview(grid, arena) {
+      const canvas = document.createElement("canvas");
+      canvas.className = "arena-mini";
+      canvas.dataset.arena = arena.id;
+      canvas.setAttribute("aria-hidden", "true");
+      void paintArenaPreview(canvas, grid, arena);
+      return canvas;
     }
 
     function buildArenaPicker() {
@@ -191,7 +275,7 @@
       if (!host || !game) return;
       const heading = document.createElement("span");
       heading.className = "micro";
-      heading.textContent = `[ ARENA TEMPLATE ] · ${game.listArenas().length} layouts`;
+      heading.textContent = `[ ARENAS ] · ${game.listArenas().length} real previews`;
       host.replaceChildren(heading);
       game.listArenas().forEach((arena) => {
         const button = document.createElement("button");
@@ -201,15 +285,18 @@
         button.setAttribute("role", "radio");
         button.setAttribute("aria-checked", String(arena.id === game.selectedArena));
         button.title = arena.blurb;
-        const mini = document.createElement("div");
-        mini.className = "arena-mini";
-        mini.setAttribute("aria-hidden", "true");
-        paintArenaMini(mini, game.previewGrid(arena.id), arena.id);
+        const previewShell = document.createElement("div");
+        previewShell.className = "arena-preview-shell";
+        const previewLabel = document.createElement("span");
+        previewLabel.className = "arena-preview-label micro";
+        previewLabel.textContent = "REAL ARENA VIEW";
+        previewLabel.setAttribute("aria-hidden", "true");
+        previewShell.append(createArenaPreview(game.previewGrid(arena.id), arena), previewLabel);
         const title = document.createElement("strong");
         title.textContent = arena.label;
         const blurb = document.createElement("small");
         blurb.textContent = arena.blurb;
-        button.append(mini, title, blurb);
+        button.append(previewShell, title, blurb);
         button.addEventListener("click", () => {
           game.selectArena(arena.id);
           UI.arenaChoices.forEach((choice) => {
@@ -223,80 +310,23 @@
       UI.arenaChoices = [...host.querySelectorAll(".arena-choice")];
     }
 
-    function buildSoundtrackPicker() {
-      const host = document.getElementById("soundtrack-select") || document.querySelector(".soundtrack-select");
-      if (!host || !music) return;
-      const heading = document.createElement("span");
-      heading.className = "micro";
-      heading.textContent = `[ AUDIO BANK ] · ${music.listStyles().length} styles · click to preview`;
-      host.replaceChildren(heading);
-      let previewToken = 0;
-      music.listStyles().forEach((style, index) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "soundtrack-choice";
-        button.dataset.style = style.id;
-        button.setAttribute("role", "radio");
-        button.setAttribute("aria-checked", String(style.id === music.styleId || (index === 0 && !music.styleId)));
-        button.title = `Preview ${style.label}`;
-        const title = document.createElement("strong");
-        title.textContent = style.label;
-        const blurb = document.createElement("small");
-        blurb.textContent = style.blurb;
-        button.append(title, blurb);
-        button.addEventListener("click", async () => {
-          const token = ++previewToken;
-          UI.soundtrackChoices.forEach((choice) => {
-            const selected = choice.dataset.style === style.id;
-            choice.setAttribute("aria-checked", String(selected));
-            choice.classList.toggle("is-loading", selected);
-            choice.classList.remove("is-previewing");
-          });
-          heading.textContent = `Loading preview · ${style.label}…`;
-          UI.live.textContent = `Loading soundtrack preview: ${style.label}`;
-          try {
-            const applied = await music.previewStyle(style.id);
-            if (token !== previewToken) return;
-            UI.soundtrackChoices.forEach((choice) => {
-              const selected = choice.dataset.style === style.id;
-              choice.classList.toggle("is-loading", false);
-              choice.classList.toggle("is-previewing", selected);
-            });
-            heading.textContent = `[ LIVE ] ${applied.label.toUpperCase()}`;
-            if (UI.trackTitle) {
-              UI.trackTitle.textContent = `${applied.label.toUpperCase()} · ${Math.round(music.bpm)} BPM`;
-            }
-            if (UI.bpmLabel) {
-              UI.bpmLabel.textContent = `${applied.label} · ${applied.blurb}`;
-            }
-            if (UI.musicSection) UI.musicSection.textContent = applied.sections[0].name;
-            UI.live.textContent = `Previewing ${applied.label}. Click Play to start the match with this track.`;
-            if (UI.sound) {
-              UI.sound.setAttribute("aria-pressed", "false");
-              UI.sound.setAttribute("aria-label", "Mute soundtrack");
-              UI.sound.style.color = "";
-            }
-          } catch (error) {
-            if (token !== previewToken) return;
-            console.warn("Soundtrack preview failed:", error);
-            UI.soundtrackChoices.forEach((choice) => {
-              choice.classList.remove("is-loading", "is-previewing");
-            });
-            heading.textContent = `[ AUDIO BANK ] · ${music.listStyles().length} styles · click to preview`;
-            music.setStyle(style.id);
-            UI.live.textContent = `Selected ${style.label} (preview unavailable — will play on start).`;
-          }
-        });
-        host.appendChild(button);
-      });
-      UI.soundtrackChoices = [...host.querySelectorAll(".soundtrack-choice")];
-    }
-
     function boot() {
+      sfx = new SfxEngine();
+      const previewRenderer = {
+        cameraShake: 0,
+        hitPulse: 0,
+        addShock() {},
+        ensureChampionModel() { return Promise.resolve(); },
+        ensureChampionModels() { return Promise.resolve(); }
+      };
+      game = new Game(previewRenderer, sfx, new BrowserMatchPresentation());
+      buildArenaPicker();
+      UI.championChoices.forEach((button) =>
+        button.addEventListener("click", () => game.selectChampion(button.dataset.champion))
+      );
       try {
-        music = new MusicEngine();
         renderer = new Renderer(UI.canvas);
-        game = new Game(renderer, music, new BrowserMatchPresentation());
+        game.renderer = renderer;
         const embeddedModels = game.players
           .map((player) => player.champion)
           .filter((champion) => PLAYABLE_CHAMPIONS[champion]);
@@ -329,11 +359,6 @@
         }
         UI.gpuLabel.textContent = `WebGL2 · ${renderer.ext ? "HDR" : "adaptive"}`;
         setupInput();
-        UI.championChoices.forEach((button) =>
-          button.addEventListener("click", () => game.selectChampion(button.dataset.champion))
-        );
-        buildArenaPicker();
-        buildSoundtrackPicker();
         UI.start.addEventListener("click", beginGame);
         UI.restart.addEventListener("click", () => {
           UI.end.hidden = true;
@@ -349,7 +374,6 @@
           event.preventDefault();
           closeGuide();
         });
-        UI.sound.addEventListener("click", toggleSound);
         UI.pause.addEventListener("click", () => game.togglePause());
         UI.arenaBombAction.addEventListener("click", () => game.placeBomb());
         UI.bombAction.addEventListener("click", () => game.castAbility(0));

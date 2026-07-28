@@ -34,7 +34,7 @@ procedural motifs and palettes.
   movement grid.
 - Arena atmosphere is disabled automatically when dynamic resolution falls
   below the medium tier.
-- `prefers-reduced-motion` removes musical pulsing and freezes ambient motion.
+- `prefers-reduced-motion` removes rhythmic pulsing and freezes ambient motion.
 - Gameplay bloom, hit shockwaves and blast colors remain neutral and
   independent from the selected biome.
 

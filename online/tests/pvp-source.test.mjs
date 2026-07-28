@@ -26,8 +26,6 @@ test("loads the online duel layer into the reconstructed game", async () => {
   assert.match(packager, /riftbomb\.html/);
   assert.match(packager, /PART_SIZE/);
   assert.match(packager, /manifest\.json/);
-  assert.match(packager, /RIFTBOMB_SAMPLE_MANIFEST/);
-  assert.match(packager, /audioOutputDirectory/);
   assert.match(packager, /arenaTextureOutputDirectory/);
   assert.match(packager, /championModelOutputDirectory/);
   assert.doesNotMatch(page, /<script>[\s\S]*<\/script>/);
@@ -52,25 +50,6 @@ test("packages every web part behind a self-consistent dynamic manifest", async 
     createHash("sha256").update(artifact).digest("hex"),
     manifest.sha256,
   );
-});
-
-test("keeps the real sample bank out of the initial online payload", async () => {
-  const directory = new URL("public/riftbomb-parts/", root);
-  const names = (await readdir(directory))
-    .filter((name) => /^part-\d+$/.test(name))
-    .sort();
-  const parts = await Promise.all(
-    names.map((name) => readFile(new URL(name, directory), "utf8")),
-  );
-  const game = parts.join("");
-
-  assert.equal(names.length, 1);
-  assert.doesNotMatch(game, /RIFTBOMB_SAMPLE_BANK\s*=/);
-  assert.match(game, /RIFTBOMB_SAMPLE_MANIFEST\s*=/);
-  assert.match(game, /fetchAndDecodeSample/);
-
-  const sample = await readFile(new URL("public/audio/cello/C2.ogg", root));
-  assert.equal(sample.subarray(0, 4).toString("ascii"), "OggS");
 });
 
 test("keeps arena WebP files out of the initial online payload", async () => {
@@ -152,12 +131,30 @@ test("loads only the playable champion models selected in the lobby", async () =
     const texture = await readFile(
       new URL(`${modelDirectory}/${champion}-model-texture.webp`, root),
     );
+    const metadata = JSON.parse(
+      await readFile(
+        new URL(`${modelDirectory}/${champion}-model-metadata.json`, root),
+        "utf8",
+      ),
+    );
     assert.deepEqual(Buffer.from(payload.vertices, "base64"), vertices);
     assert.deepEqual(Buffer.from(payload.indices, "base64"), indices);
     assert.deepEqual(
       Buffer.from(payload.texture.replace(/^data:image\/webp;base64,/, ""), "base64"),
       texture,
     );
+    if (metadata.runtime === "vat-v1") {
+      const frames = await readFile(
+        new URL(`${modelDirectory}/${champion}-model-frames.bin`, root),
+      );
+      const normals = await readFile(
+        new URL(`${modelDirectory}/${champion}-model-normals.bin`, root),
+      );
+      assert.deepEqual(Buffer.from(payload.frames, "base64"), frames);
+      assert.deepEqual(Buffer.from(payload.normals, "base64"), normals);
+      assert.equal(payload.animation.runtime, "vat-v1");
+      assert.equal(payload.animation.frameCount, metadata.frameCount);
+    }
   }
 });
 

@@ -24,5 +24,18 @@ test("the packaged catalog comes from each champion playable model", async () =>
       const bytes = await readFile(path.join(modelDirectory, `${champion}-model-${artifact}`));
       assert.ok(catalog.includes(bytes.toString("base64")), `${champion} ${artifact} must feed the catalog`);
     }
+    const metadata = JSON.parse(
+      await readFile(path.join(modelDirectory, `${champion}-model-metadata.json`), "utf8")
+    );
+    if (metadata.runtime === "vat-v1") {
+      for (const artifact of ["frames.bin", "normals.bin"]) {
+        const bytes = await readFile(path.join(modelDirectory, `${champion}-model-${artifact}`));
+        assert.ok(
+          catalog.includes(bytes.toString("base64")),
+          `${champion} ${artifact} must feed the animated catalog`
+        );
+      }
+      assert.match(catalog, new RegExp(`"frameCount":${metadata.frameCount}`));
+    }
   }
 });

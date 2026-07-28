@@ -200,15 +200,8 @@
 .online-connection[data-state="connected"]::before { background: #56e6b1; }
 .online-connection[data-state="disconnected"]::before { background: #ff6b5b; }
 
-.soundtrack-choice--silent { border-color: rgb(243 207 112 / 48%) !important; }
-.soundtrack-choice--silent[aria-checked="true"] {
-  color: #fff3b8;
-  background: rgb(243 207 112 / 11%);
-}
-
 body.is-online-match #pause-toggle { display: none !important; }
 body.is-online-match .arena-choice,
-body.is-online-match .soundtrack-choice,
 body.is-online-match .champion-choice { touch-action: manipulation; }
 
 @media (max-width: 720px) {

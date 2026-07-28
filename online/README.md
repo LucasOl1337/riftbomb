@@ -6,7 +6,7 @@ Aplicação hospedável do Riftbomb com partidas PvP entre dois navegadores.
 
 - o host cria um lobby e compartilha o código;
 - cada jogador escolhe o próprio campeão;
-- o host escolhe arena e trilha, inclusive sem música;
+- o host escolhe a arena;
 - o convidado confirma `READY`;
 - a partida online não pode ser pausada;
 - o host mantém a simulação autoritativa;

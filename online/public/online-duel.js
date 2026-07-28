@@ -1,7 +1,7 @@
 "use strict";
 
 (() => {
-  if (typeof game === "undefined" || typeof UI === "undefined" || typeof music === "undefined") return;
+  if (typeof game === "undefined" || typeof UI === "undefined") return;
 
   const SIGNALING_URL = "/api/pvp";
   const ICE_SERVERS = [
@@ -46,8 +46,6 @@
     hostChampion: game.selectedChampion,
     guestChampion: "ziggs",
     arena: game.selectedArena,
-    musicStyle: music.styleId || "gravesong",
-    musicEnabled: true,
     guestRound: 0,
     guestMode: "intro"
   };
@@ -91,7 +89,7 @@
         </article>
       </div>
       <div class="online-ready-row">
-        <span class="micro" id="online-role-help">Admin chooses arena and soundtrack.</span>
+        <span class="micro" id="online-role-help">Admin chooses the arena.</span>
         <button type="button" id="online-ready" hidden>I'M READY</button>
       </div>
     </div>
@@ -160,17 +158,6 @@
     );
   }
 
-  function setSoundtrackButtons(style, enabled) {
-    UI.soundtrackChoices.forEach((button) => {
-      const selected = enabled && button.dataset.style === style;
-      button.setAttribute("aria-checked", String(selected));
-      button.classList.toggle("is-previewing", selected);
-      button.classList.remove("is-loading");
-    });
-    document.querySelector(".soundtrack-choice[data-style='none']")
-      ?.setAttribute("aria-checked", String(!enabled));
-  }
-
   function updateLobbyDisplay() {
     hostChampionLabel.textContent = championName(state.hostChampion);
     guestChampionLabel.textContent = championName(state.guestChampion);
@@ -200,24 +187,7 @@
     readyButton.hidden = role !== "guest";
     roleHelp.textContent = role === "guest"
       ? "Choose your champion, then confirm READY."
-      : "Admin chooses champion, arena and soundtrack.";
-  }
-
-  function applyMusicState() {
-    if (state.musicEnabled) {
-      music.setStyle(state.musicStyle);
-      if (music.musicBus && music.ctx) {
-        music.musicBus.gain.cancelScheduledValues(music.ctx.currentTime);
-        music.musicBus.gain.setTargetAtTime(music.musicLevel, music.ctx.currentTime, 0.04);
-      }
-    } else {
-      music.cutMusicVoices?.();
-      if (music.musicBus && music.ctx) {
-        music.musicBus.gain.cancelScheduledValues(music.ctx.currentTime);
-        music.musicBus.gain.setTargetAtTime(0, music.ctx.currentTime, 0.025);
-      }
-    }
-    setSoundtrackButtons(state.musicStyle, state.musicEnabled);
+      : "Admin chooses their champion and the arena.";
   }
 
   function applyMatchConfig() {
@@ -227,21 +197,13 @@
       game.selectArena(state.arena);
       game.resetPlayers();
     }
-    applyMusicState();
   }
 
   async function beginConfiguredGame() {
     applyMatchConfig();
-    const musicStart = music.start;
-    if (!state.musicEnabled && !music.ctx) music.start = async () => {};
-    try {
-      await originalBeginGame();
-    } finally {
-      music.start = musicStart;
-    }
+    await originalBeginGame();
     game.paused = false;
     game.p2Human = true;
-    applyMusicState();
   }
 
   async function signaling(method, data, query = "") {
@@ -390,8 +352,6 @@
       hostChampion: state.hostChampion,
       guestChampion: state.guestChampion,
       arena: state.arena,
-      musicStyle: state.musicStyle,
-      musicEnabled: state.musicEnabled,
       guestReady: state.guestReady
     };
   }
@@ -405,8 +365,6 @@
     if (validChampion(message.hostChampion)) state.hostChampion = message.hostChampion;
     if (validChampion(message.guestChampion)) state.guestChampion = message.guestChampion;
     if (typeof message.arena === "string") state.arena = message.arena;
-    if (typeof message.musicStyle === "string") state.musicStyle = message.musicStyle;
-    state.musicEnabled = message.musicEnabled !== false;
     state.guestReady = Boolean(message.guestReady);
     void renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
     if (game.mode === "intro") {
@@ -417,7 +375,6 @@
     }
     setChampionButtons(state.role === "guest" ? state.guestChampion : state.hostChampion);
     setArenaButtons(state.arena);
-    setSoundtrackButtons(state.musicStyle, state.musicEnabled);
     updateLobbyDisplay();
   }
 
@@ -527,7 +484,7 @@
       if (game.paused) {
         game.paused = false;
         game.presentation.setPaused(false);
-        music.togglePause(false);
+        sfx.togglePause(false);
       }
       game.presentation.announce("Online matches cannot be paused");
       return false;
@@ -569,8 +526,6 @@
     state.hostChampion = game.selectedChampion;
     state.guestChampion = "ziggs";
     state.arena = game.selectedArena;
-    state.musicStyle = music.styleId || "gravesong";
-    state.musicEnabled = true;
     setBusy(true);
     roomLabel.textContent = "LOBBY CODE · SEND TO PLAYER 2";
     roomCode.textContent = "------";
@@ -589,7 +544,7 @@
       state.roomCode = room.code;
       state.hostToken = room.hostToken;
       roomCode.textContent = room.code;
-      setStatus("Lobby created. Choose champion, arena and music while Player 2 joins.", "ok");
+      setStatus("Lobby created. Choose your champion and arena while Player 2 joins.", "ok");
       updateConnection("waiting", `ONLINE · LOBBY ${room.code} · WAITING FOR PLAYER 2`);
       updateLobbyDisplay();
       pollForAnswer();
@@ -841,49 +796,6 @@
     });
   });
 
-  function ensureNoMusicChoice() {
-    const host = document.getElementById("soundtrack-select") || document.querySelector(".soundtrack-select");
-    if (!host || host.querySelector("[data-style='none']")) return;
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "soundtrack-choice soundtrack-choice--silent";
-    button.dataset.style = "none";
-    button.setAttribute("role", "radio");
-    button.setAttribute("aria-checked", "false");
-    button.innerHTML = "<strong>NO MUSIC</strong><small>Soundtrack disabled · fastest load</small>";
-    host.appendChild(button);
-    UI.soundtrackChoices = [...host.querySelectorAll(".soundtrack-choice")];
-    button.addEventListener("click", (event) => {
-      if (state.role === "guest") {
-        event.preventDefault(); event.stopImmediatePropagation();
-        return setStatus("Only the lobby admin chooses the soundtrack.", "error");
-      }
-      state.musicEnabled = false;
-      state.guestReady = false;
-      applyMusicState();
-      updateLobbyDisplay();
-      if (state.role === "host") sendLobby();
-      setStatus("No music selected. The match will load faster.", "ok");
-    }, true);
-  }
-
-  ensureNoMusicChoice();
-  UI.soundtrackChoices.forEach((button) => {
-    if (button.dataset.style === "none") return;
-    button.addEventListener("click", (event) => {
-      if (state.role !== "guest") return;
-      event.preventDefault(); event.stopImmediatePropagation();
-      setStatus("Only the lobby admin chooses the soundtrack.", "error");
-    }, true);
-    button.addEventListener("click", () => {
-      if (state.role !== "host") return;
-      state.musicStyle = button.dataset.style;
-      state.musicEnabled = true;
-      state.guestReady = false;
-      setTimeout(() => { applyMusicState(); updateLobbyDisplay(); sendLobby(); });
-    });
-  });
-
   readyButton.addEventListener("click", () => {
     if (state.role !== "guest" || !state.connected) return;
     state.guestReady = !state.guestReady;
@@ -933,7 +845,7 @@
   }
 
   document.querySelector(".intro-lede").textContent =
-    "Create a lightweight lobby, choose champion, arena and soundtrack, then duel online without pause.";
+    "Create a lightweight lobby, choose champion and arena, then duel online without pause.";
   const feature = [...document.querySelectorAll(".intro-notes span")]
     .find((item) => item.textContent.includes("Local PvP") || item.textContent.includes("Online PvP"));
   if (feature) feature.textContent = "Online PvP · independent controls";

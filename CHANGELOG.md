@@ -14,17 +14,21 @@
   snapshot isolation for live blast and pickup objects.
 - Added complete player-facing release notes in
   [`PATCH_NOTES_V1.2.0.md`](PATCH_NOTES_V1.2.0.md).
+- Removed the selectable score, its media bank, lobby fields and runtime
+  implementation.
+- Replaced the flat arena thumbnails with isometric previews built from each
+  arena's real layout and authored materials.
 
 ## 2026-07-27
 
 ### Performance
 
 - Parallelized the ten-part online game download (`0a82390`).
-- Deferred the online soundtrack bank until music is requested (`045b2f6`).
+- Deferred the optional media bank from the initial online payload (`045b2f6`).
 - Moved arena textures out of the initial game payload (`7b8db74`).
 - Loaded only the champion models selected for the match (`7148860`).
-- Loaded and cached only the exact samples used by the selected soundtrack
-  style, with full-loop source-pitch regression coverage (`757c648`).
+- Reduced optional sampled-media requests and added regression coverage
+  (`757c648`).
 - Cached room schema initialization and removed redundant expired-room cleanup
   from reads and joins (`cd61f78`).
 

@@ -22,7 +22,6 @@
       guideClose: $("#close-guide"),
       championChoices: $$(".champion-choice"),
       arenaChoices: $$(".arena-choice"),
-      soundtrackChoices: $$(".soundtrack-choice"),
       championPortrait: $("#champion-portrait"),
       playerName: $("#player-name"),
       matchSubtitle: $("#match-subtitle"),
@@ -41,13 +40,6 @@
       bossFill: $("#boss-fill"),
       bossText: $("#boss-hp-text"),
       eventKicker: $("#event-kicker"),
-      trackTime: $("#track-time"),
-      trackTitle: $("#track-title"),
-      musicSection: $("#music-section"),
-      waveform: $("#waveform"),
-      playhead: $("#playhead"),
-      beatDots: $$("#beat-dots i"),
-      sound: $("#sound-toggle"),
       pause: $("#pause-toggle"),
       pauseIcon: $("#pause-icon"),
       abilityDock: $("#ability-dock"),
@@ -152,13 +144,6 @@
     };
     const skillArtUrl = (champion, slot) =>
       RIFTBOMB_SKILL_ART[champion]?.[slot] || null;
-
-    for (let i = 0; i < 48; i++) {
-      const bar = document.createElement("i");
-      const h = 18 + ((i * 29 + i * i * 7) % 76);
-      bar.style.setProperty("--h", h);
-      UI.waveform.appendChild(bar);
-    }
 
     const hexToRgb = (hex) => {
       const n = parseInt(hex.replace("#", ""), 16);
@@ -415,6 +400,10 @@
         this.mainProgram = this.createProgram(Renderer.mainVertex, Renderer.mainFragment);
         this.arenaFxProgram = this.createProgram(Renderer.arenaFxVertex, Renderer.arenaFxFragment);
         this.katarinaProgram = this.createProgram(Renderer.katarinaVertex, Renderer.katarinaFragment);
+        this.vatChampionProgram = this.createProgram(
+          Renderer.vatChampionVertex,
+          Renderer.katarinaFragment
+        );
         this.particleProgram = this.createProgram(Renderer.particleVertex, Renderer.particleFragment);
         this.postProgram = this.createProgram(Renderer.postVertex, Renderer.postFragment);
         this.mainUniforms = this.uniforms(this.mainProgram, [
@@ -433,6 +422,13 @@
           "uIdleMix", "uRunMix", "uMoving", "uCast", "uHurt", "uInvulnerable",
           "uLotus", "uVoracity", "uDash", "uShadow", "uStyle", "uAlpha"
         ]);
+        this.vatChampionUniforms = this.uniforms(this.vatChampionProgram, [
+          "uModel", "uViewProjection", "uChampion", "uPositionFrames", "uNormalFrames",
+          "uPositionMin", "uPositionRange", "uFrameA", "uFrameB", "uFrameMix",
+          "uPreviousFrameA", "uPreviousFrameB", "uPreviousFrameMix", "uTransition",
+          "uCamera", "uTime", "uBeat", "uHurt", "uInvulnerable", "uLotus",
+          "uVoracity", "uDash", "uShadow", "uStyle", "uAlpha", "uSkill"
+        ]);
         this.postUniforms = this.uniforms(this.postProgram, [
           "uScene", "uResolution", "uTime", "uBeat", "uEnergy", "uHit",
           "uHealth", "uShock0", "uShock1", "uShock2", "uShock3", "uReduced"
@@ -449,6 +445,7 @@
         };
         this.championModelInitialised = new Set();
         this.championModelLoadPromises = {};
+        this.vladimirAnimationStates = new Map();
         for (const champion of ["katarina", "zed", "renekton", "vladimir", "gangplank"]) {
           if (PLAYABLE_CHAMPIONS[champion]) this.initialiseChampionModel(champion);
         }
@@ -496,6 +493,13 @@
         this.championModelInitialised.add(champion);
         if (champion === "katarina") return this.createKatarinaModel();
         if (champion === "zed") return this.createZedModel();
+        if (champion === "vladimir" && packed.animation?.runtime === "vat-v1") {
+          // Vladimir has a small enough mesh to stream one decoded animation pose per
+          // player.  Do not use the old vertex-animation-texture path here: it was
+          // fragile across drivers and made it impossible to prove the final draw
+          // matched the source model.
+          return this.createCpuAnimatedChampionModel(champion, packed, [48, 5, 18, 255]);
+        }
         const fallbackColors = {
           renekton: [24, 26, 21, 255],
           vladimir: [48, 5, 18, 255],
@@ -699,6 +703,242 @@
           image.src = PLAYABLE_CHAMPIONS.zed.texture;
         });
         return this.zedModelReadyPromise;
+      }
+
+      createCpuAnimatedChampionModel(key, packed, fallbackRgba) {
+        const gl = this.gl;
+        const decode = (base64) => {
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          return bytes;
+        };
+        const vertexBytes = decode(packed.vertices);
+        const indexBytes = decode(packed.indices);
+        const frameBytes = decode(packed.frames);
+        const normalBytes = decode(packed.normals);
+        const animation = packed.animation;
+        const vertexCount = animation.vertexCount;
+        const sourceUv = new Float32Array(
+          vertexBytes.buffer, vertexBytes.byteOffset, vertexBytes.byteLength / 4
+        );
+        const frameData = new Uint16Array(
+          frameBytes.buffer, frameBytes.byteOffset, frameBytes.byteLength / 2
+        );
+        const normalData = new Uint8Array(
+          normalBytes.buffer, normalBytes.byteOffset, normalBytes.byteLength
+        );
+        if (sourceUv.length !== vertexCount * 2 ||
+            frameData.length !== vertexCount * animation.frameCount * 4 ||
+            normalData.length !== vertexCount * animation.frameCount * 4) {
+          throw new Error(`${key} animated model data is inconsistent`);
+        }
+
+        const vao = gl.createVertexArray();
+        const vertexBuffer = gl.createBuffer();
+        const indexBuffer = gl.createBuffer();
+        const dynamicVertices = new Float32Array(vertexCount * 26);
+        for (let index = 0; index < vertexCount; index += 1) {
+          dynamicVertices[index * 26 + 24] = sourceUv[index * 2];
+          dynamicVertices[index * 26 + 25] = sourceUv[index * 2 + 1];
+        }
+        const attributes = [
+          ["aIdleA", 3, 0], ["aIdleB", 3, 3],
+          ["aRunA", 3, 6], ["aRunB", 3, 9],
+          ["aCast", 3, 12], ["aLotus", 3, 15],
+          ["aNormalIdle", 3, 18], ["aNormalLotus", 3, 21], ["aUv", 2, 24]
+        ];
+        gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, dynamicVertices, gl.DYNAMIC_DRAW);
+        for (const [name, size, offset] of attributes) {
+          const location = gl.getAttribLocation(this.katarinaProgram, name);
+          gl.enableVertexAttribArray(location);
+          gl.vertexAttribPointer(location, size, gl.FLOAT, false, 26 * 4, offset * 4);
+        }
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexBytes, gl.STATIC_DRAW);
+        gl.bindVertexArray(null);
+
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
+          gl.UNSIGNED_BYTE, new Uint8Array(fallbackRgba));
+
+        this[`${key}Vao`] = vao;
+        this[`${key}VertexBuffer`] = vertexBuffer;
+        this[`${key}IndexBuffer`] = indexBuffer;
+        this[`${key}IndexCount`] = indexBytes.byteLength / 2;
+        this[`${key}Texture`] = texture;
+        this[`${key}Animation`] = animation;
+        this[`${key}CpuAnimation`] = { frameData, normalData, dynamicVertices, vertexCount };
+        this[`${key}Ready`] = false;
+        this[`${key}ModelReadyPromise`] = new Promise((resolve) => {
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            // Vladimir's baked UVs are already in the atlas orientation. Flipping
+            // the image samples unrelated pieces of the atlas and destroys the
+            // red/black character material.
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
+            if (anisotropic) {
+              const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+              gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8, max));
+            }
+            this[`${key}Ready`] = true;
+            resolve(true);
+          };
+          image.onerror = () => {
+            console.error(`${key} game texture failed to decode.`);
+            resolve(false);
+          };
+          image.src = packed.texture;
+        });
+        return this[`${key}ModelReadyPromise`];
+      }
+
+      createVatChampionModel(key, packed, fallbackRgba) {
+        const gl = this.gl;
+        const decode = (base64) => {
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          return bytes;
+        };
+        const vertexBytes = decode(packed.vertices);
+        const indexBytes = decode(packed.indices);
+        const frameBytes = decode(packed.frames);
+        const normalBytes = decode(packed.normals);
+        const animation = packed.animation;
+        const [textureWidth, textureHeight] = animation.textureDimensions;
+        const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+        if (textureWidth > maxTextureSize || textureHeight > maxTextureSize) {
+          throw new Error(
+            `${key} animation texture ${textureWidth}x${textureHeight} exceeds ${maxTextureSize}`
+          );
+        }
+
+        const vao = gl.createVertexArray();
+        const vertexBuffer = gl.createBuffer();
+        const indexBuffer = gl.createBuffer();
+        gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertexBytes, gl.STATIC_DRAW);
+        const uvLocation = gl.getAttribLocation(this.vatChampionProgram, "aUv");
+        gl.enableVertexAttribArray(uvLocation);
+        gl.vertexAttribPointer(uvLocation, 2, gl.FLOAT, false, 2 * 4, 0);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexBytes, gl.STATIC_DRAW);
+        gl.bindVertexArray(null);
+
+        const positionFrames = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, positionFrames);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA16UI,
+          textureWidth,
+          textureHeight,
+          0,
+          gl.RGBA_INTEGER,
+          gl.UNSIGNED_SHORT,
+          new Uint16Array(
+            frameBytes.buffer,
+            frameBytes.byteOffset,
+            frameBytes.byteLength / Uint16Array.BYTES_PER_ELEMENT
+          )
+        );
+
+        const normalFrames = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, normalFrames);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA8,
+          textureWidth,
+          textureHeight,
+          0,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          normalBytes
+        );
+
+        const texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA8,
+          1,
+          1,
+          0,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          new Uint8Array(fallbackRgba)
+        );
+
+        this[`${key}Vao`] = vao;
+        this[`${key}VertexBuffer`] = vertexBuffer;
+        this[`${key}IndexBuffer`] = indexBuffer;
+        this[`${key}IndexCount`] = indexBytes.byteLength / 2;
+        this[`${key}PositionFrames`] = positionFrames;
+        this[`${key}NormalFrames`] = normalFrames;
+        this[`${key}Animation`] = animation;
+        this[`${key}Texture`] = texture;
+        this[`${key}Ready`] = false;
+        this[`${key}ModelReadyPromise`] = new Promise((resolve) => {
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
+            if (anisotropic) {
+              const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+              gl.texParameterf(
+                gl.TEXTURE_2D,
+                anisotropic.TEXTURE_MAX_ANISOTROPY_EXT,
+                Math.min(8, max)
+              );
+            }
+            this[`${key}Ready`] = true;
+            resolve(true);
+          };
+          image.onerror = () => {
+            console.error(`${key} game texture failed to decode.`);
+            resolve(false);
+          };
+          image.src = packed.texture;
+        });
+        return this[`${key}ModelReadyPromise`];
       }
 
       createPackedChampionModel(key, encodedVertices, encodedIndices, textureSource, fallbackRgba) {
@@ -1793,6 +2033,319 @@
         if (!shadow && player.shield > 0) this.drawShieldField(player, t, beat, 1.02 + bob, 0.78, 1.12);
       }
 
+      sampleVatClip(animation, key, progress) {
+        const clip = animation.clips[key];
+        if (!clip) throw new Error(`Missing VAT animation clip: ${key}`);
+        const phase = clip.loop
+          ? ((progress % 1) + 1) % 1
+          : clamp(progress, 0, 1);
+        const localFrame = phase * (clip.loop ? clip.frameCount : clip.frameCount - 1);
+        const localA = Math.floor(localFrame) % clip.frameCount;
+        const localB = clip.loop
+          ? (localA + 1) % clip.frameCount
+          : Math.min(clip.frameCount - 1, localA + 1);
+        return {
+          key,
+          frameA: clip.startFrame + localA,
+          frameB: clip.startFrame + localB,
+          mix: localFrame - Math.floor(localFrame)
+        };
+      }
+
+      resolveVladimirAnimation(player, t) {
+        const animation = this.vladimirAnimation;
+        const poolRemaining = player.vladimirPool || 0;
+        let desired;
+        if (poolRemaining > 0) {
+          if (poolRemaining > 1.18) {
+            desired = this.sampleVatClip(
+              animation,
+              "poolDown",
+              clamp((1.45 - poolRemaining) / 0.27, 0, 1)
+            );
+          } else if (poolRemaining < 0.24) {
+            desired = this.sampleVatClip(
+              animation,
+              "poolUp",
+              clamp(1 - poolRemaining / 0.24, 0, 1)
+            );
+          } else {
+            this.vladimirAnimationStates.delete(player.id);
+            return { hidden: true, key: "pool" };
+          }
+        } else if (player.vladimirQAnim > 0) {
+          desired = this.sampleVatClip(
+            animation,
+            "q",
+            1 - player.vladimirQAnim / 0.56
+          );
+        } else if (player.vladimirEAnim > 0) {
+          desired = this.sampleVatClip(
+            animation,
+            "e",
+            1 - player.vladimirEAnim / 0.62
+          );
+        } else if (player.vladimirUltAnim > 0) {
+          desired = this.sampleVatClip(
+            animation,
+            "r",
+            1 - player.vladimirUltAnim / 0.66
+          );
+        } else if (player.vladimirAttackAnim > 0) {
+          desired = this.sampleVatClip(
+            animation,
+            "attack",
+            1 - player.vladimirAttackAnim / 0.42
+          );
+        } else {
+          const key = player.moving ? "run" : "idle";
+          const clip = animation.clips[key];
+          const speed = key === "run" ? 1.52 : 1;
+          const phase = prefersReducedMotion
+            ? 0.35
+            : (t * speed + player.id * 0.173) / clip.duration;
+          desired = this.sampleVatClip(animation, key, phase);
+        }
+
+        let state = this.vladimirAnimationStates.get(player.id);
+        if (!state) {
+          state = {
+            key: desired.key,
+            changedAt: t,
+            previous: desired,
+            current: desired
+          };
+          this.vladimirAnimationStates.set(player.id, state);
+        } else if (state.key !== desired.key) {
+          state.previous = state.current;
+          state.key = desired.key;
+          state.changedAt = t;
+        }
+        state.current = desired;
+        const transition = prefersReducedMotion
+          ? 1
+          : clamp((t - state.changedAt) / 0.12, 0, 1);
+        if (transition >= 1) state.previous = desired;
+        return { ...desired, previous: state.previous, transition, hidden: false };
+      }
+
+      updateCpuAnimatedChampion(key, frame) {
+        const animation = this[`${key}Animation`];
+        const cpu = this[`${key}CpuAnimation`];
+        const min = animation.positionMin;
+        const range = animation.positionRange;
+        const sample = (frameIndex, vertexIndex, axis) => {
+          const offset = (frameIndex * cpu.vertexCount + vertexIndex) * 4 + axis;
+          return min[axis] + cpu.frameData[offset] / 65535 * range[axis];
+        };
+        const normal = (frameIndex, vertexIndex, axis) => {
+          const offset = (frameIndex * cpu.vertexCount + vertexIndex) * 4 + axis;
+          return cpu.normalData[offset] / 255 * 2 - 1;
+        };
+        for (let vertex = 0; vertex < cpu.vertexCount; vertex += 1) {
+          const target = vertex * 26;
+          for (let axis = 0; axis < 3; axis += 1) {
+            const current = sample(frame.frameA, vertex, axis) +
+              (sample(frame.frameB, vertex, axis) - sample(frame.frameA, vertex, axis)) * frame.mix;
+            const previous = sample(frame.previous.frameA, vertex, axis) +
+              (sample(frame.previous.frameB, vertex, axis) - sample(frame.previous.frameA, vertex, axis)) * frame.previous.mix;
+            const position = previous + (current - previous) * frame.transition;
+            for (let slot = 0; slot < 6; slot += 1) cpu.dynamicVertices[target + slot * 3 + axis] = position;
+            const currentNormal = normal(frame.frameA, vertex, axis) +
+              (normal(frame.frameB, vertex, axis) - normal(frame.frameA, vertex, axis)) * frame.mix;
+            const previousNormal = normal(frame.previous.frameA, vertex, axis) +
+              (normal(frame.previous.frameB, vertex, axis) - normal(frame.previous.frameA, vertex, axis)) * frame.previous.mix;
+            const blendedNormal = previousNormal + (currentNormal - previousNormal) * frame.transition;
+            cpu.dynamicVertices[target + 18 + axis] = blendedNormal;
+            cpu.dynamicVertices[target + 21 + axis] = blendedNormal;
+          }
+        }
+        const gl = this.gl;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this[`${key}VertexBuffer`]);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, cpu.dynamicVertices);
+      }
+
+      drawCpuAnimatedChampion(player, t, beat, key, style, options = {}) {
+        if (!this[`${key}Ready`]) return this.drawVatChampion(player, t, beat, key, style, options);
+        const frame = this.resolveVladimirAnimation(player, t);
+        if (frame.hidden) return false;
+        this.updateCpuAnimatedChampion(key, frame);
+        const gl = this.gl;
+        const model = modelMatrix(player.x, 0.02, player.z,
+          options.scale || 1, options.scale || 1, options.scale || 1, player.facing || 0);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.disable(gl.CULL_FACE);
+        gl.useProgram(this.katarinaProgram);
+        const uniforms = this.katarinaUniforms;
+        gl.uniformMatrix4fv(uniforms.uModel, false, model);
+        gl.uniformMatrix4fv(uniforms.uViewProjection, false, this.lastViewProjection);
+        gl.uniform3fv(uniforms.uCamera, this.lastCamera);
+        gl.uniform1f(uniforms.uTime, t);
+        gl.uniform1f(uniforms.uBeat, beat);
+        gl.uniform1f(uniforms.uIdleMix, 0);
+        gl.uniform1f(uniforms.uRunMix, 0);
+        gl.uniform1f(uniforms.uMoving, 0);
+        gl.uniform1f(uniforms.uCast, 0);
+        gl.uniform1f(uniforms.uHurt, player.hurt > 0 ? 1 : 0);
+        gl.uniform1f(uniforms.uInvulnerable, player.invulnerable > 0 ? 1 : 0);
+        gl.uniform1f(uniforms.uLotus, 0);
+        gl.uniform1f(uniforms.uVoracity, 0);
+        gl.uniform1f(uniforms.uDash, 0);
+        gl.uniform1f(uniforms.uShadow, 0);
+        gl.uniform1f(uniforms.uStyle, style);
+        gl.uniform1f(uniforms.uAlpha, 1);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this[`${key}Texture`]);
+        gl.uniform1i(uniforms.uChampion, 0);
+        gl.bindVertexArray(this[`${key}Vao`]);
+        gl.drawElements(gl.TRIANGLES, this[`${key}IndexCount`], gl.UNSIGNED_SHORT, 0);
+        gl.bindVertexArray(null);
+        gl.disable(gl.BLEND);
+        gl.enable(gl.CULL_FACE);
+        gl.useProgram(this.mainProgram);
+        gl.uniformMatrix4fv(this.mainUniforms.uViewProjection, false, this.lastViewProjection);
+        gl.uniform3fv(this.mainUniforms.uCamera, this.lastCamera);
+        gl.uniform1f(this.mainUniforms.uTime, t);
+        gl.uniform1f(this.mainUniforms.uBeat, beat);
+        return true;
+      }
+
+      drawVatChampion(player, t, beat, key, style, options = {}) {
+        const C = Renderer.colors;
+        if (!this[`${key}Ready`]) {
+          this.draw(
+            "sphere",
+            [player.x, 0.76, player.z],
+            [0.4, 0.76, 0.34],
+            C.vladimirCrimson,
+            2,
+            0.3,
+            player.facing
+          );
+          this.draw(
+            "crystal",
+            [player.x, 1.45, player.z],
+            [0.28, 0.4, 0.26],
+            C.vladimirCrimson,
+            3,
+            1.6 + beat,
+            player.facing
+          );
+          return false;
+        }
+
+        const frame = this.resolveVladimirAnimation(player, t);
+        if (frame.hidden) return false;
+        const gl = this.gl;
+        const animation = this[`${key}Animation`];
+        const invulnerable = player.invulnerable > 0 || player.vladimirPool > 0;
+        const action = ["attack", "q", "poolDown", "poolUp", "e", "r"].includes(frame.key);
+        const skill = action ? 0.72 : 0;
+        const bob = prefersReducedMotion || action
+          ? 0
+          : Math.sin(t * (frame.key === "run" ? 11 : 2.2)) *
+            (frame.key === "run" ? 0.016 : 0.009);
+
+        this.draw(
+          "sphere",
+          [player.x, 0.035, player.z],
+          [0.74, 0.035, 0.74],
+          C.blueSide,
+          4,
+          0.8 + beat,
+          t,
+          0.38
+        );
+        this.draw(
+          "torus",
+          [player.x, 0.064, player.z],
+          [0.56, 0.052, 0.56],
+          C.vladimirCrimson,
+          4,
+          0.68 + beat * 0.2 + (frame.key === "r" ? 2.2 : 0),
+          -t * 1.9,
+          0.72,
+          0,
+          Math.PI * 0.5
+        );
+        this.draw(
+          "sphere",
+          [player.x, 0.073, player.z],
+          [0.5, 0.034, 0.38],
+          C.vladimirBloodDark,
+          0,
+          0.025,
+          0,
+          0.88
+        );
+
+        const scale = options.scale || 1;
+        const model = modelMatrix(
+          player.x,
+          0.02 + bob,
+          player.z,
+          scale,
+          scale,
+          scale,
+          player.facing || 0
+        );
+        const uniforms = this.vatChampionUniforms;
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.disable(gl.CULL_FACE);
+        gl.useProgram(this.vatChampionProgram);
+        gl.uniformMatrix4fv(uniforms.uModel, false, model);
+        gl.uniformMatrix4fv(uniforms.uViewProjection, false, this.lastViewProjection);
+        gl.uniform3fv(uniforms.uCamera, this.lastCamera);
+        gl.uniform3fv(uniforms.uPositionMin, animation.positionMin);
+        gl.uniform3fv(uniforms.uPositionRange, animation.positionRange);
+        gl.uniform1i(uniforms.uFrameA, frame.frameA);
+        gl.uniform1i(uniforms.uFrameB, frame.frameB);
+        gl.uniform1f(uniforms.uFrameMix, frame.mix);
+        gl.uniform1i(uniforms.uPreviousFrameA, frame.previous.frameA);
+        gl.uniform1i(uniforms.uPreviousFrameB, frame.previous.frameB);
+        gl.uniform1f(uniforms.uPreviousFrameMix, frame.previous.mix);
+        gl.uniform1f(uniforms.uTransition, frame.transition);
+        gl.uniform1f(uniforms.uTime, t);
+        gl.uniform1f(uniforms.uBeat, beat);
+        gl.uniform1f(uniforms.uHurt, player.hurt > 0 ? 1 : 0);
+        gl.uniform1f(uniforms.uInvulnerable, invulnerable ? 1 : 0);
+        gl.uniform1f(uniforms.uLotus, frame.key === "r" ? skill : 0);
+        gl.uniform1f(uniforms.uVoracity, frame.key === "e" ? skill : 0);
+        gl.uniform1f(uniforms.uDash, frame.key === "q" ? skill * 0.4 : 0);
+        gl.uniform1f(uniforms.uShadow, 0);
+        gl.uniform1f(uniforms.uStyle, style);
+        gl.uniform1f(uniforms.uSkill, skill);
+        gl.uniform1f(
+          uniforms.uAlpha,
+          player.invulnerable > 0 && Math.floor(player.invulnerable * 14) % 2 === 0
+            ? 0.52
+            : 1
+        );
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, this[`${key}Texture`]);
+        gl.uniform1i(uniforms.uChampion, 0);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, this[`${key}PositionFrames`]);
+        gl.uniform1i(uniforms.uPositionFrames, 1);
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_2D, this[`${key}NormalFrames`]);
+        gl.uniform1i(uniforms.uNormalFrames, 2);
+        gl.bindVertexArray(this[`${key}Vao`]);
+        gl.drawElements(gl.TRIANGLES, this[`${key}IndexCount`], gl.UNSIGNED_SHORT, 0);
+        gl.bindVertexArray(null);
+
+        gl.disable(gl.BLEND);
+        gl.enable(gl.CULL_FACE);
+        gl.useProgram(this.mainProgram);
+        gl.uniformMatrix4fv(this.mainUniforms.uViewProjection, false, this.lastViewProjection);
+        gl.uniform3fv(this.mainUniforms.uCamera, this.lastCamera);
+        gl.uniform1f(this.mainUniforms.uTime, t);
+        gl.uniform1f(this.mainUniforms.uBeat, beat);
+        return true;
+      }
+
       drawPackedChampion(player, t, beat, key, style, options = {}) {
         const C = Renderer.colors;
         if (!this[`${key}Ready`]) {
@@ -1916,12 +2469,19 @@
           ? clamp(1 - player.vladimirUltAnim / 0.66, 0, 1)
           : 0;
         const ultPose = player.vladimirUltAnim > 0 ? Math.sin(ultProgress * Math.PI) : 0;
-        this.drawPackedChampion(player, t, beat, "vladimir", 3, {
+        const options = {
           scale: modelReviewMode ? 1.14 : 1.02,
           ult: ultPose,
           slash: player.vladimirEAnim > 0 ? 1 : 0,
           pool
-        });
+        };
+        if (this.vladimirCpuAnimation) {
+          this.drawCpuAnimatedChampion(player, t, beat, "vladimir", 3, options);
+        } else if (this.vladimirAnimation?.runtime === "vat-v1") {
+          this.drawVatChampion(player, t, beat, "vladimir", 3, options);
+        } else {
+          this.drawPackedChampion(player, t, beat, "vladimir", 3, options);
+        }
 
         if (pool) {
           const pulse = 0.9 + Math.sin(t * 7) * 0.08;
@@ -2077,7 +2637,7 @@
         }
       }
 
-      render(game, music, dt, now) {
+      render(game, sfx, dt, now) {
         if (this.lost) return;
         const gl = this.gl;
         this.resize();
@@ -2089,7 +2649,7 @@
         const aspect = this.width / this.height;
         const compact = aspect < 0.8;
         const t = now * 0.001;
-        const beat = music.visualBeat();
+        const beat = sfx.visualPulse();
         const essentialShake = prefersReducedMotion ? 0 : this.cameraShake;
         const shakeX = Math.sin(t * 61) * essentialShake * 0.2;
         const shakeZ = Math.cos(t * 47) * essentialShake * 0.16;
@@ -2481,6 +3041,8 @@
             shield: modelReviewPose === "shield" ? 4 : 0,
             moving: modelReviewPose === "run",
             vladimirPool: modelReviewPose === "pool" ? 2 : 0,
+            vladimirAttackAnim: modelReviewPose === "attack" ? 0.21 : 0,
+            vladimirQAnim: modelReviewPose === "cast" ? 0.28 : 0,
             vladimirUltAnim: modelReviewPose === "ult" ? 0.33 : 0,
             vladimirEAnim: modelReviewPose === "burst" ? 0.4 : 0,
             castAnim: modelReviewPose === "cast" ? 0.28 : 0,
@@ -2528,7 +3090,7 @@
         gl.uniform2f(this.postUniforms.uResolution, this.width, this.height);
         gl.uniform1f(this.postUniforms.uTime, t);
         gl.uniform1f(this.postUniforms.uBeat, beat);
-        gl.uniform1f(this.postUniforms.uEnergy, music.energy);
+        gl.uniform1f(this.postUniforms.uEnergy, sfx.intensity);
         gl.uniform1f(this.postUniforms.uHit, this.hitPulse);
         gl.uniform1f(this.postUniforms.uHealth, player ? player.health / player.maxHealth : 1);
         gl.uniform1f(this.postUniforms.uReduced, prefersReducedMotion ? 1 : 0);
@@ -3102,6 +3664,74 @@
         vLocal = position;
         vUv = aUv;
         vSkill = max(uLotus, max(uVoracity * 0.72, max(uCast * 0.5, uDash * 0.32)));
+        gl_Position = uViewProjection * world;
+      }
+    `;
+
+    Renderer.vatChampionVertex = `#version 300 es
+      precision highp float;
+      precision highp usampler2D;
+      in vec2 aUv;
+      uniform mat4 uModel;
+      uniform mat4 uViewProjection;
+      uniform usampler2D uPositionFrames;
+      uniform sampler2D uNormalFrames;
+      uniform vec3 uPositionMin;
+      uniform vec3 uPositionRange;
+      uniform int uFrameA;
+      uniform int uFrameB;
+      uniform float uFrameMix;
+      uniform int uPreviousFrameA;
+      uniform int uPreviousFrameB;
+      uniform float uPreviousFrameMix;
+      uniform float uTransition;
+      uniform float uSkill;
+      out vec2 vUv;
+      out vec3 vWorld;
+      out vec3 vNormal;
+      out vec3 vLocal;
+      out float vSkill;
+
+      vec3 framePosition(int frame) {
+        uvec3 packed = texelFetch(uPositionFrames, ivec2(gl_VertexID, frame), 0).xyz;
+        return uPositionMin + (vec3(packed) / 65535.0) * uPositionRange;
+      }
+
+      vec3 frameNormal(int frame) {
+        return normalize(
+          texelFetch(uNormalFrames, ivec2(gl_VertexID, frame), 0).xyz * 2.0 - 1.0
+        );
+      }
+
+      void main() {
+        vec3 currentPosition = mix(
+          framePosition(uFrameA),
+          framePosition(uFrameB),
+          uFrameMix
+        );
+        vec3 previousPosition = mix(
+          framePosition(uPreviousFrameA),
+          framePosition(uPreviousFrameB),
+          uPreviousFrameMix
+        );
+        vec3 currentNormal = normalize(mix(
+          frameNormal(uFrameA),
+          frameNormal(uFrameB),
+          uFrameMix
+        ));
+        vec3 previousNormal = normalize(mix(
+          frameNormal(uPreviousFrameA),
+          frameNormal(uPreviousFrameB),
+          uPreviousFrameMix
+        ));
+        vec3 position = mix(previousPosition, currentPosition, uTransition);
+        vec3 normal = normalize(mix(previousNormal, currentNormal, uTransition));
+        vec4 world = uModel * vec4(position, 1.0);
+        vWorld = world.xyz;
+        vNormal = normalize(mat3(uModel) * normal);
+        vLocal = position;
+        vUv = aUv;
+        vSkill = uSkill;
         gl_Position = uViewProjection * world;
       }
     `;

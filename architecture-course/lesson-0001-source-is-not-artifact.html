@@ -70,14 +70,14 @@
 
     <section class="measure">
       <h2>A primeira modularização não será uma reinvenção</h2>
-      <p>O arquivo atual já contém três módulos naturais: <code>Renderer</code>, <code>MusicEngine</code> e <code>Game</code>. Eles possuem nomes de domínio, comportamento substancial e interfaces menores que suas implementações. O primeiro movimento seguro é extrair esses blocos quase intactos, sem redesenhar o jogo durante a movimentação.</p>
+      <p>O arquivo atual já contém três módulos naturais: <code>Renderer</code>, <code>SfxEngine</code> e <code>Game</code>. Eles possuem nomes de domínio, comportamento substancial e interfaces menores que suas implementações. O primeiro movimento seguro é extrair esses blocos quase intactos, sem redesenhar o jogo durante a movimentação.</p>
     </section>
 
     <pre aria-label="Mapa provisório da primeira extração"><code>index.html                 # shell visual e ponto de entrada
 src/main.js                # composição, boot e frame
 src/game.js                # classe Game intacta no primeiro passe
 src/renderer.js            # classe Renderer + shaders
-src/music-engine.js        # classe MusicEngine
+src/sfx-engine.js          # classe SfxEngine
 src/ui-input.js            # DOM, teclado e touch
 src/generated/models.js    # payload produzido pelo model-baker
 dist/riftbomb.html         # continua sendo o artefato jogável</code></pre>

@@ -9,7 +9,7 @@
  *   - dt: length of this perception tick
  *
  * What this does NOT include:
- *   - renderer, music, presentation, particles, skillTrails
+ *   - renderer, sfx, presentation, particles, skillTrails
  *   - hidden powerup plan inside crates
  *   - CPU internal fields (aiDx, aiDz, aiCommit, aiThink)
  *   - full kit-world data (P1)

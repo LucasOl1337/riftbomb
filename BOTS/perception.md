@@ -205,7 +205,7 @@ Só relevantes quando a política de skills existir; a percepção já deve rese
 | Coisa | Motivo |
 |-------|--------|
 | `particles`, `skillTrails`, cores, shock, camera shake | Apresentação |
-| `renderer`, `music`, `presentation`, DOM, teclas do humano | Infra / outro jogador |
+| `renderer`, `sfx`, `presentation`, DOM, teclas do humano | Infra / outro jogador |
 | `enemies` (legado vazio) | Não é o duelo 1v1 atual |
 | Seed interno / implementação do PRNG | Bot só recebe amostras via `random()` injetado, se precisar de ruído |
 | Plano oculto de powerup em crates intactas | Informação escondida de design |

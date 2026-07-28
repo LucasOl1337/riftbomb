@@ -10,12 +10,8 @@ const onlineRoot = path.resolve(scriptDirectory, "..");
 const repositoryRoot = path.resolve(onlineRoot, "..");
 const gameSource = path.join(repositoryRoot, "riftbomb.html");
 const outputDirectory = path.join(onlineRoot, "public", "riftbomb-parts");
-const audioSourceDirectory = path.join(repositoryRoot, "game", "audio");
-const audioOutputDirectory = path.join(onlineRoot, "public", "audio");
 const arenaTextureOutputDirectory = path.join(onlineRoot, "public", "arena-textures");
 const championModelOutputDirectory = path.join(onlineRoot, "public", "champion-models");
-const sampleBankSource = path.join(repositoryRoot, "game", "load-sample-bank-data.js");
-const sampleManifestSource = path.join(audioSourceDirectory, "sample-manifest.json");
 const arenaTextureBundleSource = path.join(repositoryRoot, "game", "load-arena-textures.js");
 const championModelBundleSource = path.join(
   repositoryRoot,
@@ -147,19 +143,6 @@ for (const [before, after] of replacements) {
   onlineGame = replaceOnce(onlineGame, before, after);
 }
 
-const embeddedSampleBank = await readFile(sampleBankSource, "utf8");
-const sampleManifest = JSON.parse(await readFile(sampleManifestSource, "utf8"));
-onlineGame = replaceOnce(
-  onlineGame,
-  `  <script>\n${embeddedSampleBank.trimEnd()}\n  </script>`,
-  [
-    "  <script>",
-    '    "use strict";',
-    `    window.RIFTBOMB_SAMPLE_MANIFEST = Object.freeze(${JSON.stringify(sampleManifest)});`,
-    "  </script>",
-  ].join("\n"),
-);
-
 const embeddedArenaTextures = await readFile(arenaTextureBundleSource, "utf8");
 const arenaTextureAliasesAt = embeddedArenaTextures.indexOf(
   "const ARENA_TEXTURES = Object.freeze({",
@@ -192,16 +175,38 @@ onlineGame = replaceOnce(
 
 async function playableChampionPayload(champion) {
   const directory = path.join(championSourceDirectory, champion, "playable-model");
-  const [vertices, indices, texture] = await Promise.all([
+  const [vertices, indices, texture, metadataSource] = await Promise.all([
     readFile(path.join(directory, `${champion}-model-vertices.bin`)),
     readFile(path.join(directory, `${champion}-model-indices.bin`)),
     readFile(path.join(directory, `${champion}-model-texture.webp`)),
+    readFile(path.join(directory, `${champion}-model-metadata.json`), "utf8"),
   ]);
-  return {
+  const metadata = JSON.parse(metadataSource);
+  const payload = {
     vertices: vertices.toString("base64"),
     indices: indices.toString("base64"),
     texture: `data:image/webp;base64,${texture.toString("base64")}`,
   };
+  if (metadata.runtime === "vat-v1") {
+    const [frames, normals] = await Promise.all([
+      readFile(path.join(directory, `${champion}-model-frames.bin`)),
+      readFile(path.join(directory, `${champion}-model-normals.bin`)),
+    ]);
+    Object.assign(payload, {
+      frames: frames.toString("base64"),
+      normals: normals.toString("base64"),
+      animation: {
+        runtime: metadata.runtime,
+        vertexCount: metadata.vertexCount,
+        frameCount: metadata.frameCount,
+        textureDimensions: metadata.textureDimensions,
+        positionMin: metadata.positionBounds.min,
+        positionRange: metadata.positionBounds.range,
+        clips: metadata.animationClips,
+      },
+    });
+  }
+  return payload;
 }
 
 const championModelPayloads = Object.fromEntries(
@@ -238,8 +243,6 @@ const sha256 = createHash("sha256").update(game).digest("hex");
 
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
-await rm(audioOutputDirectory, { recursive: true, force: true });
-await cp(audioSourceDirectory, audioOutputDirectory, { recursive: true });
 await rm(arenaTextureOutputDirectory, { recursive: true, force: true });
 await mkdir(arenaTextureOutputDirectory, { recursive: true });
 await Promise.all(
