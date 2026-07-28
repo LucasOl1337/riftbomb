@@ -10,6 +10,8 @@ body {
   margin: 0;
   overflow: hidden;
   background: #05070b;
+  overscroll-behavior: none;
+  touch-action: none;
 }
 
 .loading-screen {
@@ -45,6 +47,54 @@ body {
   border: 0;
 }
 
+.game-shell {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #05070b;
+}
+
 .game-frame {
   display: block;
+}
+
+.mobile-launch {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  .mobile-launch {
+    position: fixed;
+    z-index: 20;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    gap: 0.65rem;
+    width: 100%;
+    border: 0;
+    padding: 2rem;
+    color: #f4f4f4;
+    background:
+      linear-gradient(rgb(5 7 11 / 72%), rgb(5 7 11 / 92%)),
+      radial-gradient(circle at 50% 35%, #5a1010 0, #160a0d 40%, #05070b 78%);
+    text-align: center;
+    touch-action: manipulation;
+  }
+
+  .mobile-launch strong {
+    font: 900 clamp(1.4rem, 7vw, 2.4rem)/1 Arial, Helvetica, sans-serif;
+    letter-spacing: 0.05em;
+  }
+
+  .mobile-launch span {
+    color: #d9a6a6;
+    font: 700 0.82rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.04em;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .mobile-launch {
+    display: none;
+  }
 }
