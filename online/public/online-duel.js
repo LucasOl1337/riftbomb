@@ -7,6 +7,8 @@
   const ICE_SERVERS = [
     { urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] }
   ];
+  const ICE_CANDIDATE_GRACE_MS = 250;
+  const ICE_GATHER_TIMEOUT_MS = 8000;
   const CHAMPIONS = ["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"];
   const CHAMPION_NAMES = {
     katarina: "Katarina", zed: "Zed", renekton: "Renekton",
@@ -272,13 +274,31 @@
   function waitForIce(peer) {
     if (peer.iceGatheringState === "complete") return Promise.resolve();
     return new Promise((resolve) => {
-      const timeout = setTimeout(resolve, 8000);
-      const onChange = () => {
-        if (peer.iceGatheringState !== "complete") return;
+      let settled = false;
+      let candidateGrace = 0;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
         clearTimeout(timeout);
+        clearTimeout(candidateGrace);
+        peer.removeEventListener("icecandidate", onCandidate);
         peer.removeEventListener("icegatheringstatechange", onChange);
         resolve();
       };
+      const onCandidate = (event) => {
+        if (!event.candidate || !["srflx", "relay"].includes(event.candidate.type)) return;
+        // A second STUN server can keep Chrome in "gathering" after a public
+        // candidate is already usable. Keep a short quiet window for siblings,
+        // then publish the SDP instead of idling until the hard timeout.
+        clearTimeout(candidateGrace);
+        candidateGrace = setTimeout(finish, ICE_CANDIDATE_GRACE_MS);
+      };
+      const onChange = () => {
+        if (peer.iceGatheringState !== "complete") return;
+        finish();
+      };
+      const timeout = setTimeout(finish, ICE_GATHER_TIMEOUT_MS);
+      peer.addEventListener("icecandidate", onCandidate);
       peer.addEventListener("icegatheringstatechange", onChange);
     });
   }

@@ -27,6 +27,10 @@ test("ships host-authoritative room and snapshot behavior", async () => {
   const client = await readFile(new URL("public/online-duel.js", root), "utf8");
   assert.match(client, /RTCPeerConnection/);
   assert.match(client, /action: "create"/);
+  assert.match(client, /ICE_CANDIDATE_GRACE_MS/);
+  assert.match(client, /\["srflx", "relay"\]\.includes\(event\.candidate\.type\)/);
+  assert.match(client, /setTimeout\(finish, ICE_CANDIDATE_GRACE_MS\)/);
+  assert.match(client, /removeEventListener\("icecandidate", onCandidate\)/);
   assert.match(client, /SNAPSHOT_INTERVAL/);
   assert.match(client, /state\.role === "guest"/);
   assert.match(client, /game\.p2Human = false/);
