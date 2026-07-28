@@ -93,8 +93,8 @@ Hoje no produto:
 
 Handoff: se `p2Human === true`, **não há percepção de bot** — o pipeline de CPU não roda.
 
-Campeão atual do Red no código: fixo **"ziggs"** no `createPlayer`.  
-A percepção deve carregar `self.champion` de forma genérica (não assumir Ziggs para sempre).
+Campeão atual do Red no código: fixo **"gangplank"** no `createPlayer`.
+A percepção deve carregar `self.champion` de forma genérica (não assumir um campeão fixo para sempre).
 
 ---
 
@@ -133,12 +133,11 @@ Por jogador (`self` e `rival`):
 
 - `speed`, `maxBombs`, `range`, `shield`
 - `invulnerable`, `hurt`, `stunned`
-- `dashing`, `dashCooldown`, `dashRequested` (Ziggs satchel/dash)
 - `speedBoost`
 
 **Kit / skills — P1**
 
-- `skillsUnlocked[4]` — Q/W/E/R (ou slots) desbloqueados por drop; **crítico**: skills começam locked exceto bomb lane do Ziggs
+- `skillsUnlocked[4]` — Q/W/E/R (ou slots) desbloqueados por drop; **crítico**: skills começam locked
 - `qCooldown`, `wCooldown`, `eCooldown`, `rCooldown`
 - Estados por campeão (só os do `self.champion` + o que o rival expõe e afeta o self):
   - Katarina: `ultChannel`, `ultTick`, `spin`, daggers no mundo
@@ -146,7 +145,6 @@ Por jogador (`self` e `rival`):
   - Renekton: `fury`, `renektonDominus`, `renektonDashRecast`, …
   - Vladimir: `vladimirPool`, `vladimirQStacks`, marks no chão
   - Gangplank: barrels / barrages
-  - Ziggs: slots + dash
 
 **Campos internos de CPU (não são “mundo”, são memória de controle)**
 

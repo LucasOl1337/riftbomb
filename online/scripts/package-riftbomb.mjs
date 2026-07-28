@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,9 +11,10 @@ const repositoryRoot = path.resolve(onlineRoot, "..");
 const gameSource = path.join(repositoryRoot, "riftbomb.html");
 const outputDirectory = path.join(onlineRoot, "public", "riftbomb-parts");
 
-execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build"], {
+execSync("npm run build", {
   cwd: repositoryRoot,
   stdio: "inherit",
+  shell: process.platform === "win32" ? process.env.ComSpec : "/bin/sh",
 });
 
 function replaceOnce(source, before, after) {
@@ -26,7 +27,7 @@ function replaceOnce(source, before, after) {
 
 const replacements = [
   [
-    'UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · Red Ziggs`;',
+    'UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · ${p2.name}`;',
     'UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · ${p2.name}`;',
   ],
   [
@@ -35,10 +36,10 @@ const replacements = [
   ],
   [
     '        this.selectedChampion = "katarina";\n        this.selectedArena = ARENA_TEMPLATES[0].id;',
-    '        this.selectedChampion = "katarina";\n        this.selectedChampion2 = "ziggs";\n        this.selectedArena = ARENA_TEMPLATES[0].id;',
+    '        this.selectedChampion = "katarina";\n        this.selectedChampion2 = "gangplank";\n        this.selectedArena = ARENA_TEMPLATES[0].id;',
   ],
   [
-    '        const champion = id === 1 ? this.selectedChampion : "ziggs";',
+    '        const champion = id === 1 ? this.selectedChampion : "gangplank";',
     [
       '        const champion = id === 1 ? this.selectedChampion : this.selectedChampion2;',
       '        const championNames = {',
@@ -47,22 +48,21 @@ const replacements = [
       '          renekton: "Renekton",',
       '          vladimir: "Vladimir",',
       '          gangplank: "Gangplank",',
-      '          ziggs: "Ziggs"',
       '        };',
     ].join("\n"),
   ],
   [
     [
       '          name: id === 1',
-      '            ? ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir", gangplank: "Gangplank" }[champion] || "Blue Ziggs")',
-      '            : "Red Ziggs",',
+      '            ? ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir", gangplank: "Gangplank" }[champion] || "Champion")',
+      '            : "Red Gangplank",',
     ].join("\n"),
-    '          name: `${id === 1 ? "Blue" : "Red"} ${championNames[champion] || "Ziggs"}`,',
+    '          name: `${id === 1 ? "Blue" : "Red"} ${championNames[champion] || "Champion"}`,',
   ],
   [
     [
       '      selectChampion(champion) {',
-      '        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;',
+      '        if (!["katarina", "zed", "renekton", "vladimir", "gangplank"].includes(champion) || this.mode !== "intro") return;',
       '        this.selectedChampion = champion;',
       '        this.resetPlayers();',
       '        this.presentation.update(this);',
@@ -70,14 +70,14 @@ const replacements = [
     ].join("\n"),
     [
       '      selectChampion(champion) {',
-      '        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;',
+      '        if (!["katarina", "zed", "renekton", "vladimir", "gangplank"].includes(champion) || this.mode !== "intro") return;',
       '        this.selectedChampion = champion;',
       '        this.resetPlayers();',
       '        this.presentation.update(this);',
       '      }',
       '',
       '      selectChampion2(champion) {',
-      '        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;',
+      '        if (!["katarina", "zed", "renekton", "vladimir", "gangplank"].includes(champion) || this.mode !== "intro") return;',
       '        this.selectedChampion2 = champion;',
       '        this.resetPlayers();',
       '        this.presentation.update(this);',
@@ -85,22 +85,21 @@ const replacements = [
     ].join("\n"),
   ],
   [
-    'this.presentation.announce("Player 2 joined · Red Ziggs is local");',
-    'this.presentation.announce(`Player 2 joined · ${p2.name} is local`);',
+    'this.presentation.announce(`${p2?.name || "Player 2"} joined locally`);',
+    'this.presentation.announce(`${p2?.name || "Player 2"} joined locally`);',
   ],
   [
-    'this.presentation.announce("Death Lotus needs Red Ziggs nearby");',
-    'this.presentation.announce("Death Lotus needs the rival nearby");',
+    'this.presentation.announce(`Death Lotus needs ${this.players[1]?.name || "the rival"} nearby`);',
+    'this.presentation.announce(`Death Lotus needs ${this.players[1]?.name || "the rival"} nearby`);',
   ],
   [
-    'this.presentation.announce("Death Mark needs Red Ziggs in range");',
-    'this.presentation.announce("Death Mark needs the rival in range");',
+    'this.presentation.announce(`Death Mark needs ${this.players[1]?.name || "the rival"} in range`);',
+    'this.presentation.announce(`Death Mark needs ${this.players[1]?.name || "the rival"} in range`);',
   ],
   [
     [
-      '      UI.live.textContent = game.player.champion !== "ziggs"',
-      '        ? `Rift Bomber · ${arenaName}. ${game.player.name} uses WASD, Q/F/E/R and Space. Red Ziggs uses arrows and Enter.`',
-      '        : `Rift Bomber · ${arenaName}. Blue Ziggs uses WASD, Q and Shift. Red Ziggs uses arrows and Enter.`;',
+      '      UI.live.textContent =',
+      '        `Rift Bomber · ${arenaName}. ${game.player.name} uses WASD, Q/F/E/R and Space. ${game.players[1].name} uses arrows and Enter.`;',
     ].join("\n"),
     [
       '      UI.live.textContent =',
@@ -109,7 +108,7 @@ const replacements = [
   ],
 ];
 
-let onlineGame = await readFile(gameSource, "utf8");
+let onlineGame = (await readFile(gameSource, "utf8")).replace(/\r\n/g, "\n");
 for (const [before, after] of replacements) {
   onlineGame = replaceOnce(onlineGame, before, after);
 }

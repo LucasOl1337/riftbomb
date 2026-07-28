@@ -1183,7 +1183,7 @@
 
     .champion-select {
       display: grid;
-      grid-template-columns: auto repeat(6, minmax(0, 1fr));
+      grid-template-columns: auto repeat(5, minmax(0, 1fr));
       align-items: stretch;
       gap: 0.35rem;
       width: min(62rem, 100%);
@@ -1228,10 +1228,6 @@
       background: var(--ink);
       color: var(--phosphor);
       box-shadow: none;
-    }
-
-    .champion-choice[data-champion="ziggs"][aria-pressed="true"] {
-      background: var(--ink);
     }
 
     .champion-choice[data-champion="zed"][aria-pressed="true"],
@@ -1331,58 +1327,45 @@
       max-height: 5.5rem;
       padding: 2px;
       border: 1px solid var(--line);
-      background: #06110e;
+      background: var(--arena-clear, #06110e);
     }
 
     .arena-mini i {
       display: block;
       min-width: 0;
       min-height: 0;
-      background: #0f2a22;
+      background: var(--arena-floor-a, #0f2a22);
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 3%);
+    }
+
+    .arena-mini i[data-parity="1"] {
+      background: var(--arena-floor-b, #0b211b);
     }
 
     .arena-mini i[data-t="1"] {
-      background: #6a7a82;
+      background: linear-gradient(145deg,
+        var(--arena-stone-top, #82928c) 0 38%,
+        var(--arena-stone, #4a5c64) 40% 100%);
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 8%);
     }
 
     .arena-mini i[data-t="2"] {
-      background: #8a5a32;
+      background:
+        linear-gradient(45deg, transparent 42%, #c6954d 44% 54%, transparent 56%),
+        linear-gradient(135deg, transparent 42%, #c6954d 44% 54%, transparent 56%),
+        #5a3824;
+      box-shadow: inset 0 0 0 1px #2a1814;
     }
 
-    .arena-mini i[data-t="s"] {
-      background: #2a9d8f;
+    .arena-mini i[data-t="blue"] {
+      background: #2fb8ec;
+      box-shadow: inset 0 0 0 1px var(--arena-crystal, #fff);
     }
 
-    /* Mini preview tint per arena theme */
-    .arena-mini[data-arena="lattice"] { background: #0c1412; }
-    .arena-mini[data-arena="lattice"] i { background: #163830; }
-    .arena-mini[data-arena="lattice"] i[data-t="1"] { background: #6a7a82; }
-    .arena-mini[data-arena="lattice"] i[data-t="2"] { background: #8a5a32; }
-    .arena-mini[data-arena="lattice"] i[data-t="s"] { background: #4dcecf; }
-
-    .arena-mini[data-arena="clearing"] { background: #0a1220; }
-    .arena-mini[data-arena="clearing"] i { background: #122a40; }
-    .arena-mini[data-arena="clearing"] i[data-t="1"] { background: #6a9aba; }
-    .arena-mini[data-arena="clearing"] i[data-t="2"] { background: #8a6a42; }
-    .arena-mini[data-arena="clearing"] i[data-t="s"] { background: #7ad4ff; }
-
-    .arena-mini[data-arena="labyrinth"] { background: #080e14; }
-    .arena-mini[data-arena="labyrinth"] i { background: #0c242c; }
-    .arena-mini[data-arena="labyrinth"] i[data-t="1"] { background: #2a4a58; }
-    .arena-mini[data-arena="labyrinth"] i[data-t="2"] { background: #7a5a28; }
-    .arena-mini[data-arena="labyrinth"] i[data-t="s"] { background: #2ef0e0; }
-
-    .arena-mini[data-arena="forts"] { background: #120c0a; }
-    .arena-mini[data-arena="forts"] i { background: #2a1c18; }
-    .arena-mini[data-arena="forts"] i[data-t="1"] { background: #6a5a4a; }
-    .arena-mini[data-arena="forts"] i[data-t="2"] { background: #8a5028; }
-    .arena-mini[data-arena="forts"] i[data-t="s"] { background: #e8a050; }
-
-    .arena-mini[data-arena="pit"] { background: #0c0808; }
-    .arena-mini[data-arena="pit"] i { background: #1e100e; }
-    .arena-mini[data-arena="pit"] i[data-t="1"] { background: #3a3038; }
-    .arena-mini[data-arena="pit"] i[data-t="2"] { background: #6a3a28; }
-    .arena-mini[data-arena="pit"] i[data-t="s"] { background: #e04030; }
+    .arena-mini i[data-t="red"] {
+      background: #df414d;
+      box-shadow: inset 0 0 0 1px var(--arena-accent, #fff);
+    }
 
     .arena-choice strong {
       font-family: var(--display);
@@ -1955,7 +1938,7 @@
       .fx-grain { display: none; }
     }
 
-    /* Ziggs keeps Bomberman's lethal pip; champions expose their five-part duel health. */
+    /* Playable champions expose their five-part duel health. */
     .hearts .heart:nth-child(n + 2) { display: none; }
 
     html[data-champion="katarina"] .hearts .heart,

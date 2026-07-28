@@ -244,7 +244,20 @@
       }
 
       listArenas() {
-        return ARENA_TEMPLATES.map(({ id, label, blurb }) => ({ id, label, blurb }));
+        return ARENA_TEMPLATES.map(({ id, label, blurb, theme }) => ({
+          id,
+          label,
+          blurb,
+          previewTheme: {
+            clear: theme.clear,
+            floorA: theme.floorA,
+            floorB: theme.floorB,
+            stone: theme.stone,
+            stoneTop: theme.stoneTop,
+            crystal: theme.crystal,
+            accent: theme.accent
+          }
+        }));
       }
 
       arenaTemplate(id = this.selectedArena) {
@@ -348,14 +361,14 @@
         const r = id === 1 ? this.rows - 2 : 1;
         const c = id === 1 ? 1 : this.cols - 2;
         const [x, z] = this.worldFromCell(r, c);
-        const champion = id === 1 ? this.selectedChampion : "ziggs";
+        const champion = id === 1 ? this.selectedChampion : "gangplank";
         return {
           id,
           champion,
           side: id === 1 ? "blue" : "red",
           name: id === 1
-            ? ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir", gangplank: "Gangplank" }[champion] || "Blue Ziggs")
-            : "Red Ziggs",
+            ? ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir", gangplank: "Gangplank" }[champion] || "Champion")
+            : "Red Gangplank",
           x, z,
           health: 1,
           maxHealth: 1,
@@ -365,10 +378,7 @@
           range: 2,
           shield: 0,
           // Start with arena bomb only — Q/W/E/R unlock from crate skill drops.
-          // Ziggs: slot 0 is the bomb (always on); slot 1 is Satchel (locked).
-          skillsUnlocked: champion === "ziggs"
-            ? [true, false, false, false]
-            : [false, false, false, false],
+          skillsUnlocked: [false, false, false, false],
           invulnerable: 1.25,
           hurt: 0,
           dashCooldown: 0,
@@ -420,7 +430,7 @@
       }
 
       selectChampion(champion) {
-        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;
+        if (!["katarina", "zed", "renekton", "vladimir", "gangplank"].includes(champion) || this.mode !== "intro") return;
         this.selectedChampion = champion;
         this.resetPlayers();
         this.presentation.update(this);
@@ -478,7 +488,7 @@
           p2.aiDx = 0;
           p2.aiDz = 0;
         }
-        this.presentation.announce("Player 2 joined · Red Ziggs is local");
+        this.presentation.announce(`${p2?.name || "Player 2"} joined locally`);
         this.presentation.update(this);
       }
 
@@ -539,34 +549,13 @@
         return true;
       }
 
-      requestDash(player = this.player) {
-        if (this.mode !== "playing" || this.paused || this.roundLocked || !player?.alive ||
-            player.dashCooldown > 0 || player.champion !== "ziggs") return;
-        player.dashRequested = true;
-      }
-
-      executeDash(player) {
-        if (player.dashCooldown > 0 || player.dashing > 0 || !player.alive) return;
-        player.dashing = 0.18;
-        player.dashCooldown = 5;
-        player.invulnerable = Math.max(player.invulnerable, 0.22);
-        this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.14);
-        this.music.effect("dash");
-        this.spawnParticles(player.x, 0.5, player.z,
-          player.id === 1 ? Renderer.colors.rift : Renderer.colors.ember, 18, 0.48, 0.1);
-      }
-
       isSkillUnlocked(player, slot) {
         if (!player?.skillsUnlocked) return true;
-        if (player.champion === "ziggs" && slot === 0) return true;
         return Boolean(player.skillsUnlocked[slot]);
       }
 
       lockedSkillSlots(player) {
         if (!player) return [];
-        if (player.champion === "ziggs") {
-          return player.skillsUnlocked[1] ? [] : [1];
-        }
         return [0, 1, 2, 3].filter((slot) => !player.skillsUnlocked[slot]);
       }
 
@@ -576,28 +565,15 @@
           zed: ["Razor Shuriken", "Living Shadow", "Shadow Slash", "Death Mark"],
           renekton: ["Cull the Meek", "Ruthless Predator", "Slice and Dice", "Dominus"],
           vladimir: ["Transfusion", "Sanguine Pool", "Tides of Blood", "Hemoplague"],
-          gangplank: ["Parrrley", "Remove Scurvy", "Powder Keg", "Cannon Barrage"],
-          ziggs: ["Bomb", "Satchel burst", "Blast range", "Speed"]
+          gangplank: ["Parrrley", "Remove Scurvy", "Powder Keg", "Cannon Barrage"]
         };
-        return (kits[player.champion] || kits.ziggs)[slot] || `Skill ${slot + 1}`;
+        return (kits[player.champion] || [])[slot] || `Skill ${slot + 1}`;
       }
 
       castAbility(slot, player = this.player) {
         if (!player?.alive || this.mode !== "playing" || this.paused || this.roundLocked) return false;
         if (player.vladimirPool > 0) return false;
         this.dropOwnerId = player.id;
-        if (player.champion === "ziggs") {
-          if (slot === 0) return this.placeBomb(player);
-          if (slot === 1) {
-            if (!this.isSkillUnlocked(player, 1)) {
-              this.presentation.announce("Satchel locked · break crates");
-              return false;
-            }
-            this.requestDash(player);
-            return true;
-          }
-          return false;
-        }
         if (!this.isSkillUnlocked(player, slot)) {
           this.presentation.announce(`${this.skillSlotLabel(player, slot)} locked · break crates`);
           return false;
@@ -754,7 +730,7 @@
         if (player.rCooldown > 0 || player.ultChannel > 0) return false;
         const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
         if (!rival || Math.hypot(rival.x - player.x, rival.z - player.z) > this.tile * 3.35) {
-          this.presentation.announce("Death Lotus needs Red Ziggs nearby");
+          this.presentation.announce(`Death Lotus needs ${this.players[1]?.name || "the rival"} nearby`);
           return false;
         }
         player.rCooldown = 28;
@@ -943,7 +919,7 @@
         if (player.rCooldown > 0) return false;
         const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
         if (!rival || Math.hypot(rival.x - player.x, rival.z - player.z) > this.tile * 4.5) {
-          this.presentation.announce("Death Mark needs Red Ziggs in range");
+          this.presentation.announce(`Death Mark needs ${this.players[1]?.name || "the rival"} in range`);
           return false;
         }
         const fromX = player.x;
@@ -1607,10 +1583,6 @@
           dz = player.lastDz;
         }
 
-        if (player.dashRequested) {
-          this.executeDash(player);
-          player.dashRequested = false;
-        }
         if (!moving && player.dashing <= 0) return;
 
         const passableBombs = this.bombs.filter((bomb) =>

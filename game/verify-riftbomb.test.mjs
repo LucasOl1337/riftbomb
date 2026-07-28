@@ -123,14 +123,29 @@ test("arena render does not reference an undeclared turret color", async () => {
   assert.match(renderer, /\[turret\.x, 0\.22, turret\.z\][\s\S]{0,100}C\.arenaStone/);
 });
 
-test("the build retains the six playable champions and duel rules", async () => {
+test("the build retains the five playable champions and duel rules", async () => {
   const document = await readFile(releasePath, "utf8");
 
-  for (const champion of ["Katarina", "Zed", "Renekton", "Vladimir", "Gangplank", "Ziggs"]) {
+  for (const champion of ["Katarina", "Zed", "Renekton", "Vladimir", "Gangplank"]) {
     assert.ok(document.includes(champion), `${champion} must remain in the build`);
   }
 
   assert.match(document, /first to 3/i);
   assert.match(document, /Breakable Hextech blocks/);
   assert.match(document, /Local PvP/);
+  assert.doesNotMatch(document, /data-champion="ziggs"|drawZiggs|ZIGGS_PORTRAIT/i);
+});
+
+test("the soundtrack exposes only the three approved tracks", async () => {
+  const soundtrack = await readFile(path.join(gameDirectory, "play-rift-soundtrack.js"), "utf8");
+
+  for (const track of ["Silver Thread", "Blood Moon", "Skyglass"]) {
+    assert.ok(soundtrack.includes(`"label":"${track}"`), `${track} must remain selectable`);
+  }
+
+  assert.equal(
+    [...soundtrack.matchAll(/^\s+(silver|bloodmoon|skyglass): Object\.freeze/gm)].length,
+    3
+  );
+  assert.doesNotMatch(soundtrack, /"label":"(?:Gravesong|Hextech Pulse|Noxian March|Shadow Waltz)"/);
 });

@@ -21,7 +21,7 @@
       UI.playhead.style.setProperty("--progress", progress.toFixed(5));
       UI.trackTime.textContent = formatTime(position);
       UI.musicSection.textContent = section.name;
-      const style = music.styles[music.styleId] || music.styles.gravesong;
+      const style = music.styles[music.styleId] || music.styles.silver;
       if (UI.trackTitle) {
         UI.trackTitle.textContent = music.samplesReady
           ? `${style.label.toUpperCase()} · ${Math.round(music.bpm)} BPM`
@@ -70,9 +70,8 @@
       UI.chrome.removeAttribute("inert");
       UI.start.disabled = false;
       const arenaName = game.arenaTemplate().label;
-      UI.live.textContent = game.player.champion !== "ziggs"
-        ? `Rift Bomber · ${arenaName}. ${game.player.name} uses WASD, Q/F/E/R and Space. Red Ziggs uses arrows and Enter.`
-        : `Rift Bomber · ${arenaName}. Blue Ziggs uses WASD, Q and Shift. Red Ziggs uses arrows and Enter.`;
+      UI.live.textContent =
+        `Rift Bomber · ${arenaName}. ${game.player.name} uses WASD, Q/F/E/R and Space. ${game.players[1].name} uses arrows and Enter.`;
     }
 
     function openGuide() {
@@ -108,7 +107,6 @@
         else if (event.code === "KeyR") game.castAbility(3);
         else if (event.code === "ShiftLeft") game.castAbility(1);
         else if (event.code === "Enter" || event.code === "Numpad0") game.placeBomb(game.players[1]);
-        else if (event.code === "ShiftRight") game.requestDash(game.players[1]);
         else if (event.code === "KeyM") toggleSound();
         else if (event.code === "KeyP") game.togglePause();
         else if (event.code === "KeyH") openGuide();
@@ -162,18 +160,28 @@
       UI.live.textContent = muted ? "Soundtrack muted" : "Soundtrack restored";
     }
 
-    function paintArenaMini(host, grid, arenaId) {
+    function paintArenaMini(host, grid, arena) {
       host.replaceChildren();
-      const safe = new Set([
-        `${grid.length - 2},1`, `${grid.length - 3},1`, `${grid.length - 2},2`,
-        `1,${grid[0].length - 2}`, `2,${grid[0].length - 2}`, `1,${grid[0].length - 3}`
-      ]);
-      host.dataset.arena = arenaId || "";
+      const rows = grid.length;
+      const cols = grid[0].length;
+      const blueSpawn = new Set([`${rows - 2},1`, `${rows - 3},1`, `${rows - 2},2`]);
+      const redSpawn = new Set([`1,${cols - 2}`, `2,${cols - 2}`, `1,${cols - 3}`]);
+      const theme = arena.previewTheme;
+      host.dataset.arena = arena.id;
+      host.style.setProperty("--arena-clear", theme.clear);
+      host.style.setProperty("--arena-floor-a", theme.floorA);
+      host.style.setProperty("--arena-floor-b", theme.floorB);
+      host.style.setProperty("--arena-stone", theme.stone);
+      host.style.setProperty("--arena-stone-top", theme.stoneTop);
+      host.style.setProperty("--arena-crystal", theme.crystal);
+      host.style.setProperty("--arena-accent", theme.accent);
       for (let r = 0; r < grid.length; r++) {
         for (let c = 0; c < grid[r].length; c++) {
           const cell = document.createElement("i");
           const key = `${r},${c}`;
-          if (safe.has(key)) cell.dataset.t = "s";
+          cell.dataset.parity = String((r + c) % 2);
+          if (blueSpawn.has(key)) cell.dataset.t = "blue";
+          else if (redSpawn.has(key)) cell.dataset.t = "red";
           else if (grid[r][c] === 1) cell.dataset.t = "1";
           else if (grid[r][c] === 2) cell.dataset.t = "2";
           host.appendChild(cell);
@@ -199,7 +207,7 @@
         const mini = document.createElement("div");
         mini.className = "arena-mini";
         mini.setAttribute("aria-hidden", "true");
-        paintArenaMini(mini, game.previewGrid(arena.id), arena.id);
+        paintArenaMini(mini, game.previewGrid(arena.id), arena);
         const title = document.createElement("strong");
         title.textContent = arena.label;
         const blurb = document.createElement("small");

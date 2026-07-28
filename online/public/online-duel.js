@@ -9,10 +9,10 @@
   ];
   const ICE_CANDIDATE_GRACE_MS = 250;
   const ICE_GATHER_TIMEOUT_MS = 8000;
-  const CHAMPIONS = ["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"];
+  const CHAMPIONS = ["katarina", "zed", "renekton", "vladimir", "gangplank"];
   const CHAMPION_NAMES = {
     katarina: "Katarina", zed: "Zed", renekton: "Renekton",
-    vladimir: "Vladimir", gangplank: "Gangplank", ziggs: "Ziggs"
+    vladimir: "Vladimir", gangplank: "Gangplank"
   };
   const SNAPSHOT_INTERVAL = 1000 / 20;
   const SNAPSHOT_ARRAYS = [
@@ -46,7 +46,7 @@
     remoteInput: { up: false, down: false, left: false, right: false },
     localInput: { up: false, down: false, left: false, right: false },
     hostChampion: game.selectedChampion,
-    guestChampion: "ziggs",
+    guestChampion: "gangplank",
     arena: game.selectedArena,
     musicStyle: music.styleId || "gravesong",
     musicEnabled: true,
@@ -88,7 +88,7 @@
         </article>
         <article class="online-player" data-player="guest">
           <span class="online-player__side">P2 · GUEST</span>
-          <strong id="online-guest-champion">Ziggs</strong>
+          <strong id="online-guest-champion">Gangplank</strong>
           <span class="online-player__state" id="online-guest-state">WAITING</span>
         </article>
       </div>
@@ -128,7 +128,7 @@
   const status = $p("#online-status");
 
   const validChampion = (value) => typeof value === "string" && CHAMPIONS.includes(value);
-  const championName = (value) => CHAMPION_NAMES[value] || "Ziggs";
+  const championName = (value) => CHAMPION_NAMES[value] || "Gangplank";
 
   function setStatus(message, tone = "") {
     status.textContent = message;
@@ -586,7 +586,7 @@
     resetConnection();
     setOnlineRole("host");
     state.hostChampion = game.selectedChampion;
-    state.guestChampion = "ziggs";
+    state.guestChampion = "gangplank";
     state.arena = game.selectedArena;
     state.musicStyle = music.styleId || "gravesong";
     state.musicEnabled = true;
@@ -642,7 +642,7 @@
     resetConnection();
     setOnlineRole("guest");
     state.roomCode = code;
-    state.guestChampion = "ziggs";
+    state.guestChampion = "gangplank";
     roomLabel.textContent = "JOINED LOBBY";
     roomCode.textContent = code;
     setChampionButtons(state.guestChampion);
@@ -702,7 +702,7 @@
     setBusy(false);
     joinForm.hidden = true;
     connection.hidden = true;
-    game.selectedChampion2 = "ziggs";
+    game.selectedChampion2 = "gangplank";
     if (game.mode === "intro") game.resetPlayers();
     UI.start.disabled = false;
     UI.start.textContent = `>>> DEPLOY ${game.player.name.toUpperCase()}`;

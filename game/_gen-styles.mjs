@@ -10,43 +10,8 @@ function S(id, label, blurb, baseBpm, minBpm, maxBpm, swing, mix, sections, chor
 const sec = (names, intensities) =>
   names.map((name, i) => ({ bar: [0, 8, 20, 36, 50, 60][i], name, intensity: intensities[i] }));
 
+// The selectable score is intentionally limited to the three approved tracks.
 const styles = {
-  gravesong: S("gravesong", "Gravesong", "Dark fantasy · slow cello weight", 68, 58, 84, 0,
-    { string: 1.15, keys: 0.72, low: 2.8, dark: 4200, reverb: 0.55 },
-    sec(["Low strings", "Ostinato", "Stone piano", "Thin violin", "Weight", "Fade mist"], [0.16, 0.32, 0.48, 0.62, 0.82, 0.4]),
-    [[45, 48, 52], [41, 45, 48], [50, 53, 57], [40, 43, 47]], [33, 29, 38, 28],
-    [0, 0, 7, 0, 0, 8, 7, 5],
-    [45, 43, 41, 40, 38, 40, 41, 43, 45, 47, 48, 47, 45, 43, 41, 40],
-    [57, 55, 53, 52, 53, 55, 57, 55, 52, 50, 52, 53, 55, 57, 55, 52],
-    { organ: 1, piano: 0.5, celloOst: 1, celloMel: 1, violin: 0.45, halfViolin: 0.55, subBass: 1, harp: 0, flute: 0, horn: 0.2, drive: 0 }),
-
-  hextech: S("hextech", "Hextech Pulse", "Faster · piano drive · organ stabs", 92, 80, 112, 0,
-    { string: 1.0, keys: 0.95, low: 1.6, dark: 5200, reverb: 0.38 },
-    sec(["Crystal idle", "Core spin", "Lane heat", "Overdrive", "Surge", "Coolant"], [0.22, 0.4, 0.58, 0.74, 0.92, 0.48]),
-    [[48, 52, 55], [43, 47, 50], [45, 48, 52], [41, 45, 48]], [36, 31, 33, 29],
-    [0, 7, 0, 5, 0, 7, 3, 5],
-    [48, 50, 52, 50, 48, 47, 45, 47, 48, 52, 55, 52, 50, 48, 47, 45],
-    [60, 62, 64, 62, 60, 59, 57, 59, 60, 64, 67, 64, 62, 60, 59, 57],
-    { organ: 1, piano: 1, celloOst: 1, celloMel: 0.65, violin: 0.55, halfViolin: 0.7, subBass: 0.45, harp: 0.15, flute: 0, horn: 0.25, drive: 1 }),
-
-  noxian: S("noxian", "Noxian March", "Heavy march · contrabass iron", 78, 68, 96, 0,
-    { string: 1.25, keys: 0.55, low: 3.6, dark: 3600, reverb: 0.42 },
-    sec(["Iron step", "War hush", "Blade line", "Charge", "Blood", "Aftermath"], [0.2, 0.38, 0.56, 0.72, 0.9, 0.44]),
-    [[45, 48, 52], [40, 43, 47], [38, 41, 45], [43, 47, 50]], [33, 28, 26, 31],
-    [0, 0, 0, 7, 0, 0, 5, 7],
-    [40, 41, 43, 40, 38, 40, 41, 43, 45, 43, 41, 40, 38, 36, 38, 40],
-    [55, 57, 59, 57, 55, 52, 55, 57, 59, 60, 59, 57, 55, 52, 53, 55],
-    { organ: 0.55, piano: 0.35, celloOst: 1.2, celloMel: 0.85, violin: 0.35, halfViolin: 0.5, subBass: 1.15, harp: 0, flute: 0, horn: 0.4, drive: 0 }),
-
-  shadow: S("shadow", "Shadow Waltz", "Sparse · violin mist · soft keys", 60, 52, 76, 0.12,
-    { string: 1.05, keys: 0.88, low: 2.0, dark: 4800, reverb: 0.68 },
-    sec(["Mist", "Veil", "Whisper line", "Duet dusk", "Eclipse", "Fade"], [0.14, 0.28, 0.46, 0.6, 0.78, 0.36]),
-    [[45, 48, 52], [48, 52, 55], [41, 45, 48], [43, 47, 50]], [33, 36, 29, 31],
-    [0, 0, 3, 0, 0, 7, 5, 3],
-    [45, 47, 48, 47, 45, 43, 41, 43, 45, 48, 50, 48, 47, 45, 43, 41],
-    [57, 59, 60, 62, 60, 59, 57, 55, 57, 60, 64, 62, 60, 59, 57, 55],
-    { organ: 0.85, piano: 0.4, celloOst: 0.7, celloMel: 0.75, violin: 0.75, halfViolin: 0.85, subBass: 0.25, harp: 0.3, flute: 0.1, horn: 0, drive: 0 }),
-
   silver: S("silver", "Silver Thread", "Long bows · light duet · airy", 72, 64, 88, 0.06,
     { string: 1.12, keys: 0.48, low: 0.6, dark: 5600, reverb: 0.5 },
     sec(["Silver air", "Thread", "Long line", "Duet silver", "Lift", "Drift"], [0.18, 0.34, 0.5, 0.66, 0.8, 0.42]),
@@ -56,186 +21,6 @@ const styles = {
     [64, 62, 60, 62, 64, 67, 64, 62, 60, 59, 60, 62, 64, 62, 60, 57],
     { organ: 0.35, piano: 0.25, celloOst: 0.55, celloMel: 1.05, violin: 0.95, halfViolin: 0.9, subBass: 0, harp: 0.55, flute: 0.2, horn: 0.15, drive: 0 }),
 
-  glass: S("glass", "Glass Arco", "Clear cello · violin lead · no weight", 66, 58, 82, 0,
-    { string: 1.08, keys: 0.4, low: 0.35, dark: 6000, reverb: 0.58 },
-    sec(["Clear air", "Glass bow", "Violin open", "Mirror line", "Shine", "Still"], [0.16, 0.32, 0.52, 0.68, 0.82, 0.4]),
-    [[50, 53, 57], [48, 52, 55], [52, 55, 59], [45, 48, 52]], [50, 48, 52, 45],
-    [0, 0, 0, 5, 0, 0, 7, 5],
-    [57, 55, 53, 55, 57, 59, 57, 55, 53, 52, 53, 55, 57, 59, 60, 57],
-    [67, 64, 62, 64, 67, 69, 67, 64, 62, 60, 62, 64, 67, 64, 62, 60],
-    { organ: 0.25, piano: 0.2, celloOst: 0.4, celloMel: 0.95, violin: 1.1, halfViolin: 1.0, subBass: 0, harp: 0.35, flute: 0.65, horn: 0, drive: 0 }),
-
-  aurora: S("aurora", "Aurora Duet", "Soft long notes · gentle piano", 64, 56, 78, 0.08,
-    { string: 1.05, keys: 0.62, low: 0.9, dark: 5400, reverb: 0.62 },
-    sec(["Dawn hush", "Pale light", "Twin bows", "Open sky", "Bloom", "Afterglow"], [0.15, 0.3, 0.48, 0.64, 0.78, 0.38]),
-    [[48, 52, 55], [50, 53, 57], [45, 48, 52], [47, 50, 53]], [48, 50, 45, 47],
-    [0, 0, 7, 0, 3, 0, 5, 7],
-    [52, 53, 55, 57, 55, 53, 52, 50, 52, 55, 57, 59, 57, 55, 53, 52],
-    [64, 65, 67, 69, 67, 65, 64, 62, 64, 67, 69, 71, 69, 67, 65, 64],
-    { organ: 0.45, piano: 0.55, celloOst: 0.5, celloMel: 1.0, violin: 1.0, halfViolin: 0.95, subBass: 0.05, harp: 0.45, flute: 0.25, horn: 0.4, drive: 0 }),
-
-  underdark: S("underdark", "Underdark", "Very low · sparse · dread", 58, 50, 72, 0,
-    { string: 1.2, keys: 0.5, low: 3.8, dark: 3000, reverb: 0.72 },
-    sec(["Depth", "Crawl", "Pressure", "Vein", "Abyss", "Silence"], [0.12, 0.28, 0.46, 0.62, 0.84, 0.34]),
-    [[40, 43, 47], [38, 41, 45], [33, 36, 40], [36, 40, 43]], [28, 26, 21, 24],
-    [0, 0, 0, 0, 0, 5, 0, 7],
-    [40, 38, 36, 38, 40, 41, 40, 38, 36, 33, 36, 38, 40, 38, 36, 33],
-    [52, 50, 48, 50, 52, 53, 52, 50, 48, 47, 48, 50, 52, 50, 48, 45],
-    { organ: 0.7, piano: 0.15, celloOst: 0.9, celloMel: 0.7, violin: 0.25, halfViolin: 0.35, subBass: 1.2, harp: 0, flute: 0, horn: 0.15, drive: 0 }),
-
-  voidchoir: S("voidchoir", "Void Choir", "Organ cathedral · slow swell", 62, 54, 78, 0,
-    { string: 0.95, keys: 1.05, low: 2.2, dark: 3800, reverb: 0.78 },
-    sec(["Nave", "Choir pad", "Aisle", "Sanctum", "Spire", "Amen"], [0.18, 0.36, 0.52, 0.7, 0.86, 0.4]),
-    [[45, 48, 52], [41, 45, 48], [48, 52, 55], [43, 47, 50]], [33, 29, 36, 31],
-    [0, 0, 7, 0, 0, 0, 5, 0],
-    [45, 45, 43, 41, 40, 41, 43, 45, 47, 48, 47, 45, 43, 41, 40, 41],
-    [57, 55, 53, 55, 57, 59, 57, 55, 53, 52, 53, 55, 57, 55, 53, 52],
-    { organ: 1.25, piano: 0.2, celloOst: 0.55, celloMel: 0.6, violin: 0.4, halfViolin: 0.45, subBass: 0.55, harp: 0.1, flute: 0, horn: 0.35, drive: 0 }),
-
-  ionia: S("ionia", "Ionia Bloom", "Soft · flute color · gentle", 74, 66, 90, 0.05,
-    { string: 1.0, keys: 0.55, low: 0.7, dark: 5800, reverb: 0.55 },
-    sec(["Petal", "Stream", "Grove", "Spirit", "Bloom", "Still water"], [0.18, 0.34, 0.5, 0.66, 0.8, 0.4]),
-    [[48, 50, 55], [50, 53, 57], [45, 48, 52], [47, 50, 55]], [48, 50, 45, 47],
-    [0, 0, 5, 0, 0, 7, 2, 5],
-    [55, 57, 59, 60, 59, 57, 55, 52, 55, 57, 60, 62, 60, 57, 55, 52],
-    [64, 67, 69, 67, 64, 62, 64, 67, 69, 71, 69, 67, 64, 62, 60, 62],
-    { organ: 0.3, piano: 0.35, celloOst: 0.5, celloMel: 0.9, violin: 0.85, halfViolin: 0.8, subBass: 0, harp: 0.5, flute: 0.75, horn: 0.1, drive: 0 }),
-
-  freljord: S("freljord", "Freljord Wind", "Cold open fifths · sparse", 70, 60, 86, 0,
-    { string: 1.1, keys: 0.45, low: 1.4, dark: 4500, reverb: 0.7 },
-    sec(["Snow", "Gale", "Ice line", "Ridge", "Storm edge", "Whiteout"], [0.14, 0.3, 0.48, 0.64, 0.8, 0.38]),
-    [[45, 52, 57], [40, 47, 52], [43, 50, 55], [38, 45, 50]], [33, 28, 31, 26],
-    [0, 0, 7, 0, 0, 7, 0, 12],
-    [45, 45, 47, 45, 43, 40, 43, 45, 47, 48, 47, 45, 43, 40, 38, 40],
-    [57, 57, 59, 57, 55, 52, 55, 57, 59, 60, 59, 57, 55, 52, 50, 52],
-    { organ: 0.4, piano: 0.2, celloOst: 0.75, celloMel: 0.7, violin: 0.55, halfViolin: 0.5, subBass: 0.5, harp: 0.15, flute: 0.35, horn: 0.45, drive: 0 }),
-
-  piltover: S("piltover", "Piltover Clock", "Bright mid · piano tick", 88, 78, 106, 0,
-    { string: 0.95, keys: 1.0, low: 1.2, dark: 5600, reverb: 0.4 },
-    sec(["Gear idle", "Tick", "Workshop", "Spark", "Launch", "Cool"], [0.22, 0.4, 0.56, 0.72, 0.9, 0.46]),
-    [[48, 52, 55], [50, 53, 57], [43, 47, 50], [45, 48, 52]], [36, 38, 31, 33],
-    [0, 5, 7, 5, 0, 7, 12, 7],
-    [48, 50, 52, 53, 52, 50, 48, 47, 48, 52, 55, 53, 52, 50, 48, 45],
-    [60, 62, 64, 65, 64, 62, 60, 59, 60, 64, 67, 65, 64, 62, 60, 57],
-    { organ: 0.7, piano: 1.05, celloOst: 0.75, celloMel: 0.55, violin: 0.5, halfViolin: 0.6, subBass: 0.35, harp: 0.2, flute: 0.15, horn: 0.3, drive: 1 }),
-
-  mistveil: S("mistveil", "Mistveil", "Ultra sparse · violin whisper", 56, 48, 70, 0.1,
-    { string: 1.0, keys: 0.35, low: 0.5, dark: 5200, reverb: 0.8 },
-    sec(["Fog", "Drift", "Far bow", "Near veil", "Part", "Gone"], [0.1, 0.22, 0.4, 0.55, 0.7, 0.3]),
-    [[45, 52, 57], [48, 52, 55], [41, 48, 53], [43, 50, 55]], [33, 36, 29, 31],
-    [0, 0, 0, 7, 0, 0, 0, 5],
-    [45, 45, 43, 45, 47, 45, 43, 41, 43, 45, 47, 48, 47, 45, 43, 41],
-    [57, 59, 60, 59, 57, 55, 57, 59, 60, 62, 60, 59, 57, 55, 53, 55],
-    { organ: 0.25, piano: 0.15, celloOst: 0.35, celloMel: 0.55, violin: 1.05, halfViolin: 0.7, subBass: 0, harp: 0.4, flute: 0.3, horn: 0, drive: 0 }),
-
-  willow: S("willow", "Willow Cello", "Cello first · long · soft", 68, 60, 84, 0.04,
-    { string: 1.18, keys: 0.38, low: 0.8, dark: 5000, reverb: 0.52 },
-    sec(["Solo bow", "Root", "Phrase", "Answer", "Rise", "Rest"], [0.16, 0.32, 0.5, 0.64, 0.78, 0.38]),
-    [[48, 52, 55], [45, 48, 52], [50, 53, 57], [43, 47, 50]], [48, 45, 50, 43],
-    [0, 0, 0, 5, 0, 0, 7, 0],
-    [52, 53, 55, 57, 55, 53, 52, 50, 52, 55, 57, 59, 57, 55, 52, 48],
-    [60, 62, 64, 62, 60, 57, 60, 62, 64, 65, 64, 62, 60, 57, 55, 57],
-    { organ: 0.2, piano: 0.2, celloOst: 0.45, celloMel: 1.2, violin: 0.45, halfViolin: 0.4, subBass: 0, harp: 0.25, flute: 0.1, horn: 0.15, drive: 0 }),
-
-  celestine: S("celestine", "Celestine", "Violin + harp · luminous", 70, 62, 86, 0.06,
-    { string: 1.05, keys: 0.7, low: 0.45, dark: 6200, reverb: 0.6 },
-    sec(["Star", "Harp dust", "Arc", "Constellation", "Peak light", "Dim"], [0.18, 0.34, 0.52, 0.68, 0.84, 0.4]),
-    [[50, 53, 57], [52, 55, 59], [48, 52, 55], [45, 48, 52]], [50, 52, 48, 45],
-    [0, 0, 7, 0, 0, 5, 0, 7],
-    [55, 57, 59, 60, 59, 57, 55, 53, 55, 57, 60, 62, 60, 57, 55, 52],
-    [67, 69, 71, 69, 67, 64, 67, 69, 71, 72, 71, 69, 67, 64, 62, 64],
-    { organ: 0.25, piano: 0.3, celloOst: 0.4, celloMel: 0.65, violin: 1.15, halfViolin: 1.0, subBass: 0, harp: 0.9, flute: 0.35, horn: 0.1, drive: 0 }),
-
-  twilight: S("twilight", "Twilight Balance", "Even cello · violin · soft", 72, 64, 88, 0.05,
-    { string: 1.1, keys: 0.55, low: 1.0, dark: 5200, reverb: 0.55 },
-    sec(["Dusk", "Balance", "Trade", "Weave", "Glow", "Night"], [0.18, 0.34, 0.52, 0.68, 0.82, 0.4]),
-    [[45, 48, 52], [48, 52, 55], [50, 53, 57], [43, 47, 50]], [45, 48, 50, 43],
-    [0, 0, 5, 7, 0, 5, 0, 3],
-    [52, 53, 55, 53, 52, 50, 52, 55, 57, 55, 53, 52, 50, 48, 50, 52],
-    [64, 65, 67, 65, 64, 62, 64, 67, 69, 67, 65, 64, 62, 60, 62, 64],
-    { organ: 0.4, piano: 0.4, celloOst: 0.65, celloMel: 0.95, violin: 0.95, halfViolin: 0.9, subBass: 0.15, harp: 0.35, flute: 0.2, horn: 0.2, drive: 0 }),
-
-  nocturne: S("nocturne", "Nocturne", "Night minor · soft weight", 64, 56, 80, 0.08,
-    { string: 1.08, keys: 0.7, low: 1.5, dark: 4400, reverb: 0.65 },
-    sec(["Lamp", "Street", "Window", "Hall", "Midnight", "Out"], [0.16, 0.32, 0.5, 0.66, 0.82, 0.38]),
-    [[45, 48, 52], [41, 45, 48], [48, 52, 55], [38, 41, 45]], [33, 29, 36, 26],
-    [0, 0, 7, 0, 3, 0, 5, 7],
-    [45, 47, 48, 50, 48, 47, 45, 43, 45, 48, 50, 52, 50, 48, 47, 45],
-    [57, 59, 60, 62, 60, 59, 57, 55, 57, 60, 62, 64, 62, 60, 59, 57],
-    { organ: 0.75, piano: 0.45, celloOst: 0.7, celloMel: 0.85, violin: 0.7, halfViolin: 0.65, subBass: 0.4, harp: 0.2, flute: 0.1, horn: 0.25, drive: 0 }),
-
-  emberline: S("emberline", "Emberline", "Warm minor · soft horn", 76, 66, 92, 0,
-    { string: 1.05, keys: 0.6, low: 1.3, dark: 4800, reverb: 0.48 },
-    sec(["Coal", "Glow", "Line", "Forge soft", "Flame", "Ash"], [0.2, 0.36, 0.54, 0.7, 0.86, 0.42]),
-    [[45, 48, 52], [50, 53, 57], [41, 45, 48], [43, 47, 50]], [33, 38, 29, 31],
-    [0, 5, 0, 7, 0, 5, 3, 7],
-    [48, 50, 52, 50, 48, 45, 48, 50, 52, 53, 52, 50, 48, 45, 43, 45],
-    [60, 62, 64, 62, 60, 57, 60, 62, 64, 65, 64, 62, 60, 57, 55, 57],
-    { organ: 0.5, piano: 0.4, celloOst: 0.8, celloMel: 0.8, violin: 0.6, halfViolin: 0.55, subBass: 0.35, harp: 0.15, flute: 0.1, horn: 0.7, drive: 0 }),
-
-  riftcalm: S("riftcalm", "Rift Calm", "Arena idle · mid cello", 80, 70, 98, 0,
-    { string: 1.05, keys: 0.65, low: 1.1, dark: 5000, reverb: 0.45 },
-    sec(["Idle", "Path", "Brush", "Skirmish hush", "Push soft", "Reset"], [0.2, 0.36, 0.54, 0.7, 0.84, 0.44]),
-    [[48, 52, 55], [45, 48, 52], [43, 47, 50], [41, 45, 48]], [36, 33, 31, 29],
-    [0, 0, 7, 5, 0, 7, 0, 5],
-    [50, 52, 53, 52, 50, 48, 50, 52, 55, 53, 52, 50, 48, 47, 48, 50],
-    [62, 64, 65, 64, 62, 60, 62, 64, 67, 65, 64, 62, 60, 59, 60, 62],
-    { organ: 0.55, piano: 0.5, celloOst: 0.75, celloMel: 0.85, violin: 0.65, halfViolin: 0.6, subBass: 0.3, harp: 0.2, flute: 0.15, horn: 0.25, drive: 0 }),
-
-  solari: S("solari", "Solari Rise", "Brighter minor · lift", 84, 72, 102, 0,
-    { string: 1.0, keys: 0.75, low: 0.9, dark: 5800, reverb: 0.42 },
-    sec(["Horizon", "Climb", "Crest", "Sun line", "Peak", "Gold fade"], [0.22, 0.4, 0.58, 0.74, 0.9, 0.46]),
-    [[48, 52, 55], [50, 53, 57], [52, 55, 59], [45, 48, 52]], [36, 38, 40, 33],
-    [0, 7, 12, 7, 0, 5, 7, 12],
-    [52, 55, 57, 59, 57, 55, 52, 50, 52, 55, 59, 60, 59, 55, 52, 48],
-    [64, 67, 69, 71, 69, 67, 64, 62, 64, 67, 71, 72, 71, 67, 64, 60],
-    { organ: 0.55, piano: 0.6, celloOst: 0.6, celloMel: 0.75, violin: 0.85, halfViolin: 0.8, subBass: 0.2, harp: 0.35, flute: 0.4, horn: 0.45, drive: 0.5 }),
-
-  hushsteel: S("hushsteel", "Hush Steel", "Quiet combat · mid bows", 82, 72, 100, 0,
-    { string: 1.12, keys: 0.5, low: 1.4, dark: 4600, reverb: 0.4 },
-    sec(["Ready", "Step", "Clash hush", "Press", "Steel", "Hold"], [0.2, 0.38, 0.56, 0.72, 0.88, 0.44]),
-    [[45, 48, 52], [43, 47, 50], [40, 43, 47], [41, 45, 48]], [33, 31, 28, 29],
-    [0, 0, 7, 0, 5, 7, 0, 5],
-    [48, 47, 45, 47, 48, 50, 48, 47, 45, 43, 45, 47, 48, 50, 48, 45],
-    [60, 59, 57, 59, 60, 62, 60, 59, 57, 55, 57, 59, 60, 62, 60, 57],
-    { organ: 0.4, piano: 0.35, celloOst: 0.9, celloMel: 0.8, violin: 0.55, halfViolin: 0.55, subBass: 0.45, harp: 0, flute: 0, horn: 0.3, drive: 0 }),
-
-  riverlight: S("riverlight", "Riverlight", "Flowing cello · soft harp", 76, 68, 92, 0.07,
-    { string: 1.08, keys: 0.58, low: 0.75, dark: 5600, reverb: 0.58 },
-    sec(["Bank", "Current", "Eddy", "Bend", "Glint", "Shore"], [0.18, 0.34, 0.5, 0.66, 0.8, 0.4]),
-    [[50, 53, 57], [48, 52, 55], [52, 55, 59], [47, 50, 53]], [50, 48, 52, 47],
-    [0, 0, 5, 7, 0, 3, 5, 7],
-    [55, 57, 59, 60, 59, 57, 55, 53, 55, 57, 59, 62, 60, 57, 55, 52],
-    [64, 65, 67, 69, 67, 65, 64, 62, 64, 67, 69, 71, 69, 67, 64, 60],
-    { organ: 0.35, piano: 0.35, celloOst: 0.55, celloMel: 1.0, violin: 0.8, halfViolin: 0.85, subBass: 0, harp: 0.7, flute: 0.35, horn: 0.15, drive: 0 }),
-
-  ashveil: S("ashveil", "Ashveil", "Muted · after battle", 60, 52, 74, 0,
-    { string: 1.05, keys: 0.5, low: 1.8, dark: 4000, reverb: 0.7 },
-    sec(["Smoke", "Ash", "Quiet field", "Wind", "Ember rest", "Cold"], [0.14, 0.28, 0.44, 0.58, 0.72, 0.34]),
-    [[40, 43, 47], [45, 48, 52], [38, 41, 45], [43, 47, 50]], [28, 33, 26, 31],
-    [0, 0, 0, 5, 0, 0, 7, 0],
-    [43, 41, 40, 41, 43, 45, 43, 41, 40, 38, 40, 41, 43, 45, 43, 40],
-    [55, 53, 52, 53, 55, 57, 55, 53, 52, 50, 52, 53, 55, 57, 55, 52],
-    { organ: 0.55, piano: 0.25, celloOst: 0.6, celloMel: 0.75, violin: 0.5, halfViolin: 0.45, subBass: 0.55, harp: 0.1, flute: 0, horn: 0.2, drive: 0 }),
-
-  silkroad: S("silkroad", "Silk Road", "Traveling theme · mid bows", 78, 70, 94, 0.05,
-    { string: 1.05, keys: 0.5, low: 0.95, dark: 5400, reverb: 0.5 },
-    sec(["Path", "Caravan", "Pass", "Vista", "Camp", "Stars"], [0.2, 0.36, 0.52, 0.68, 0.82, 0.42]),
-    [[48, 52, 55], [50, 53, 57], [45, 50, 53], [47, 52, 55]], [36, 38, 33, 35],
-    [0, 5, 0, 7, 0, 5, 2, 7],
-    [52, 53, 55, 57, 55, 53, 50, 52, 55, 57, 59, 57, 55, 52, 50, 48],
-    [64, 65, 67, 69, 67, 65, 62, 64, 67, 69, 71, 69, 67, 64, 62, 60],
-    { organ: 0.35, piano: 0.4, celloOst: 0.65, celloMel: 0.9, violin: 0.85, halfViolin: 0.8, subBass: 0.15, harp: 0.45, flute: 0.4, horn: 0.3, drive: 0 }),
-
-  deepwell: S("deepwell", "Deep Well", "Low cello well · organ", 66, 58, 80, 0,
-    { string: 1.15, keys: 0.75, low: 2.6, dark: 3600, reverb: 0.66 },
-    sec(["Stone rim", "Drop", "Echo", "Depth", "Pressure", "Surface"], [0.16, 0.32, 0.48, 0.64, 0.8, 0.38]),
-    [[40, 43, 47], [45, 48, 52], [38, 41, 45], [41, 45, 48]], [28, 33, 26, 29],
-    [0, 0, 7, 0, 0, 5, 0, 7],
-    [40, 41, 43, 45, 43, 41, 40, 38, 40, 43, 45, 47, 45, 43, 40, 36],
-    [52, 53, 55, 57, 55, 53, 52, 50, 52, 55, 57, 59, 57, 55, 52, 48],
-    { organ: 0.9, piano: 0.25, celloOst: 0.85, celloMel: 0.85, violin: 0.4, halfViolin: 0.4, subBass: 0.85, harp: 0, flute: 0, horn: 0.25, drive: 0 }),
-
   bloodmoon: S("bloodmoon", "Blood Moon", "Ritual dark · thin violin", 58, 50, 72, 0.04,
     { string: 1.12, keys: 0.55, low: 2.4, dark: 3400, reverb: 0.74 },
     sec(["Rite", "Red hush", "Circle", "Omen", "Eclipse blood", "Still"], [0.14, 0.3, 0.48, 0.66, 0.84, 0.36]),
@@ -244,105 +29,6 @@ const styles = {
     [40, 41, 43, 41, 40, 38, 40, 43, 45, 43, 41, 40, 38, 36, 38, 40],
     [55, 53, 52, 53, 55, 57, 55, 53, 52, 50, 52, 55, 57, 55, 52, 48],
     { organ: 0.85, piano: 0.2, celloOst: 0.75, celloMel: 0.7, violin: 0.65, halfViolin: 0.55, subBass: 0.7, harp: 0.05, flute: 0, horn: 0.2, drive: 0 }),
-
-  demacia: S("demacia", "Demacia Light", "Noble mid · horn + strings", 80, 70, 98, 0,
-    { string: 1.08, keys: 0.7, low: 1.1, dark: 5600, reverb: 0.42 },
-    sec(["Walls", "Banner", "March soft", "Crest", "Glory hush", "Home"], [0.2, 0.38, 0.56, 0.72, 0.88, 0.44]),
-    [[48, 52, 55], [50, 53, 57], [45, 48, 52], [43, 47, 50]], [36, 38, 33, 31],
-    [0, 7, 0, 5, 0, 7, 12, 7],
-    [52, 53, 55, 57, 55, 53, 52, 50, 52, 55, 57, 59, 57, 55, 52, 48],
-    [64, 65, 67, 69, 67, 65, 64, 62, 64, 67, 69, 71, 69, 67, 64, 60],
-    { organ: 0.5, piano: 0.45, celloOst: 0.7, celloMel: 0.8, violin: 0.75, halfViolin: 0.7, subBass: 0.25, harp: 0.25, flute: 0.2, horn: 0.75, drive: 0.25 }),
-
-  zaun: S("zaun", "Zaun Chem", "Gritty mid · piano pulse", 90, 78, 110, 0,
-    { string: 0.95, keys: 0.95, low: 1.7, dark: 4800, reverb: 0.36 },
-    sec(["Pipe", "Valve", "Spark", "Fumes", "Overclock", "Drain"], [0.22, 0.4, 0.58, 0.74, 0.92, 0.46]),
-    [[45, 48, 52], [43, 47, 50], [48, 52, 55], [41, 45, 48]], [33, 31, 36, 29],
-    [0, 5, 7, 5, 0, 7, 3, 5],
-    [48, 50, 52, 50, 48, 47, 45, 47, 48, 52, 53, 52, 50, 48, 47, 45],
-    [60, 62, 64, 62, 60, 59, 57, 59, 60, 64, 65, 64, 62, 60, 59, 57],
-    { organ: 0.65, piano: 1.0, celloOst: 0.85, celloMel: 0.55, violin: 0.45, halfViolin: 0.55, subBass: 0.5, harp: 0.05, flute: 0, horn: 0.2, drive: 1 }),
-
-  targon: S("targon", "Targon Peak", "Cosmic sparse · high bows", 62, 54, 78, 0.06,
-    { string: 1.1, keys: 0.5, low: 0.55, dark: 6000, reverb: 0.72 },
-    sec(["Summit air", "Stars", "Constellation", "Peak line", "Void edge", "Descend"], [0.14, 0.3, 0.48, 0.66, 0.82, 0.36]),
-    [[50, 53, 57], [52, 55, 59], [48, 52, 55], [45, 50, 53]], [50, 52, 48, 45],
-    [0, 0, 7, 0, 0, 12, 7, 5],
-    [55, 57, 59, 60, 59, 57, 55, 52, 55, 57, 60, 62, 60, 57, 55, 52],
-    [67, 69, 71, 72, 71, 69, 67, 64, 67, 69, 72, 74, 72, 69, 67, 64],
-    { organ: 0.35, piano: 0.25, celloOst: 0.4, celloMel: 0.7, violin: 1.1, halfViolin: 0.95, subBass: 0, harp: 0.55, flute: 0.45, horn: 0.15, drive: 0 }),
-
-  bilgewater: S("bilgewater", "Bilgewater Tide", "Sway · mid cello · soft", 72, 64, 88, 0.14,
-    { string: 1.08, keys: 0.55, low: 1.2, dark: 5000, reverb: 0.55 },
-    sec(["Dock", "Tide", "Hull", "Horizon", "Storm edge", "Calm port"], [0.18, 0.34, 0.52, 0.68, 0.84, 0.4]),
-    [[45, 48, 52], [48, 52, 55], [43, 47, 50], [41, 45, 48]], [33, 36, 31, 29],
-    [0, 0, 5, 0, 7, 5, 0, 3],
-    [48, 50, 52, 53, 52, 50, 48, 47, 48, 50, 53, 55, 53, 50, 48, 45],
-    [60, 62, 64, 65, 64, 62, 60, 59, 60, 62, 65, 67, 65, 62, 60, 57],
-    { organ: 0.4, piano: 0.35, celloOst: 0.7, celloMel: 0.95, violin: 0.7, halfViolin: 0.7, subBass: 0.3, harp: 0.3, flute: 0.2, horn: 0.25, drive: 0 }),
-
-  blackmist: S("blackmist", "Black Mist", "Dread sparse · low organ", 54, 48, 68, 0,
-    { string: 1.15, keys: 0.65, low: 3.0, dark: 3000, reverb: 0.78 },
-    sec(["Fog wall", "Whisper", "Pull", "Drown soft", "Abyss", "Fade"], [0.1, 0.24, 0.42, 0.6, 0.8, 0.32]),
-    [[40, 43, 47], [38, 41, 45], [33, 36, 40], [36, 40, 43]], [28, 26, 21, 24],
-    [0, 0, 0, 0, 0, 0, 5, 0],
-    [40, 38, 36, 38, 40, 41, 40, 38, 36, 33, 36, 38, 40, 38, 36, 33],
-    [52, 50, 48, 50, 52, 53, 52, 50, 48, 45, 48, 50, 52, 50, 48, 45],
-    { organ: 1.0, piano: 0.1, celloOst: 0.65, celloMel: 0.55, violin: 0.3, halfViolin: 0.25, subBass: 1.0, harp: 0, flute: 0, horn: 0.1, drive: 0 }),
-
-  crystalspire: S("crystalspire", "Crystal Spire", "Bright harp · clear piano", 78, 68, 96, 0.04,
-    { string: 0.95, keys: 0.95, low: 0.55, dark: 6400, reverb: 0.48 },
-    sec(["Facet", "Sparkle", "Prism", "Spire", "Flash", "Rest light"], [0.2, 0.36, 0.54, 0.72, 0.88, 0.42]),
-    [[50, 53, 57], [52, 55, 59], [48, 52, 55], [47, 50, 53]], [50, 52, 48, 47],
-    [0, 5, 7, 12, 0, 7, 5, 7],
-    [55, 57, 59, 60, 59, 57, 55, 53, 55, 57, 60, 62, 60, 57, 55, 52],
-    [67, 69, 71, 72, 71, 69, 67, 65, 67, 69, 72, 74, 72, 69, 67, 64],
-    { organ: 0.3, piano: 0.85, celloOst: 0.4, celloMel: 0.55, violin: 0.7, halfViolin: 0.75, subBass: 0, harp: 1.0, flute: 0.35, horn: 0.1, drive: 0.35 }),
-
-  ironvale: S("ironvale", "Ironvale", "Combat mid · cello iron", 84, 74, 104, 0,
-    { string: 1.15, keys: 0.5, low: 1.8, dark: 4400, reverb: 0.4 },
-    sec(["Guard", "Step", "Clash", "Push", "Hold line", "Breathe"], [0.22, 0.4, 0.58, 0.74, 0.9, 0.46]),
-    [[45, 48, 52], [40, 43, 47], [43, 47, 50], [41, 45, 48]], [33, 28, 31, 29],
-    [0, 0, 7, 5, 0, 7, 5, 3],
-    [48, 47, 45, 47, 48, 50, 48, 47, 45, 43, 45, 47, 48, 50, 48, 45],
-    [60, 59, 57, 59, 60, 62, 60, 59, 57, 55, 57, 59, 60, 62, 60, 57],
-    { organ: 0.45, piano: 0.4, celloOst: 1.05, celloMel: 0.8, violin: 0.5, halfViolin: 0.5, subBass: 0.55, harp: 0, flute: 0, horn: 0.4, drive: 0.3 }),
-
-  duskpetal: S("duskpetal", "Dusk Petal", "Ultra soft · long bows", 60, 52, 74, 0.1,
-    { string: 1.05, keys: 0.45, low: 0.4, dark: 5800, reverb: 0.68 },
-    sec(["Petal fall", "Dusk air", "Soft line", "Twin hush", "Bloom dim", "Sleep"], [0.12, 0.26, 0.44, 0.6, 0.74, 0.34]),
-    [[48, 52, 55], [50, 53, 57], [45, 48, 52], [47, 50, 53]], [48, 50, 45, 47],
-    [0, 0, 0, 5, 0, 0, 7, 3],
-    [52, 53, 55, 53, 52, 50, 52, 55, 57, 55, 53, 52, 50, 48, 50, 52],
-    [64, 65, 67, 65, 64, 62, 64, 67, 69, 67, 65, 64, 62, 60, 62, 64],
-    { organ: 0.2, piano: 0.3, celloOst: 0.35, celloMel: 1.05, violin: 1.0, halfViolin: 0.9, subBass: 0, harp: 0.55, flute: 0.4, horn: 0.1, drive: 0 }),
-
-  stormcall: S("stormcall", "Stormcall", "Rising heat · horn swell", 86, 74, 108, 0,
-    { string: 1.05, keys: 0.7, low: 1.4, dark: 5000, reverb: 0.46 },
-    sec(["Cloud", "Wind up", "Thunder hush", "Call", "Break", "Rain cool"], [0.22, 0.4, 0.58, 0.74, 0.92, 0.46]),
-    [[45, 48, 52], [48, 52, 55], [43, 47, 50], [41, 45, 48]], [33, 36, 31, 29],
-    [0, 7, 0, 5, 0, 7, 5, 12],
-    [50, 52, 53, 55, 53, 52, 50, 48, 50, 53, 55, 57, 55, 52, 50, 48],
-    [62, 64, 65, 67, 65, 64, 62, 60, 62, 65, 67, 69, 67, 64, 62, 60],
-    { organ: 0.55, piano: 0.55, celloOst: 0.75, celloMel: 0.7, violin: 0.7, halfViolin: 0.7, subBass: 0.35, harp: 0.15, flute: 0.15, horn: 0.85, drive: 0.55 }),
-
-  stillwater: S("stillwater", "Stillwater", "Bare cello · space", 56, 50, 70, 0.08,
-    { string: 1.12, keys: 0.3, low: 0.7, dark: 5200, reverb: 0.7 },
-    sec(["Surface", "Ripple", "Depth soft", "Long note", "Mirror", "Quiet"], [0.1, 0.24, 0.4, 0.56, 0.7, 0.3]),
-    [[48, 52, 55], [45, 48, 52], [50, 53, 57], [43, 47, 50]], [48, 45, 50, 43],
-    [0, 0, 0, 0, 0, 5, 0, 0],
-    [52, 52, 50, 52, 53, 52, 50, 48, 50, 52, 55, 53, 52, 50, 48, 45],
-    [60, 60, 59, 60, 62, 60, 59, 57, 59, 60, 64, 62, 60, 59, 57, 55],
-    { organ: 0.15, piano: 0.15, celloOst: 0.3, celloMel: 1.15, violin: 0.55, halfViolin: 0.45, subBass: 0, harp: 0.2, flute: 0.15, horn: 0, drive: 0 }),
-
-  forgeglow: S("forgeglow", "Forge Glow", "Warm low · soft organ", 74, 64, 90, 0,
-    { string: 1.1, keys: 0.7, low: 2.0, dark: 4200, reverb: 0.5 },
-    sec(["Coal bed", "Heat", "Hammer hush", "Glow", "Metal song", "Cool"], [0.18, 0.36, 0.54, 0.7, 0.86, 0.4]),
-    [[45, 48, 52], [40, 43, 47], [48, 52, 55], [43, 47, 50]], [33, 28, 36, 31],
-    [0, 0, 7, 0, 5, 0, 7, 5],
-    [45, 47, 48, 50, 48, 47, 45, 43, 45, 48, 50, 52, 50, 48, 45, 43],
-    [57, 59, 60, 62, 60, 59, 57, 55, 57, 60, 62, 64, 62, 60, 57, 55],
-    { organ: 0.85, piano: 0.35, celloOst: 0.85, celloMel: 0.8, violin: 0.45, halfViolin: 0.45, subBass: 0.65, harp: 0.05, flute: 0, horn: 0.45, drive: 0 }),
 
   skyglass: S("skyglass", "Skyglass", "Airy violin · flute color", 70, 62, 86, 0.05,
     { string: 1.05, keys: 0.45, low: 0.35, dark: 6200, reverb: 0.6 },
@@ -354,25 +40,24 @@ const styles = {
     { organ: 0.2, piano: 0.25, celloOst: 0.35, celloMel: 0.6, violin: 1.15, halfViolin: 1.05, subBass: 0, harp: 0.4, flute: 0.85, horn: 0.1, drive: 0 })
 };
 
-// Serialize as JS object freeze block
-function emit(obj, indent = 10) {
-  const pad = " ".repeat(indent);
-  const lines = [];
-  for (const [id, style] of Object.entries(styles)) {
-    lines.push(`${pad}${id}: Object.freeze(${JSON.stringify(style)}),`);
-  }
-  return lines.join("\n");
+function emit() {
+  const pad = " ".repeat(10);
+  return Object.entries(styles)
+    .map(([id, style]) => `${pad}${id}: Object.freeze(${JSON.stringify(style)}),`)
+    .join("\n");
 }
 
 const p = "game/play-rift-soundtrack.js";
 let src = fs.readFileSync(p, "utf8");
-const start = src.indexOf("        // Selectable suite styles");
-const end = src.indexOf("        this.styleId = \"gravesong\";");
-if (start < 0 || end < 0) {
-  console.error("markers", start, end);
+const start = src.indexOf("        // Selectable score");
+const legacyStart = src.indexOf("        // Selectable suite styles");
+const markerStart = start >= 0 ? start : legacyStart;
+const end = src.indexOf("        this.styleId = ");
+if (markerStart < 0 || end < 0) {
+  console.error("markers", markerStart, end);
   process.exit(1);
 }
-const block = `        // Selectable suite styles — large quality catalog (real samples).\n        this.styles = Object.freeze({\n${emit()}\n        });\n`;
-src = src.slice(0, start) + block + src.slice(end);
+const block = `        // Selectable score — three approved tracks using the shared real-sample bank.\n        this.styles = Object.freeze({\n${emit()}\n        });\n`;
+src = src.slice(0, markerStart) + block + src.slice(end);
 fs.writeFileSync(p, src);
 console.log("styles:", Object.keys(styles).length, Object.keys(styles).join(", "));

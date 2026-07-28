@@ -32,14 +32,10 @@
             passive: GANGPLANK_ASSETS.passive,
             art: [GANGPLANK_ASSETS.q, GANGPLANK_ASSETS.w, GANGPLANK_ASSETS.e, GANGPLANK_ASSETS.r],
             abilities: ["Parrrley", "Remove Scurvy", "Powder Keg", "Cannon Barrage"]
-          },
-          ziggs: {
-            name: "Blue Ziggs", alt: "Ziggs, o Especialista em Hexplosivos", portrait: ZIGGS_PORTRAIT,
-            passive: null, art: null, abilities: ["Place bomb", "Satchel burst", "Current blast range", "Current speed and shield"]
           }
         };
         const presentation = presentations[selectedChampion];
-        const skillChampion = selectedChampion !== "ziggs";
+        const skillChampion = true;
         const championName = presentation.name;
         document.documentElement.dataset.champion = selectedChampion;
         UI.championChoices.forEach((button) =>
@@ -48,10 +44,8 @@
         UI.championPortrait.src = presentation.portrait;
         UI.championPortrait.alt = presentation.alt;
         UI.playerName.textContent = `P1 / ${championName.toUpperCase()}`;
-        UI.matchSubtitle.textContent = skillChampion
-          ? `${championName} vs Ziggs · first to 3`
-          : "Ziggs mirror match · first to 3";
-        UI.abilityDock.setAttribute("aria-label", skillChampion ? `${championName} abilities` : "Blue Ziggs arena stats");
+        UI.matchSubtitle.textContent = `${championName} vs Gangplank · first to 3`;
+        UI.abilityDock.setAttribute("aria-label", `${championName} abilities`);
         UI.start.textContent = `>>> DEPLOY ${championName.toUpperCase()}`;
 
         const icons = [UI.bombIcon, UI.dashIcon, UI.mineIcon, UI.ultIcon];
@@ -113,10 +107,8 @@
         UI.waveNumber.textContent = String(match.round);
         UI.enemyCount.textContent = String(Math.ceil(match.roundTime)).padStart(2, "0");
         const arenaLabel = match.arenaTemplate ? match.arenaTemplate().label : "Arena";
-        UI.matchSubtitle.textContent = p1.champion !== "ziggs"
-          ? `${p1.name} vs Ziggs · ${arenaLabel} · first to 3`
-          : `Ziggs mirror · ${arenaLabel} · first to 3`;
-        UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · Red Ziggs`;
+        UI.matchSubtitle.textContent = `${p1.name} vs ${p2.name.replace(/^Red /, "")} · ${arenaLabel} · first to 3`;
+        UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · ${p2.name}`;
         UI.waveLabel.textContent = match.roundLocked
           ? (match.pendingMatchWinner ? "Match point converted" : `Round ${String(match.round).padStart(2, "0")} complete`)
           : `Round ${String(match.round).padStart(2, "0")} · ${match.p2Human ? "Local versus" : "CPU controls Red"}`;
@@ -320,27 +312,6 @@
           UI.playerCard.dataset.eCooldown = p1.eCooldown.toFixed(3);
           UI.playerCard.dataset.rCooldown = p1.rCooldown.toFixed(3);
           UI.playerCard.dataset.barrels = String(barrels);
-        } else {
-          UI.resourceFill.style.transform = "scaleX(0.82)";
-          UI.bombLabel.textContent = `Bomb · ${available}/${p1.maxBombs} ready`;
-          UI.dashLabel.textContent = !unlocked[1]
-            ? "Satchel"
-            : p1.dashCooldown > 0 ? `Satchel · ${p1.dashCooldown.toFixed(1)}s` : "Satchel · ready";
-          UI.bombFill.style.transform = `scaleX(${available > 0 ? 1 : 0})`;
-          UI.dashFill.style.transform = `scaleX(${unlocked[1] ? 1 - clamp(p1.dashCooldown / 5, 0, 1) : 0})`;
-          UI.rangeLabel.textContent = `Blast · ${p1.range} tiles`;
-          UI.mineFill.style.transform = `scaleX(${clamp(p1.range / 6, 0, 1)})`;
-          UI.shieldLabel.textContent = p1.shield > 0
-            ? `Shield · ${p1.shield} charge${p1.shield > 1 ? "s" : ""}`
-            : `Speed · ${(p1.speed / 3.45).toFixed(1)}×`;
-          UI.ultFill.style.transform = `scaleX(${p1.shield > 0 ? p1.shield / 2 : clamp((p1.speed - 3.2) / 1.55, 0.12, 1)})`;
-          UI.bombAction.disabled = available <= 0 || locked;
-          UI.bombAction.classList.remove("is-locked");
-          gateSkill(UI.dashAction, 1, p1.dashCooldown > 0);
-          UI.mineAction.disabled = true;
-          UI.ultAction.disabled = true;
-          UI.mineAction.classList.add("is-locked");
-          UI.ultAction.classList.add("is-locked");
         }
 
         const maxX = match.tile * (match.cols - 1) / 2;

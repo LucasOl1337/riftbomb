@@ -71,7 +71,7 @@ Hoje o CPU **não** usa skills. Requisito alvo:
 | Kit v1 | Usa 1–2 skills “simples” por campeão (ex.: dash de escape, skill de poke) |
 | Kit v2 | Combo e timing de R coerentes com o kit real |
 
-O bot deve escolher kit **do campeão que está jogando** (Katarina, Zed, Renekton, Vladimir, Gangplank, Ziggs…), não um kit genérico inventado.
+O bot deve escolher kit **do campeão que está jogando** (Katarina, Zed, Renekton, Vladimir, Gangplank…), não um kit genérico inventado.
 
 ### RF-07 — Dificuldades
 

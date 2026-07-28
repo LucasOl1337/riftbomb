@@ -1649,7 +1649,6 @@ aba498c27e46429c assets/characters/renekton/skins/skin48/particles/renekton_skin
 0cbd6450f4e6c98e assets/characters/renekton/skins/skin48/particles/renekton_vg_trasition.tex
 e4c6fb37c0289bdc assets/characters/renekton/skins/skin48/particles/sruap_order_nexus_sparklegold.tex
 fda9375498e87c88 assets/characters/renekton/skins/skin48/particles/testvfx_w_inkpact_erode_03.tex
-64d287d1a9211bd5 assets/characters/renekton/skins/skin48/particles/testziggs_skin05_passive_energyring.scb
 2b16cebf43cbea54 assets/characters/renekton/skins/skin48/particles/trans-renektonblade.tex
 97c1d1de20335089 assets/characters/renekton/skins/skin48/particles/udyr_skin06_blots.tex
 76661fd0c747ffa7 assets/characters/renekton/skins/skin48/particles/udyr_skin06_cape_nebula.tex
@@ -1692,7 +1691,6 @@ bde92efa5be96f1c assets/characters/renekton/skins/skin48/particles/yasuo_skin56_
 0cc899bfb0458e4a assets/characters/renekton/skins/skin48/particles/yasuo_skin56_w_ground_01.tex
 f54e9daebd5e26f5 assets/characters/renekton/skins/skin48/particles/yone_skin35_hit01.tex
 c8f7110963d0f7a0 assets/characters/renekton/skins/skin48/particles/yone_skin35_z_einstein_01_mult.tex
-da1fff7cb1b86d51 assets/characters/renekton/skins/skin48/particles/ziggs_skin05_passive_energylines2side.tex
 51d1dcf32f1e56b0 assets/characters/renekton/skins/skin48/renekton_skin48.skl
 e1385e44383534ae assets/characters/renekton/skins/skin48/renekton_skin48.skn
 02a1219a7d12d8a8 assets/characters/renekton/skins/skin48/renekton_skin48_tattoomask_tx_cm.tex

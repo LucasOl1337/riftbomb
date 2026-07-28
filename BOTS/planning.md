@@ -161,8 +161,6 @@ Ordem sugerida (do mais simples ao mais estadoful):
 3. **Katarina** — E em dagger / escape; Q para marcar
 4. **Zed** — W shadow + swap; Q poke
 5. **Gangplank** — barril + Q
-6. **Ziggs** — quando kit de arena estiver estável
-
 Cada campeão pode ter um módulo de pesos `BOTS/kits/<champ>.md` (doc) e depois `.js` se o arquivo crescer junto.
 
 **Estimativa:** 1 sessão por campeão na v1 rasa.
