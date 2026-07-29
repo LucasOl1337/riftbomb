@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { performance } from "node:perf_hooks";
 import { WebSocketServer, WebSocket } from "ws";
 import { AuthoritativeRooms, isChampion, validPreset } from "./authoritative-rooms.mjs";
 import { createJsonTransport } from "./json-transport.mjs";
@@ -106,7 +107,17 @@ const server = createServer((request, response) => {
   response.setHeader("cache-control", "no-store");
   if (request.url === "/health") {
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ ok: true, rooms: rooms.size, authority: "server", region: "sa-saopaulo-1" }));
+    response.end(JSON.stringify({
+      ok: true,
+      rooms: rooms.size,
+      authority: "server",
+      region: "sa-saopaulo-1",
+      performance: {
+        ...authoritativeRooms.performanceSnapshot(),
+        webSocketClients: webSockets.clients.size,
+        eventLoopUtilization: Number(performance.eventLoopUtilization().utilization.toFixed(4))
+      }
+    }));
     return;
   }
   response.writeHead(404, { "content-type": "application/json" });

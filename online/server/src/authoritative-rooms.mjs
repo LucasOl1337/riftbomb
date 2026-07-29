@@ -61,6 +61,13 @@ export class AuthoritativeRooms {
     this.snapshotTimer = null;
     this.tickQueueActive = false;
     this.snapshotQueueActive = false;
+    this.performanceCounters = {
+      tickCycles: 0,
+      skippedTickCycles: 0,
+      snapshotCycles: 0,
+      skippedSnapshotCycles: 0,
+      snapshotsProduced: 0
+    };
   }
 
   async getDuelRuntime() {
@@ -135,13 +142,21 @@ export class AuthoritativeRooms {
               includeGrid
             )
           });
+          this.performanceCounters.snapshotsProduced += 1;
         });
       }, 1000 / SNAPSHOT_RATE);
     }
   }
 
   runRoomQueue(activeFlag, visit) {
-    if (this[activeFlag]) return;
+    const isTick = activeFlag === "tickQueueActive";
+    const startedCounter = isTick ? "tickCycles" : "snapshotCycles";
+    const skippedCounter = isTick ? "skippedTickCycles" : "skippedSnapshotCycles";
+    if (this[activeFlag]) {
+      this.performanceCounters[skippedCounter] += 1;
+      return;
+    }
+    this.performanceCounters[startedCounter] += 1;
     this[activeFlag] = true;
     const rooms = this.rooms.values();
     const drain = () => {
@@ -156,6 +171,19 @@ export class AuthoritativeRooms {
       this.scheduleImmediate(drain);
     };
     drain();
+  }
+
+  performanceSnapshot() {
+    let activeMatches = 0;
+    for (const room of this.rooms.values()) {
+      if (room.game) activeMatches += 1;
+    }
+    return {
+      activeMatches,
+      tickClockActive: Boolean(this.tickTimer),
+      snapshotClockActive: Boolean(this.snapshotTimer),
+      ...this.performanceCounters
+    };
   }
 
   stopClockIfIdle() {
