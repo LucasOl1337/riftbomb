@@ -126,7 +126,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | Rodada | Estado | Entrega | Evidência | Commit |
 |---|---|---|---|---|
 | 1/20 | Concluída | Baseline de rotas, comandos, tempos, payloads, arquivos quentes e budgets | 3 execuções dos checks viáveis; inventário em bytes; scorecard histórico identificado | `b5da03b` |
-| 2/20 | Concluída | Ranking de gargalos de rede, assets, API, bundle e build; loader CPU rebaixado com benchmark | 3 amostras HTTP por recurso; 3 lotes de 100 operações do loader; 3 execuções dos gates | Pendente de commit local |
+| 2/20 | Concluída | Ranking de gargalos de rede, assets, API, bundle e build; loader CPU rebaixado com benchmark | 3 amostras HTTP por recurso; 3 lotes de 100 operações do loader; 3 execuções dos gates | `2afaba7` |
 
 ## Escopos reivindicados
 
