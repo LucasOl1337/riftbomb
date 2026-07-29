@@ -838,6 +838,7 @@
           : normalBytes.slice();
         const animation = packed.animation;
         const vertexCount = animation.vertexCount;
+        const componentsPerTexel = animation.componentsPerTexel || 4;
         const sourceUv = new Float32Array(
           vertexBytes.buffer.slice(vertexBytes.byteOffset, vertexBytes.byteOffset + vertexBytes.byteLength)
         );
@@ -848,8 +849,8 @@
           normalCopy.buffer, normalCopy.byteOffset, normalCopy.byteLength
         );
         if (sourceUv.length !== vertexCount * 2 ||
-            frameData.length !== vertexCount * animation.frameCount * 4 ||
-            normalData.length !== vertexCount * animation.frameCount * 4) {
+            frameData.length !== vertexCount * animation.frameCount * componentsPerTexel ||
+            normalData.length !== vertexCount * animation.frameCount * componentsPerTexel) {
           throw new Error(`${key} animated model data is inconsistent`);
         }
 
@@ -894,7 +895,13 @@
         this[`${key}IndexCount`] = indexBytes.byteLength / 2;
         this[`${key}Texture`] = texture;
         this[`${key}Animation`] = animation;
-        this[`${key}CpuAnimation`] = { frameData, normalData, dynamicVertices, vertexCount };
+        this[`${key}CpuAnimation`] = {
+          frameData,
+          normalData,
+          dynamicVertices,
+          vertexCount,
+          componentsPerTexel
+        };
         this[`${key}Ready`] = false;
         // Texture decode only — outer initialiseChampionModel already owns the shared promise.
         return new Promise((resolve) => {
@@ -934,6 +941,10 @@
           this.loadPackedBinary(packed.normals, packed.normalsUrl, `${key} normals`),
         ]);
         const animation = packed.animation;
+        const componentsPerTexel = animation.componentsPerTexel || 4;
+        if (componentsPerTexel !== 3 && componentsPerTexel !== 4) {
+          throw new Error(`${key} animation component count is unsupported`);
+        }
         const [textureWidth, textureHeight] = animation.textureDimensions;
         const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
         if (textureWidth > maxTextureSize || textureHeight > maxTextureSize) {
@@ -963,14 +974,15 @@
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
         gl.texImage2D(
           gl.TEXTURE_2D,
           0,
-          gl.RGBA16UI,
+          componentsPerTexel === 3 ? gl.RGB16UI : gl.RGBA16UI,
           textureWidth,
           textureHeight,
           0,
-          gl.RGBA_INTEGER,
+          componentsPerTexel === 3 ? gl.RGB_INTEGER : gl.RGBA_INTEGER,
           gl.UNSIGNED_SHORT,
           new Uint16Array(
             frameBytes.buffer,
@@ -988,14 +1000,15 @@
         gl.texImage2D(
           gl.TEXTURE_2D,
           0,
-          gl.RGBA8,
+          componentsPerTexel === 3 ? gl.RGB8 : gl.RGBA8,
           textureWidth,
           textureHeight,
           0,
-          gl.RGBA,
+          componentsPerTexel === 3 ? gl.RGB : gl.RGBA,
           gl.UNSIGNED_BYTE,
           normalBytes
         );
+        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
 
         const texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -2193,11 +2206,13 @@ drawKatarinaFallback(player, t, beat) {
         const min = animation.positionMin;
         const range = animation.positionRange;
         const sample = (frameIndex, vertexIndex, axis) => {
-          const offset = (frameIndex * cpu.vertexCount + vertexIndex) * 4 + axis;
+          const offset = (frameIndex * cpu.vertexCount + vertexIndex) *
+            cpu.componentsPerTexel + axis;
           return min[axis] + cpu.frameData[offset] / 65535 * range[axis];
         };
         const normal = (frameIndex, vertexIndex, axis) => {
-          const offset = (frameIndex * cpu.vertexCount + vertexIndex) * 4 + axis;
+          const offset = (frameIndex * cpu.vertexCount + vertexIndex) *
+            cpu.componentsPerTexel + axis;
           return cpu.normalData[offset] / 255 * 2 - 1;
         };
         for (let vertex = 0; vertex < cpu.vertexCount; vertex += 1) {

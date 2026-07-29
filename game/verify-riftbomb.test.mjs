@@ -289,6 +289,10 @@ test("the full roster maps Model Viewer clips to CPU-streamed animation meshes",
   assert.match(renderer, /updateCpuAnimatedChampion/);
   assert.match(renderer, /drawCpuAnimatedChampion/);
   assert.match(renderer, /resolveChampionAnimation/);
+  assert.match(renderer, /animation\.componentsPerTexel \|\| 4/);
+  assert.match(renderer, /componentsPerTexel === 3 \? gl\.RGB16UI : gl\.RGBA16UI/);
+  assert.match(renderer, /componentsPerTexel === 3 \? gl\.RGB8 : gl\.RGBA8/);
+  assert.match(renderer, /cpu\.componentsPerTexel \+ axis/);
   assert.match(renderer, /Model Viewer glTF UVs are already in atlas orientation/);
   assert.match(renderer, /resolveVladimirAnimation/);
   assert.match(rules, /vladimirAttackAnim/);

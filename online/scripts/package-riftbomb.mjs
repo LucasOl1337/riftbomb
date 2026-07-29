@@ -125,6 +125,30 @@ onlineGame = replaceOnce(
 // shipped as separate .bin assets so base64 JS never blows past that limit.
 const WORKERS_ASSET_MAX_BYTES = 25 * 1024 * 1024;
 
+function compactConstantAlpha(buffer, componentBytes, label) {
+  const sourcePixelBytes = componentBytes * 4;
+  const targetPixelBytes = componentBytes * 3;
+  if (buffer.byteLength % sourcePixelBytes !== 0) {
+    throw new Error(`${label} does not contain complete RGBA texels`);
+  }
+  const compact = Buffer.allocUnsafe(buffer.byteLength / 4 * 3);
+  for (
+    let sourceOffset = 0, targetOffset = 0;
+    sourceOffset < buffer.byteLength;
+    sourceOffset += sourcePixelBytes, targetOffset += targetPixelBytes
+  ) {
+    for (let alphaOffset = sourceOffset + targetPixelBytes;
+      alphaOffset < sourceOffset + sourcePixelBytes;
+      alphaOffset += 1) {
+      if (buffer[alphaOffset] !== 0xff) {
+        throw new Error(`${label} has a non-constant alpha component`);
+      }
+    }
+    buffer.copy(compact, targetOffset, sourceOffset, sourceOffset + targetPixelBytes);
+  }
+  return compact;
+}
+
 async function playableChampionPayload(champion) {
   const directory = path.join(championSourceDirectory, champion, "playable-model");
   const [vertices, indices, texture, metadataSource] = await Promise.all([
@@ -141,10 +165,12 @@ async function playableChampionPayload(champion) {
   };
   const binaryAssets = [];
   if (metadata.runtime === "vat-v1") {
-    const [frames, normals] = await Promise.all([
+    const [rgbaFrames, rgbaNormals] = await Promise.all([
       readFile(path.join(directory, `${champion}-model-frames.bin`)),
       readFile(path.join(directory, `${champion}-model-normals.bin`)),
     ]);
+    const frames = compactConstantAlpha(rgbaFrames, Uint16Array.BYTES_PER_ELEMENT, `${champion} frames`);
+    const normals = compactConstantAlpha(rgbaNormals, Uint8Array.BYTES_PER_ELEMENT, `${champion} normals`);
     const framesName = `${champion}-frames.bin`;
     const normalsName = `${champion}-normals.bin`;
     for (const [label, buffer] of [
@@ -169,6 +195,7 @@ async function playableChampionPayload(champion) {
         vertexCount: metadata.vertexCount,
         frameCount: metadata.frameCount,
         textureDimensions: metadata.textureDimensions,
+        componentsPerTexel: 3,
         positionMin: metadata.positionBounds.min,
         positionRange: metadata.positionBounds.range,
         // Required by resolveChampionAnimation — without actions the mesh

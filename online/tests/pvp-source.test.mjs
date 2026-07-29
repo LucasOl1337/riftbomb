@@ -178,12 +178,28 @@ test("loads only the playable champion models selected in the lobby", async () =
       const packedNormals = await readFile(
         new URL(`public/champion-models/${champion}-normals.bin`, root),
       );
-      assert.deepEqual(packedFrames, frames);
-      assert.deepEqual(packedNormals, normals);
+      const compactRgb = (rgba, componentBytes) => {
+        const rgbaPixelBytes = componentBytes * 4;
+        const rgbPixelBytes = componentBytes * 3;
+        const rgb = Buffer.alloc(rgba.byteLength / 4 * 3);
+        for (
+          let sourceOffset = 0, targetOffset = 0;
+          sourceOffset < rgba.byteLength;
+          sourceOffset += rgbaPixelBytes, targetOffset += rgbPixelBytes
+        ) {
+          rgba.copy(rgb, targetOffset, sourceOffset, sourceOffset + rgbPixelBytes);
+        }
+        return rgb;
+      };
+      assert.deepEqual(packedFrames, compactRgb(frames, Uint16Array.BYTES_PER_ELEMENT));
+      assert.deepEqual(packedNormals, compactRgb(normals, Uint8Array.BYTES_PER_ELEMENT));
+      assert.equal(packedFrames.byteLength, frames.byteLength * 3 / 4);
+      assert.equal(packedNormals.byteLength, normals.byteLength * 3 / 4);
       assert.ok(script.length < 25 * 1024 * 1024, `${champion}.js must stay under Workers asset limit`);
       assert.ok(packedFrames.byteLength < 25 * 1024 * 1024);
       assert.ok(packedNormals.byteLength < 25 * 1024 * 1024);
       assert.equal(payload.animation.runtime, "vat-v1");
+      assert.equal(payload.animation.componentsPerTexel, 3);
       assert.equal(payload.animation.frameCount, metadata.frameCount);
       assert.ok(payload.animation.actions, `${champion} must ship animation.actions`);
       assert.deepEqual(payload.animation.actions, metadata.animationActions);
