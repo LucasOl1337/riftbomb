@@ -6,9 +6,9 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **11/20 — Backend: concorrência e filas (disponível)**
-- Última rodada concluída: **10/20 — Backend: cache de aplicação**
-- Próxima rodada planejada: **11/20 — Backend: concorrência e filas**
+- Rodada atual: **12/20 — Cold start / boot (disponível)**
+- Última rodada concluída: **11/20 — Backend: concorrência e filas**
+- Próxima rodada planejada: **12/20 — Cold start / boot**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/b17b/riftbomb`
 - Branch local: `automation/perf-sequential-r01-baseline`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 10 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 11 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -77,6 +77,8 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 | `POST /api/pvp` join, mediana publicada | ≤ 30 ms | 14,4 ms histórico | 15,6 ms |
 | Serializações JSON por broadcast para dois jogadores | ≤ 1 | 2 antes da rodada 10; 1 atual | atende |
 | Valores materializados por leitura de sala com SDP máximo | ≤ 33.000 B | 64.175 B antes da rodada 9; 32.080 B máximo atual | 920 B |
+| Intervals registrados com 128 partidas | ≤ 4 | 256 antes da rodada 11; 2 atuais | atende com 2 de margem |
+| Atraso p95 do event loop com 128 partidas, benchmark local | ≤ 4 ms | 7,029 ms antes da rodada 11; 2,890 ms atual | 1,110 ms |
 
 Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanhos em disco, sem compressão HTTP; latências de API são históricas e precisam ser remedidas antes de qualquer nova alegação de ganho.
 
@@ -142,6 +144,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 8/20 | Concluída | Limpeza expirada e primeiro `INSERT` de criação de sala agrupados numa transação `D1Database.batch`; retry de colisão preservado sem nova limpeza | Chamadas D1 no sucesso normal: 2 → 1 (-50%); proxy de 20 ms/chamada, mediana 41,72 → 21,10 ms em 3/3 | `785fd45` |
 | 9/20 | Concluída | Projeções SQL distintas para host/convidado removem o SDP e os valores de autenticação não usados sem adicionar round-trip | Linha com SDPs máximos: 64.175 → 32.079 B no host e 32.080 B no convidado (≈-50%); 1 chamada e plano por PK mantidos em 3/3 | `de2bfe5` |
 | 10/20 | Concluída | Codificação JSON reutilizada dentro de cada broadcast autoritativo para host e convidado, sem cache persistente de estado mutável | 40.000 → 20.000 serializações (-50%); proxy de 1.041 B, mediana 448,27 → 226,33 ms (-49,5%) em 3/3 | `d4a38b4` |
+| 11/20 | Concluída | Dois relógios compartilhados substituem timers por sala; filas limitadas a oito salas cedem o event loop sem acumular ciclos atrasados | 128 salas: intervals 256 → 2; callbacks medianos 20.630 → 2.997 (-85,47%); p95 7,029 → 2,890 ms (-58,88%); snapshots medianos 7.059 → 7.680 | `8fe1241` |
 
 ## Escopos reivindicados
 
@@ -149,7 +152,7 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 11:** medir se criação de duelo ou serialização de snapshots bloqueia o event loop sob múltiplas salas; preservar o tick autoritativo e aplicar limites/execução assíncrona somente se o benchmark demonstrar fila ou atraso real.
+1. **Rodada 12:** decompor o boot do servidor autoritativo e do Worker, medindo import, listen/ready e inicializações sob demanda; só adiar imports quando o caminho frio demonstrar custo relevante.
 2. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates. A rodada 10 adotou apenas reutilização efêmera do payload dentro do mesmo broadcast, sem guardar snapshots entre ticks.
 3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
@@ -202,3 +205,9 @@ Nenhum escopo ativo.
 - Benchmark controlado da rodada 10 com payload ASCII de snapshot de **1.041 B**, 20.000 broadcasts para dois destinatários e três repetições: serializações **40.000 → 20.000 (-50%)**, bytes enviados preservados em **41.640.000**, mediana **448,27 → 226,33 ms (-49,5%)**. Os milissegundos são um proxy local de CPU, não latência de produção; a evidência causal é a contagem de codificações.
 - Validação da rodada 10: teste específico passou **3/3**; `npm test` em `online/server/` passou **5/5** contando os três novos casos e os dois fluxos existentes; `npm test` em `online/` passou **17/17** com build verificado; `npm test` raiz passou **42/42**; lint terminou com **0 erros** e quatro avisos conhecidos. `git diff --check` passou. Playwright/headless não foi usado.
 - Limitação da rodada 10: o benchmark usa payload sintético representativo e sockets em memória; não mede CPU ou event-loop lag do servidor publicado. O cache é deliberadamente efêmero ao broadcast atual para não reter snapshots nem introduzir invalidação entre ticks.
+- Rodada 11: cada partida ativa registrava um timer de simulação a 60 Hz e outro de snapshot a 30 Hz. Em 128 salas, isso significava **256 intervals** e até **23.040 callbacks esperados em 2 s**; o baseline entregou somente 19.740 / 20.630 / 20.829 callbacks e 6.891 / 7.059 / 7.165 snapshots, evidenciando atraso sob carga.
+- O relógio agora é propriedade única de `AuthoritativeRooms`: dois intervals percorrem todas as salas, e filas limitadas processam **oito salas por turno de event loop** com `setImmediate`. Um ciclo ainda ativo faz o próximo disparo ser descartado em vez de formar backlog sem limite. Cada sala conserva seu próprio `lastTick`, o limite de `dt`, a simulação a 60 Hz e snapshots a 30 Hz.
+- Benchmark de 128 salas por 2 s, em 3/3 execuções: intervals **256 → 2 (-99,22%)**; callbacks medianos **20.630 → 2.997 (-85,47%)**, contando timer e `setImmediate` depois; snapshots medianos **7.059 → 7.680 (+8,80%)**, atingindo 100% do esperado na mediana; utilização mediana do event loop **49,96% → 45,77% (-4,19 p.p.)**; atraso p95 mediano **7,029 → 2,890 ms (-58,88%)** e máximo mediano **32,686 → 14,000 ms (-57,17%)**.
+- Estresse pós-mudança no teto de 256 salas, 3/3: somente **2 intervals**, p95 **2,230 / 2,014 / 2,016 ms**, utilização **65,09 / 61,00 / 62,17%** e 14.856 / 15.440 / 15.272 snapshots em cerca de 2 s. Não há baseline de 256 salas, portanto esses números validam capacidade, mas não são usados para calcular ganho.
+- Validação da rodada 11: testes focados passaram **6/6**; `npm test` raiz passou **42/42**; `npm test` em `online/` passou **17/17** com build verificado; `npm test` em `online/server/` passou **5/5**; lint terminou com **0 erros** e quatro avisos conhecidos. `git diff --check` passou. Playwright/headless não foi usado.
+- Limitação da rodada 11: o benchmark usa partidas e serialização reais, mas sockets em memória e uma única máquina local; não mede latência de rede nem CPU do host publicado. As amostras de 2 s apresentam ruído de scheduler, por isso a comparação usa medianas de três execuções.
