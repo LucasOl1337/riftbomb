@@ -1,15 +1,7 @@
-type D1Statement = {
-  bind(...values: unknown[]): D1Statement;
-  first<T>(): Promise<T | null>;
-  run(): Promise<{ success: boolean; meta?: { changes?: number } }>;
-};
-
-type D1Database = {
-  prepare(sql: string): D1Statement;
-  batch(
-    statements: D1Statement[],
-  ): Promise<Array<{ success: boolean; meta?: { changes?: number } }>>;
-};
+import {
+  createPersistedRoom,
+  type D1Database,
+} from "./room-storage";
 
 type SessionDescription = {
   type: "offer" | "answer";
@@ -108,10 +100,6 @@ function createHostToken(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function deleteExpiredRooms(db: D1Database, now: number): Promise<void> {
-  await db.prepare("DELETE FROM pvp_rooms WHERE expires_at < ?").bind(now).run();
-}
-
 export async function POST(request: Request): Promise<Response> {
   const db = await getDatabase();
   if (!db) return response({ error: "pvp_storage_unavailable" }, 503);
@@ -127,23 +115,17 @@ export async function POST(request: Request): Promise<Response> {
         return response({ error: "invalid_offer" }, 400);
       }
 
-      await deleteExpiredRooms(db, now);
       const offer = body.offer ? JSON.stringify(body.offer) : "null";
       const hostToken = createHostToken();
       const expiresAt = now + ROOM_LIFETIME_MS;
-
-      for (let attempt = 0; attempt < 6; attempt += 1) {
-        const code = createRoomCode();
-        const result = await db
-          .prepare(
-            "INSERT OR IGNORE INTO pvp_rooms (code, host_token, offer, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-          )
-          .bind(code, hostToken, offer, now, expiresAt)
-          .run();
-        if ((result.meta?.changes ?? 0) > 0) {
-          return response({ code, hostToken, expiresAt }, 201);
-        }
-      }
+      const code = await createPersistedRoom(db, {
+        now,
+        expiresAt,
+        hostToken,
+        offer,
+        createCode: createRoomCode,
+      });
+      if (code) return response({ code, hostToken, expiresAt }, 201);
       return response({ error: "room_code_unavailable" }, 503);
     }
 

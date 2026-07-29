@@ -450,9 +450,5 @@ test("declares persistent signaling storage", async () => {
   assert.match(route, /preparing: true/);
   assert.match(route, /let schemaReady: Promise<void> \| null = null/);
   assert.match(route, /if \(!schemaReady\)/);
-  assert.equal(
-    (route.match(/await deleteExpiredRooms\(/g) || []).length,
-    1,
-    "expired-room cleanup belongs only on room creation",
-  );
+  assert.match(route, /createPersistedRoom\(db/);
 });
