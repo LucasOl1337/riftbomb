@@ -11,7 +11,8 @@ const isContentPath = (trackedPath) =>
   trackedPath.startsWith("game/arena-appearance/")
   || /^champions\/(?!prepare-playable-models\/)[^/]+\//.test(trackedPath);
 
-const isIndependentProjectPath = (trackedPath) => trackedPath.startsWith("online/");
+const isIndependentProjectPath = (trackedPath) =>
+  trackedPath.startsWith("online/") || trackedPath.startsWith(".github/");
 const isGeographyExempt = (trackedPath) =>
   isContentPath(trackedPath) || isIndependentProjectPath(trackedPath);
 

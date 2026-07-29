@@ -447,6 +447,19 @@
     }
   }
 
+  function updatePresetSummary() {
+    presetSummary.textContent = `${championName(inviteHostSelect.value).toUpperCase()} VS ${championName(inviteGuestSelect.value).toUpperCase()} · ${ARENA_NAMES[inviteArenaSelect.value].toUpperCase()} · FIRST TO ${INVITE_MATCH_TARGET}`;
+  }
+
+  function closeSetupPanels(except = "") {
+    const showInvite = except === "invite";
+    const showJoin = except === "join";
+    invitePresetForm.hidden = !showInvite;
+    joinForm.hidden = !showJoin;
+    showInviteButton.setAttribute("aria-expanded", String(showInvite));
+    showJoinButton.setAttribute("aria-expanded", String(showJoin));
+  }
+
   function sendControl(message) {
     if (state.socket?.readyState === WebSocket.OPEN) state.socket.send(JSON.stringify(message));
   }
@@ -848,7 +861,7 @@
     resetConnection();
     setOnlineRole("offline");
     setBusy(false);
-    joinForm.hidden = true;
+    closeSetupPanels();
     connection.hidden = true;
     connection.textContent = "";
     game.selectedChampion2 = "zed";
@@ -1095,12 +1108,24 @@
       : "READY cancelled. You can change your champion.", state.guestReady ? "ok" : "");
   });
 
-  createButton.addEventListener("click", () => createRoom());
-  showInviteButton.addEventListener("click", () => {
-    invitePresetForm.hidden = !invitePresetForm.hidden;
-    joinForm.hidden = true;
-    if (!invitePresetForm.hidden) inviteHostSelect.focus();
+  createButton.addEventListener("click", () => {
+    closeSetupPanels();
+    createRoom();
   });
+  showInviteButton.addEventListener("click", () => {
+    const opening = invitePresetForm.hidden;
+    if (opening) {
+      inviteHostSelect.value = validChampion(game.selectedChampion) ? game.selectedChampion : CHAMPIONS[0];
+      inviteArenaSelect.value = validArena(game.selectedArena) ? game.selectedArena : ARENAS[0];
+      updatePresetSummary();
+    }
+    closeSetupPanels(opening ? "invite" : "");
+    setStatus(opening ? "Set both fighters and the arena, then create the share link." : "Choose a match format.");
+    if (opening) inviteHostSelect.focus();
+  });
+  [inviteHostSelect, inviteGuestSelect, inviteArenaSelect].forEach((select) =>
+    select.addEventListener("change", updatePresetSummary)
+  );
   invitePresetForm.addEventListener("submit", (event) => {
     event.preventDefault();
     createRoom({
@@ -1111,9 +1136,10 @@
     });
   });
   showJoinButton.addEventListener("click", () => {
-    joinForm.hidden = !joinForm.hidden;
-    invitePresetForm.hidden = true;
-    if (!joinForm.hidden) codeInput.focus();
+    const opening = joinForm.hidden;
+    closeSetupPanels(opening ? "join" : "");
+    setStatus(opening ? "Enter the six-character code shared by the lobby host." : "Choose a match format.");
+    if (opening) codeInput.focus();
   });
   offlineButton.addEventListener("click", chooseOffline);
   joinForm.addEventListener("submit", (event) => {
