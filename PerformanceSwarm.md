@@ -6,9 +6,9 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **2/20 — Inventário de gargalos (disponível)**
-- Última rodada concluída: **1/20 — Baseline real**
-- Próxima rodada planejada: **2/20 — Inventário de gargalos**
+- Rodada atual: **3/20 — Frontend: bundle e code-splitting (disponível)**
+- Última rodada concluída: **2/20 — Inventário de gargalos**
+- Próxima rodada planejada: **3/20 — Frontend: bundle e code-splitting**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/f4aa/riftbomb`
 - Branch local: `automation/perf-sequential-r01-baseline`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 1 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 2 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -88,11 +88,45 @@ Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanho
 - Transporte: `online/server/src/server.mjs` (6.858 B).
 - Relógio/snapshots: `online/server/src/authoritative-rooms.mjs` (3.612 B).
 
+## Inventário de gargalos — rodada 2
+
+Medição executada em 2026-07-29 a partir de São Paulo. As amostras publicadas usam `curl` contra `https://bombpvp.com`; são três requests independentes por recurso, não um waterfall de navegador. O proxy de CPU usa Node/Web Crypto sobre a parte local de 667.151 B, 100 iterações por lote em três lotes.
+
+| Prioridade | Suspeito | Evidência objetiva | Impacto provável | Rodada indicada |
+|---:|---|---|---|---:|
+| 1 | Cadeia serial do iframe sem cache fresco no navegador | HTML → loader → manifest → parte → CSS/JS; medianas independentes somam **~1.549 ms**. Todos os seis recursos retornaram `Cache-Control: public, max-age=0, must-revalidate`, apesar de `CF-Cache-Status: HIT` | Cada visita exige round-trips de revalidação antes de a arena ficar pronta; afeta primeira carga e retorno | 6 |
+| 2 | Modelo do campeão selecionado | **Katarina 33.629.823 B**, Zed 15.793.471 B, Gangplank 11.384.503 B, Renekton 7.881.443 B e Vladimir 6.724.809 B; três arquivos por campeão | A escolha pode adicionar 6,7–33,6 MB antes do primeiro duelo/primeira animação; maior risco em rede móvel | 3 e 5 |
+| 3 | Latência da consulta `/api/pvp` | GET seguro para sala inexistente: 1.024 / 612 / 454 ms; mediana **612 ms**, status 404 e payload de 26 B | O custo não está no payload; há provável espera de Worker/D1/rota que merece decomposição antes de otimizar | 8 e 9 |
+| 4 | Payload crítico publicado perto do budget | Produção entregou **758.717 B** raw nos seis recursos do jogo, contra 739.851 B do baseline local (**+18.866 B / +2,55%**); margem restante do budget de 800 KB: 41.283 B | Drift entre artefato local e publicado reduz a margem e pode virar regressão silenciosa | 3 e 15 |
+| 5 | Grafo JS/CSS do shell | Baseline local: 331.629 B JS + 23.301 B CSS raw; proxies gzip medidos nesta rodada para os assets gerados: ~104,4 KB JS + 5,7 KB CSS | Budget de JS tem só 18.371 B de margem; pode atrasar a UI do lobby em dispositivo fraco | 3 e 4 |
+| 6 | Custo de build/validação online | `npm test` online: 13,44 / 11,70 / 12,34 s, mediana **12,34 s**; lint 12,98 s; servidor 3,19 / 2,97 / 3,06 s, mediana **3,06 s** | Custo relevante para feedback de desenvolvimento, mas menor que os gargalos de runtime | 13 |
+
+### Suspeitos eliminados ou rebaixados
+
+- **Concatenação + SHA-256 + decode do loader:** 2,874 / 2,697 / 2,781 ms por operação; mediana **2,781 ms** no proxy local. O custo de rede domina por duas ordens de grandeza, então micro-otimizar esse código agora não teria valor perceptível.
+- **Artefato offline de 107,7 MB:** grande, mas não é o payload inicial publicado; permanece relevante para distribuição offline e build, não para a primeira interação online.
+- **Total de 82–84 MB em `public`/`dist`:** não é transferido de uma vez; os testes confirmam carregamento seletivo. Otimizações devem mirar o campeão efetivamente escolhido, não o diretório inteiro.
+
+### Evidência HTTP publicada (medianas de três amostras)
+
+| Recurso | Bytes publicados | TTFB mediano | Total mediano | Cache observado |
+|---|---:|---:|---:|---|
+| `/` | 21.891 B | 306 ms | 307 ms | sem `Cache-Control` observado |
+| `/riftbomb.html` | 807 B | 315 ms | 315 ms | revalidação obrigatória |
+| `/riftbomb-loader.js` | 3.315 B | 287 ms | 287 ms | revalidação obrigatória |
+| `/riftbomb-parts/manifest.json` | 164 B | 291 ms | 291 ms | revalidação obrigatória |
+| `/riftbomb-parts/part-00` | 673.974 B | 289 ms | 352 ms | revalidação obrigatória |
+| `/online-duel.css` | 11.921 B | 282 ms | 282 ms | revalidação obrigatória |
+| `/online-duel.js` | 68.536 B | 292 ms | 304 ms | revalidação obrigatória |
+
+O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifest e `part-00`; por isso nenhuma latência local desses recursos foi usada como baseline de usuário. A produção respondeu 200 para ambos. Isso é uma incompatibilidade de preview a investigar, não uma alegação de falha publicada.
+
 ## Histórico de rodadas
 
 | Rodada | Estado | Entrega | Evidência | Commit |
 |---|---|---|---|---|
 | 1/20 | Concluída | Baseline de rotas, comandos, tempos, payloads, arquivos quentes e budgets | 3 execuções dos checks viáveis; inventário em bytes; scorecard histórico identificado | `b5da03b` |
+| 2/20 | Concluída | Ranking de gargalos de rede, assets, API, bundle e build; loader CPU rebaixado com benchmark | 3 amostras HTTP por recurso; 3 lotes de 100 operações do loader; 3 execuções dos gates | Pendente de commit local |
 
 ## Escopos reivindicados
 
@@ -100,10 +134,11 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 2:** ordenar gargalos com evidência. Começar pelos 75,4 MB de modelos sob demanda, pelo grafo de 331,6 KB do shell e pelo custo de concatenação/hash/decode dos 667,2 KB do loader; confirmar o que entra realmente na primeira interação antes de otimizar.
-2. Corrigir ou normalizar CRLF dos scripts bash em uma rodada compatível, pois hoje o build online não é reproduzível nesta worktree Windows. Não mascarar a falha nem mudar o script sem teste.
-3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e um fluxo lobby → sala → primeiro frame. O baseline atual não afirma LCP/INP/primeiro frame.
-4. Preservar o carregamento seletivo dos modelos; `katarina` sozinho possui 33,25 MB em frames/normais e merece medição específica na rodada de assets.
+1. **Rodada 3:** reduzir o grafo JS do shell ou impedir entrega antecipada de código fora da primeira interação. Medir os mesmos chunks raw/gzip antes/depois; não atacar os ~2,8 ms de CPU do loader.
+2. **Rodada 5:** reduzir o payload do campeão escolhido, começando por Katarina (33,63 MB) e preservando o carregamento seletivo já existente.
+3. **Rodada 6:** definir cache longo e imutável para recursos versionados; manter o manifest com invalidação segura. Confirmar em produção que visitas repetidas eliminam revalidações desnecessárias.
+4. **Rodada 8/9:** decompor a consulta `/api/pvp`; a amostra de sala inexistente teve mediana de 612 ms, mas não substitui benchmark de create/join.
+5. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Esta rodada não afirma LCP/INP.
 
 ## Evidências e limitações
 
@@ -113,3 +148,6 @@ Nenhum escopo ativo.
 - Nenhuma medição de navegador foi inventada. O número de 87,7 ms e as latências de API vêm do scorecard versionado `PERFORMANCE.md`, não desta máquina.
 - A worktree recebeu regeneração de `game/arena-appearance/load-arena-appearance.js` e `riftbomb.html` durante a coleta. Esses artefatos não pertencem à entrega documental e não serão incluídos no commit seletivo.
 - Esta rodada não mudou código de produto; o “depois” é a existência de um baseline/budgets reproduzíveis onde antes não havia coordenação do enxame.
+- Na rodada 2, `npm test` online passou 3/3 com 11 testes por execução ao priorizar `C:/Program Files/Git/bin` no `PATH`; o `bash.exe` padrão do Windows continua resolvendo para WSL e falha antes do build neste ambiente.
+- `npm run lint` online passou em 12,98 s. O servidor autoritativo passou 3/3; o gate raiz passou 3/3 com 41 testes por execução (mediana 5,94 s nesta sessão).
+- A soma de medianas HTTP (**~1.549 ms**) é um indicador de prioridade da dependência serial, não uma medição direta de waterfall. Compressão, conexão reutilizada e execução do navegador podem alterar o resultado real.
