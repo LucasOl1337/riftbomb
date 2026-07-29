@@ -82,7 +82,7 @@ test("the decorative WebGL background waits until core boot can finish", async (
   assert.deepEqual(mounted, [{ nodeName: "FLUID-BG" }]);
 });
 
-test("arena textures load only for the selected or explored arena", async () => {
+test("arena textures load only for the selected or explored arena", async (t) => {
   const document = await readFile(sourcePath, "utf8");
   const planSource = await readFile(
     path.join(gameDirectory, "arena-appearance", "plan-arena-texture-loads.js"),
@@ -90,6 +90,7 @@ test("arena textures load only for the selected or explored arena", async () => 
   );
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
   const controls = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
+  const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
   const context = vm.createContext({});
   vm.runInContext(planSource, context);
 
@@ -117,6 +118,43 @@ test("arena textures load only for the selected or explored arena", async () => 
   assert.match(controls, /addEventListener\("pointerenter", preview\.request/);
   assert.match(controls, /addEventListener\("focus", preview\.request/);
   assert.doesNotMatch(controls, /renderer\.arenaTexturesReady/);
+
+  const themePattern = /theme: Object\.freeze\(\{\s*floor: "([^"]+)",\s*wall: "([^"]+)",\s*wallTop: "([^"]+)"/g;
+  const themes = [...rules.matchAll(themePattern)].map(([, floor, wall, wallTop]) => ({
+    floor,
+    wall,
+    wallTop
+  }));
+  const declaredThemeCount = (rules.match(/theme: Object\.freeze\(\{/g) ?? []).length;
+  assert.ok(declaredThemeCount > 0, "at least one arena theme must be budgeted");
+  assert.equal(themes.length, declaredThemeCount, "every declared arena theme must enter the texture budget");
+
+  const texturePathForKey = (key) => {
+    if (key === "crate") return path.join("crates", "crate-albedo.webp");
+    if (key === "crateTop") return path.join("crates", "crate-top-albedo.webp");
+    const directory = key.startsWith("floor") ? "ground" : "walls";
+    const fileName = key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    return path.join(directory, `${fileName}.webp`);
+  };
+  const texturesDirectory = path.join(gameDirectory, "arena-appearance", "textures");
+  const measuredThemes = await Promise.all(themes.map(async (arenaTheme) => {
+    const keys = [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(arenaTheme)];
+    assert.ok(keys.length <= 5, `arena boot requests ${keys.length} textures; budget is 5`);
+    const sizes = await Promise.all(keys.map(async (key) => (
+      await stat(path.join(texturesDirectory, texturePathForKey(key)))
+    ).size));
+    return { bytes: sizes.reduce((total, size) => total + size, 0), keys };
+  }));
+  const largestTheme = measuredThemes.reduce((largest, measured) => (
+    measured.bytes > largest.bytes ? measured : largest
+  ));
+  assert.ok(
+    largestTheme.bytes <= 2_700_000,
+    `arena boot loads ${largestTheme.bytes} B; budget is 2700000 B`
+  );
+  t.diagnostic(
+    `arena texture budget: ${themes.length} themes, max ${largestTheme.keys.length} requests / ${largestTheme.bytes} B`
+  );
 });
 
 test("the readable combat layer preserves the canonical 100 HP rules", async () => {
