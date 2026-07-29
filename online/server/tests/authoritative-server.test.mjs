@@ -205,6 +205,22 @@ test("websocket room starts only after both players are ready", async (t) => {
     reconnectedGuest.messages.find(({ type }) => type === "connected")?.soundCursor,
     1
   );
+
+  const healthResponse = await fetch(`http://127.0.0.1:${port}/health`);
+  const health = await healthResponse.json();
+  assert.equal(healthResponse.status, 200);
+  assert.equal(health.rooms, 1);
+  assert.equal(health.performance.activeMatches, 1);
+  assert.equal(health.performance.webSocketClients, 2);
+  assert.equal(health.performance.tickClockActive, true);
+  assert.equal(health.performance.snapshotClockActive, true);
+  assert.ok(health.performance.tickCycles >= 1);
+  assert.ok(health.performance.snapshotCycles >= 1);
+  assert.ok(health.performance.snapshotsProduced >= 1);
+  assert.ok(health.performance.eventLoopUtilization >= 0);
+  assert.ok(health.performance.eventLoopUtilization <= 1);
+  assert.ok(!JSON.stringify(health).includes("ABC234"));
+  assert.ok(!JSON.stringify(health).includes("test-proxy-secret"));
 });
 
 test("host rematch rebuilds the authoritative duel", async (t) => {

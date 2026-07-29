@@ -519,6 +519,16 @@ test("shares one tick and snapshot clock across active rooms", async () => {
   snapshotClock.callback();
   assert.deepEqual([...rooms.values()].map(({ sequence }) => sequence), [1, 1]);
   assert.equal(broadcasts.filter(({ message }) => message.type === "snapshot" && message.data.grid).length, 2);
+  assert.deepEqual(manager.performanceSnapshot(), {
+    activeMatches: 2,
+    tickClockActive: true,
+    snapshotClockActive: true,
+    tickCycles: 1,
+    skippedTickCycles: 0,
+    snapshotCycles: 1,
+    skippedSnapshotCycles: 0,
+    snapshotsProduced: 2
+  });
 
   broadcasts.length = 0;
   snapshotClock.callback();
@@ -557,9 +567,11 @@ test("yields between bounded room batches", () => {
   assert.equal(visited.length, 8);
   assert.equal(pending.length, 1);
   manager.runRoomQueue("tickQueueActive", () => assert.fail("overlapping queue must be skipped"));
+  assert.equal(manager.performanceSnapshot().skippedTickCycles, 1);
   pending.shift()();
   assert.equal(visited.length, 16);
   pending.shift()();
   assert.equal(visited.length, 17);
   assert.equal(manager.tickQueueActive, false);
+  assert.equal(manager.performanceSnapshot().tickCycles, 1);
 });
