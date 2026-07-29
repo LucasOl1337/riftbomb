@@ -13,6 +13,17 @@ function extractFunctionDeclaration(source, name, nextDeclaration) {
   return source.slice(start, end);
 }
 
+async function readPackagedGameParts() {
+  const manifest = JSON.parse(
+    await readFile(new URL("public/riftbomb-parts/manifest.json", root), "utf8"),
+  );
+  const directory = new URL(`public${manifest.partsPath}/`, root);
+  const names = (await readdir(directory))
+    .filter((entry) => /^part-\d+$/.test(entry))
+    .sort((left, right) => Number(left.slice(5)) - Number(right.slice(5)));
+  return { directory, manifest, names };
+}
+
 test("loads the online duel layer into the reconstructed game", async () => {
   const page = await readFile(new URL("public/riftbomb.html", root), "utf8");
   const loader = await readFile(
@@ -193,18 +204,18 @@ test("online seat binding always resolves host=1 guest=2 by player id", async ()
 });
 
 test("packages every web part behind a self-consistent dynamic manifest", async () => {
-  const partsDirectory = new URL("public/riftbomb-parts/", root);
-  const manifest = JSON.parse(
-    await readFile(new URL("manifest.json", partsDirectory), "utf8"),
-  );
-  const entries = (await readdir(partsDirectory))
-    .filter((entry) => /^part-\d+$/.test(entry))
-    .sort((left, right) => Number(left.slice(5)) - Number(right.slice(5)));
+  const partsRoot = new URL("public/riftbomb-parts/", root);
+  const { directory, manifest, names } = await readPackagedGameParts();
+  const versionDirectories = (await readdir(partsRoot, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
 
-  assert.equal(manifest.version, 1);
-  assert.equal(entries.length, manifest.partCount);
+  assert.equal(manifest.version, 2);
+  assert.equal(manifest.partsPath, `/riftbomb-parts/${manifest.sha256}`);
+  assert.deepEqual(versionDirectories, [manifest.sha256]);
+  assert.equal(names.length, manifest.partCount);
   const artifact = Buffer.concat(
-    await Promise.all(entries.map((entry) => readFile(new URL(entry, partsDirectory)))),
+    await Promise.all(names.map((entry) => readFile(new URL(entry, directory)))),
   );
   assert.equal(artifact.length, manifest.byteLength);
   assert.equal(
@@ -213,11 +224,25 @@ test("packages every web part behind a self-consistent dynamic manifest", async 
   );
 });
 
+test("caches only fingerprinted game parts as immutable", async () => {
+  const headers = await readFile(new URL("public/_headers", root), "utf8");
+  const loader = await readFile(new URL("public/riftbomb-loader.js", root), "utf8");
+
+  assert.match(
+    headers,
+    /\/riftbomb-parts\/:version\/\*\s+Cache-Control: public, max-age=31556952, immutable/,
+  );
+  assert.match(
+    headers,
+    /\/riftbomb-parts\/manifest\.json\s+Cache-Control: no-store/,
+  );
+  assert.match(loader, /manifest\.partsPath !== `\/riftbomb-parts\/\$\{manifest\.sha256\}`/);
+  assert.match(loader, /fetch\(`\$\{manifest\.partsPath\}\/part-\$\{name\}/);
+  assert.doesNotMatch(headers, /^\/riftbomb\.html|^\/riftbomb-loader\.js/m);
+});
+
 test("keeps arena WebP files out of the initial online payload", async () => {
-  const directory = new URL("public/riftbomb-parts/", root);
-  const names = (await readdir(directory))
-    .filter((name) => /^part-\d+$/.test(name))
-    .sort();
+  const { directory, names } = await readPackagedGameParts();
   const parts = await Promise.all(
     names.map((name) => readFile(new URL(name, directory), "utf8")),
   );
@@ -264,10 +289,7 @@ test("keeps arena WebP files out of the initial online payload", async () => {
 });
 
 test("loads only the playable champion models selected in the lobby", async () => {
-  const directory = new URL("public/riftbomb-parts/", root);
-  const names = (await readdir(directory))
-    .filter((name) => /^part-\d+$/.test(name))
-    .sort();
+  const { directory, names } = await readPackagedGameParts();
   const parts = await Promise.all(
     names.map((name) => readFile(new URL(name, directory), "utf8")),
   );

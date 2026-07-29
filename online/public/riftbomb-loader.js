@@ -11,26 +11,27 @@
     if (!manifestResponse.ok) throw new Error("Manifesto da arena indisponível");
     const manifest = await manifestResponse.json();
     if (
-      manifest.version !== 1
+      manifest.version !== 2
       || !Number.isSafeInteger(manifest.partCount)
       || manifest.partCount < 1
       || manifest.partCount > 999
       || !Number.isSafeInteger(manifest.byteLength)
       || manifest.byteLength < 1
       || !/^[a-f0-9]{64}$/.test(manifest.sha256)
+      || manifest.partsPath !== `/riftbomb-parts/${manifest.sha256}`
     ) {
       throw new Error("Manifesto da arena inválido");
     }
 
     progress.max = manifest.partCount;
-    const version = manifest.sha256.slice(0, 16);
     let completedParts = 0;
     const pieces = await Promise.all(
       Array.from({ length: manifest.partCount }, async (_, index) => {
         const name = String(index).padStart(2, "0");
-        const query = new URLSearchParams({ v: version });
-        if (benchmarkRun) query.set("perf-run", benchmarkRun);
-        const response = await fetch(`/riftbomb-parts/part-${name}?${query}`);
+        const query = benchmarkRun
+          ? `?${new URLSearchParams({ "perf-run": benchmarkRun })}`
+          : "";
+        const response = await fetch(`${manifest.partsPath}/part-${name}${query}`);
         if (!response.ok) throw new Error(`Parte ${name} indisponível`);
 
         const piece = new Uint8Array(await response.arrayBuffer());
