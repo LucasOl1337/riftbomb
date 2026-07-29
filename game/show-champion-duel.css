@@ -869,6 +869,215 @@
       100% { opacity: 0; transform: translateY(-0.25rem); }
     }
 
+    /* Active-match HUD: one aligned instrument panel around the arena. */
+    @media (min-width: 60rem) and (min-height: 34rem) {
+    html.is-match-active .topbar {
+      top: clamp(0.85rem, 2vw, 1.35rem);
+      grid-template-columns: minmax(16rem, 1fr) minmax(18rem, auto) minmax(16rem, 1fr);
+      align-items: center;
+      min-height: 4.4rem;
+      padding: 0.65rem 0.85rem;
+      border: 1px solid #343434;
+      border-top: 2px solid var(--hazard);
+      background:
+        linear-gradient(90deg, rgb(230 25 25 / 7%), transparent 25%),
+        rgb(10 10 10 / 92%);
+      box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 24%);
+    }
+
+    html.is-match-active .brand {
+      min-width: 0;
+      width: auto;
+    }
+
+    html.is-match-active .brand-copy {
+      min-width: 0;
+    }
+
+    html.is-match-active .brand-copy span {
+      max-width: min(30vw, 29rem);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    html.is-match-active .wave-ribbon {
+      min-width: clamp(18rem, 25vw, 22rem);
+      padding: 0.25rem 1.4rem 0.35rem;
+      border: 0;
+      border-inline: 1px solid #343434;
+      background: transparent;
+    }
+
+    html.is-match-active .wave-ribbon .label {
+      color: #929292;
+    }
+
+    html.is-match-active .wave-ribbon strong {
+      margin-top: 0.28rem;
+      font-size: clamp(0.9rem, 1.15vw, 1.08rem);
+    }
+
+    html.is-match-active .score-stack {
+      top: clamp(6.25rem, 14vh, 7.3rem);
+      width: min(12.4rem, 28vw);
+      padding: 0.9rem 1rem 1rem;
+      border: 1px solid #343434;
+      border-inline-start: 2px solid var(--hazard);
+      background: rgb(10 10 10 / 90%);
+      box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 22%);
+    }
+
+    html.is-match-active .score-stack::before {
+      margin-bottom: 0.45rem;
+    }
+
+    html.is-match-active .score {
+      margin-top: 0.15rem;
+      font-size: clamp(3rem, 4.25vw, 4.5rem);
+    }
+
+    html.is-match-active .score-meta {
+      justify-content: space-between;
+      gap: 0.65rem;
+      margin-top: 0.65rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid #343434;
+    }
+
+    html.is-match-active .combo {
+      display: flex;
+      width: 100%;
+      min-height: 2rem;
+      margin-top: 0.65rem;
+      border: 1px solid #343434;
+      border-inline-start: 2px solid var(--hazard);
+      color: #d0d0d0;
+    }
+
+    html.is-match-active .guide-button {
+      top: clamp(18.2rem, 41vh, 19.7rem);
+      bottom: auto;
+      width: min(12.4rem, 28vw);
+      min-height: 3rem;
+      border: 1px solid #343434;
+      border-inline-start: 2px solid var(--hazard);
+      background: rgb(10 10 10 / 90%);
+      text-align: start;
+    }
+
+    html.is-match-active .player-card {
+      width: 14.5rem;
+      min-height: 5.15rem;
+      bottom: clamp(1rem, 2.5vh, 1.5rem);
+      transform: translateX(-19.55rem);
+      padding: 0.78rem 1rem 0.85rem 5.15rem;
+      border: 1px solid #343434;
+      border-top: 2px solid var(--hazard);
+      border-inline-start: 1px solid #343434;
+      background: rgb(10 10 10 / 94%);
+      box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 28%);
+    }
+
+    html.is-match-active .champion-portrait {
+      left: 0.6rem;
+      bottom: 0.55rem;
+      width: 3.85rem;
+      height: 3.85rem;
+    }
+
+    html.is-match-active .player-line > .micro {
+      overflow: hidden;
+      font-size: 0.58rem;
+      letter-spacing: 0.1em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    html.is-match-active .player-line {
+      display: grid;
+      grid-template-columns: 1fr;
+      align-items: start;
+      gap: 0.3rem;
+    }
+
+    html.is-match-active .hearts {
+      justify-self: start;
+    }
+
+    html.is-match-active .player-card .health-track {
+      margin-top: 0.38rem;
+    }
+
+    html.is-match-active .player-card .combat-hp-readout {
+      position: absolute;
+      inset-inline-start: 0;
+      bottom: calc(100% + 0.45rem);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      width: 40.2rem;
+      margin: 0;
+      border: 1px solid #343434;
+      border-top: 2px solid var(--hazard);
+      background: #343434;
+      font-size: 0.61rem;
+      letter-spacing: 0.08em;
+    }
+
+    html.is-match-active .player-card .combat-hp-readout span {
+      min-width: 0;
+      padding: 0.48rem 0.7rem;
+      overflow: hidden;
+      border: 0;
+      background: rgb(10 10 10 / 94%);
+      text-overflow: ellipsis;
+    }
+
+    html.is-match-active .ability-dock {
+      bottom: clamp(1rem, 2.5vh, 1.5rem);
+      grid-template-columns: repeat(5, minmax(4.55rem, 5rem));
+      min-height: 5.15rem;
+      transform: translateX(-4.75rem);
+      border-color: #343434;
+      background: #343434;
+      box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 28%);
+    }
+
+    html.is-match-active .ability {
+      min-height: 5rem;
+      padding: 0.6rem 0.55rem 0.62rem;
+      text-align: start;
+      transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+    }
+
+    html.is-match-active .ability:hover:not(:disabled) {
+      transform: translateY(-2px);
+    }
+
+    html.is-match-active .ability:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    html.is-match-active .ability:focus-visible,
+    html.is-match-active .guide-button:focus-visible {
+      outline: 2px solid white;
+      outline-offset: 3px;
+    }
+
+    html.is-match-active .ability-name {
+      color: #b7b7b7;
+      line-height: 1.25;
+    }
+
+    html.is-match-active .minimap {
+      bottom: clamp(1rem, 2.5vh, 1.5rem);
+      width: clamp(7.6rem, 9vw, 8.35rem);
+      border: 1px solid #343434;
+      border-top: 2px solid var(--hazard);
+      box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 28%);
+    }
+    }
+
     .intro {
       position: fixed;
       z-index: 8;
