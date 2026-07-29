@@ -92,7 +92,7 @@ Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanho
 
 | Rodada | Estado | Entrega | Evidência | Commit |
 |---|---|---|---|---|
-| 1/20 | Concluída | Baseline de rotas, comandos, tempos, payloads, arquivos quentes e budgets | 3 execuções dos checks viáveis; inventário em bytes; scorecard histórico identificado | `PENDENTE_COMMIT_LOCAL` |
+| 1/20 | Concluída | Baseline de rotas, comandos, tempos, payloads, arquivos quentes e budgets | 3 execuções dos checks viáveis; inventário em bytes; scorecard histórico identificado | `b5da03b` |
 
 ## Escopos reivindicados
 
