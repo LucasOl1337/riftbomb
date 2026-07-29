@@ -6,17 +6,17 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **19/20 — Segunda passada nos top 3 wins (disponível)**
-- Última rodada concluída: **18/20 — Regressão**
-- Próxima rodada planejada: **19/20 — Segunda passada nos top 3 wins**
-- Worktree isolada: `C:/Users/user/.codex/worktrees/r18p/riftbomb`
-- Branch local: `automation/perf-sequential-r18-regression`
-- Base: `06ec5c2e0f226b641fa29e6cfd360aeae73af5f5`
+- Rodada atual: **20/20 — Polimento final e relatório (disponível)**
+- Última rodada concluída: **19/20 — Segunda passada nos top 3 wins**
+- Próxima rodada planejada: **20/20 — Polimento final e relatório**
+- Worktree isolada: `C:/Users/user/.codex/worktrees/a1a3/riftbomb`
+- Branch local: `automation/perf-sequential-r19-top-wins`
+- Base: `2b6af7467cb056e5a398f0a2706b9322d10197ad`
 - Runtime medido: Node `v24.14.0`, npm `11.18.0`, Windows/PowerShell; build online sob WSL Node `v22.22.1`
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 18 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 19 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -64,8 +64,8 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 
 | Budget inicial | Limite | Baseline | Margem |
 |---|---:|---:|---:|
-| Payload estático crítico do jogo | ≤ 800.000 B | 742.991 B frio após a rodada 17; até 72.989 B sem a parte numa revisita quente | 57.009 B no frio |
-| Requests estáticos críticos do jogo | ≤ 8 frio; ≤ 5 na revisita da mesma versão | 6 frio; até 5 na revisita | 2 frio; parte quente atende o alvo |
+| Payload estático crítico do jogo | ≤ 800.000 B | 743.151 B frio no build da rodada 19; até 72.981 B sem a parte numa revisita quente | 56.849 B no frio |
+| Requests estáticos críticos do jogo | ≤ 8 frio; ≤ 5 na revisita da mesma versão | 5 frio; até 4 na revisita | 3 frio; revisita supera o alvo em 1 request |
 | Texturas de arena solicitadas no boot | ≤ 5 arquivos / ≤ 2.700.000 B | 17 / 5.149.084 B antes; 5 / 2.634.254 B atual, com guard executável em 5/5 arenas | 65.746 B de margem |
 | JS do shell `/`, não comprimido | ≤ 350.000 B | 289.213 B atual (331.629 B inicial) | 60.787 B |
 | CSS do shell `/`, não comprimido | ≤ 25.000 B | 23.301 B | 1.699 B |
@@ -96,7 +96,7 @@ Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanho
 - Aparência/asset bundling: `game/arena-appearance/package-arena-appearance.mjs` e `game/arena-appearance/load-arena-appearance.js`.
 - Fundo decorativo: `game/animate-bomber-rift-background.js` define o custom element; `game/arena-appearance/defer-bomber-rift-background.js` só conecta o segundo WebGL em idle, com timeout de 1 s.
 - Empacotamento publicado: `online/scripts/package-riftbomb.mjs`; separa jogo, texturas e modelos e publica as partes no namespace do SHA-256.
-- Loader publicado: `online/public/riftbomb-loader.js`; exige `partsPath` igual ao SHA-256 do manifest, faz fetch paralelo, concatenação, SHA-256, decode e `document.write`.
+- Shell/loader publicados: `online/riftbomb-shell.html` é a fonte do HTML gerado; `online/public/riftbomb-loader.js` usa primeiro o manifesto incorporado, exige `partsPath` igual ao SHA-256, faz fetch paralelo, concatenação, SHA-256, decode e `document.write`, mantendo o manifesto externo como fallback.
 - Política HTTP estática: `online/public/_headers`; somente partes fingerprintadas recebem cache imutável, enquanto o manifest permanece `no-store`.
 - Lobby: `online/app/page.tsx` (27.064 B) e `online/app/riftbomb-client.ts` (6.654 B).
 - Salas/API: `online/app/api/pvp/route.ts`; persistência, projeções SQL e benchmark em `online/app/api/pvp/room-storage.ts` e `online/scripts/benchmark-pvp-read.mjs`.
@@ -161,6 +161,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 16/20 | Concluída | Token bucket por socket limita floods antes de conversão/parsing sem remover autenticação do proxy, `maxPayload`, validação autoritativa ou backpressure | 200.000 frames: parses 200.000 → 240; mediana 436,003 → 5,766 ms (-98,68%); overhead permitido 26,169 ns/mensagem em nove pares | `86a0f1e` |
 | 17/20 | Concluída | Renderer e seletor carregam somente as cinco texturas da arena ativa; previews não selecionados começam com layout/cores e hidratam sob interação | Boot: 17 → 5 requests; 5.149.084 → 2.634.254 B (-2.514.830 B / -48,84%) em 3/3 inventários | `ee00e78` |
 | 18/20 | Concluída | Guard de regressão mede todas as arenas nos WebPs-fonte e aplica os budgets de requests e bytes no gate raiz | Cobertura executável: 0 → 5/5 arenas; pior caso estável em 3/3, 5 requests / 2.634.254 B, margem 65.746 B | `23c213d` |
+| 19/20 | Concluída | Manifesto do jogo incorporado pelo empacotador no shell gerado; loader mantém fallback externo e validação SHA-256 | Cadeia manifesto→parte: 2 → 1 requests; proxy de 50 ms/resposta, mediana 109,931 → 55,395 ms; payload crítico +170 B | `fc94cc3` |
 
 ## Escopos reivindicados
 
@@ -168,11 +169,18 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 19:** reavaliar os três maiores ganhos ainda exploráveis com base nas evidências acumuladas: cadeia serial de `/riftbomb.html`, payload do campeão selecionado e latência publicada de `/api/pvp`; escolher somente um com medição repetível e sem deploy.
+1. **Rodada 20:** consolidar o relatório final das 19 rodadas, atualizar os budgets com os artefatos mais recentes e destacar os dois gargalos remanescentes: payload do campeão selecionado e latência publicada de `/api/pvp`. Não iniciar uma nova otimização ampla nessa rodada.
 2. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates. A rodada 10 adotou apenas reutilização efêmera do payload dentro do mesmo broadcast, sem guardar snapshots entre ticks.
 3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
 ## Evidências e limitações
+
+- Rodada 19: `online/scripts/package-riftbomb.mjs` passou a gerar `online/public/riftbomb.html` a partir de `online/riftbomb-shell.html` e incorpora nele exatamente o mesmo manifesto escrito em `riftbomb-parts/manifest.json`. O loader usa os metadados incorporados no caminho normal e só busca o JSON externo para compatibilidade com shells antigos/sem atributo; tamanho total, `partsPath` fingerprintado e SHA-256 continuam validados antes de `document.write`.
+- Inventário causal com a mesma parte de 670.170 B, repetido **3/3**: requests estáticos críticos **6 → 5 (-16,67%)**; bytes raw **742.981 → 743.151 B (+170 B / +0,023%)**. O pequeno aumento troca 170 B por retirar uma dependência serial e mantém 56.849 B de margem no budget de 800.000 B.
+- Proxy HTTP local com conexão aquecida e atraso controlado de 50 ms por resposta, três pares: caminho externo **107,711 / 116,226 / 109,931 ms** (mediana **109,931 ms**) e incorporado **55,252 / 55,395 / 64,725 ms** (mediana **55,395 ms**); economia pareada mediana **52,459 ms**. Isso evidencia o round-trip removido, mas não é uma alegação de TTFB/LCP em produção.
+- Validação da rodada 19: teste focado **10/10**; `npm test` raiz **43/43**; `npm test` online concluiu build verificado e **19/19** após instalar pelo lockfile; servidor **14/14**; lint online **0 erros** e quatro avisos históricos de `<img>`; `git diff --check` passou. Playwright/headless não foi usado.
+- Limitação da rodada 19: não houve deploy nem navegador visível, então `data-riftbomb-ready-ms`, Network e Web Vitals publicados não foram remedidos. O primeiro gate online parou antes do build por ausência de `node_modules`; `npm ci` preservou `package-lock.json` e a repetição passou.
+- Arquivos de produto/teste da rodada 19: `online/riftbomb-shell.html`, `online/scripts/package-riftbomb.mjs`, `online/public/riftbomb-loader.js`, `online/public/riftbomb.html` e `online/tests/pvp-source.test.mjs`; commit local `fc94cc3`.
 
 - Rodada 18: o teste raiz que já verificava o lazy loading agora descobre todos os blocos de tema declarados em `run-champion-bomb-duel.js`, aplica o plano real de carregamento e soma os WebPs-fonte correspondentes. Novas arenas que não entrarem na medição falham por diferença na contagem de temas; qualquer arena acima de **5 requests** ou **2.700.000 B** falha com o valor observado.
 - Antes desta rodada, o budget móvel estava documentado, mas **0 arenas** tinham o teto de bytes executado pelo gate. Depois, **5/5 arenas** são medidas; em três execuções focadas e três gates raiz o pior caso permaneceu em **5 requests / 2.634.254 B**, com **65.746 B de margem**. Não houve mudança em runtime, payload ou regra de negócio.
