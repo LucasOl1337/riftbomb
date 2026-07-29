@@ -8,6 +8,7 @@
   },
   "scripts": {
     "benchmark:room-clock": "node scripts/benchmark-room-clock.mjs",
+    "benchmark:grid-cache": "node scripts/benchmark-grid-cache.mjs",
     "start": "node src/server.mjs",
     "benchmark:boot": "node scripts/benchmark-server-boot.mjs",
     "benchmark:serialization": "node scripts/benchmark-json-transport.mjs",

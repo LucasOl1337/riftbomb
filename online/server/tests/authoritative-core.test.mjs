@@ -1,7 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createAuthoritativeDuel, applyInputMask } from "../../../game/create-authoritative-duel.mjs";
-import { AuthoritativeRooms } from "../src/authoritative-rooms.mjs";
+import { AuthoritativeRooms, updateGridCache } from "../src/authoritative-rooms.mjs";
+
+test("tracks exact grid changes without transient serialization", () => {
+  const room = { gridCache: null };
+  const grid = [[0, 1], [2, 3]];
+
+  assert.equal(updateGridCache(room, grid), true);
+  assert.notEqual(room.gridCache, grid);
+  assert.equal(updateGridCache(room, grid), false);
+
+  grid[0][1] = 9;
+  assert.equal(updateGridCache(room, grid), true);
+  assert.deepEqual(room.gridCache, grid);
+  assert.equal(updateGridCache(room, grid), false);
+
+  grid.push([4]);
+  assert.equal(updateGridCache(room, grid), true);
+  assert.deepEqual(room.gridCache, grid);
+});
 
 test("headless duel advances independently from a browser", async () => {
   const game = await createAuthoritativeDuel({
@@ -21,11 +39,14 @@ test("shares one tick and snapshot clock across active rooms", async () => {
   const rooms = new Map();
   const timers = new Map();
   const cancelled = [];
+  const broadcasts = [];
   let timerId = 0;
   let now = 100;
   const manager = new AuthoritativeRooms({
     rooms,
-    broadcast() {},
+    broadcast(room, message) {
+      broadcasts.push({ room, message });
+    },
     now: () => now,
     scheduleImmediate: (callback) => callback(),
     scheduleInterval(callback, delay) {
@@ -47,10 +68,26 @@ test("shares one tick and snapshot clock across active rooms", async () => {
 
   assert.equal(timers.size, 2);
   assert.deepEqual([...timers.values()].map(({ delay }) => Math.round(delay)), [17, 33]);
+  const [tickClock, snapshotClock] = [...timers.values()];
   now += 1000 / 60;
-  [...timers.values()][0].callback();
-  [...timers.values()][1].callback();
+  tickClock.callback();
+  snapshotClock.callback();
   assert.deepEqual([...rooms.values()].map(({ sequence }) => sequence), [1, 1]);
+  assert.equal(broadcasts.filter(({ message }) => message.type === "snapshot" && message.data.grid).length, 2);
+
+  broadcasts.length = 0;
+  snapshotClock.callback();
+  assert.equal(broadcasts.filter(({ message }) => message.data.grid).length, 0);
+  broadcasts.length = 0;
+  const changedRoom = rooms.get("ROOM01");
+  changedRoom.game.grid[0][0] = changedRoom.game.grid[0][0] === 0 ? 1 : 0;
+  snapshotClock.callback();
+  assert.equal(broadcasts.find(({ room }) => room === changedRoom).message.data.grid, changedRoom.game.grid);
+  assert.equal(broadcasts.find(({ room }) => room !== changedRoom).message.data.grid, undefined);
+
+  broadcasts.length = 0;
+  for (let sequence = 3; sequence <= 60; sequence += 1) snapshotClock.callback();
+  assert.equal(broadcasts.slice(-2).filter(({ message }) => message.data.grid).length, 2);
 
   manager.stop(rooms.get("ROOM01"));
   assert.equal(timers.size, 2);

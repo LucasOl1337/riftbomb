@@ -16,6 +16,28 @@ export function validPreset(value = {}) {
   };
 }
 
+export function updateGridCache(room, grid) {
+  const cache = room.gridCache;
+  const shapeChanged = !cache || cache.length !== grid.length ||
+    grid.some((row, index) => cache[index]?.length !== row.length);
+  if (shapeChanged) {
+    room.gridCache = grid.map((row) => row.slice());
+    return true;
+  }
+
+  let changed = false;
+  for (let rowIndex = 0; rowIndex < grid.length; rowIndex += 1) {
+    const row = grid[rowIndex];
+    const cachedRow = cache[rowIndex];
+    for (let columnIndex = 0; columnIndex < row.length; columnIndex += 1) {
+      if (cachedRow[columnIndex] === row[columnIndex]) continue;
+      cachedRow[columnIndex] = row[columnIndex];
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 export class AuthoritativeRooms {
   constructor({
     rooms,
@@ -59,7 +81,7 @@ export class AuthoritativeRooms {
       lastTick: 0,
       createdAt: Date.now(),
       lastActivity: Date.now(),
-      gridSignature: ""
+      gridCache: null
     };
     this.rooms.set(code, room);
     return room;
@@ -81,7 +103,7 @@ export class AuthoritativeRooms {
     room.sequence = 0;
     room.inputs = [0, 0];
     room.lastTick = 0;
-    room.gridSignature = "";
+    room.gridCache = null;
     this.stopClockIfIdle();
   }
 
@@ -104,9 +126,7 @@ export class AuthoritativeRooms {
       this.snapshotTimer = this.scheduleInterval(() => {
         this.runRoomQueue("snapshotQueueActive", (room) => {
           if (!room.game) return;
-          const gridSignature = JSON.stringify(room.game.grid);
-          const includeGrid = gridSignature !== room.gridSignature || room.sequence % 60 === 0;
-          room.gridSignature = gridSignature;
+          const includeGrid = updateGridCache(room, room.game.grid) || room.sequence % 60 === 0;
           this.broadcast(room, {
             type: "snapshot",
             data: this.duelRuntime.serializeAuthoritativeSnapshot(
@@ -156,7 +176,7 @@ export class AuthoritativeRooms {
       room.game = await duelRuntime.createAuthoritativeDuel(room.preset);
       room.sequence = 0;
       room.inputs = [0, 0];
-      room.gridSignature = "";
+      room.gridCache = null;
       room.lastTick = this.now();
       this.startClock();
       this.broadcast(room, { ...this.lobbyMessage(room), type: rematch ? "rematch" : "start" });
