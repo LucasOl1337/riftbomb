@@ -27,6 +27,9 @@
     labyrinth: "Cinderfrost Works", forts: "Aeolian Bastions", pit: "Storm-Eye Basin"
   };
   const INVITE_MATCH_TARGET = 10;
+  const CLIENT_BRIDGE_VERSION = 1;
+  const CLIENT_SOURCE = "riftbomb-client";
+  const RUNTIME_SOURCE = "riftbomb-runtime";
   const SNAPSHOT_ARRAYS = [
     "bombs", "blasts", "ultimates", "pickups", "daggers", "projectiles",
     "skillTrails", "slashes", "zedShadows", "zedMarks", "vladimirMarks",
@@ -209,10 +212,51 @@
   const validArena = (value) => typeof value === "string" && ARENAS.includes(value);
   const championName = championNameSafe;
 
+  function clientPhase() {
+    if (game.mode === "playing" || game.mode === "matchover") return "match";
+    return state.role === "offline" ? "setup" : "lobby";
+  }
+
+  function clientStateSnapshot() {
+    return {
+      phase: clientPhase(),
+      role: state.role,
+      roomCode: state.roomCode,
+      connected: state.connected,
+      rivalConnected: state.rivalConnected,
+      guestReady: state.guestReady,
+      inviteMode: state.inviteMode,
+      inviteUrl: state.inviteUrl,
+      busy: Boolean(
+        createButton.disabled ||
+        showInviteButton.disabled ||
+        showJoinButton.disabled
+      ),
+      hostChampion: state.hostChampion,
+      guestChampion: state.guestChampion,
+      arena: state.arena,
+      matchTarget: state.matchTarget,
+      status: status.textContent || "",
+      tone: status.dataset.tone || ""
+    };
+  }
+
+  function publishClientState(reason = "update") {
+    if (window.parent === window) return;
+    window.parent.postMessage({
+      source: RUNTIME_SOURCE,
+      version: CLIENT_BRIDGE_VERSION,
+      type: "state",
+      reason,
+      state: clientStateSnapshot()
+    }, window.location.origin);
+  }
+
   function setStatus(message, tone = "") {
     status.textContent = message;
     status.dataset.tone = tone;
     UI.live.textContent = message;
+    publishClientState("status");
   }
 
   function updateConnection(kind, message) {
@@ -227,6 +271,7 @@
     connection.hidden = false;
     connection.dataset.state = kind;
     connection.textContent = message;
+    publishClientState("connection");
   }
 
   function setBusy(busy) {
@@ -237,6 +282,7 @@
     codeInput.disabled = busy;
     joinForm.querySelector("button").disabled = busy;
     invitePresetForm.querySelector("button").disabled = busy;
+    publishClientState("busy");
   }
 
   function setChampionButtons(champion) {
@@ -280,6 +326,7 @@
           ? `>>> START ONLINE MATCH · ${state.roomCode}`
           : "WAITING FOR PLAYER 2 READY…";
     }
+    publishClientState("lobby");
   }
 
   function setOnlineRole(role) {
@@ -298,6 +345,7 @@
       : "Admin chooses their champion and the arena.";
     game.localPlayerId = role === "guest" ? 2 : 1;
     globalThis.configurePlayerView?.(game.localPlayerId, { shared: role === "offline" });
+    publishClientState("role");
   }
 
   function applyMatchConfig() {
@@ -819,7 +867,11 @@
     if (options.inviteMode) applyInvitePreset(options);
     setOnlineRole("guest");
     state.roomCode = code;
-    if (!state.inviteMode) state.guestChampion = "zed";
+    if (!state.inviteMode) {
+      state.guestChampion = validChampion(options.guestChampion)
+        ? options.guestChampion
+        : "zed";
+    }
     state.guestReady = state.inviteMode;
     roomLabel.textContent = state.inviteMode ? "DIRECT CHALLENGE" : "JOINED LOBBY";
     roomCode.textContent = code;
@@ -1181,6 +1233,163 @@
     }
   });
 
+  function selectChampionFromClient(champion) {
+    if (!validChampion(champion)) return;
+    if (state.inviteMode && state.role !== "offline") {
+      setStatus("This challenge link has locked champions.", "ok");
+      return;
+    }
+    if (state.role === "guest") {
+      state.guestChampion = champion;
+      state.guestReady = false;
+      void renderer.ensureChampionModel(champion);
+      setChampionButtons(champion);
+      sendGuestConfig();
+      updateLobbyDisplay();
+      setStatus(`${championName(champion)} selected. Press READY when finished.`, "ok");
+      return;
+    }
+    game.selectChampion(champion);
+    state.hostChampion = champion;
+    setChampionButtons(champion);
+    if (state.role === "host") {
+      state.guestReady = false;
+      sendLobby();
+      updateLobbyDisplay();
+    }
+    publishClientState("champion");
+  }
+
+  function selectRivalChampionFromClient(champion) {
+    if (!validChampion(champion)) return;
+    if (state.inviteMode && state.role !== "offline") {
+      setStatus("This challenge link has locked champions.", "ok");
+      return;
+    }
+    if (state.role !== "offline") return;
+    game.selectChampion2(champion);
+    state.guestChampion = champion;
+    publishClientState("rival-champion");
+  }
+
+  function selectArenaFromClient(arena) {
+    if (!validArena(arena)) return;
+    if (state.role === "guest") {
+      setStatus("Only the lobby admin chooses the arena.", "error");
+      return;
+    }
+    if (state.inviteMode && state.role !== "offline") {
+      setStatus("This challenge link has a locked arena.", "ok");
+      return;
+    }
+    game.selectArena(arena);
+    state.arena = arena;
+    setArenaButtons(arena);
+    if (state.role === "host") {
+      state.guestReady = false;
+      sendLobby();
+      updateLobbyDisplay();
+    }
+    publishClientState("arena");
+  }
+
+  async function startOfflineFromClient(payload = {}) {
+    chooseOffline();
+    const champion = validChampion(payload.champion) ? payload.champion : "katarina";
+    const guestChampion = validChampion(payload.guestChampion) ? payload.guestChampion : "zed";
+    const arena = validArena(payload.arena) ? payload.arena : ARENAS[0];
+    game.p2Human = payload.mode === "local";
+    game.selectChampion(champion);
+    game.selectChampion2(guestChampion);
+    game.selectArena(arena);
+    state.hostChampion = champion;
+    state.guestChampion = guestChampion;
+    state.arena = arena;
+    state.matchTarget = 3;
+    await originalBeginGame();
+    publishClientState("match");
+  }
+
+  async function handleClientCommand(action, payload = {}) {
+    if (action === "sync") {
+      publishClientState("sync");
+      return;
+    }
+    if (action === "select-champion") {
+      selectChampionFromClient(payload.champion);
+      return;
+    }
+    if (action === "select-rival-champion") {
+      selectRivalChampionFromClient(payload.champion);
+      return;
+    }
+    if (action === "select-arena") {
+      selectArenaFromClient(payload.arena);
+      return;
+    }
+    if (action === "create-room") {
+      chooseOffline();
+      selectChampionFromClient(payload.champion);
+      selectArenaFromClient(payload.arena);
+      await createRoom();
+      return;
+    }
+    if (action === "create-challenge") {
+      await createRoom({
+        inviteMode: true,
+        hostChampion: payload.hostChampion,
+        guestChampion: payload.guestChampion,
+        arena: payload.arena
+      });
+      return;
+    }
+    if (action === "join-room") {
+      const code = String(payload.code || "").trim().toUpperCase();
+      if (!/^[A-HJ-NP-Z2-9]{6}$/.test(code)) {
+        setStatus("Enter the six-character lobby code.", "error");
+        return;
+      }
+      await joinRoom(code, { guestChampion: payload.champion });
+      return;
+    }
+    if (action === "toggle-ready") {
+      readyButton.click();
+      return;
+    }
+    if (action === "start-online") {
+      await startHostOnlineMatch(false);
+      return;
+    }
+    if (action === "start-offline") {
+      await startOfflineFromClient(payload);
+      return;
+    }
+    if (action === "leave-lobby") {
+      chooseOffline();
+    }
+  }
+
+  addEventListener("message", (event) => {
+    if (event.source !== window.parent || event.origin !== window.location.origin) return;
+    const message = event.data;
+    if (
+      !message ||
+      message.source !== CLIENT_SOURCE ||
+      message.version !== CLIENT_BRIDGE_VERSION ||
+      message.type !== "command" ||
+      typeof message.action !== "string"
+    ) {
+      return;
+    }
+    const payload = message.payload && typeof message.payload === "object"
+      ? message.payload
+      : {};
+    void handleClientCommand(message.action, payload).catch((error) => {
+      console.warn("Riftbomb client command failed", error);
+      setStatus("Could not complete that client action. Try again.", "error");
+    });
+  });
+
   let parentParams = new URLSearchParams();
   try { parentParams = new URLSearchParams(window.parent.location.search); } catch {}
   const parentRoom = parentParams.get("room");
@@ -1211,4 +1420,5 @@
   setTimeout(() => {
     void renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
   });
+  publishClientState("ready");
 })();

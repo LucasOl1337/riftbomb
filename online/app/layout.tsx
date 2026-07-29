@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Riftbomb Online PvP",
-  description: "Riftbomb: duelo Bomber Rift online para dois jogadores.",
+  title: "Riftbomb — Bomber Rift Client",
+  description: "Escolha o modo, prepare a sala e entre na arena do Riftbomb.",
   other: {
     "codex-preview": "development",
   },
@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
