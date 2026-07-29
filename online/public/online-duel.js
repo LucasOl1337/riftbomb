@@ -286,8 +286,6 @@
     state.role = role;
     panel.dataset.mode = role;
     document.body.classList.toggle("is-online-match", role !== "offline");
-    UI.pause.disabled = role !== "offline";
-    UI.pause.setAttribute("aria-hidden", String(role !== "offline"));
     lobbyBox.hidden = role === "offline";
     panel.querySelector(".online-panel__head strong").textContent = role === "offline" ? "CREATE YOUR DUEL" : "MATCH LOBBY";
     readyButton.hidden = role !== "guest" || state.inviteMode;
