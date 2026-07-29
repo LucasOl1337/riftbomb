@@ -1,12 +1,7 @@
-import {
-  applyInputMask,
-  createAuthoritativeDuel,
-  serializeAuthoritativeSnapshot
-} from "../../../game/create-authoritative-duel.mjs";
-
 const TICK_RATE = 60;
 const SNAPSHOT_RATE = 30;
 const ROOMS_PER_TURN = 8;
+const loadDefaultDuelRuntime = () => import("../../../game/create-authoritative-duel.mjs");
 const CHAMPIONS = new Set(["katarina", "zed", "renekton", "vladimir", "gangplank"]);
 const ARENAS = new Set(["lattice", "clearing", "labyrinth", "forts", "pit"]);
 
@@ -29,7 +24,8 @@ export class AuthoritativeRooms {
     scheduleInterval = setInterval,
     cancelInterval = clearInterval,
     scheduleImmediate = setImmediate,
-    now = () => performance.now()
+    now = () => performance.now(),
+    loadDuelRuntime = loadDefaultDuelRuntime
   }) {
     this.rooms = rooms;
     this.broadcast = broadcast;
@@ -37,10 +33,20 @@ export class AuthoritativeRooms {
     this.cancelInterval = cancelInterval;
     this.scheduleImmediate = scheduleImmediate;
     this.now = now;
+    this.loadDuelRuntime = loadDuelRuntime;
+    this.duelRuntime = null;
+    this.duelRuntimePromise = null;
     this.tickTimer = null;
     this.snapshotTimer = null;
     this.tickQueueActive = false;
     this.snapshotQueueActive = false;
+  }
+
+  async getDuelRuntime() {
+    if (this.duelRuntime) return this.duelRuntime;
+    this.duelRuntimePromise ??= Promise.resolve(this.loadDuelRuntime())
+      .then((runtime) => (this.duelRuntime = runtime));
+    return this.duelRuntimePromise;
   }
 
   create(code, preset) {
@@ -92,8 +98,8 @@ export class AuthoritativeRooms {
           if (!room.game) return;
           const dt = Math.min(0.05, Math.max(0, (now - room.lastTick) / 1000));
           room.lastTick = now;
-          applyInputMask(room.game, 1, room.inputs[0]);
-          applyInputMask(room.game, 2, room.inputs[1]);
+          this.duelRuntime.applyInputMask(room.game, 1, room.inputs[0]);
+          this.duelRuntime.applyInputMask(room.game, 2, room.inputs[1]);
           room.game.update(dt);
           room.lastActivity = Date.now();
         });
@@ -106,7 +112,11 @@ export class AuthoritativeRooms {
           const gridSignature = JSON.stringify(room.game.grid);
           const includeGrid = gridSignature !== room.gridSignature || room.sequence % 60 === 0;
           room.gridSignature = gridSignature;
-          const snapshot = serializeAuthoritativeSnapshot(room.game, ++room.sequence, includeGrid);
+          const snapshot = this.duelRuntime.serializeAuthoritativeSnapshot(
+            room.game,
+            ++room.sequence,
+            includeGrid
+          );
           room.soundEventSequence = Math.max(room.soundEventSequence, snapshot.sound.latest);
           this.broadcast(room, { type: "snapshot", data: snapshot });
         });
@@ -146,7 +156,8 @@ export class AuthoritativeRooms {
     room.starting = true;
     try {
       if (rematch) this.stopMatch(room);
-      room.game = await createAuthoritativeDuel({
+      const duelRuntime = await this.getDuelRuntime();
+      room.game = await duelRuntime.createAuthoritativeDuel({
         ...room.preset,
         soundEventStartId: room.soundEventSequence
       });
@@ -161,6 +172,11 @@ export class AuthoritativeRooms {
     } finally {
       room.starting = false;
     }
+  }
+
+  applyPlayerAction(room, playerId, action) {
+    if (!room.game || !this.duelRuntime) return false;
+    return this.duelRuntime.applyPlayerAction(room.game, playerId, action);
   }
 
   stop(room) {
