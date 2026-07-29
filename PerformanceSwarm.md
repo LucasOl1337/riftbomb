@@ -6,17 +6,17 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **17/20 — Mobile / rede lenta (disponível)**
-- Última rodada concluída: **16/20 — Segurança vs performance**
-- Próxima rodada planejada: **17/20 — Mobile / rede lenta**
-- Worktree isolada: `C:/Users/user/.codex/worktrees/1c0f/riftbomb`
-- Branch local: `automation/perf-sequential-r16-security-performance`
+- Rodada atual: **18/20 — Regressão (disponível)**
+- Última rodada concluída: **17/20 — Mobile / rede lenta**
+- Próxima rodada planejada: **18/20 — Regressão**
+- Worktree isolada: `C:/Users/user/.codex/worktrees/r17p/riftbomb`
+- Branch local: `automation/perf-sequential-r17-mobile-slow-network`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
 - Runtime medido: Node `v24.14.0`, npm `11.18.0`, Windows/PowerShell
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 16 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 17 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -64,8 +64,9 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 
 | Budget inicial | Limite | Baseline | Margem |
 |---|---:|---:|---:|
-| Payload estático crítico do jogo | ≤ 800.000 B | 741.346 B frio; até 72.811 B sem a parte numa revisita quente | 58.654 B no frio |
+| Payload estático crítico do jogo | ≤ 800.000 B | 742.991 B frio após a rodada 17; até 72.989 B sem a parte numa revisita quente | 57.009 B no frio |
 | Requests estáticos críticos do jogo | ≤ 8 frio; ≤ 5 na revisita da mesma versão | 6 frio; até 5 na revisita | 2 frio; parte quente atende o alvo |
+| Texturas de arena solicitadas no boot | ≤ 5 arquivos / ≤ 2.700.000 B | 17 / 5.149.084 B antes; 5 / 2.634.254 B atual | 65.746 B de margem |
 | JS do shell `/`, não comprimido | ≤ 350.000 B | 289.213 B atual (331.629 B inicial) | 60.787 B |
 | CSS do shell `/`, não comprimido | ≤ 25.000 B | 23.301 B | 1.699 B |
 | VAT publicado de Katarina | ≤ 25.000.000 B | 24.938.550 B atual (33.251.400 B inicial) | 61.450 B |
@@ -158,6 +159,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 14/20 | Concluída | Cache estrutural exato substitui `JSON.stringify` da grade em todo snapshot estável, preservando mutações e refresh periódico | 384.000 verificações: mediana 982,999 → 199,591 ms (-79,70% / 4,93x); strings temporárias 384.000 → 0 | `8c05e87` |
 | 15/20 | Concluída | `/health` passou a expor dez sinais agregados de capacidade, relógio e event loop, sem identificadores de sala ou credenciais | Antes: somente total de salas; depois: 10 sinais, com 4,108 ns/ciclo de overhead mediano em nove pares | `40461a2` |
 | 16/20 | Concluída | Token bucket por socket limita floods antes de conversão/parsing sem remover autenticação do proxy, `maxPayload`, validação autoritativa ou backpressure | 200.000 frames: parses 200.000 → 240; mediana 436,003 → 5,766 ms (-98,68%); overhead permitido 26,169 ns/mensagem em nove pares | `86a0f1e` |
+| 17/20 | Concluída | Renderer e seletor carregam somente as cinco texturas da arena ativa; previews não selecionados começam com layout/cores e hidratam sob interação | Boot: 17 → 5 requests; 5.149.084 → 2.634.254 B (-2.514.830 B / -48,84%) em 3/3 inventários | `ee00e78` |
 
 ## Escopos reivindicados
 
@@ -165,11 +167,18 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 17:** validar mobile/rede lenta com os proxies reproduzíveis disponíveis, priorizando o carregamento do modelo selecionado e a reconstrução do jogo sem iniciar Playwright/headless.
+1. **Rodada 18:** executar uma passada explícita de regressão sobre contratos do jogo, empacotamento online, servidor e budgets acumulados; priorizar um guard automatizado para o maior risco ainda não coberto, sem iniciar Playwright/headless.
 2. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates. A rodada 10 adotou apenas reutilização efêmera do payload dentro do mesmo broadcast, sem guardar snapshots entre ticks.
 3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
 ## Evidências e limitações
+
+- Rodada 17: `Renderer.createArenaTextures()` criava 17 `Image`s imediatamente e os cinco cards do seletor também pintavam previews com todas as famílias. Agora os 17 fallbacks WebGL continuam válidos, mas somente o plano da arena ativa inicia rede; cada Promise é memoizada. Os quatro cards não selecionados desenham layout/cores sem rede e hidratam resolução integral em `pointerenter`, foco ou clique.
+- Inventário determinístico repetido **3/3**: texturas solicitadas no boot **17 → 5 (-70,59%)** e bytes WebP **5.149.084 → 2.634.254 B (-2.514.830 B / -48,84%)** para a arena padrão. Num piso controlado de 1,6 Mbit/s, somente transferência raw cai de **25,745 para 13,171 s (-12,574 s)**; isso não é alegado como waterfall real de navegador.
+- O custo do plano lazy acrescentou **1.645 B** ao payload estático crítico (741.346 → 742.991 B), mantendo **6 requests** e margem de **57.009 B** no budget de 800.000 B. Resolução, arquivos WebP, mipmaps, anisotropia e fallbacks não foram reduzidos.
+- Validação da rodada 17: teste focado passou; raiz **43/43** em duas execuções do gate durante a rodada; online fez build/verificação do artefato e **17/17** em duas execuções; servidor **14/14**; lint online terminou com **0 erros** e quatro avisos conhecidos. `git diff --check` passou. Playwright/headless não foi usado.
+- Limitação da rodada 17: requests/bytes vêm do grafo de carregamento testado e do tamanho determinístico dos assets locais; não houve navegador visível, throttling real, decode/GPU profiling ou deploy. Interagir com outras arenas carrega sob demanda seus três WebPs exclusivos, como esperado.
+- Arquivos de produto/teste da rodada 17: `game/arena-appearance/plan-arena-texture-loads.js`, `game/play-riftbomb.html`, `game/draw-bomber-rift.js`, `game/start-champion-duel.js` e `game/verify-riftbomb.test.mjs`; commit local `ee00e78`. Artefatos gerados `game/arena-appearance/load-arena-appearance.js` e `riftbomb.html` ficaram fora do commit seletivo.
 
 - Rodada 16: o servidor aceitava frames sem limite de frequência; `maxPayload: 32_768` restringia apenas o tamanho individual. O token bucket novo admite burst de **240 mensagens** e repõe **120/s por socket**, descartando excesso antes de `Buffer.toString()` e `JSON.parse()`; autenticação por segredo do proxy, limite de payload, validações autoritativas e backpressure não foram removidos.
 - Benchmark reproduzível `npm run benchmark:message-rate-limit`, com aquecimento e **nove pares intercalados** sobre 200.000 frames de 1 KiB: trabalho de parsing **200.000 → 240 (-99,88%)**; mediana **436,003 → 5,766 ms (-98,68%)**. Em 1.000.000 de mensagens admitidas, o custo incremental mediano do bucket foi **26,169 ns/mensagem**.
