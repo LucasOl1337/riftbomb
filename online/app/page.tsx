@@ -22,6 +22,7 @@ import {
   championById,
   isRuntimeStateMessage,
   modeById,
+  runtimeStateEquals,
   type ArenaId,
   type ChampionId,
   type ClientCommand,
@@ -187,6 +188,7 @@ function playerStateLabel(runtime: RuntimeState, side: "host" | "guest") {
 
 export default function Home() {
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const lastRuntimeRef = useRef<RuntimeState | null>(null);
   const [runtime, setRuntime] = useState(INITIAL_RUNTIME_STATE);
   const [activeMode, setActiveMode] = useState<ClientMode>("online");
   const [champion, setChampion] = useState<ChampionId>("katarina");
@@ -224,6 +226,8 @@ export default function Home() {
         return;
       }
       const next = event.data.state;
+      if (runtimeStateEquals(lastRuntimeRef.current, next)) return;
+      lastRuntimeRef.current = next;
       setRuntime(next);
       setChampion(next.role === "guest" ? next.guestChampion : next.hostChampion);
       setRivalChampion(

@@ -245,6 +245,31 @@ export function isRuntimeStateMessage(
   );
 }
 
+export function runtimeStateEquals(
+  left: RuntimeState | null,
+  right: RuntimeState,
+) {
+  return (
+    left === right ||
+    (left !== null &&
+      left.phase === right.phase &&
+      left.role === right.role &&
+      left.roomCode === right.roomCode &&
+      left.connected === right.connected &&
+      left.rivalConnected === right.rivalConnected &&
+      left.guestReady === right.guestReady &&
+      left.inviteMode === right.inviteMode &&
+      left.inviteUrl === right.inviteUrl &&
+      left.busy === right.busy &&
+      left.hostChampion === right.hostChampion &&
+      left.guestChampion === right.guestChampion &&
+      left.arena === right.arena &&
+      left.matchTarget === right.matchTarget &&
+      left.status === right.status &&
+      left.tone === right.tone)
+  );
+}
+
 export function championById(id: ChampionId) {
   return CHAMPIONS.find((champion) => champion.id === id) ?? CHAMPIONS[0];
 }
