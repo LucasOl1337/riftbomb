@@ -6,9 +6,9 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **10/20 — Backend: cache de aplicação (disponível)**
-- Última rodada concluída: **9/20 — Backend: banco e queries**
-- Próxima rodada planejada: **10/20 — Backend: cache de aplicação**
+- Rodada atual: **11/20 — Backend: concorrência e filas (disponível)**
+- Última rodada concluída: **10/20 — Backend: cache de aplicação**
+- Próxima rodada planejada: **11/20 — Backend: concorrência e filas**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/b17b/riftbomb`
 - Branch local: `automation/perf-sequential-r01-baseline`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 9 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 10 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -75,6 +75,7 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 | `POST /api/pvp` create, mediana publicada | ≤ 50 ms | 28,0 ms histórico | 22,0 ms |
 | Chamadas D1 sequenciais no create aquecido | ≤ 1 | 2 antes da rodada 8; 1 atual | atende |
 | `POST /api/pvp` join, mediana publicada | ≤ 30 ms | 14,4 ms histórico | 15,6 ms |
+| Serializações JSON por broadcast para dois jogadores | ≤ 1 | 2 antes da rodada 10; 1 atual | atende |
 | Valores materializados por leitura de sala com SDP máximo | ≤ 33.000 B | 64.175 B antes da rodada 9; 32.080 B máximo atual | 920 B |
 
 Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanhos em disco, sem compressão HTTP; latências de API são históricas e precisam ser remedidas antes de qualquer nova alegação de ganho.
@@ -90,7 +91,8 @@ Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanho
 - Política HTTP estática: `online/public/_headers`; somente partes fingerprintadas recebem cache imutável, enquanto o manifest permanece `no-store`.
 - Lobby: `online/app/page.tsx` (27.064 B) e `online/app/riftbomb-client.ts` (6.654 B).
 - Salas/API: `online/app/api/pvp/route.ts`; persistência, projeções SQL e benchmark em `online/app/api/pvp/room-storage.ts` e `online/scripts/benchmark-pvp-read.mjs`.
-- Transporte: `online/server/src/server.mjs` (6.858 B).
+- Transporte: `online/server/src/server.mjs` (6.917 B).
+- Codificação WebSocket: `online/server/src/json-transport.mjs`; reutiliza o JSON somente durante o broadcast corrente e mantém readiness/backpressure antes de codificar.
 - Relógio/snapshots: `online/server/src/authoritative-rooms.mjs` (3.612 B).
 
 ## Inventário de gargalos — rodada 2
@@ -139,6 +141,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 7/20 | Concluída | Fundo WebGL decorativo tornado inerte durante o parse e montado em idle; início da partida cancela a montagem pendente | Inicializações WebGL antes do idle: 1 → 0 em 3/3 no proxy instrumentado; zero scripts/origens remotos; custo de payload +657 B | `187be3b` |
 | 8/20 | Concluída | Limpeza expirada e primeiro `INSERT` de criação de sala agrupados numa transação `D1Database.batch`; retry de colisão preservado sem nova limpeza | Chamadas D1 no sucesso normal: 2 → 1 (-50%); proxy de 20 ms/chamada, mediana 41,72 → 21,10 ms em 3/3 | `785fd45` |
 | 9/20 | Concluída | Projeções SQL distintas para host/convidado removem o SDP e os valores de autenticação não usados sem adicionar round-trip | Linha com SDPs máximos: 64.175 → 32.079 B no host e 32.080 B no convidado (≈-50%); 1 chamada e plano por PK mantidos em 3/3 | `de2bfe5` |
+| 10/20 | Concluída | Codificação JSON reutilizada dentro de cada broadcast autoritativo para host e convidado, sem cache persistente de estado mutável | 40.000 → 20.000 serializações (-50%); proxy de 1.041 B, mediana 448,27 → 226,33 ms (-49,5%) em 3/3 | `d4a38b4` |
 
 ## Escopos reivindicados
 
@@ -146,8 +149,9 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 10:** avaliar cache somente para resultados estáveis/negativos e medir hit rate provável. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates; a rodada 9 mostrou que cada leitura atual já faz uma única chamada indexada e transfere no máximo um SDP.
-2. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
+1. **Rodada 11:** medir se criação de duelo ou serialização de snapshots bloqueia o event loop sob múltiplas salas; preservar o tick autoritativo e aplicar limites/execução assíncrona somente se o benchmark demonstrar fila ou atraso real.
+2. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates. A rodada 10 adotou apenas reutilização efêmera do payload dentro do mesmo broadcast, sem guardar snapshots entre ticks.
+3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
 ## Evidências e limitações
 
@@ -194,3 +198,7 @@ Nenhum escopo ativo.
 - Benchmark local reproduzível com SQLite e os dois SDPs no limite de 32.000 caracteres, repetido 3 vezes: valores serializados **64.175 → 32.079 B** no host (**-32.096 B / -50,02%**) e **64.175 → 32.080 B** no convidado cheio (**-32.095 B / -50,01%**). Antes/depois mantiveram **1 chamada** e `EXPLAIN QUERY PLAN` confirmou `SEARCH pvp_rooms USING INDEX sqlite_autoindex_pvp_rooms_1 (code=?)` em todas as amostras; nenhum índice redundante foi adicionado.
 - Validação da rodada 9: testes específicos de persistência passaram **4/4**; `npm test` raiz passou e o conjunto direto confirmou **42/42**; `npm test` em `online/` passou com build verificado e o conjunto direto confirmou **17/17**; `npm test` em `online/server/` passou os **3/3 grupos**; lint terminou com **0 erros** e quatro avisos conhecidos. `git diff --check` passou. Playwright/headless não foi usado.
 - Limitação da rodada 9: os bytes medem os valores materializados em SQLite local, não bytes faturados ou latência real do D1 remoto. O ganho estrutural é a remoção de uma coluna SDP de até 32 KB por leitura; nenhum ganho de milissegundos em produção é alegado. O primeiro `npm test` online foi bloqueado pela ausência inicial de dependências; após `npm ci` com lockfile preservado, o gate passou.
+- Rodada 10: `broadcast` codificava o mesmo objeto separadamente para host e convidado. `json-transport.mjs` agora verifica readiness/backpressure, codifica uma vez se houver ao menos um destinatário elegível e envia a mesma string aos sockets elegíveis; envios diretos continuam codificando cada mensagem distinta.
+- Benchmark controlado da rodada 10 com payload ASCII de snapshot de **1.041 B**, 20.000 broadcasts para dois destinatários e três repetições: serializações **40.000 → 20.000 (-50%)**, bytes enviados preservados em **41.640.000**, mediana **448,27 → 226,33 ms (-49,5%)**. Os milissegundos são um proxy local de CPU, não latência de produção; a evidência causal é a contagem de codificações.
+- Validação da rodada 10: teste específico passou **3/3**; `npm test` em `online/server/` passou **5/5** contando os três novos casos e os dois fluxos existentes; `npm test` em `online/` passou **17/17** com build verificado; `npm test` raiz passou **42/42**; lint terminou com **0 erros** e quatro avisos conhecidos. `git diff --check` passou. Playwright/headless não foi usado.
+- Limitação da rodada 10: o benchmark usa payload sintético representativo e sockets em memória; não mede CPU ou event-loop lag do servidor publicado. O cache é deliberadamente efêmero ao broadcast atual para não reter snapshots nem introduzir invalidação entre ticks.
