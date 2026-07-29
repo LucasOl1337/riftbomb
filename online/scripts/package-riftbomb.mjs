@@ -163,6 +163,9 @@ async function playableChampionPayload(champion) {
         textureDimensions: metadata.textureDimensions,
         positionMin: metadata.positionBounds.min,
         positionRange: metadata.positionBounds.range,
+        // Required by resolveChampionAnimation — without actions the mesh
+        // loads but every frame returns null and champions go invisible.
+        actions: metadata.animationActions,
         clips: metadata.animationClips,
       },
     });

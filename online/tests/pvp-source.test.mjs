@@ -177,6 +177,9 @@ test("loads only the playable champion models selected in the lobby", async () =
       assert.ok(packedNormals.byteLength < 25 * 1024 * 1024);
       assert.equal(payload.animation.runtime, "vat-v1");
       assert.equal(payload.animation.frameCount, metadata.frameCount);
+      assert.ok(payload.animation.actions, `${champion} must ship animation.actions`);
+      assert.deepEqual(payload.animation.actions, metadata.animationActions);
+      assert.ok(payload.animation.clips, `${champion} must ship animation.clips`);
     }
   }
 });

@@ -3,7 +3,7 @@
   "completeClipCatalog": true,
   "source": "Khada Model Viewer Zed base GLB with all animation clips",
   "sourceUrl": "https://cdn.modelviewer.lol/lol/models/zed/238000/model.glb",
-  "unitScale": 1.289390319603972,
+  "unitScale": 1.3126973504372477,
   "vertexCount": 5462,
   "indexCount": 26109,
   "strideFloats": 2,
@@ -14,19 +14,19 @@
   ],
   "positionBounds": {
     "min": [
-      -20671.61328125,
-      -0.001246187137439847,
-      -46366.40625
+      -2.277755968570709,
+      -0.7174999999999999,
+      -2.3585215139389035
     ],
     "max": [
-      1.9156326055526733,
-      81436.8828125,
-      45222.33203125
+      2.1524307656288144,
+      2.6746127891540525,
+      2.630533866882324
     ],
     "range": [
-      20673.528913855553,
-      81436.88405868714,
-      91588.73828125
+      4.430186734199523,
+      3.3921127891540523,
+      4.9890553808212275
     ]
   },
   "materials": [

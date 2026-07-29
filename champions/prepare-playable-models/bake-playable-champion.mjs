@@ -39,6 +39,8 @@ const fixedConfigs = {
     targetHeight: 2.05,
     runtime: "vat-v1",
     sourceUrl: "https://cdn.modelviewer.lol/lol/models/zed/238000/model.glb",
+    // Shadow-clone / ult clips inject skinned outliers that wreck raw min/max.
+    robustGround: true,
     actions: {
       idle: "Zed_idle1.anm", run: "Zed_run.anm", attack: "Zed_attack1.anm",
       q: "Zed_spell1.anm", w: "Zed_spell2_cast.anm", e: "Zed_spell3.anm",
@@ -315,21 +317,68 @@ if (config.runtime === "vat-v1") {
   const indexCount = meshes.reduce((sum, mesh) => sum + mesh.geometry.index.count, 0);
   if (vertexCount >= 65536) throw new Error("Model exceeds Uint16 index range");
 
-  const positionMin = [Infinity, Infinity, Infinity];
-  const positionMax = [-Infinity, -Infinity, -Infinity];
-  for (const frame of positionFrames) {
+  // Build VAT bounds from the idle clip only, then pad for combat motion.
+  // Zed Q/W/R (and several supporting clips) leave whole vertex islands at
+  // ±1e4 after skinning — including them in min/max collapses the body.
+  const idleClip = animationClips[config.actions.idle] ||
+    animationClips[Object.keys(animationClips).find((key) => /idle/i.test(key)) || ""];
+  const axisSamples = [[], [], []];
+  const idleFrameCount = idleClip ? idleClip.frameCount : 1;
+  const idleStart = idleClip ? idleClip.startFrame : 0;
+  for (let frameOffset = 0; frameOffset < idleFrameCount; frameOffset += 1) {
+    const frame = positionFrames[idleStart + frameOffset];
     for (const meshPositions of frame) {
       for (let index = 0; index < meshPositions.length; index += 3) {
         for (let axis = 0; axis < 3; axis += 1) {
-          positionMin[axis] = Math.min(positionMin[axis], meshPositions[index + axis]);
-          positionMax[axis] = Math.max(positionMax[axis], meshPositions[index + axis]);
+          axisSamples[axis].push(meshPositions[index + axis]);
         }
       }
     }
   }
+  const positionMin = [0, 0, 0];
+  const positionMax = [0, 0, 0];
+  const height = config.targetHeight || 2;
+  for (let axis = 0; axis < 3; axis += 1) {
+    const values = axisSamples[axis];
+    values.sort((a, b) => a - b);
+    const low = percentile(values, 0.01);
+    const high = percentile(values, 0.99);
+    const center = (low + high) * 0.5;
+    const half = Math.max((high - low) * 0.5, height * (axis === 1 ? 0.15 : 0.2));
+    // Idle box padded so run/attack still fit; hard-cap so one exploded prop
+    // cannot re-open a multi-kilometer range.
+    const pad = axis === 1 ? height * 0.35 : height * 0.85;
+    positionMin[axis] = Math.max(center - half - pad, low - pad);
+    positionMax[axis] = Math.min(center + half + pad, high + pad);
+  }
+  // Keep feet near the idle contact plane.
+  const foot = percentile(axisSamples[1], 0.02);
+  positionMin[1] = Math.min(positionMin[1], foot - height * 0.05);
+  positionMax[1] = Math.max(positionMax[1], percentile(axisSamples[1], 0.99) + height * 0.2);
+  // Absolute safety cap relative to idle center (stops any residual runaway).
+  const idleCenter = axisSamples.map((values) => percentile(values, 0.5));
+  positionMin[0] = Math.max(positionMin[0], idleCenter[0] - height * 1.6);
+  positionMax[0] = Math.min(positionMax[0], idleCenter[0] + height * 1.6);
+  positionMin[1] = Math.max(positionMin[1], idleCenter[1] - height * 1.2);
+  positionMax[1] = Math.min(positionMax[1], idleCenter[1] + height * 1.4);
+  positionMin[2] = Math.max(positionMin[2], idleCenter[2] - height * 1.6);
+  positionMax[2] = Math.min(positionMax[2], idleCenter[2] + height * 1.6);
   const positionRange = positionMax.map((maximum, axis) =>
     Math.max(1e-6, maximum - positionMin[axis])
   );
+  // Re-clamp every sample into the robust global box before quantization.
+  for (const frame of positionFrames) {
+    for (const meshPositions of frame) {
+      for (let index = 0; index < meshPositions.length; index += 3) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          meshPositions[index + axis] = Math.max(
+            positionMin[axis],
+            Math.min(positionMax[axis], meshPositions[index + axis]),
+          );
+        }
+      }
+    }
+  }
 
   const frameCount = positionFrames.length;
   const quantizedPositions = new Uint16Array(frameCount * vertexCount * 4);

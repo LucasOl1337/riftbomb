@@ -1837,7 +1837,10 @@ drawKatarinaFallback(player, t, beat) {
           this.drawKatarinaFallback(player, t, beat);
           return;
         }
-        if (this.katarinaCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "katarina")) return;
+        if (this.katarinaCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "katarina")) {
+          this.drawKatarinaFallback(player, t, beat);
+          return;
+        }
 
         const gl = this.gl;
         const C = Renderer.colors;
@@ -1943,7 +1946,13 @@ drawKatarinaFallback(player, t, beat) {
             C.zedCrimson, 3, 1.8 + beat, player.facing, shadow ? 0.5 : 1);
           return;
         }
-        if (this.zedCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "zed")) return;
+        if (this.zedCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "zed")) {
+          this.draw("sphere", [player.x, 0.72, player.z], [0.34, 0.72, 0.3],
+            shadow ? C.zedShadow : C.zedSteel, 2, shadow ? 1.4 : 0.18, player.facing, shadow ? 0.48 : 1);
+          this.draw("crystal", [player.x, 1.38, player.z], [0.3, 0.38, 0.28],
+            C.zedCrimson, 3, 1.8 + beat, player.facing, shadow ? 0.5 : 1);
+          return;
+        }
 
         const gl = this.gl;
         const teleport = player.zedUltAnim > 0 ? 1 : 0;
@@ -2495,7 +2504,11 @@ drawKatarinaFallback(player, t, beat) {
           ? Math.sin(ultProgress * Math.PI)
           : dominus ? 0.12 + Math.sin(t * 2.8) * 0.035 : 0;
         const scale = (modelReviewMode ? 1.08 : 0.92) * (dominus ? 1.16 : 1);
-        if (this.renektonCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "renekton")) return;
+        if (this.renektonCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "renekton")) {
+          this.draw("sphere", [player.x, 0.76, player.z], [0.4, 0.76, 0.34],
+            C.renektonTeal || C.vladimirCrimson, 2, 0.3, player.facing);
+          return;
+        }
         this.drawPackedChampion(player, t, beat, "renekton", 2, {
           scale,
           ult: ultPose,
@@ -2562,7 +2575,11 @@ drawKatarinaFallback(player, t, beat) {
           ? clamp(1 - player.gangplankUltAnim / 0.7, 0, 1)
           : 0;
         const ultPose = player.gangplankUltAnim > 0 ? Math.sin(ultProgress * Math.PI) : 0;
-        if (this.gangplankCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "gangplank")) return;
+        if (this.gangplankCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "gangplank")) {
+          this.draw("sphere", [player.x, 0.76, player.z], [0.4, 0.76, 0.34],
+            C.gangplankWood || C.vladimirCrimson, 2, 0.3, player.facing);
+          return;
+        }
         this.drawPackedChampion(player, t, beat, "gangplank", 4, {
           scale: modelReviewMode ? 1.14 : 1.05,
           ult: ultPose,
