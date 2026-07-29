@@ -1,8 +1,51 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import {
+  INITIAL_RUNTIME_STATE,
+  runtimeStateEquals,
+} from "../app/riftbomb-client.ts";
 
 const root = new URL("../", import.meta.url);
+
+test("deduplicates unchanged runtime snapshots before React state updates", () => {
+  const snapshot = {
+    ...INITIAL_RUNTIME_STATE,
+    phase: "lobby",
+    role: "host",
+    roomCode: "ABC234",
+    connected: true,
+    rivalConnected: true,
+    guestReady: true,
+    inviteMode: true,
+    inviteUrl: "https://example.test/?room=ABC234",
+    busy: false,
+    hostChampion: "zed",
+    guestChampion: "renekton",
+    arena: "pit",
+    matchTarget: 10,
+    status: "Ready",
+    tone: "ok",
+  };
+
+  assert.equal(runtimeStateEquals(null, snapshot), false);
+  assert.equal(runtimeStateEquals(snapshot, snapshot), true);
+  assert.equal(runtimeStateEquals({ ...snapshot }, snapshot), true);
+
+  for (const field of Object.keys(snapshot)) {
+    const value = snapshot[field];
+    const changed = {
+      ...snapshot,
+      [field]:
+        typeof value === "boolean"
+          ? !value
+          : typeof value === "number"
+            ? value + 1
+            : `${value}-changed`,
+    };
+    assert.equal(runtimeStateEquals(changed, snapshot), false, field);
+  }
+});
 
 test("ships a real client shell while keeping the classic runtime reversible", async () => {
   const [page, styles, data] = await Promise.all([
