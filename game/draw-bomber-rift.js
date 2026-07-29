@@ -548,37 +548,63 @@
         }
         const packed = PLAYABLE_CHAMPIONS[champion];
         if (!packed) return Promise.resolve(false);
+        // Register the in-flight promise BEFORE any await so concurrent
+        // ensureChampionModel calls share the same load instead of resolving false.
+        let settleReady;
+        this[`${champion}ModelReadyPromise`] = new Promise((resolve) => {
+          settleReady = resolve;
+        });
         this.championModelInitialised.add(champion);
-        if (packed.animation?.runtime === "vat-v1") {
-          // Stream the decoded pose through the proven vertex path used by Vladimir.
-          // This keeps the source VAT deterministic across WebGL drivers.
-          const animatedFallbackColors = {
-            katarina: [42, 8, 18, 255],
-            zed: [14, 13, 17, 255],
+
+        const finish = (ok) => {
+          settleReady(Boolean(ok));
+          return Boolean(ok);
+        };
+        const fail = (error) => {
+          console.error(`Playable model ${champion} failed to initialise.`, error);
+          this.championModelInitialised.delete(champion);
+          this[`${champion}Ready`] = false;
+          return finish(false);
+        };
+
+        try {
+          if (packed.animation?.runtime === "vat-v1") {
+            // Stream the decoded pose through the proven vertex path used by Vladimir.
+            // This keeps the source VAT deterministic across WebGL drivers.
+            const animatedFallbackColors = {
+              katarina: [42, 8, 18, 255],
+              zed: [14, 13, 17, 255],
+              renekton: [24, 26, 21, 255],
+              vladimir: [48, 5, 18, 255],
+              gangplank: [92, 58, 28, 255]
+            };
+            return this.createCpuAnimatedChampionModel(
+              champion,
+              packed,
+              animatedFallbackColors[champion]
+            ).then(finish, fail);
+          }
+          if (champion === "katarina") {
+            return Promise.resolve(this.createKatarinaModel()).then(finish, fail);
+          }
+          if (champion === "zed") {
+            return Promise.resolve(this.createZedModel()).then(finish, fail);
+          }
+          const fallbackColors = {
             renekton: [24, 26, 21, 255],
             vladimir: [48, 5, 18, 255],
             gangplank: [92, 58, 28, 255]
           };
-          return this.createCpuAnimatedChampionModel(
+          return Promise.resolve(this.createPackedChampionModel(
             champion,
-            packed,
-            animatedFallbackColors[champion]
-          );
+            packed.vertices,
+            packed.indices,
+            packed.texture,
+            fallbackColors[champion] || [24, 24, 24, 255]
+          )).then(finish, fail);
+        } catch (error) {
+          return Promise.resolve(fail(error));
         }
-        if (champion === "katarina") return this.createKatarinaModel();
-        if (champion === "zed") return this.createZedModel();
-        const fallbackColors = {
-          renekton: [24, 26, 21, 255],
-          vladimir: [48, 5, 18, 255],
-          gangplank: [92, 58, 28, 255]
-        };
-        return this.createPackedChampionModel(
-          champion,
-          packed.vertices,
-          packed.indices,
-          packed.texture,
-          fallbackColors[champion] || [24, 24, 24, 255]
-        );
       }
 
       ensureChampionModel(champion) {
@@ -603,15 +629,14 @@
           script.src = source;
           script.async = true;
           script.onload = () => {
-            try {
-              resolve(this.initialiseChampionModel(champion));
-            } catch (error) {
+            Promise.resolve(this.initialiseChampionModel(champion)).then(resolve, (error) => {
               console.error(`Playable model ${champion} failed to initialise.`, error);
               resolve(false);
-            }
+            });
           };
           script.onerror = () => {
             console.error(`Playable model ${champion} failed to load.`);
+            delete this.championModelLoadPromises[champion];
             resolve(false);
           };
           document.head.appendChild(script);
@@ -799,20 +824,27 @@
         const gl = this.gl;
         const vertexBytes = this.decodePackedBinary(packed.vertices);
         const indexBytes = this.decodePackedBinary(packed.indices);
+        // Copy into fresh buffers so typed views stay aligned after network fetch.
         const [frameBytes, normalBytes] = await Promise.all([
           this.loadPackedBinary(packed.frames, packed.framesUrl, `${key} frames`),
           this.loadPackedBinary(packed.normals, packed.normalsUrl, `${key} normals`),
         ]);
+        const frameCopy = frameBytes.byteOffset === 0 && (frameBytes.byteLength % 2) === 0
+          ? frameBytes
+          : frameBytes.slice();
+        const normalCopy = normalBytes.byteOffset === 0
+          ? normalBytes
+          : normalBytes.slice();
         const animation = packed.animation;
         const vertexCount = animation.vertexCount;
         const sourceUv = new Float32Array(
-          vertexBytes.buffer, vertexBytes.byteOffset, vertexBytes.byteLength / 4
+          vertexBytes.buffer.slice(vertexBytes.byteOffset, vertexBytes.byteOffset + vertexBytes.byteLength)
         );
         const frameData = new Uint16Array(
-          frameBytes.buffer, frameBytes.byteOffset, frameBytes.byteLength / 2
+          frameCopy.buffer, frameCopy.byteOffset, frameCopy.byteLength / 2
         );
         const normalData = new Uint8Array(
-          normalBytes.buffer, normalBytes.byteOffset, normalBytes.byteLength
+          normalCopy.buffer, normalCopy.byteOffset, normalCopy.byteLength
         );
         if (sourceUv.length !== vertexCount * 2 ||
             frameData.length !== vertexCount * animation.frameCount * 4 ||
@@ -863,7 +895,8 @@
         this[`${key}Animation`] = animation;
         this[`${key}CpuAnimation`] = { frameData, normalData, dynamicVertices, vertexCount };
         this[`${key}Ready`] = false;
-        this[`${key}ModelReadyPromise`] = new Promise((resolve) => {
+        // Texture decode only — outer initialiseChampionModel already owns the shared promise.
+        return new Promise((resolve) => {
           const image = new Image();
           image.decoding = "async";
           image.onload = () => {
@@ -889,7 +922,6 @@
           };
           image.src = packed.texture;
         });
-        return this[`${key}ModelReadyPromise`];
       }
 
       async createVatChampionModel(key, packed, fallbackRgba) {
