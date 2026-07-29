@@ -1,3 +1,4 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Sitemap: https://bombpvp.com/sitemap.xml

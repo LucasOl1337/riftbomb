@@ -32,3 +32,14 @@
 - **Responsivo / screenshots:** não aplicável, pois a mudança é um endpoint textual de SEO e não altera a renderização desktop ou mobile. Playwright headless, scripts `hostile-ui` e `headless_shell` não foram usados.
 - **Branch:** `swarm/riftbomb/landing` sobre `b83e28b`; nenhum merge, push, PR ou deploy foi realizado.
 - **Próximo passo:** quando os arquivos centrais da landing estiverem livres, melhorar o hero/CTA e então validar desktop e mobile em navegador visível.
+
+## 2026-07-29 19:06:22 -03:00 — entregue
+
+- **Antes:** a landing permitia rastreamento público por `robots.txt`, mas não publicava nem anunciava um sitemap canônico para o domínio comercial.
+- **Decisão:** fazer uma única melhoria isolável de SEO básico sem tocar no WIP dos arquivos centrais: publicar um sitemap mínimo da entrada comercial e anunciá-lo ao crawler.
+- **Depois:** `/sitemap.xml` descreve `https://bombpvp.com/` como a URL canônica, com atualização semanal, e `/robots.txt` aponta explicitamente para esse sitemap.
+- **Arquivos da entrega:** `online/public/sitemap.xml` e `online/public/robots.txt`; este ledger registra a rodada, mas não é contado como entrega de produto.
+- **Evidência:** `npm test` na raiz passou 79/79; `npm test` em `online/` passou build, validação do artefato e 21/21 testes; `npm test` em `online/server/` passou 10/10 testes. `online/dist/client/sitemap.xml` e `online/dist/client/robots.txt` foram conferidos após o build e contêm a URL canônica esperada.
+- **Responsivo / screenshots:** não aplicável, pois a mudança cria endpoints textuais de SEO e não altera a renderização desktop ou mobile. Playwright headless, scripts `hostile-ui` e `headless_shell` não foram usados.
+- **Branch:** `swarm/riftbomb/landing` sobre `dffc91e`; nenhum merge, push, PR ou deploy foi realizado.
+- **Próximo passo:** quando `online/app/page.tsx` e `online/app/globals.css` estiverem livres, reforçar a hierarquia comercial do hero e validar desktop/mobile em navegador visível.
