@@ -6,9 +6,9 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **8/20 — Backend: latência de API (disponível)**
-- Última rodada concluída: **7/20 — Frontend: third-party e scripts**
-- Próxima rodada planejada: **8/20 — Backend: latência de API**
+- Rodada atual: **9/20 — Backend: banco e queries (disponível)**
+- Última rodada concluída: **8/20 — Backend: latência de API**
+- Próxima rodada planejada: **9/20 — Backend: banco e queries**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/f4aa/riftbomb`
 - Branch local: `automation/perf-sequential-r01-baseline`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 7 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 8 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -73,6 +73,7 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 | Teste raiz completo, mediana local | ≤ 7.500 ms | 6.587,3 ms | 912,7 ms |
 | Teste do servidor, mediana local | ≤ 4.000 ms | 3.056,6 ms | 943,4 ms |
 | `POST /api/pvp` create, mediana publicada | ≤ 50 ms | 28,0 ms histórico | 22,0 ms |
+| Chamadas D1 sequenciais no create aquecido | ≤ 1 | 2 antes da rodada 8; 1 atual | atende |
 | `POST /api/pvp` join, mediana publicada | ≤ 30 ms | 14,4 ms histórico | 15,6 ms |
 
 Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanhos em disco, sem compressão HTTP; latências de API são históricas e precisam ser remedidas antes de qualquer nova alegação de ganho.
@@ -135,6 +136,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 5/20 | Concluída | Remoção sem perda do quarto canal constante dos VATs publicados; runtime mantém compatibilidade RGB/RGBA | Katarina VAT: 33.251.400 → 24.938.550 B (-8.312.850 B / -25%); cinco VATs: -18.569.598 B | `5112417` |
 | 6/20 | Concluída | Fingerprint SHA-256 nas partes do jogo e cache imutável restrito ao namespace versionado; manifest permanece `no-store` | Worker local: header da parte confirmado 3/3 como `max-age=31556952, immutable`; revisita elimina 1 revalidação e até 667.878 B de transferência | `3d9b2c7` |
 | 7/20 | Concluída | Fundo WebGL decorativo tornado inerte durante o parse e montado em idle; início da partida cancela a montagem pendente | Inicializações WebGL antes do idle: 1 → 0 em 3/3 no proxy instrumentado; zero scripts/origens remotos; custo de payload +657 B | `187be3b` |
+| 8/20 | Concluída | Limpeza expirada e primeiro `INSERT` de criação de sala agrupados numa transação `D1Database.batch`; retry de colisão preservado sem nova limpeza | Chamadas D1 no sucesso normal: 2 → 1 (-50%); proxy de 20 ms/chamada, mediana 41,72 → 21,10 ms em 3/3 | `785fd45` |
 
 ## Escopos reivindicados
 
@@ -142,8 +144,8 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 8:** decompor a consulta `/api/pvp`; a amostra de sala inexistente teve mediana de 612 ms, mas não substitui benchmark de create/join.
-2. **Rodada 9:** usar a decomposição da API para decidir se query, índice ou acesso ao D1 merece intervenção segura.
+1. **Rodada 9:** medir planos e payloads das queries de leitura de sala. A chave primária já cobre `code`; verificar se projeções separadas para host/convidado evitam transferir SDP não utilizado antes de alterar índice.
+2. **Rodada 10:** somente aplicar cache se a rodada 9 encontrar leitura quente segura e uma política de invalidação que preserve publicação de offer/answer.
 3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
 ## Evidências e limitações
@@ -183,3 +185,7 @@ Nenhum escopo ativo.
 - O trade-off foi **+657 B** na parte publicada (667.878 → 668.535 B; +0,10%), mantendo o payload frio em 741.346 B, abaixo do budget de 800.000 B. Não houve request adicional.
 - Validação da rodada 7: `npm test` raiz passou **42/42 em 3/3 após o teste final** (7.297,4 / 6.690,0 / 5.357,1 ms; mediana 6.690,0 ms); `npm test` em `online/` passou **13/13 em 3/3** (13.724,9 / 12.982,8 / 13.110,2 ms; mediana 13.110,2 ms); lint online terminou em 7.678 ms com **0 erros** e quatro avisos conhecidos. O servidor não foi alterado; Playwright/headless não foi usado.
 - Limitação da rodada 7: sem navegador visível, não há alegação de LCP/INP ou milissegundos reais de GPU. O ganho é a remoção estrutural e testada do trabalho WebGL do task crítico, preservando o efeito após idle.
+- Rodada 8: o caminho normal de criação aquecido fazia `DELETE` e `INSERT` em duas chamadas D1 aguardadas em sequência. Agora os dois statements seguem no mesmo `D1Database.batch`, que a documentação oficial define como uma única chamada ao banco e uma transação sequencial; colisões continuam em até seis tentativas e não repetem a limpeza.
+- Benchmark controlado da rodada 8, repetido 3 vezes com 20 ms sintéticos por chamada: antes **41,72 / 42,13 / 41,21 ms** (mediana **41,72 ms**, 2 chamadas); depois **21,32 / 20,75 / 21,10 ms** (mediana **21,10 ms**, 1 chamada). A queda de **49,4%** no proxy não é alegada como latência real de produção; a evidência causal é **2 → 1 chamadas D1 (-50%)**.
+- Validação da rodada 8: teste instrumentado específico passou **2/2**; `npm test` raiz passou **42/42**; `npm test` em `online/` passou **15/15** com build verificado; `npm test` em `online/server/` passou os **3/3 grupos**; lint terminou com **0 erros** e quatro avisos conhecidos. Playwright/headless não foi usado.
+- Limitação da rodada 8: nenhum deploy ou benchmark de produção foi autorizado, portanto os 28,0 ms históricos de create não foram substituídos. Em isolate frio, `ensureSchema` ainda acrescenta uma chamada D1 anterior; a redução desta rodada vale tanto no frio (3 → 2 chamadas) quanto no caminho aquecido comum (2 → 1).
