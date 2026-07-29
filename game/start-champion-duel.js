@@ -121,7 +121,7 @@
       }
       document.querySelector(".online-panel")?.setAttribute("hidden", "");
       // fluid-bg is a second WebGL surface — kill it during match on phones.
-      const fluid = document.querySelector("fluid-bg");
+      const fluid = document.querySelector("fluid-bg, #riftbomb-background");
       if (fluid) {
         fluid.style.display = "none";
         fluid.setAttribute("hidden", "");

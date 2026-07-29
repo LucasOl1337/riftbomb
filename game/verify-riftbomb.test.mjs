@@ -27,6 +27,61 @@ test("the editable page enters every game module through one named path", async 
   }
 });
 
+test("the decorative WebGL background waits until core boot can finish", async () => {
+  const document = await readFile(sourcePath, "utf8");
+  const deferredBackground = await readFile(
+    path.join(gameDirectory, "arena-appearance", "defer-bomber-rift-background.js"),
+    "utf8"
+  );
+  const controls = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
+
+  assert.match(document, /<template id="riftbomb-background">\s*<fluid-bg/);
+  assert.match(document, /animate-bomber-rift-background\.js[\s\S]*defer-bomber-rift-background\.js/);
+  assert.match(deferredBackground, /requestIdleCallback\(mountBackground, \{ timeout: 1000 \}\)/);
+  assert.match(deferredBackground, /setTimeout\(mountBackground, 0\)/);
+  assert.match(deferredBackground, /template\.content\.cloneNode\(true\)/);
+  assert.match(deferredBackground, /is-match-active/);
+  assert.match(controls, /fluid-bg, #riftbomb-background/);
+
+  class TemplateElement {}
+  const idleCallbacks = [];
+  const mounted = [];
+  const template = Object.assign(new TemplateElement(), {
+    isConnected: true,
+    content: {
+      cloneNode(deep) {
+        assert.equal(deep, true);
+        return { nodeName: "FLUID-BG" };
+      }
+    },
+    replaceWith(node) {
+      mounted.push(node);
+      this.isConnected = false;
+    },
+    remove() {
+      this.isConnected = false;
+    }
+  });
+  const context = vm.createContext({
+    HTMLTemplateElement: TemplateElement,
+    document: {
+      getElementById() { return template; },
+      documentElement: { classList: { contains() { return false; } } }
+    },
+    requestIdleCallback(callback, options) {
+      idleCallbacks.push({ callback, options });
+    }
+  });
+
+  vm.runInContext(deferredBackground, context);
+
+  assert.deepEqual(mounted, [], "background must not mount during the critical script task");
+  assert.equal(idleCallbacks.length, 1);
+  assert.equal(idleCallbacks[0].options.timeout, 1000);
+  idleCallbacks[0].callback();
+  assert.deepEqual(mounted, [{ nodeName: "FLUID-BG" }]);
+});
+
 test("the readable combat layer preserves the canonical 100 HP rules", async () => {
   const document = await readFile(sourcePath, "utf8");
   const combat = await readFile(path.join(gameDirectory, "apply-readable-combat.js"), "utf8");
