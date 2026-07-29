@@ -452,6 +452,9 @@ test("the full roster samples tiled VAT on the GPU with a bounded CPU fallback",
   assert.match(renderer, /gl\.getError\(\)/);
   assert.match(renderer, /using its fallback material/);
   assert.match(renderer, /resolveChampionAnimation/);
+  assert.match(renderer, /animation\.componentsPerTexel \|\| 4/);
+  assert.match(renderer, /layout\.texelCount \* componentsPerTexel/);
+  assert.match(renderer, /cpu\.componentsPerTexel \+ axis/);
   assert.match(renderer, /resolveVladimirAnimation/);
   assert.match(rules, /vladimirAttackAnim/);
   assert.match(rules, /vladimirQAnim/);

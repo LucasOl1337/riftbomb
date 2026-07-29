@@ -24,11 +24,11 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 
 | Métrica | Quantidade |
 |---|---:|
-| Total inventariado | 12 |
+| Total inventariado | 13 |
 | Aprovadas | 0 |
 | Mudança necessária | 0 |
 | Corrigidas localmente | 6 |
-| Verificadas ao vivo | 5 |
+| Verificadas ao vivo | 6 |
 | Em andamento | 0 |
 | Reauditoria necessária | 0 |
 | Bloqueadas | 1 |
@@ -50,6 +50,7 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | 010 | Qualidade LoL · rodada 05 · Katarina Q no runtime autoritativo | fixed_local | Codex `/root` | 2026-07-29T20:29:00-03:00 | `59e15e5` + worktree | working tree local | ✅ trace renderizado no navegador visível | — | — | ✅ Q entra por `applyPlayerAction`, interpola por 40 ticks e resolve em uma adaga sem browser global | ✅ 140/140; smoke 25/25 e 15.000 ticks; P0=0, P1=0, P2=0 no escopo | `artifacts/comparar-qa/2026-07-29/lol-quality-round-05/` | Netcode 55→57. Corrigida a dependência `lerp` ausente; ACK/replay, payload nulo e desaparecimento visual de Katarina continuam pendentes. Não publicada. |
 | 011 | Qualidade LoL · rodada 06 · limite seguro de payload WebSocket | fixed_local | Codex `/root` | 2026-07-29T20:51:00-03:00 | `f5c08f1` + worktree | working tree local | ✅ quadro de rastreio 1440×900 no navegador visível | — | — | ✅ JSON inválido, campos com profundidade 12.000 e frame de 40 KB ficam confinados ao peer; `hello`, `input`, `action` e `/health` continuam | ✅ 143/143; duas auditorias, P0=0, P1=0, P2=0 | `artifacts/comparar-qa/2026-07-29/lol-quality-round-06/` | Netcode 57→60. Frame acima de 32 KiB fecha com 1009 sem derrubar processo; ACK/replay e allowlist semântica por estado continuam pendentes. Não publicada. |
 | 012 | Qualidade LoL · rodada 07 · roster VAT visível em idle/cast | verified_live | Codex `/root` | 2026-07-29T21:35:00-03:00 | `3684e7e` + worktree | `4d00db7` · Worker `4cf807a9` | ✅ 10/10 idle/cast, 1280×720 produção | — | — | ✅ cinco campeões renderizados com o modelo real; hot path VAT GPU preservado | ✅ 64/64 + 28/28 + 21/21; console live limpo | `artifacts/comparar-qa/2026-07-29/lol-quality-round-07/` | P1 de desaparecimento resolvido por gates de silhueta/topologia/quantização e reparo dos frames fonte corrompidos. Revisão: P0=0, P1=0, P2=2; aceite restrito à renderizabilidade idle/cast, sem alegação de continuidade temporal. |
+| 013 | Qualidade LoL · rodada 08 · continuidade temporal VAT | verified_live | Codex `/root` | 2026-07-29T23:58:39-03:00 | `4d00db7` + worktree | `4747568` · release `286865b` · Worker `e0b6dc4a` | ✅ 4 matrizes antes/depois e 24 frames, 1280×720 produção | — | — | ✅ 25 reparos usam donors autorais imutáveis; quatro casts recuperaram progressão temporal | ✅ 68/68 + 31/31 + 21/21; 17/17 hashes live; P0=0, P1=0 | `artifacts/comparar-qa/2026-07-29/lol-quality-round-08/` | Fluidez 54→60. Katarina Q/E, Zed Q e Gangplank W passaram de plateaus longos para 8/8 poses únicas; Zed run e a recuperação parcial de Gangplank W permanecem P2. A prova cobre o renderer VAT; roteamento real de Katarina E/Gangplank W vira finding separado de mecânica. |
 
 ## Placar de qualidade — baseline do programa
 
@@ -62,7 +63,7 @@ meta de 90% vale para cada aspecto do vertical slice, nunca para a média.
 | Som | 74/100 | faltam teste auditivo, mix medido, material original mais rico e feedback local reconciliado |
 | Mecânicas | 58/100 | faltam cast lock, resolução simultânea neutra e fidelidade fina dos kits |
 | Netcode | 60/100 | sem `inputSeq → ACK → replay`, deduplicação e allowlist semântica por estado |
-| Fluidez | 54/100 | faltam trace p95/p99, matriz física e eliminação do parse síncrono do catálogo VAT de 95,53 MiB |
+| Fluidez | 60/100 | faltam trace p95/p99, matriz física, locomoção íntegra de Zed e eliminação do parse síncrono do catálogo VAT de 95,53 MiB |
 
 Notas têm caps de evidência: sem testes perceptuais, trace p95/p99, soak e
 dispositivos físicos, nenhuma afirmação de paridade de 90% é permitida.
@@ -183,14 +184,55 @@ erro sem URL `MutationObserver.observe(null)` já classificado na auditoria
 multidispositivo; `MutationObserver` permanece ausente da fonte e dos
 artefatos client/server desta release.
 
+### Rodada 08 — continuidade temporal VAT publicada
+
+O reparo deixou de copiar o vizinho já reparado em cascata. O planner
+`authored-temporal-v2` congela a elegibilidade dos donors antes de qualquer
+mutação, impede que um frame reconstruído vire fonte, interpola transforms de
+rig com TRS e quaternion slerp antes do skinning e falha fechado quando um
+clipe integralmente inválido não possui fallback semântico explícito. O
+Gangplank W usa a recuperação autoral `Spell2_Idle_TRA`; Katarina E preserva a
+antecipação vertical por bounds específicos da ação. Dois rebakes e os assets
+promovidos coincidiram byte a byte em 25/25 arquivos.
+
+Os quatro plateaus comprovados foram eliminados:
+
+- Katarina Q: 4/8 poses, hold 5 → 8/8, hold exato/perceptual 1 e articulação
+  92,8%;
+- Katarina E: 4/8, hold perceptual 5 → 8/8, hold exato 1, perceptual 2 e
+  articulação 93,2%;
+- Zed Q: 3/8, hold 6 → 8/8, hold 1 e articulação 98,0%;
+- Gangplank W: 1/8, hold 8 e articulação 0% → 8/8, hold 1 e articulação 94,3%.
+
+A auditoria independente recomputou 38 ações diretamente dos binários: 28
+ações de combate passaram, os 25 reparos têm alvo único e donor autoral não
+reparado, e nenhum frame ficou sem resolução. Zed run permaneceu bit-idêntico
+(`78fb199cc55a4aae493097cfeb2aaa47dc64d5b670dac76d0e2126ed5ee61fbf`),
+preservando deliberadamente seu P2 de 5,58–5,61% de triângulos degenerados. O
+segundo P2 é Gangplank W: a recuperação é fluida e segura, mas não restaura o
+cast fonte corrompido completo. A matriz visual prova a ação VAT exata no
+renderer real; o fluxo normal ainda não prova que Katarina E e Gangplank W
+roteiam esses clips, portanto isso não foi contado como ganho de mecânica.
+
+O release exato `286865b` incluiu o commit funcional `4747568` e o contrato de
+checkout LF para scripts Bash. O artefato foi testado, validado por dry-run e
+publicado sem rebuild. O inventário de 101 arquivos permaneceu byte a byte
+estável antes/depois do deploy, SHA-256
+`9ef996695c33762a49019fbd69aa86624cee3ea89f094cd71fb1d1de46fef4dd`.
+Depois da propagação, manifesto, parte web e 15 assets de campeão passaram
+17/17 comparações HTTP 200 por hash. As quatro folhas canônicas usam a linha
+superior da produção anterior e a inferior do Worker `e0b6dc4a`; duas
+capturas transitórias de fallback durante carga foram descartadas e refeitas
+após o modelo real estar disponível.
+
 ## Validações automatizadas
 
-- raiz da árvore exata de release: 64/64 testes passaram;
-- `online/`: build Vinext validado e 28/28 testes passaram; pacote inicial em
-  702.939 bytes, abaixo do teto de 750.000;
+- raiz da árvore exata de release: 68/68 testes passaram;
+- `online/`: build Vinext validado e 31/31 testes passaram; pacote inicial em
+  704.091 bytes, abaixo do teto de 750.000;
 - `online/server/`: core, WebSocket, rematch e Quick Match passaram (21/21);
-- produção: manifest + 15/15 assets de campeão coincidiram por SHA-256 com o
-  build; dez cenas idle/cast e a landing foram recapturadas no domínio público;
+- produção: manifesto + parte web + 15/15 assets de campeão coincidiram por
+  SHA-256 com o build; 12 frames de ação foram recapturados no domínio público;
 - nenhum Playwright headless ou `headless_shell` foi iniciado.
 
 ## Rodadas
@@ -206,3 +248,4 @@ artefatos client/server desta release.
 | 2026-07-29 | Codex `/root` | 010 | 1 `fixed_local` | working tree; sem deploy | Rodada 05: runtime autoritativo recebeu `lerp` puro e regressão real de Katarina Q por 40 ticks; 140/140 gates, sem P0–P2 no escopo. Netcode 55→57. |
 | 2026-07-29 | Codex `/root` | 011 | 1 `fixed_local` | `f5c08f1` + working tree; sem deploy | Rodada 06: limite WebSocket tornou-se seguro para o processo contra JSON inválido, campos profundamente aninhados e oversize; 143/143 gates, duas auditorias sem P0–P2. Netcode 57→60. |
 | 2026-07-29 | Codex `/root` | 012 | 1 `verified_live` | `4d00db7`; Worker `4cf807a9-3253-4f5f-a3c2-c2a03b67a34c` | Rodada 07: frames VAT fonte corrompidos passaram a ser detectados/reparados antes da publicação; 10/10 idle/cast e 15/15 assets verificados ao vivo. Gráficos 58→63; Fluidez permaneceu 54 por dois P2 temporais documentados. |
+| 2026-07-29 | Codex `/root` | 013 | 1 `verified_live` | `4747568`; release `286865b`; Worker `e0b6dc4a-a875-41f5-b830-54a608a7de6b` | Rodada 08: donors VAT tornaram-se imutáveis e reparos de rig recuperaram variedade temporal em Katarina Q/E, Zed Q e Gangplank W; 68/68 + 31/31 + 21/21 gates, 17/17 hashes públicos e quatro folhas antes/live depois. Fluidez 54→60. |

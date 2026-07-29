@@ -894,6 +894,10 @@
           : normalBytes.slice();
         const animation = packed.animation;
         const vertexCount = animation.vertexCount;
+        const componentsPerTexel = animation.componentsPerTexel || 4;
+        if (componentsPerTexel !== 3 && componentsPerTexel !== 4) {
+          throw new Error(`${key} animation component count is unsupported`);
+        }
         const sourceUv = new Float32Array(
           vertexBytes.buffer.slice(vertexBytes.byteOffset, vertexBytes.byteOffset + vertexBytes.byteLength)
         );
@@ -904,8 +908,8 @@
           normalCopy.buffer, normalCopy.byteOffset, normalCopy.byteLength
         );
         if (sourceUv.length !== vertexCount * 2 ||
-            frameData.length !== vertexCount * animation.frameCount * 4 ||
-            normalData.length !== vertexCount * animation.frameCount * 4) {
+            frameData.length !== vertexCount * animation.frameCount * componentsPerTexel ||
+            normalData.length !== vertexCount * animation.frameCount * componentsPerTexel) {
           throw new Error(`${key} animated model data is inconsistent`);
         }
 
@@ -950,7 +954,13 @@
         this[`${key}IndexCount`] = indexBytes.byteLength / 2;
         this[`${key}Texture`] = texture;
         this[`${key}Animation`] = animation;
-        this[`${key}CpuAnimation`] = { frameData, normalData, dynamicVertices, vertexCount };
+        this[`${key}CpuAnimation`] = {
+          frameData,
+          normalData,
+          dynamicVertices,
+          vertexCount,
+          componentsPerTexel
+        };
         this[`${key}Ready`] = false;
         // Texture decode only — outer initialiseChampionModel already owns the shared promise.
         return new Promise((resolve) => {
@@ -993,11 +1003,15 @@
         const animation = packed.animation;
         const vertexCount = animation.vertexCount;
         const frameCount = animation.frameCount;
+        const componentsPerTexel = animation.componentsPerTexel || 4;
+        if (componentsPerTexel !== 3 && componentsPerTexel !== 4) {
+          throw new Error(`${key} animation component count is unsupported`);
+        }
         const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
         const layout = planVatTextureLayout(vertexCount, frameCount, maxTextureSize);
         if (vertexBytes.byteLength !== vertexCount * 2 * Float32Array.BYTES_PER_ELEMENT ||
-            frameBytes.byteLength !== layout.texelCount * 4 * Uint16Array.BYTES_PER_ELEMENT ||
-            normalBytes.byteLength !== layout.texelCount * 4) {
+            frameBytes.byteLength !== layout.texelCount * componentsPerTexel * Uint16Array.BYTES_PER_ELEMENT ||
+            normalBytes.byteLength !== layout.texelCount * componentsPerTexel) {
           throw new Error(`${key} animated model data is inconsistent`);
         }
         const frameCopy = frameBytes.byteOffset % Uint16Array.BYTES_PER_ELEMENT === 0
@@ -1008,14 +1022,31 @@
           frameCopy.byteOffset,
           frameCopy.byteLength / Uint16Array.BYTES_PER_ELEMENT
         );
-        const positionData = layout.paddedTexelCount === layout.texelCount
-          ? positionSource
-          : new Uint16Array(layout.paddedTexelCount * 4);
-        if (positionData !== positionSource) positionData.set(positionSource);
-        const normalData = layout.paddedTexelCount === layout.texelCount
-          ? normalBytes
-          : new Uint8Array(layout.paddedTexelCount * 4);
-        if (normalData !== normalBytes) normalData.set(normalBytes);
+        let positionData;
+        let normalData;
+        if (componentsPerTexel === 4 && layout.paddedTexelCount === layout.texelCount) {
+          positionData = positionSource;
+          normalData = normalBytes;
+        } else {
+          positionData = new Uint16Array(layout.paddedTexelCount * 4);
+          normalData = new Uint8Array(layout.paddedTexelCount * 4);
+          for (let texel = 0; texel < layout.texelCount; texel += 1) {
+            const source = texel * componentsPerTexel;
+            const target = texel * 4;
+            positionData[target] = positionSource[source];
+            positionData[target + 1] = positionSource[source + 1];
+            positionData[target + 2] = positionSource[source + 2];
+            positionData[target + 3] = componentsPerTexel === 4
+              ? positionSource[source + 3]
+              : 65535;
+            normalData[target] = normalBytes[source];
+            normalData[target + 1] = normalBytes[source + 1];
+            normalData[target + 2] = normalBytes[source + 2];
+            normalData[target + 3] = componentsPerTexel === 4
+              ? normalBytes[source + 3]
+              : 255;
+          }
+        }
 
         const assertContextAvailable = () => {
           if (this.lost || gl.isContextLost?.()) {
@@ -2353,11 +2384,13 @@ drawKatarinaFallback(player, t, beat) {
         const min = animation.positionMin;
         const range = animation.positionRange;
         const sample = (frameIndex, vertexIndex, axis) => {
-          const offset = (frameIndex * cpu.vertexCount + vertexIndex) * 4 + axis;
+          const offset = (frameIndex * cpu.vertexCount + vertexIndex) *
+            cpu.componentsPerTexel + axis;
           return min[axis] + cpu.frameData[offset] / 65535 * range[axis];
         };
         const normal = (frameIndex, vertexIndex, axis) => {
-          const offset = (frameIndex * cpu.vertexCount + vertexIndex) * 4 + axis;
+          const offset = (frameIndex * cpu.vertexCount + vertexIndex) *
+            cpu.componentsPerTexel + axis;
           return cpu.normalData[offset] / 255 * 2 - 1;
         };
         for (let vertex = 0; vertex < cpu.vertexCount; vertex += 1) {
