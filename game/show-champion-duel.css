@@ -873,12 +873,18 @@
       position: fixed;
       z-index: 8;
       inset: 0;
-      display: block;
+      display: grid;
+      align-items: center;
       overflow-x: hidden;
       overflow-y: auto;
       overscroll-behavior: contain;
       padding: clamp(0.75rem, 2vh, 1.5rem) clamp(0.75rem, 2vw, 1.5rem) 1.25rem;
-      background: var(--panel);
+      background:
+        radial-gradient(circle at 8% 46%, rgb(230 25 25 / 9%), transparent 28rem),
+        linear-gradient(90deg, rgb(255 255 255 / 1.2%) 1px, transparent 1px),
+        linear-gradient(rgb(255 255 255 / 1.2%) 1px, transparent 1px),
+        var(--panel);
+      background-size: auto, 4rem 4rem, 4rem 4rem, auto;
       transition: opacity 800ms cubic-bezier(.16, 1, .3, 1), visibility 800ms;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: thin;
@@ -892,13 +898,30 @@
     }
 
     .intro-content {
-      width: min(64rem, 96vw);
+      display: grid;
+      grid-template-columns: minmax(17rem, 0.72fr) minmax(36rem, 1.55fr);
+      grid-template-areas:
+        "season player"
+        "wordmark player"
+        "title champion"
+        "lede champion"
+        "actions arena"
+        "notes arena"
+        "legal legal";
+      grid-template-rows: auto auto auto auto auto 1fr auto;
+      column-gap: clamp(2rem, 4.5vw, 4.75rem);
+      row-gap: 0.45rem;
+      width: min(74rem, calc(100vw - 3rem));
+      min-height: calc(100dvh - 3rem);
       margin: 0 auto;
       padding-bottom: 0.5rem;
-      text-align: center;
+      align-content: center;
+      text-align: start;
     }
 
     .season-tag {
+      grid-area: season;
+      justify-self: start;
       display: inline-flex;
       align-items: center;
       gap: 0.65rem;
@@ -908,22 +931,24 @@
     .season-tag::before,
     .season-tag::after {
       content: "";
-      width: clamp(2rem, 7vw, 6rem);
+      width: 2.75rem;
       height: 1px;
-      background: var(--panel);
+      background: var(--hazard);
     }
 
-    .season-tag::after { transform: scaleX(-1); }
+    .season-tag::before { display: none; }
 
     .intro h1 {
+      grid-area: title;
       position: relative;
-      max-width: 14ch;
-      margin: 0.45rem auto 0;
+      justify-self: start;
+      max-width: 9ch;
+      margin: 0.25rem 0 0;
       font-family: var(--display);
-      font-size: clamp(2.8rem, 8vw, 6.5rem);
+      font-size: clamp(3.6rem, 5.4vw, 5.5rem);
       font-weight: 900;
-      letter-spacing: -0.05em;
-      line-height: 0.88;
+      letter-spacing: -0.065em;
+      line-height: 0.84;
       text-wrap: balance;
       text-transform: uppercase;
       color: var(--phosphor);
@@ -953,7 +978,9 @@
     }
 
     .lol-wordmark {
-      margin: 0.75rem auto -0.1rem;
+      grid-area: wordmark;
+      justify-self: start;
+      margin: 0.35rem 0 0;
       font-family: var(--data);
       font-size: clamp(0.72rem, 1.4vw, 0.9rem);
       font-weight: 700;
@@ -1054,50 +1081,69 @@
     }
 
     .intro-lede {
-      max-width: 40rem;
-      margin: 0.85rem auto 0;
-      font-size: clamp(0.82rem, 1.2vw, 0.98rem);
-      line-height: 1.5;
-      color: var(--phosphor);
-      text-wrap: balance;
+      grid-area: lede;
+      max-width: 35ch;
+      margin: 0.8rem 0 0;
+      font-size: clamp(0.86rem, 1.15vw, 1rem);
+      line-height: 1.55;
+      color: #c7c7c7;
+      text-wrap: pretty;
     }
 
     .champion-select {
+      grid-area: champion;
       display: grid;
-      grid-template-columns: auto repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       align-items: stretch;
-      gap: 0.35rem;
-      width: min(62rem, 100%);
-      margin: 0.9rem auto 0;
-      padding: 0.35rem;
+      align-self: center;
+      gap: 0.5rem;
+      width: 100%;
+      margin: 0;
+      padding: 0.85rem;
       border: 1px solid var(--line);
-      /* brutalist: 90° only */
+      border-top: 2px solid var(--hazard);
       background: var(--panel);
-      /* brutalist: no translucency */
     }
 
     .player-selector {
+      grid-area: player;
+      align-self: end;
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1px;
-      width: min(46rem, 94vw);
-      margin: 0.85rem auto 0;
-      background: var(--line);
+      gap: 0.5rem;
+      width: 100%;
+      margin: 0;
+      background: transparent;
     }
 
     .player-selector button {
-      min-height: 2.45rem;
-      border: 0;
+      min-height: 3rem;
+      border: 1px solid var(--line);
       background: var(--panel);
       color: var(--phosphor);
       font: 800 0.68rem/1 var(--data);
       letter-spacing: 0.08em;
       cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+    }
+
+    .player-selector button:hover {
+      border-color: var(--hazard);
+      background: var(--panel-2);
     }
 
     .player-selector button[aria-pressed="true"] {
+      border-color: var(--hazard);
       background: var(--hazard);
       color: white;
+    }
+
+    .player-selector button:focus-visible,
+    .champion-choice:focus-visible,
+    .arena-choice:focus-visible,
+    .intro-actions button:focus-visible {
+      outline: 2px solid white;
+      outline-offset: 3px;
     }
 
     .player-two-hud {
@@ -1172,12 +1218,12 @@
     body.is-local-multiplayer .player-two-hud { display: block; }
 
     .champion-select > .micro {
-      display: grid;
-      place-items: center;
-      padding: 0 0.7rem;
-      color: var(--phosphor);
-      writing-mode: vertical-rl;
-      rotate: 180deg;
+      grid-column: 1 / -1;
+      display: block;
+      padding: 0 0 0.25rem;
+      color: var(--hazard);
+      writing-mode: horizontal-tb;
+      rotate: none;
     }
 
     .champion-choice {
@@ -1187,17 +1233,22 @@
       grid-template-rows: auto auto;
       gap: 0.06rem 0.4rem;
       min-width: 0;
-      min-height: 2.85rem;
-      padding: 0.45rem 0.5rem;
+      min-height: 4.15rem;
+      padding: 0.6rem;
       overflow: hidden;
       border: 1px solid var(--line);
       background: var(--panel-2);
-      text-align: left;
+      text-align: start;
       color: var(--phosphor);
-      transition: border-color 160ms ease, background 160ms ease, translate 160ms ease;
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
     }
 
-    .champion-choice:hover { translate: none; }
+    .champion-choice:hover {
+      border-color: #6b6b6b;
+      background: #1b1b1b;
+      transform: translateY(-2px);
+    }
 
     .champion-choice[aria-pressed="true"] {
       border-color: var(--hazard);
@@ -1244,28 +1295,33 @@
       font: 600 0.46rem var(--data);
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      opacity: 0.58;
+      color: #9b9b9b;
+      opacity: 1;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
     .arena-select {
+      grid-area: arena;
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 0.4rem;
-      margin-top: 0.85rem;
-      width: min(56rem, 100%);
-      max-width: none;
-      margin-inline: auto;
-      padding: 0.1rem 0;
+      align-self: start;
+      gap: 0.5rem;
+      width: 100%;
+      margin: 0;
+      padding: 0.85rem;
+      border: 1px solid var(--line);
+      border-top: 2px solid var(--hazard);
+      background: var(--panel);
     }
 
     .arena-select > .micro {
       grid-column: 1 / -1;
-      color: var(--line);
+      padding-bottom: 0.25rem;
+      color: var(--hazard);
       letter-spacing: 0.18em;
-      text-align: left;
+      text-align: start;
     }
 
     .arena-choice {
@@ -1274,8 +1330,8 @@
       gap: 0.28rem;
       min-width: 0;
       min-height: 0;
-      padding: 0.45rem;
-      text-align: left;
+      padding: 0.55rem;
+      text-align: start;
       border: 1px solid var(--line);
       background: var(--panel);
       cursor: pointer;
@@ -1285,6 +1341,7 @@
 
     .arena-choice:hover {
       border-color: var(--term);
+      background: #181818;
     }
 
     .arena-choice[aria-checked="true"] {
@@ -1337,21 +1394,34 @@
       font: 600 0.48rem var(--data);
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--line);
-      line-height: 1.25;
+      color: #929292;
+      line-height: 1.35;
     }
 
     .intro-actions {
-      position: sticky;
-      bottom: 0;
-      z-index: 3;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.55rem;
-      margin-top: 0.9rem;
-      padding: 0.7rem 0 0.35rem;
-      background: linear-gradient(180deg, transparent 0%, var(--panel) 28%, var(--panel) 100%);
+      grid-area: actions;
+      display: grid;
+      grid-template-columns: minmax(0, 18rem);
+      justify-content: flex-start;
+      align-self: end;
+      gap: 0.75rem;
+      margin: 1rem 0 0;
+      padding: 0;
+      background: none;
+    }
+
+    .intro-actions > button {
+      width: 100%;
+    }
+
+    .intro-actions .primary:hover,
+    .intro-actions .secondary:hover {
+      transform: translateY(-2px);
+    }
+
+    .intro-actions .primary:active,
+    .intro-actions .secondary:active {
+      transform: translateY(1px);
     }
 
     .primary,
@@ -1395,12 +1465,14 @@
     }
 
     .intro-notes {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.45rem 1rem;
-      margin-top: 0.65rem;
-      color: var(--phosphor);
+      grid-area: notes;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, max-content));
+      align-content: start;
+      justify-content: start;
+      gap: 0.5rem 1.15rem;
+      margin: 0.8rem 0 0;
+      color: #b5b5b5;
     }
 
     .intro-notes span::before {
@@ -1410,15 +1482,17 @@
     }
 
     .legal {
+      grid-area: legal;
       position: static;
-      width: min(56rem, 100%);
-      margin: 0.85rem auto 0.25rem;
-      padding: 0 0.25rem;
-      color: var(--phosphor);
-      text-align: center;
+      width: 100%;
+      margin: 0.9rem 0 0;
+      padding: 0.75rem 0.25rem 0;
+      border-top: 1px solid var(--line);
+      color: #8c8c8c;
+      text-align: start;
       font: 600 0.52rem/1.45 var(--data);
       letter-spacing: 0.05em;
-      opacity: 0.72;
+      opacity: 1;
     }
 
     #combat-guide {
@@ -2044,9 +2118,65 @@
       }
     }
 
+    @media (max-width: 60rem) {
+      .intro {
+        align-items: start;
+      }
+
+      .intro-content {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "season"
+          "wordmark"
+          "title"
+          "lede"
+          "player"
+          "champion"
+          "arena"
+          "actions"
+          "notes"
+          "legal";
+        grid-template-rows: none;
+        row-gap: 0.75rem;
+        width: min(46rem, calc(100vw - 2rem));
+        min-height: 0;
+        align-content: start;
+        text-align: center;
+      }
+
+      .season-tag,
+      .lol-wordmark,
+      .intro h1 {
+        justify-self: center;
+      }
+
+      .intro h1 {
+        max-width: 14ch;
+      }
+
+      .intro-lede {
+        margin-inline: auto;
+      }
+
+      .player-selector,
+      .champion-select,
+      .arena-select {
+        margin: 0;
+      }
+
+      .intro-actions,
+      .intro-notes {
+        justify-content: center;
+      }
+
+      .legal {
+        text-align: center;
+      }
+    }
+
     @media (max-width: 52rem) {
       .champion-select {
-        grid-template-columns: auto repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(5, minmax(0, 1fr));
       }
     }
 
@@ -2057,12 +2187,19 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
-      .champion-select > .micro { display: none; }
+      .champion-select > .micro {
+        display: block;
+        grid-column: 1 / -1;
+      }
+
+      .champion-select .champion-choice:last-child {
+        grid-column: 1 / -1;
+      }
 
       .champion-choice {
         grid-template-columns: 1.75rem 1fr;
-        min-height: 2.7rem;
-        padding: 0.4rem 0.45rem;
+        min-height: 3.5rem;
+        padding: 0.5rem;
       }
 
       .champion-choice .champion-glyph { width: 1.75rem; }
@@ -2472,12 +2609,12 @@
     }
 
     @media (max-height: 48rem) {
-      .intro h1 { font-size: clamp(2.2rem, 9vh, 4.8rem); margin-top: 0.25rem; }
+      .intro h1 { font-size: clamp(3.4rem, 9vh, 4.8rem); margin-top: 0.25rem; }
       .intro-lede { margin-top: 0.5rem; line-height: 1.4; }
-      .champion-select { margin-top: 0.65rem; }
-      .arena-select { margin-top: 0.6rem; }
-      .intro-actions { margin-top: 0.55rem; padding-top: 0.55rem; }
-      .intro-notes { margin-top: 0.45rem; }
+      .champion-select,
+      .arena-select { margin: 0; }
+      .intro-actions { margin: 0.75rem 0 0; padding: 0; }
+      .intro-notes { margin: 0.6rem 0 0; }
       .score-stack { top: 4.7rem; }
       .system-stack { display: none; }
     }
