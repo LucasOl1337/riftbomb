@@ -143,6 +143,26 @@ test("arena themes share seven GPU texture allocations", async () => {
   );
 });
 
+test("the readable HP contract survives arena texture regeneration", async () => {
+  const sourceDocument = await readFile(sourcePath, "utf8");
+  const combatLayer = await readFile(
+    path.join(gameDirectory, "apply-readable-combat-hp.js"),
+    "utf8"
+  );
+  const packedTextures = await readFile(
+    path.join(gameDirectory, "load-arena-textures.js"),
+    "utf8"
+  );
+  const document = await readFile(releasePath, "utf8");
+
+  assert.match(sourceDocument, /src="\.\/apply-readable-combat-hp\.js"/);
+  assert.match(combatLayer, /maxHealth: 100/);
+  assert.match(combatLayer, /arenaBombDamage: 35/);
+  assert.match(combatLayer, /storedBefore \+ legacyDamage \* 0\.48/);
+  assert.doesNotMatch(packedTextures, /RIFTBOMB_COMBAT/);
+  assert.ok(document.includes(combatLayer.trimEnd()));
+});
+
 test("arena render does not reference an undeclared turret color", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
 
