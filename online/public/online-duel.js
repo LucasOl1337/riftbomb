@@ -313,7 +313,6 @@
   async function beginConfiguredGame() {
     applyMatchConfig();
     await originalBeginGame();
-    game.paused = false;
     game.p2Human = true;
     globalThis.configurePlayerView?.(state.role === "guest" ? 2 : 1);
   }
@@ -431,7 +430,6 @@
     if (state.role === "offline" || !state.connected) return;
     state.connected = false;
     state.rivalConnected = false;
-    game.paused = false;
     updateConnection("disconnected", "ONLINE CONNECTION LOST · RELOAD TO REJOIN");
     if (state.role === "host") {
       game.p2Human = false;
@@ -524,7 +522,6 @@
       state.startInitiated = true;
       await beginConfiguredGame();
     }
-    game.paused = false;
     game.p2Human = true;
     UI.start.disabled = true;
     UI.start.textContent = "ONLINE MATCH IN PROGRESS";
@@ -610,7 +607,6 @@
     if (Array.isArray(data.grid)) game.grid = data.grid;
     game.particles = Array.isArray(data.particles) ? data.particles : [];
     game.pendingMatchWinner = game.players.find((player) => player.id === data.pendingWinnerId) || null;
-    game.paused = false;
     if (game.round !== previousRound && game.mode === "playing") game.presentation.prepareRound();
     game.presentation.update(game);
     if (game.mode === "matchover" && previousMode !== "matchover") {
@@ -686,7 +682,6 @@
   const originalUpdate = game.update.bind(game);
   game.update = (dt) => {
     if (state.role !== "offline" && state.connected && state.socket) {
-      game.paused = false;
       if (state.role === "guest") syncGuestStickInput();
       sendCurrentInput();
       reconcileLocalPlayer(dt);
@@ -696,20 +691,6 @@
       return;
     }
     originalUpdate(dt);
-  };
-
-  const offlineTogglePause = game.togglePause.bind(game);
-  game.togglePause = (force) => {
-    if (state.role !== "offline" && game.mode === "playing") {
-      if (game.paused) {
-        game.paused = false;
-        game.presentation.setPaused(false);
-        sfx.togglePause(false);
-      }
-      game.presentation.announce("Online matches cannot be paused");
-      return false;
-    }
-    return offlineTogglePause(force);
   };
 
   const originalBeginGame = beginGame;
