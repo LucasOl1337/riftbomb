@@ -6,9 +6,9 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **6/20 — Frontend: rede e cache HTTP (disponível)**
-- Última rodada concluída: **5/20 — Frontend: assets**
-- Próxima rodada planejada: **6/20 — Frontend: rede e cache HTTP**
+- Rodada atual: **7/20 — Frontend: third-party e scripts (disponível)**
+- Última rodada concluída: **6/20 — Frontend: rede e cache HTTP**
+- Próxima rodada planejada: **7/20 — Frontend: third-party e scripts**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/f4aa/riftbomb`
 - Branch local: `automation/perf-sequential-r01-baseline`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 5 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 6 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -51,8 +51,8 @@ Playwright/headless não foi executado, conforme `STOP-HEADLESS-PLAYWRIGHT.md`.
 
 ### Payloads e requests estáticos
 
-- Jogo publicado até reconstruir o documento: **739.851 B não comprimidos em 6 requests** (`807` HTML + `3.315` loader + `164` manifest + `667.151` parte + `11.921` CSS + `56.493` JS).
-- Manifest atual: uma parte de **667.151 B**; limite configurado por parte: 4 MiB.
+- Jogo publicado local até reconstruir o documento: **740.689 B não comprimidos em 6 requests frios** (`807` HTML + `3.327` loader + `263` manifest + `667.878` parte + `11.921` CSS + `56.493` JS). O acréscimo de 838 B sobre o baseline inicial compra o contrato de versionamento/cache.
+- Manifest atual: uma parte de **667.878 B** sob `/riftbomb-parts/<sha256>/part-00`; limite configurado por parte: 4 MiB. Em revisita da mesma versão, essa parte permanece fresca por um ano e sai do cache do navegador, removendo **1 revalidação e até 667.878 B de transferência** do caminho crítico.
 - Shell `/`: o grafo JS (`index`, runtime, framework e page) caiu de **331.629 B raw / 103.296 B gzip** para **289.213 B raw / 89.968 B gzip** na rodada 3; CSS permaneceu em **23.301 B raw / 5.666 B gzip**. Fontes e imagens são adicionais e condicionais ao HTML/render.
 - Assets publicados: texturas de arena **5.149.084 B / 17 arquivos**; modelos de campeão caíram de **75.414.049 B** para **56.844.566 B / 15 arquivos** na rodada 5; continuam carregados sob demanda pela escolha do duelo.
 - `online/dist`: baseline de **83.971.289 B / 88 arquivos**; build atual **65.270.569 B**. O delta total inclui limpeza de artefatos antigos, portanto o ganho causal usado é o inventário de modelos acima.
@@ -64,8 +64,8 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 
 | Budget inicial | Limite | Baseline | Margem |
 |---|---:|---:|---:|
-| Payload estático crítico do jogo | ≤ 800.000 B | 739.851 B | 60.149 B |
-| Requests estáticos críticos do jogo | ≤ 8 | 6 | 2 |
+| Payload estático crítico do jogo | ≤ 800.000 B | 740.689 B frio; até 72.811 B sem a parte numa revisita quente | 59.311 B no frio |
+| Requests estáticos críticos do jogo | ≤ 8 frio; ≤ 5 na revisita da mesma versão | 6 frio; até 5 na revisita | 2 frio; parte quente atende o alvo |
 | JS do shell `/`, não comprimido | ≤ 350.000 B | 289.213 B atual (331.629 B inicial) | 60.787 B |
 | CSS do shell `/`, não comprimido | ≤ 25.000 B | 23.301 B | 1.699 B |
 | VAT publicado de Katarina | ≤ 25.000.000 B | 24.938.550 B atual (33.251.400 B inicial) | 61.450 B |
@@ -82,8 +82,9 @@ Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanho
 - Registro/editáveis do jogo: `game/play-riftbomb.html` (28.743 B) e módulos sob `game/`.
 - Build offline: `game/assemble-riftbomb.mjs`; gera o arquivo LFS `riftbomb.html`.
 - Aparência/asset bundling: `game/arena-appearance/package-arena-appearance.mjs` e `game/arena-appearance/load-arena-appearance.js`.
-- Empacotamento publicado: `online/scripts/package-riftbomb.mjs`; separa jogo, texturas e modelos.
-- Loader publicado: `online/public/riftbomb-loader.js`; faz fetch paralelo, concatenação, SHA-256, decode e `document.write`.
+- Empacotamento publicado: `online/scripts/package-riftbomb.mjs`; separa jogo, texturas e modelos e publica as partes no namespace do SHA-256.
+- Loader publicado: `online/public/riftbomb-loader.js`; exige `partsPath` igual ao SHA-256 do manifest, faz fetch paralelo, concatenação, SHA-256, decode e `document.write`.
+- Política HTTP estática: `online/public/_headers`; somente partes fingerprintadas recebem cache imutável, enquanto o manifest permanece `no-store`.
 - Lobby: `online/app/page.tsx` (27.064 B) e `online/app/riftbomb-client.ts` (6.654 B).
 - Salas/API: `online/app/api/pvp/route.ts`.
 - Transporte: `online/server/src/server.mjs` (6.858 B).
@@ -131,6 +132,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 3/20 | Concluída | Remoção do runtime client-side de `next/image` do lobby para WebPs locais já otimizados | Chunk da página: 60.457 → 18.041 B raw e 19.337 → 6.009 B gzip; grafo JS: -42.416 B raw / -13.328 B gzip | `82de569` |
 | 4/20 | Concluída | Deduplicação de snapshots idênticos da ponte antes dos setters React | 10.001 mensagens iguais: 10.001 → 1 caminhos de atualização em 3/3 execuções (-99,99%); todos os 15 campos do contrato cobertos por teste | `e0a1d5e` |
 | 5/20 | Concluída | Remoção sem perda do quarto canal constante dos VATs publicados; runtime mantém compatibilidade RGB/RGBA | Katarina VAT: 33.251.400 → 24.938.550 B (-8.312.850 B / -25%); cinco VATs: -18.569.598 B | `5112417` |
+| 6/20 | Concluída | Fingerprint SHA-256 nas partes do jogo e cache imutável restrito ao namespace versionado; manifest permanece `no-store` | Worker local: header da parte confirmado 3/3 como `max-age=31556952, immutable`; revisita elimina 1 revalidação e até 667.878 B de transferência | `3d9b2c7` |
 
 ## Escopos reivindicados
 
@@ -138,9 +140,9 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 6:** definir cache longo e imutável para recursos versionados; manter o manifest com invalidação segura. Confirmar em produção que visitas repetidas eliminam revalidações desnecessárias.
+1. **Rodada 7:** inventariar scripts third-party realmente presentes no shell e no jogo; se não houver custo relevante, adaptar a rodada para scripts próprios bloqueantes no boot, com evidência antes/depois.
 2. **Rodada 8/9:** decompor a consulta `/api/pvp`; a amostra de sala inexistente teve mediana de 612 ms, mas não substitui benchmark de create/join.
-3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. A rodada 5 não afirma LCP/INP.
+3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção que a segunda visita não solicita a parte fingerprintada; a rodada 6 não afirma LCP/INP.
 
 ## Evidências e limitações
 
@@ -167,3 +169,9 @@ Nenhum escopo ativo.
 - Validação da rodada 5: `npm test` raiz passou **41/41 em 3/3 repetições** após a mudança de produto, mais uma execução final após reforçar o teste; `npm test` em `online/` passou **12/12 em 3/3** com build verificado; `npm test` em `online/server/` passou os **3/3 grupos em 3/3**; lint terminou com **0 erros** e quatro avisos conhecidos da rodada 3.
 - Limitação da rodada 5: bytes são determinísticos nos artefatos gerados, mas não houve navegador visível para medir tempo até o primeiro frame. O total de `online/dist` também removeu arquivos antigos durante o build; por isso o ganho causal declarado usa somente os pares de assets e o diretório de modelos inventariado.
 - Os artefatos gerados `game/arena-appearance/load-arena-appearance.js` e `riftbomb.html` continuam fora dos commits seletivos.
+- Rodada 6: a URL da parte deixou de ser estável (`/riftbomb-parts/part-00?v=<sha-curto>`) e passou a incorporar o SHA-256 completo (`/riftbomb-parts/<sha256>/part-00`). O loader rejeita qualquer `partsPath` que não corresponda exatamente ao digest e ainda verifica bytes totais e SHA-256 após a montagem.
+- `online/public/_headers` aplica `Cache-Control: public, max-age=31556952, immutable` somente a `/riftbomb-parts/:version/*`; `manifest.json` recebe `Cache-Control: no-store`. A configuração segue o mecanismo oficial de Static Assets do Cloudflare Workers e evita cache imutável em HTML, loader, CSS ou JS de nomes estáveis.
+- Prova HTTP local com `wrangler.unstable_startWorker`: manifest respondeu **200 + `no-store`**; a mesma parte fingerprintada respondeu **200 + `public, max-age=31556952, immutable` em 3/3 requests**. O parser registrou duas regras válidas e o build copiou `_headers` para `online/dist/client`.
+- Impacto determinístico na revisita da mesma versão: a parte de **667.878 B** fica fresca no cache por um ano, portanto o navegador pode reconstruir o jogo com **1 revalidação de rede a menos e até 667.878 B a menos transferidos**. A carga fria permanece em seis requests e cresceu **838 B** (739.851 → 740.689 B, +0,11%) por causa do caminho/versionamento explícito.
+- Validação da rodada 6: `npm test` raiz passou **41/41 em 3/3** (5.467,4 / 5.632,7 / 5.882,8 ms; mediana 5.632,7 ms); `npm test` em `online/` passou **13/13 em 3/3**, além de uma execução final após o ajuste do benchmark; `npm test` em `online/server/` passou os **3/3 grupos em 3/3** (3.005,9 / 2.720,1 / 2.734,6 ms; mediana 2.734,6 ms); lint terminou em 7.824,5 ms com **0 erros** e quatro avisos conhecidos.
+- Limitação da rodada 6: nenhum deploy foi feito, logo o header novo foi verificado no runtime local do Wrangler, não em `bombpvp.com`. A economia de request/bytes é consequência direta e padronizada do cache fresco imutável, mas não substitui Network/LCP medidos em navegador visível; Playwright/headless não foi usado.
