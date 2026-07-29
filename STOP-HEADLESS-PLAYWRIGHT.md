@@ -3,7 +3,7 @@
 User explicitly forbade auto-running these (2026-07-25):
 
 - learning-records/hostile-ui/*.mjs (moved to _DISABLED_*)
-- game/hostile-ui-breaks.test.mjs (renamed .DISABLED)
+- game/hostile-ui-breaks.test.mjs (disabled em 2026-07-25; removido em 2026-07-29 — não recriar)
 
 Reason: agents kept spawning Playwright `headless_shell` in a loop (~50%+ CPU), relaunching after kill.
 

@@ -47,7 +47,7 @@ capacidade que entregam:
 - `draw-bomber-rift.js`: WebGL, modelos e efeitos.
 - `play-rift-sfx.js`: efeitos procedurais de combate.
 - `present-champion-bomb-duel.js`: apresentação da partida no navegador.
-- `run-champion-bomb-duel.js`: regras, campeões, bombas, CPU embutido (baseline) e placar.
+- `run-champion-bomb-duel.js`: regras, campeões, bombas e placar. O CPU solo entra pela política de `bot-opponent/`, empacotada em `load-baseline-bot.js` (gerado).
 - `start-champion-duel.js`: controles e início da partida.
 
 Oponente controlado pelo computador: `bot-opponent/`.
@@ -70,6 +70,7 @@ nome:
 - `champions/zed/`
 - `champions/renekton/`
 - `champions/vladimir/`
+- `champions/gangplank/`
 
 `champions/prepare-playable-models/` é a entrada para converter, assar, inspecionar e
 empacotar esses modelos. `bake-playable-champion.mjs` recebe o nome do campeão e preserva

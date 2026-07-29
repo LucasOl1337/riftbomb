@@ -1,5 +1,10 @@
 # Status quo — CPU atual
 
+> **Registro histórico (levantamento de 2026-07-26).** Descreve o CPU embutido
+> que existia em `game/run-champion-bomb-duel.js`. Desde a extração, o CPU solo
+> entra por `bot-opponent/` (`baseline-policy.mjs`, empacotada em
+> `load-baseline-bot.js`) — veja `README.md` para o estado atual.
+
 Fonte: `game/run-champion-bomb-duel.js`  
 Data do levantamento: 2026-07-26
 

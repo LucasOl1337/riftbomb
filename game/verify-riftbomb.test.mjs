@@ -51,6 +51,10 @@ test("the built game is one offline HTML artifact", async () => {
 
   assert.match(document, /class Renderer/);
   assert.match(document, /class SfxEngine/);
+  assert.match(document, /SFX_VOLUME_DEFAULTS/);
+  assert.match(document, /setVolume\(/);
+  assert.match(document, /busForAction\(/);
+  assert.match(document, /explosion:\s*0\./);
   assert.match(document, /class Game/);
   assert.match(document, /class BrowserMatchPresentation/);
   assert.match(document, /boot\(\);/);
@@ -160,15 +164,16 @@ test("online camera starts with the full arena and supports mouse-wheel zoom", a
 test("mobile rendering stays legible and malformed animation metadata cannot stop the frame", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
 
-  assert.match(renderer, /this\.maxScale = this\.mobilePerf \? 1\.2/);
-  assert.match(renderer, /this\.minScale = this\.mobilePerf \? 0\.75/);
-  assert.match(renderer, /this\.mobilePerf[\s\S]{0,100}\? Math\.min\(devicePixelRatio \|\| 1, 1\)/);
+  assert.match(renderer, /this\.maxScale = this\.mobilePerf \? Math\.min\(devicePixelRatio \|\| 1, 2\)/);
+  assert.match(renderer, /this\.minScale = this\.mobilePerf \? 0\.9/);
+  assert.match(renderer, /this\.pixelBudget = this\.mobilePerf \? 1920 \* 1080/);
+  assert.match(renderer, /this\.scale = this\.mobilePerf\s*\n\s*\? Math\.min\(devicePixelRatio \|\| 1, 2\)/);
   assert.match(renderer, /if \(!animation\?\.clips \|\| !animation\?\.actions\) return null/);
   assert.match(renderer, /if \(!frame \|\| frame\.hidden\) return false/);
   assert.doesNotMatch(renderer, /Missing VAT (?:animation clip|action mapping)/);
 });
 
-test("mobile controls remain match-only, multitouch-safe, and zoom-accessible", async () => {
+test("mobile controls remain match-only, multitouch-safe, with a floating stick", async () => {
   const document = await readFile(sourcePath, "utf8");
   const controls = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
   const styles = await readFile(path.join(gameDirectory, "show-champion-duel.css"), "utf8");
@@ -180,6 +185,45 @@ test("mobile controls remain match-only, multitouch-safe, and zoom-accessible", 
   assert.match(controls, /let activePointer = null;[\s\S]*?addEventListener\("pointerup", release, \{ capture: true \}\)/);
   assert.doesNotMatch(controls, /button\.setPointerCapture/);
   assert.doesNotMatch(document, /user-scalable=no|maximum-scale=1/);
+
+  // Floating stick: the move zone sits before the stick and the action
+  // buttons stay outside it, so skill taps can never start movement.
+  assert.match(document, /touch-move-zone[\s\S]*?id="touch-stick"[\s\S]*?class="touch-actions"/);
+  assert.match(styles, /\.touch-move-zone \{[\s\S]*?pointer-events: auto/);
+  assert.match(styles, /\.touch-stick \{[\s\S]*?pointer-events: none/);
+  assert.match(styles, /\.touch-stick\.is-floating \{[\s\S]*?position: fixed/);
+  assert.match(styles, /\.touch-stick:not\(\.is-active\) \.touch-stick__knob \{[\s\S]*?transition: transform 90ms/);
+
+  // A pointerdown on the zone anchors the stick at the touch point and the
+  // direction offset is measured from that anchor, not the element center.
+  assert.match(controls, /zone\.addEventListener\("pointerdown"/);
+  assert.match(controls, /zone\.setPointerCapture\?\.\(event\.pointerId\)/);
+  assert.doesNotMatch(controls, /stick\.addEventListener\("pointerdown"/);
+  assert.match(controls, /anchorX = clientX/);
+  assert.match(controls, /clientX - anchorX/);
+  assert.match(controls, /parkStick/);
+});
+
+test("analog stick gets cardinal snap and corner nudge while keyboard and AI paths stay untouched", async () => {
+  const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
+
+  // Snap applies only inside the analog stick branch of movementFor.
+  const stickBranch = rules.match(/if \(stickMag > 0\.18\) \{([\s\S]*?)\} else \{/);
+  assert.ok(stickBranch, "analog stick branch must exist");
+  assert.match(stickBranch[1], /snapLimit/);
+  assert.match(stickBranch[1], /analog = true/);
+  assert.doesNotMatch(rules, /ArrowLeft[\s\S]{0,200}analog = true/);
+
+  // Corner nudging only runs when moveEntity receives the analog assist flag.
+  assert.match(rules, /moveEntity\(entity, dx, dz, speed, dt, radius, ignoreBomb = null, assist = false\)/);
+  assert.match(rules, /assist && dx !== 0/);
+  assert.match(rules, /assist && dz !== 0/);
+  assert.match(rules, /nudgeAroundCorner\(entity, nx, "x"/);
+  assert.match(rules, /nudgeAroundCorner\(entity, nz, "z"/);
+  assert.match(rules, /passableBombs, analog\)/);
+  // Nudge is capped at one frame of travel and is a pure function of state.
+  assert.match(rules, /const shift = \(maxShift \* i\) \/ 2;/);
+  assert.doesNotMatch(rules.match(/nudgeAroundCorner\(entity, target[\s\S]*?\n      \}/)[0], /Math\.random|Date\.|performance\./);
 });
 
 test("match rules do not write browser presentation directly", async () => {
@@ -232,7 +276,7 @@ test("the full roster maps Model Viewer clips to CPU-streamed animation meshes",
   assert.match(rules, /vladimirQAnim/);
 });
 
-test("arena themes share nine GPU texture allocations", async () => {
+test("arena modular kit packs seventeen authored texture sources", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
   const packedTextures = await readFile(
     path.join(gameDirectory, "arena-appearance", "load-arena-appearance.js"),
@@ -241,10 +285,14 @@ test("arena themes share nine GPU texture allocations", async () => {
 
   assert.match(renderer, /const textureGroups = \{/);
   assert.match(renderer, /for \(const \[sourceKey, aliases\] of Object\.entries\(textureGroups\)\)/);
+  assert.match(renderer, /wallClearing:\s*\["wallClearing"\]/);
+  assert.match(renderer, /wallLabyrinth:\s*\["wallLabyrinth"\]/);
+  assert.match(renderer, /wallForts:\s*\["wallForts"\]/);
+  assert.match(renderer, /wallPit:\s*\["wallPit"\]/);
   assert.equal(
     [...packedTextures.matchAll(/data:image\/webp;base64,/g)].length,
-    9,
-    "the offline build must embed each authored arena source once"
+    17,
+    "the offline build must embed each modular kit source once (5 floors + 5 walls + 5 tops + 2 crates)"
   );
 });
 

@@ -217,13 +217,10 @@
       </aside>
 
       <button class="guide-button micro" id="open-guide">H · Arena rules</button>
-      <button class="pause-button micro" id="pause-toggle" aria-label="Pause game" aria-pressed="false">
-        <svg id="pause-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>
-        P · Pause
-      </button>
     </div>
 
     <div class="touch-controls" id="touch-controls" aria-label="Touch controls">
+      <div class="touch-move-zone" id="touch-move-zone" aria-hidden="true"></div>
       <div class="touch-stick" id="touch-stick" role="application" aria-label="Move stick" aria-roledescription="virtual joystick">
         <div class="touch-stick__base" aria-hidden="true">
           <div class="touch-stick__ring"></div>
@@ -293,7 +290,6 @@
           <dt>Gangplank · Q/F/E/R</dt><dd>Parrrley, Remove Scurvy, Powder Keg and Cannon Barrage.</dd>
           <dt>P2 · Arrows</dt><dd>Move Red. Enter or Numpad 0 plants a bomb; J K L ; cast abilities.</dd>
           <dt>Solo play</dt><dd>The CPU controls Red until Player 2 presses an arrow key or Enter.</dd>
-          <dt>P</dt><dd>Pause a solo or local match.</dd>
           <dt>H</dt><dd>Open or close this guide.</dd>
         </dl>
       </section>

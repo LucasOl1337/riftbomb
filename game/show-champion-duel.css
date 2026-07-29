@@ -184,26 +184,28 @@
       overflow: hidden;
     }
 
-    /* Circular skill disc (LoL ability art) + hard tactical bezel — no soft gold glow */
+    /* Circular skill disc — steel bezel, no pink hazard ring, no SKL sticker */
     .skill-token {
       position: absolute;
-      width: 3.85rem;
-      height: 3.85rem;
-      margin-left: -1.925rem;
-      margin-top: -1.925rem;
+      width: 3.7rem;
+      height: 3.7rem;
+      margin-left: -1.85rem;
+      margin-top: -1.85rem;
       border-radius: 50%;
-      border: 3px solid var(--hazard);
-      background-color: var(--void);
+      border: 2px solid #c9a45c;
+      background-color: #0c0c0e;
       background-position: center;
       background-size: cover;
       background-repeat: no-repeat;
       box-shadow:
-        0 0 0 2px var(--void),
-        0 0 0 3px var(--line);
+        0 0 0 2px #141416,
+        0 0 0 3px #3a3a40,
+        0 4px 10px rgb(0 0 0 / 55%);
       transform: translate3d(0, 0, 0);
       will-change: left, top, transform;
-      filter: saturate(1.1) contrast(1.08);
+      filter: saturate(1.06) contrast(1.05);
       image-rendering: auto;
+      overflow: hidden;
     }
 
     .skill-token::before {
@@ -211,24 +213,14 @@
       position: absolute;
       inset: 0;
       border-radius: 50%;
-      box-shadow: inset 0 0 0 1px rgb(234 234 234 / 22%);
+      box-shadow:
+        inset 0 0 0 1px rgb(255 255 255 / 18%),
+        inset 0 -6px 10px rgb(0 0 0 / 35%);
       pointer-events: none;
     }
 
     .skill-token::after {
-      content: "SKL";
-      position: absolute;
-      left: 50%;
-      bottom: -1.05rem;
-      transform: translateX(-50%);
-      padding: 0.08rem 0.28rem;
-      border: 1px solid var(--line);
-      background: var(--void);
-      color: var(--hazard);
-      font: 700 0.42rem/1 var(--data);
-      letter-spacing: 0.14em;
-      white-space: nowrap;
-      pointer-events: none;
+      content: none;
     }
 
     .frame {
@@ -1853,7 +1845,7 @@
 
       /*
        * Wild Rift-style mobile chrome:
-       * left translucent stick, right skill arc + large attack (bomb).
+       * floating left-half movement stick, right skill arc + large attack (bomb).
        */
       html.is-match-active .touch-controls {
         position: fixed;
@@ -1875,15 +1867,38 @@
         display: none !important;
       }
 
+      /* Movement zone: left half of the screen, below the skill buttons. */
+      .touch-move-zone {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 50%;
+        z-index: 0;
+        pointer-events: auto;
+        touch-action: none;
+        user-select: none;
+      }
+
       .touch-stick {
         display: grid;
         place-items: center;
         width: clamp(7.2rem, 28vh, 9rem);
         height: clamp(7.2rem, 28vh, 9rem);
         margin: 0 0 0.15rem 0.1rem;
-        pointer-events: auto;
+        pointer-events: none;
         touch-action: none;
         user-select: none;
+      }
+
+      /* While a touch is active the stick floats, centered on the touch point. */
+      .touch-stick.is-floating {
+        position: fixed;
+        left: 0;
+        top: 0;
+        margin: 0;
+        z-index: 1;
+        will-change: transform;
       }
 
       .touch-stick__base {
@@ -1935,6 +1950,11 @@
           0 0 0 2px rgb(90 210 255 / 28%),
           0 0 1.6rem rgb(60 200 255 / 35%),
           inset 0 0 1.2rem rgb(50 170 230 / 22%);
+      }
+
+      /* Knob returns to center with a short ease; dragging stays instant. */
+      .touch-stick:not(.is-active) .touch-stick__knob {
+        transition: transform 90ms ease;
       }
 
       .touch-actions {

@@ -83,8 +83,16 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     ["game/arena-appearance/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
     ["game/arena-appearance/textures/ground/floor-forts.webp", "floor-forts.webp"],
     ["game/arena-appearance/textures/ground/floor-pit.webp", "floor-pit.webp"],
-    ["game/arena-appearance/textures/walls/wall-lattice.webp", "wall.webp"],
-    ["game/arena-appearance/textures/walls/wall-top-lattice.webp", "wall-top.webp"],
+    ["game/arena-appearance/textures/walls/wall-lattice.webp", "wall-lattice.webp"],
+    ["game/arena-appearance/textures/walls/wall-clearing.webp", "wall-clearing.webp"],
+    ["game/arena-appearance/textures/walls/wall-labyrinth.webp", "wall-labyrinth.webp"],
+    ["game/arena-appearance/textures/walls/wall-forts.webp", "wall-forts.webp"],
+    ["game/arena-appearance/textures/walls/wall-pit.webp", "wall-pit.webp"],
+    ["game/arena-appearance/textures/walls/wall-top-lattice.webp", "wall-top-lattice.webp"],
+    ["game/arena-appearance/textures/walls/wall-top-clearing.webp", "wall-top-clearing.webp"],
+    ["game/arena-appearance/textures/walls/wall-top-labyrinth.webp", "wall-top-labyrinth.webp"],
+    ["game/arena-appearance/textures/walls/wall-top-forts.webp", "wall-top-forts.webp"],
+    ["game/arena-appearance/textures/walls/wall-top-pit.webp", "wall-top-pit.webp"],
   ];
   assert.equal(
     (game.match(/\/arena-textures\/[^"]+\.webp/g) || []).length,

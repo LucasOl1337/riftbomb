@@ -45,8 +45,16 @@ const arenaTextureFiles = Object.freeze({
   floorLabyrinth: ["ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
   floorForts: ["ground/floor-forts.webp", "floor-forts.webp"],
   floorPit: ["ground/floor-pit.webp", "floor-pit.webp"],
-  wallSide: ["walls/wall-lattice.webp", "wall.webp"],
-  wallTop: ["walls/wall-top-lattice.webp", "wall-top.webp"],
+  wallLattice: ["walls/wall-lattice.webp", "wall-lattice.webp"],
+  wallClearing: ["walls/wall-clearing.webp", "wall-clearing.webp"],
+  wallLabyrinth: ["walls/wall-labyrinth.webp", "wall-labyrinth.webp"],
+  wallForts: ["walls/wall-forts.webp", "wall-forts.webp"],
+  wallPit: ["walls/wall-pit.webp", "wall-pit.webp"],
+  wallTopLattice: ["walls/wall-top-lattice.webp", "wall-top-lattice.webp"],
+  wallTopClearing: ["walls/wall-top-clearing.webp", "wall-top-clearing.webp"],
+  wallTopLabyrinth: ["walls/wall-top-labyrinth.webp", "wall-top-labyrinth.webp"],
+  wallTopForts: ["walls/wall-top-forts.webp", "wall-top-forts.webp"],
+  wallTopPit: ["walls/wall-top-pit.webp", "wall-top-pit.webp"],
 });
 
 const buildCommand = process.platform === "win32"
