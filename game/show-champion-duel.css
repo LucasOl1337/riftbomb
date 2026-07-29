@@ -1421,97 +1421,284 @@
       opacity: 0.72;
     }
 
-    dialog {
-      width: min(55rem, calc(100vw - 2rem));
-      max-height: min(46rem, calc(100svh - 2rem));
+    #combat-guide {
+      width: min(70rem, calc(100vw - 2rem));
+      max-height: calc(100dvh - 2rem);
       margin: auto;
       padding: 0;
-      overflow: auto;
-      border: 1px solid var(--line);
+      overflow: hidden;
+      border: 1px solid #383838;
+      border-top: 2px solid var(--hazard);
       color: var(--mist);
-      background: var(--panel);
-      box-shadow: none;
+      background: var(--void);
+      box-shadow:
+        0 1.5rem 4rem rgb(0 0 0 / 72%),
+        0 0 0 1px rgb(230 25 25 / 8%);
       overscroll-behavior: contain;
     }
 
-    dialog::backdrop {
-      background: rgb(1 4 12 / 78%);
-      /* brutalist: no translucency */
+    #combat-guide::backdrop {
+      background: rgb(0 0 0 / 84%);
     }
 
-    .guide-head {
-      position: sticky;
+    #combat-guide .guide-head {
+      position: relative;
       z-index: 2;
-      top: 0;
       display: flex;
-      justify-content: space-between;
-      gap: 1rem;
       align-items: center;
-      padding: 1.1rem 1.25rem;
-      border-bottom: 1px solid var(--line);
-      background: var(--panel);
-      /* brutalist: no translucency */
+      justify-content: space-between;
+      gap: 1.5rem;
+      min-height: 6.35rem;
+      padding: 1.15rem clamp(1.25rem, 2.8vw, 2rem) 1.25rem;
+      border-bottom: 1px solid #383838;
+      background:
+        linear-gradient(90deg, rgb(230 25 25 / 10%), transparent 32%),
+        var(--panel);
     }
 
-    .guide-head h2 {
+    #combat-guide .guide-head > div {
+      display: grid;
+      gap: 0.32rem;
+      min-width: 0;
+    }
+
+    #combat-guide .guide-head .micro {
+      color: var(--hazard) !important;
+      letter-spacing: 0.16em;
+    }
+
+    #combat-guide .guide-head h2 {
       margin: 0;
-      font-family: var(--display);
-      font-size: clamp(1.25rem, 3vw, 2.2rem);
-      letter-spacing: -0.03em;
       color: white;
-    }
-
-    .guide-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1px;
-      background: var(--line);
-    }
-
-    .guide-section {
-      padding: clamp(1.2rem, 3vw, 2rem);
-      background: rgb(4 10 25 / 94%);
-    }
-
-    .guide-section.wide { grid-column: 1 / -1; }
-
-    .guide-section h3 {
-      margin: 0 0 0.8rem;
       font-family: var(--display);
-      font-size: 0.9rem;
-      letter-spacing: 0.06em;
-      color: var(--gold);
+      font-size: clamp(2rem, 4vw, 3.25rem);
+      line-height: 0.92;
+      letter-spacing: -0.055em;
+      text-wrap: balance;
     }
 
-    .guide-section p,
-    .guide-section li {
-      color: var(--phosphor);
-      font-size: 0.88rem;
-      line-height: 1.65;
+    #combat-guide .guide-head .icon-button {
+      flex: 0 0 auto;
+      width: 3rem;
+      min-height: 3rem;
+      border-color: #474747;
+      background: var(--void);
+      color: #bdbdbd;
+      transition:
+        transform 140ms ease,
+        border-color 160ms ease,
+        background 160ms ease,
+        color 160ms ease;
     }
 
-    .guide-section ul {
-      margin: 0;
-      padding-left: 1.1rem;
+    #combat-guide .guide-head .icon-button:hover {
+      transform: translateY(-1px);
+      border-color: var(--hazard);
+      background: var(--hazard);
+      color: var(--void);
     }
 
-    .control-table {
+    #combat-guide .guide-head .icon-button:active {
+      transform: translateY(1px);
+    }
+
+    #combat-guide .guide-head .icon-button:focus-visible {
+      outline-color: white;
+      outline-offset: 3px;
+      box-shadow: 0 0 0 5px var(--hazard);
+    }
+
+    #combat-guide .guide-grid {
       display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 0.55rem 1rem;
-      margin: 0;
+      grid-template-columns: minmax(20rem, 0.88fr) minmax(24rem, 1.12fr);
+      align-items: start;
+      gap: 1rem;
+      max-height: calc(100dvh - 8.45rem);
+      padding: 1rem;
+      overflow-y: auto;
+      background:
+        linear-gradient(90deg, rgb(255 255 255 / 1.5%) 1px, transparent 1px),
+        linear-gradient(rgb(255 255 255 / 1.5%) 1px, transparent 1px),
+        #0d0d0e;
+      background-size: 2.5rem 2.5rem;
+      counter-reset: guide-section;
+      scrollbar-color: var(--hazard) #202020;
+      scrollbar-gutter: stable;
+      scrollbar-width: thin;
     }
 
-    .control-table dt {
-      min-width: 4.3rem;
-      color: var(--ice);
-      font: 700 0.72rem var(--data);
+    #combat-guide .guide-grid::-webkit-scrollbar {
+      width: 0.55rem;
     }
 
-    .control-table dd {
+    #combat-guide .guide-grid::-webkit-scrollbar-track {
+      background: #202020;
+    }
+
+    #combat-guide .guide-grid::-webkit-scrollbar-thumb {
+      border: 2px solid #202020;
+      background: var(--hazard);
+    }
+
+    #combat-guide .guide-section {
+      grid-column: 2;
+      padding: clamp(1.15rem, 2.2vw, 1.65rem);
+      border: 1px solid #323232;
+      border-top-color: #484848;
+      background: rgb(20 20 20 / 97%);
+      counter-increment: guide-section;
+    }
+
+    #combat-guide .guide-section:first-child {
+      grid-column: 1;
+      grid-row: 1 / span 7;
+      align-self: start;
+      border-top: 2px solid var(--hazard);
+      background: #161616;
+    }
+
+    #combat-guide .guide-section:nth-child(2) {
+      border-top: 2px solid var(--hazard);
+    }
+
+    #combat-guide .guide-section:nth-child(n + 6) {
+      grid-column: 1 / -1;
+    }
+
+    #combat-guide .guide-section.wide {
+      grid-column: 1 / -1;
+    }
+
+    #combat-guide .guide-section h3 {
+      display: flex;
+      align-items: baseline;
+      gap: 0.55rem;
+      margin: 0 0 1rem;
+      color: white;
+      font-family: var(--display);
+      font-size: 0.95rem;
+      line-height: 1.15;
+      letter-spacing: 0.045em;
+      text-transform: uppercase;
+      text-wrap: balance;
+    }
+
+    #combat-guide .guide-section h3::before {
+      content: "0" counter(guide-section) " /";
+      flex: 0 0 auto;
+      color: var(--hazard);
+      font: 800 0.68rem/1 var(--data);
+      letter-spacing: 0.08em;
+    }
+
+    #combat-guide .guide-section p,
+    #combat-guide .guide-section li {
+      color: #cecece;
+      font-size: 0.84rem;
+      line-height: 1.58;
+    }
+
+    #combat-guide .guide-section p {
+      max-width: 65ch;
       margin: 0;
-      color: var(--phosphor);
-      font-size: 0.86rem;
+      text-wrap: pretty;
+    }
+
+    #combat-guide .guide-section ul {
+      display: grid;
+      gap: 0.68rem;
+      margin: 0;
+      padding-inline-start: 1.15rem;
+    }
+
+    #combat-guide .guide-section li {
+      padding-inline-start: 0.2rem;
+    }
+
+    #combat-guide .guide-section li::marker {
+      color: var(--hazard);
+    }
+
+    #combat-guide .control-table {
+      display: grid;
+      grid-template-columns: minmax(7.25rem, 0.72fr) minmax(0, 1.28fr);
+      gap: 1px;
+      margin: 0;
+      border: 1px solid #343434;
+      background: #343434;
+    }
+
+    #combat-guide .control-table dt,
+    #combat-guide .control-table dd {
+      min-width: 0;
+      min-height: 2.95rem;
+      padding: 0.62rem 0.7rem;
+      background: #111;
+    }
+
+    #combat-guide .control-table dt {
+      color: white;
+      font: 800 0.75rem/1.35 var(--data);
+      letter-spacing: -0.02em;
+    }
+
+    #combat-guide .control-table dd {
+      margin: 0;
+      color: #bdbdbd;
+      font-size: 0.76rem;
+      line-height: 1.42;
+      text-wrap: pretty;
+    }
+
+    @media (max-width: 56rem) {
+      #combat-guide {
+        width: calc(100vw - 1rem);
+        max-height: calc(100dvh - 1rem);
+      }
+
+      #combat-guide .guide-head {
+        min-height: 5.25rem;
+        padding: 0.9rem 1rem 1rem;
+      }
+
+      #combat-guide .guide-grid {
+        grid-template-columns: 1fr;
+        max-height: calc(100dvh - 6.25rem);
+        padding: 0.65rem;
+      }
+
+      #combat-guide .guide-section,
+      #combat-guide .guide-section:first-child,
+      #combat-guide .guide-section.wide {
+        position: static;
+        grid-column: 1;
+        grid-row: auto;
+      }
+    }
+
+    @media (max-width: 34rem) {
+      #combat-guide .guide-head h2 {
+        font-size: clamp(1.7rem, 9vw, 2.25rem);
+      }
+
+      #combat-guide .guide-section {
+        padding: 1rem;
+      }
+
+      #combat-guide .control-table {
+        grid-template-columns: 1fr;
+      }
+
+      #combat-guide .control-table dt {
+        min-height: 0;
+        padding-bottom: 0.3rem;
+        color: var(--hazard);
+      }
+
+      #combat-guide .control-table dd {
+        min-height: 0;
+        padding-top: 0.3rem;
+      }
     }
 
     .end-screen {
