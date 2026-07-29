@@ -123,12 +123,12 @@ export async function POST(request: Request): Promise<Response> {
     const now = Date.now();
 
     if (action === "create") {
-      if (!validDescription(body.offer, "offer")) {
+      if (body.offer !== undefined && !validDescription(body.offer, "offer")) {
         return response({ error: "invalid_offer" }, 400);
       }
 
       await deleteExpiredRooms(db, now);
-      const offer = JSON.stringify(body.offer);
+      const offer = body.offer ? JSON.stringify(body.offer) : "null";
       const hostToken = createHostToken();
       const expiresAt = now + ROOM_LIFETIME_MS;
 
@@ -145,6 +145,24 @@ export async function POST(request: Request): Promise<Response> {
         }
       }
       return response({ error: "room_code_unavailable" }, 503);
+    }
+
+    if (action === "publish-offer") {
+      const code = normalizeCode(body.code);
+      const hostToken = typeof body.hostToken === "string" ? body.hostToken : "";
+      if (!validCode(code) || hostToken.length < 32 || !validDescription(body.offer, "offer")) {
+        return response({ error: "invalid_offer" }, 400);
+      }
+      const result = await db
+        .prepare(
+          "UPDATE pvp_rooms SET offer = ? WHERE code = ? AND host_token = ? AND expires_at >= ? AND answer IS NULL",
+        )
+        .bind(JSON.stringify(body.offer), code, hostToken, now)
+        .run();
+      if ((result.meta?.changes ?? 0) < 1) {
+        return response({ error: "room_unavailable" }, 409);
+      }
+      return response({ ok: true });
     }
 
     if (action === "answer") {
@@ -228,8 +246,10 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     if (room.answer) return response({ error: "room_full" }, 409);
+    const offer = JSON.parse(room.offer) as SessionDescription | null;
+    if (!offer) return response({ preparing: true, expiresAt: room.expires_at });
     return response({
-      offer: JSON.parse(room.offer),
+      offer,
       expiresAt: room.expires_at,
     });
   } catch {

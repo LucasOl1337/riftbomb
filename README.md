@@ -2,7 +2,7 @@
 
 Protótipo PvP de arena inspirado em Bomberman e League of Legends, com WebGL2,
 efeitos de combate procedurais e cinco campeões jogáveis: Katarina, Zed,
-Renekton, Vladimir e Ziggs.
+Renekton, Vladimir e Gangplank.
 
 ## Jogar
 
@@ -18,13 +18,15 @@ Depois acesse `http://127.0.0.1:4177/riftbomb.html`.
 ## PvP online
 
 A versão publicada com lobby por código e seleção independente de campeão e
-mapa fica em `online/`. O host controla a simulação e os navegadores
-trocam comandos e snapshots por WebRTC; a API mantém apenas a sinalização
-temporária das salas.
+mapa fica em `online/`. O servidor autoritativo executa a partida mesmo quando
+o host minimiza ou fecha a aba; os dois navegadores enviam apenas comandos e
+recebem snapshots simétricos.
 
 Jogue em:
 
-https://riftbomb-online.juliherreiro.chatgpt.site
+https://bombpvp.com
+
+Fallback Workers: https://riftbomb-online.lucasplays2000.workers.dev
 
 Para validar a aplicação hospedável:
 
@@ -48,7 +50,10 @@ capacidade que entregam:
 - `run-champion-bomb-duel.js`: regras, campeões, bombas, CPU embutido (baseline) e placar.
 - `start-champion-duel.js`: controles e início da partida.
 
-Oponente AI (requisitos, plano e políticas futuras): `BOTS/`.
+Oponente controlado pelo computador: `bot-opponent/`.
+
+A aparência e os temas da arena ficam em `game/arena-appearance/`; sua entrada de
+empacotamento é `package-arena-appearance.mjs`.
 
 Gere novamente o HTML autocontido e rode os gates:
 
@@ -65,11 +70,21 @@ nome:
 - `champions/zed/`
 - `champions/renekton/`
 - `champions/vladimir/`
-- `champions/ziggs/`
 
 `champions/prepare-playable-models/` é a entrada para converter, assar, inspecionar e
 empacotar esses modelos. `bake-playable-champion.mjs` recebe o nome do campeão e preserva
 as diferenças de poses dentro de uma única implementação. O material do curso de arquitetura começa em
 `architecture-course/course-map.html`.
+
+Para reimportar o roster base diretamente do Khada Model Viewer, extrair as texturas e
+assar **todos** os clips de cada GLB no runtime VAT:
+
+```powershell
+node champions/prepare-playable-models/import-modelviewer-roster.mjs
+```
+
+Também é possível importar somente campeões específicos passando seus nomes, por exemplo
+`zed renekton`. O comando exige ImageMagick (`magick`) para gerar os atlas WebP, grava a
+origem exata no metadata e executa a verificação de integridade após cada campeão.
 
 Projeto de fã não comercial e não endossado pela Riot Games.

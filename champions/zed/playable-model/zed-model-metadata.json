@@ -1,141 +1,610 @@
 {
-  "source": "Classic Zed game mesh and matching base rig",
-  "unitScale": 0.010959819563946203,
+  "runtime": "vat-v1",
+  "completeClipCatalog": true,
+  "source": "Khada Model Viewer Zed base GLB with all animation clips",
+  "sourceUrl": "https://cdn.modelviewer.lol/lol/models/zed/238000/model.glb",
+  "unitScale": 1.3126973504372477,
   "vertexCount": 5462,
   "indexCount": 26109,
-  "strideFloats": 26,
+  "strideFloats": 2,
+  "frameCount": 238,
+  "textureDimensions": [
+    5462,
+    238
+  ],
+  "positionBounds": {
+    "min": [
+      -2.277755968570709,
+      -0.7174999999999999,
+      -2.3585215139389035
+    ],
+    "max": [
+      2.1524307656288144,
+      2.6746127891540525,
+      2.630533866882324
+    ],
+    "range": [
+      4.430186734199523,
+      3.3921127891540523,
+      4.9890553808212275
+    ]
+  },
   "materials": [
     "lambert4"
   ],
   "skeletonBoneCount": 84,
   "animationDiagnostics": [
     {
-      "requestedName": "zed_idle1",
-      "actualName": "zed_idle1",
-      "duration": 3.3333334922790527,
+      "requestedName": "Zed_idle1.anm",
+      "actualName": "Zed_idle1.anm",
+      "duration": 3.33333158493042,
       "trackCount": 252,
       "coverage": 1
     },
     {
-      "requestedName": "zed_run",
-      "actualName": "zed_run",
-      "duration": 0.9677419066429138,
+      "requestedName": "Zed_attack1.anm",
+      "actualName": "Zed_attack1.anm",
+      "duration": 1.4999998807907104,
       "trackCount": 252,
       "coverage": 1
     },
     {
-      "requestedName": "zed_spell3",
-      "actualName": "zed_spell3",
-      "duration": 0.9677419066429138,
+      "requestedName": "Zed_crit.anm",
+      "actualName": "Zed_crit.anm",
+      "duration": 1.4333332777023315,
       "trackCount": 252,
       "coverage": 1
     },
     {
-      "requestedName": "zed_spell4_leadin",
-      "actualName": "zed_spell4_leadin",
-      "duration": 1.633333444595337,
+      "requestedName": "Death",
+      "actualName": "Death",
+      "duration": 5.333329677581787,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_idle2.anm",
+      "actualName": "Zed_idle2.anm",
+      "duration": 4.3333306312561035,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_idle3.anm",
+      "actualName": "Zed_idle3.anm",
+      "duration": 4.066664218902588,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Laugh",
+      "actualName": "Laugh",
+      "duration": 3.33333158493042,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_run.anm",
+      "actualName": "Zed_run.anm",
+      "duration": 0.9677414894104004,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Run_Fast",
+      "actualName": "Run_Fast",
+      "duration": 0.9677414894104004,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_spell1.anm",
+      "actualName": "Zed_spell1.anm",
+      "duration": 1.5333331823349,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell2",
+      "actualName": "Spell2",
+      "duration": 0.9677414894104004,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_spell3.anm",
+      "actualName": "Zed_spell3.anm",
+      "duration": 0.9677414894104004,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell4",
+      "actualName": "Spell4",
+      "duration": 1.6333330869674683,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Taunt",
+      "actualName": "Taunt",
+      "duration": 9.266666412353516,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Joke",
+      "actualName": "Joke",
+      "duration": 3.33333158493042,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Run_Haste",
+      "actualName": "Run_Haste",
+      "duration": 1.2000001668930054,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_idle_LeadIn1.anm",
+      "actualName": "Zed_idle_LeadIn1.anm",
+      "duration": 0.46875,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_run_leadin.anm",
+      "actualName": "Zed_run_leadin.anm",
+      "duration": 1.2666667699813843,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_idle4.anm",
+      "actualName": "Zed_idle4.anm",
+      "duration": 5.899995803833008,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Channel_Wndup",
+      "actualName": "Channel_Wndup",
+      "duration": 0.6451611518859863,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_channel_leadin.anm",
+      "actualName": "Zed_channel_leadin.anm",
+      "duration": 0.375,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_channel.anm",
+      "actualName": "Zed_channel.anm",
+      "duration": 0.6451611518859863,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_dance_leadin.anm",
+      "actualName": "Zed_dance_leadin.anm",
+      "duration": 1.1333333253860474,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_dance.anm",
+      "actualName": "Zed_dance.anm",
+      "duration": 9.333333015441895,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_recall.anm",
+      "actualName": "Zed_recall.anm",
+      "duration": 0.9677414894104004,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_recall_windup.anm",
+      "actualName": "Zed_recall_windup.anm",
+      "duration": 7.499994277954102,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Joke_KG_Loss",
+      "actualName": "Joke_KG_Loss",
+      "duration": 4.53333044052124,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Joke_KG_Win",
+      "actualName": "Joke_KG_Win",
+      "duration": 3.699997901916504,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_idle_LeadIn2.anm",
+      "actualName": "Zed_idle_LeadIn2.anm",
+      "duration": 0.46875,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_idle_LeadIn3.anm",
+      "actualName": "Zed_idle_LeadIn3.anm",
+      "duration": 3.7333312034606934,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell4_Strike",
+      "actualName": "Spell4_Strike",
+      "duration": 0.9677414894104004,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_attack_spell4.anm",
+      "actualName": "Zed_attack_spell4.anm",
+      "duration": 0.9677414894104004,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_attack2_part1.anm",
+      "actualName": "Zed_attack2_part1.anm",
+      "duration": 0.9677414894104004,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_attack2.anm",
+      "actualName": "Zed_attack2.anm",
+      "duration": 1.4999998807907104,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_spell2_cast.anm",
+      "actualName": "Zed_spell2_cast.anm",
+      "duration": 0.5483870506286621,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spawn",
+      "actualName": "Spawn",
+      "duration": 1.466666579246521,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Recall_Winddown",
+      "actualName": "Recall_Winddown",
+      "duration": 1.466666579246521,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Recall_Leadout",
+      "actualName": "Recall_Leadout",
+      "duration": 0.8064513206481934,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_attack_passive.anm",
+      "actualName": "Zed_attack_passive.anm",
+      "duration": 0.9677414894104004,
+      "trackCount": 252,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Zed_taunt_KG.anm",
+      "actualName": "Zed_taunt_KG.anm",
+      "duration": 9.266666412353516,
       "trackCount": 252,
       "coverage": 1
     }
   ],
-  "poseSpecs": [
-    [
-      "zed_idle1",
-      0
-    ],
-    [
-      "zed_idle1",
-      0.72
-    ],
-    [
-      "zed_run",
-      0
-    ],
-    [
-      "zed_run",
-      0.45
-    ],
-    [
-      "zed_spell3",
-      0.35
-    ],
-    [
-      "zed_spell4_leadin",
-      0.72
-    ]
-  ],
-  "bounds": [
-    {
-      "min": [
-        -0.48677095770835876,
-        -1.9250073757248742e-10,
-        -0.6697243452072144
-      ],
-      "max": [
-        0.6086625456809998,
-        2.049999952316284,
-        1.1181062459945679
-      ]
+  "animationActions": {
+    "idle": "Zed_idle1.anm",
+    "run": "Zed_run.anm",
+    "attack": "Zed_attack1.anm",
+    "q": "Zed_spell1.anm",
+    "w": "Zed_spell2_cast.anm",
+    "e": "Zed_spell3.anm",
+    "r": "Spell4",
+    "rStrike": "Spell4_Strike"
+  },
+  "animationClips": {
+    "Zed_idle1.anm": {
+      "source": "Zed_idle1.anm",
+      "startFrame": 0,
+      "frameCount": 8,
+      "duration": 3.33333158493042,
+      "loop": true
     },
-    {
-      "min": [
-        -0.4915764331817627,
-        -3.210493537686432e-10,
-        -0.6491981148719788
-      ],
-      "max": [
-        0.5889932513237,
-        2.0914981365203857,
-        1.1205271482467651
-      ]
+    "Zed_attack1.anm": {
+      "source": "Zed_attack1.anm",
+      "startFrame": 8,
+      "frameCount": 6,
+      "duration": 1.4999998807907104,
+      "loop": false
     },
-    {
-      "min": [
-        -0.6019522547721863,
-        2.469920934444758e-10,
-        -0.47100913524627686
-      ],
-      "max": [
-        1.0208003520965576,
-        1.824734091758728,
-        1.2816996574401855
-      ]
+    "Zed_crit.anm": {
+      "source": "Zed_crit.anm",
+      "startFrame": 14,
+      "frameCount": 4,
+      "duration": 1.4333332777023315,
+      "loop": false
     },
-    {
-      "min": [
-        -0.503009021282196,
-        2.403794663319303e-10,
-        -0.42498278617858887
-      ],
-      "max": [
-        1.050614833831787,
-        1.9138257503509521,
-        1.2668124437332153
-      ]
+    "Death": {
+      "source": "Death",
+      "startFrame": 18,
+      "frameCount": 8,
+      "duration": 5.333329677581787,
+      "loop": false
     },
-    {
-      "min": [
-        -0.46712979674339294,
-        1.526554299635663e-10,
-        -1.409034013748169
-      ],
-      "max": [
-        1.45119309425354,
-        2.0962576866149902,
-        1.72637140750885
-      ]
+    "Zed_idle2.anm": {
+      "source": "Zed_idle2.anm",
+      "startFrame": 26,
+      "frameCount": 8,
+      "duration": 4.3333306312561035,
+      "loop": true
     },
-    {
-      "min": [
-        -1.000277042388916,
-        1.9923419358747196e-7,
-        -0.20281217992305756
-      ],
-      "max": [
-        0.2786145806312561,
-        2.437062978744507,
-        0.682298481464386
-      ]
+    "Zed_idle3.anm": {
+      "source": "Zed_idle3.anm",
+      "startFrame": 34,
+      "frameCount": 8,
+      "duration": 4.066664218902588,
+      "loop": true
+    },
+    "Laugh": {
+      "source": "Laugh",
+      "startFrame": 42,
+      "frameCount": 7,
+      "duration": 3.33333158493042,
+      "loop": true
+    },
+    "Zed_run.anm": {
+      "source": "Zed_run.anm",
+      "startFrame": 49,
+      "frameCount": 10,
+      "duration": 0.9677414894104004,
+      "loop": true
+    },
+    "Run_Fast": {
+      "source": "Run_Fast",
+      "startFrame": 59,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": true
+    },
+    "Zed_spell1.anm": {
+      "source": "Zed_spell1.anm",
+      "startFrame": 63,
+      "frameCount": 8,
+      "duration": 1.5333331823349,
+      "loop": false
+    },
+    "Spell2": {
+      "source": "Spell2",
+      "startFrame": 71,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Zed_spell3.anm": {
+      "source": "Zed_spell3.anm",
+      "startFrame": 75,
+      "frameCount": 8,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Spell4": {
+      "source": "Spell4",
+      "startFrame": 83,
+      "frameCount": 8,
+      "duration": 1.6333330869674683,
+      "loop": false
+    },
+    "Taunt": {
+      "source": "Taunt",
+      "startFrame": 91,
+      "frameCount": 8,
+      "duration": 9.266666412353516,
+      "loop": true
+    },
+    "Joke": {
+      "source": "Joke",
+      "startFrame": 99,
+      "frameCount": 7,
+      "duration": 3.33333158493042,
+      "loop": true
+    },
+    "Run_Haste": {
+      "source": "Run_Haste",
+      "startFrame": 106,
+      "frameCount": 4,
+      "duration": 1.2000001668930054,
+      "loop": true
+    },
+    "Zed_idle_LeadIn1.anm": {
+      "source": "Zed_idle_LeadIn1.anm",
+      "startFrame": 110,
+      "frameCount": 4,
+      "duration": 0.46875,
+      "loop": true
+    },
+    "Zed_run_leadin.anm": {
+      "source": "Zed_run_leadin.anm",
+      "startFrame": 114,
+      "frameCount": 4,
+      "duration": 1.2666667699813843,
+      "loop": true
+    },
+    "Zed_idle4.anm": {
+      "source": "Zed_idle4.anm",
+      "startFrame": 118,
+      "frameCount": 8,
+      "duration": 5.899995803833008,
+      "loop": true
+    },
+    "Channel_Wndup": {
+      "source": "Channel_Wndup",
+      "startFrame": 126,
+      "frameCount": 4,
+      "duration": 0.6451611518859863,
+      "loop": false
+    },
+    "Zed_channel_leadin.anm": {
+      "source": "Zed_channel_leadin.anm",
+      "startFrame": 130,
+      "frameCount": 4,
+      "duration": 0.375,
+      "loop": false
+    },
+    "Zed_channel.anm": {
+      "source": "Zed_channel.anm",
+      "startFrame": 134,
+      "frameCount": 4,
+      "duration": 0.6451611518859863,
+      "loop": false
+    },
+    "Zed_dance_leadin.anm": {
+      "source": "Zed_dance_leadin.anm",
+      "startFrame": 138,
+      "frameCount": 4,
+      "duration": 1.1333333253860474,
+      "loop": true
+    },
+    "Zed_dance.anm": {
+      "source": "Zed_dance.anm",
+      "startFrame": 142,
+      "frameCount": 8,
+      "duration": 9.333333015441895,
+      "loop": true
+    },
+    "Zed_recall.anm": {
+      "source": "Zed_recall.anm",
+      "startFrame": 150,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Zed_recall_windup.anm": {
+      "source": "Zed_recall_windup.anm",
+      "startFrame": 154,
+      "frameCount": 8,
+      "duration": 7.499994277954102,
+      "loop": false
+    },
+    "Joke_KG_Loss": {
+      "source": "Joke_KG_Loss",
+      "startFrame": 162,
+      "frameCount": 8,
+      "duration": 4.53333044052124,
+      "loop": true
+    },
+    "Joke_KG_Win": {
+      "source": "Joke_KG_Win",
+      "startFrame": 170,
+      "frameCount": 7,
+      "duration": 3.699997901916504,
+      "loop": true
+    },
+    "Zed_idle_LeadIn2.anm": {
+      "source": "Zed_idle_LeadIn2.anm",
+      "startFrame": 177,
+      "frameCount": 4,
+      "duration": 0.46875,
+      "loop": true
+    },
+    "Zed_idle_LeadIn3.anm": {
+      "source": "Zed_idle_LeadIn3.anm",
+      "startFrame": 181,
+      "frameCount": 7,
+      "duration": 3.7333312034606934,
+      "loop": true
+    },
+    "Spell4_Strike": {
+      "source": "Spell4_Strike",
+      "startFrame": 188,
+      "frameCount": 6,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Zed_attack_spell4.anm": {
+      "source": "Zed_attack_spell4.anm",
+      "startFrame": 194,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Zed_attack2_part1.anm": {
+      "source": "Zed_attack2_part1.anm",
+      "startFrame": 198,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Zed_attack2.anm": {
+      "source": "Zed_attack2.anm",
+      "startFrame": 202,
+      "frameCount": 4,
+      "duration": 1.4999998807907104,
+      "loop": false
+    },
+    "Zed_spell2_cast.anm": {
+      "source": "Zed_spell2_cast.anm",
+      "startFrame": 206,
+      "frameCount": 8,
+      "duration": 0.5483870506286621,
+      "loop": false
+    },
+    "Spawn": {
+      "source": "Spawn",
+      "startFrame": 214,
+      "frameCount": 4,
+      "duration": 1.466666579246521,
+      "loop": false
+    },
+    "Recall_Winddown": {
+      "source": "Recall_Winddown",
+      "startFrame": 218,
+      "frameCount": 4,
+      "duration": 1.466666579246521,
+      "loop": false
+    },
+    "Recall_Leadout": {
+      "source": "Recall_Leadout",
+      "startFrame": 222,
+      "frameCount": 4,
+      "duration": 0.8064513206481934,
+      "loop": false
+    },
+    "Zed_attack_passive.anm": {
+      "source": "Zed_attack_passive.anm",
+      "startFrame": 226,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Zed_taunt_KG.anm": {
+      "source": "Zed_taunt_KG.anm",
+      "startFrame": 230,
+      "frameCount": 8,
+      "duration": 9.266666412353516,
+      "loop": true
     }
-  ]
+  }
 }

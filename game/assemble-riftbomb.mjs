@@ -2,12 +2,14 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { packagePlayableChampions } from "../champions/prepare-playable-models/package-playable-champions.mjs";
+import { packageBaselineBot } from "../bot-opponent/package-baseline-bot.mjs";
 
 const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.dirname(gameDirectory);
 const sourcePath = path.join(gameDirectory, "play-riftbomb.html");
 const outputPath = path.join(repositoryRoot, "riftbomb.html");
 const playableChampionsPath = path.join(gameDirectory, "load-playable-champion-models.js");
+const baselineBotPath = path.join(gameDirectory, "load-baseline-bot.js");
 
 let document = await readFile(sourcePath, "utf8");
 const localStylesheets = [...document.matchAll(/<link rel="stylesheet" href="\.\/([^"]+)">/g)]
@@ -16,6 +18,7 @@ const localScripts = [...document.matchAll(/<script src="\.\/([^"]+)"><\/script>
   .map((match) => match[1]);
 
 await writeFile(playableChampionsPath, await packagePlayableChampions(repositoryRoot));
+await writeFile(baselineBotPath, await packageBaselineBot());
 
 for (const stylesheet of localStylesheets) {
   const css = await readFile(path.join(gameDirectory, stylesheet), "utf8");

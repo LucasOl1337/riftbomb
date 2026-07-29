@@ -5,6 +5,8 @@ import handler from "vinext/server/app-router-entry";
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  GAME_SERVER_ORIGIN?: string;
+  GAME_SERVER_PROXY_SECRET?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -38,6 +40,20 @@ const worker = {
           return result.response();
         },
       }, allowedWidths);
+    }
+
+    if (url.pathname === "/game-ws") {
+      if (request.headers.get("upgrade")?.toLowerCase() !== "websocket") {
+        return new Response("WebSocket upgrade required", { status: 426 });
+      }
+      if (!env.GAME_SERVER_ORIGIN || !env.GAME_SERVER_PROXY_SECRET) {
+        return new Response("Game server unavailable", { status: 503 });
+      }
+      const origin = new URL(env.GAME_SERVER_ORIGIN);
+      origin.search = url.search;
+      const headers = new Headers(request.headers);
+      headers.set("x-riftbomb-proxy", env.GAME_SERVER_PROXY_SECRET);
+      return fetch(new Request(origin, { method: request.method, headers }));
     }
 
     return handler.fetch(request, env, ctx);

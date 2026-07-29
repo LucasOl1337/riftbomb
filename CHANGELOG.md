@@ -8,8 +8,8 @@
 - Changed arena bombs from unconditional instant elimination to 35 damage.
 - Added exact P1 and P2 health readouts and critical-health signaling.
 - Preserved existing champion damage and healing through a documented legacy-value compatibility boundary.
-- Added the canonical combat and balance reference in [`docs/combat-system.md`](docs/combat-system.md).
-- Added implementation notes in [`PatchNotes/patch-note-2026-07-28-combat-hp.md`](PatchNotes/patch-note-2026-07-28-combat-hp.md).
+- Added the canonical combat and balance reference in [`game/combat-system.md`](game/combat-system.md).
+- Added implementation notes in [`game/patch-note-2026-07-28-combat-hp.md`](game/patch-note-2026-07-28-combat-hp.md).
 
 ### Release v1.2.0
 

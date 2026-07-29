@@ -5,6 +5,32 @@
     let game;
     let lastFrame = performance.now();
     let guidePausedGame = false;
+    let selectedLocalPlayer = 1;
+
+    function updatePlayerSelector(playerId) {
+      selectedLocalPlayer = playerId === 2 ? 2 : 1;
+      UI.playerSelectorButtons.forEach((button) => {
+        const selected = Number(button.dataset.selectPlayer) === selectedLocalPlayer;
+        button.setAttribute("aria-pressed", String(selected));
+      });
+      if (UI.playerConfigLabel) UI.playerConfigLabel.textContent = `P${selectedLocalPlayer} / UNIT`;
+      const champion = selectedLocalPlayer === 2 ? game.selectedChampion2 : game.selectedChampion;
+      game.presentation.selectChampion(champion, selectedLocalPlayer);
+    }
+
+    function configurePlayerView(playerId = 1, options = {}) {
+      const localPlayerId = playerId === 2 ? 2 : 1;
+      const shared = Boolean(options.shared);
+      const localMultiplayer = Boolean(options.localMultiplayer);
+      game.localPlayerId = localPlayerId;
+      renderer?.setViewPlayer(shared ? 0 : localPlayerId);
+      document.body.classList.toggle("is-local-multiplayer", localMultiplayer);
+      const local = game.players.find((player) => player.id === localPlayerId);
+      if (local) game.presentation.selectChampion(local.champion, localPlayerId);
+      game.presentation.update(game);
+    }
+
+    globalThis.configurePlayerView = configurePlayerView;
 
     function frame(now) {
       const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
@@ -20,8 +46,8 @@
     async function beginGame() {
       UI.start.disabled = true;
       UI.start.textContent = "Loading selected arena…";
+      void sfx.start().catch((error) => console.warn("Audio will resume after player input:", error));
       const assetResults = await Promise.allSettled([
-        sfx.start(),
         renderer.ensureChampionModels(game.players.map((player) => player.champion)),
         renderer.arenaTexturesReady
       ]);
@@ -32,15 +58,121 @@
       }
       UI.start.textContent = "Arena ready";
       game.start();
+      if (game.p2Human) configurePlayerView(1, { shared: true, localMultiplayer: true });
       UI.intro.classList.add("is-gone");
       UI.chrome.classList.remove("is-hidden");
       UI.chrome.setAttribute("aria-hidden", "false");
       UI.chrome.removeAttribute("inert");
       UI.start.disabled = false;
       const arenaName = game.arenaTemplate().label;
-      UI.live.textContent = game.player.champion !== "ziggs"
-        ? `Rift Bomber · ${arenaName}. ${game.player.name} uses WASD, Q/F/E/R and Space. Red Ziggs uses arrows and Enter.`
-        : `Rift Bomber · ${arenaName}. Blue Ziggs uses WASD, Q and Shift. Red Ziggs uses arrows and Enter.`;
+      UI.live.textContent = `Rift Bomber · ${arenaName}. P1 uses WASD, Q/F/E/R and Space. P2 uses arrows, J/K/L/; and Enter.`;
+      await enterMatchPresentation();
+    }
+
+    function isCoarseOrPhone() {
+      return window.matchMedia("(pointer: coarse)").matches
+        || window.matchMedia("(hover: none)").matches
+        || Math.min(window.innerWidth, window.innerHeight) <= 520;
+    }
+
+    function isPortrait() {
+      return window.matchMedia("(orientation: portrait)").matches
+        || window.innerHeight > window.innerWidth;
+    }
+
+    function updateLandscapeGate() {
+      const gate = document.getElementById("landscape-gate");
+      if (!gate) return;
+      const matchActive = document.documentElement.classList.contains("is-match-active");
+      const show = matchActive && isCoarseOrPhone() && isPortrait();
+      gate.hidden = !show;
+      gate.setAttribute("aria-hidden", String(!show));
+      document.documentElement.classList.toggle("needs-landscape", show);
+      if (show) {
+        if (game?.mode === "playing" && !game.paused) {
+          game.togglePause(true);
+          gate.dataset.pausedForRotate = "1";
+        }
+      } else if (gate.dataset.pausedForRotate === "1") {
+        gate.dataset.pausedForRotate = "0";
+        if (game?.mode === "playing" && game.paused) game.togglePause(false);
+      }
+    }
+
+    async function lockLandscapeOrientation() {
+      try {
+        const root = document.documentElement;
+        if (!document.fullscreenElement) {
+          if (root.requestFullscreen) {
+            await root.requestFullscreen({ navigationUI: "hide" });
+          } else if (root.webkitRequestFullscreen) {
+            await root.webkitRequestFullscreen();
+          }
+        }
+      } catch {
+        // Fullscreen is best-effort; iOS Safari often blocks it.
+      }
+      try {
+        const orientation = screen.orientation;
+        if (orientation?.lock) await orientation.lock("landscape");
+      } catch {
+        // Orientation lock requires fullscreen/PWA on many browsers.
+      }
+    }
+
+    async function enterMatchPresentation() {
+      document.documentElement.classList.add("is-match-active");
+      document.body.classList.add("is-match-active");
+      // Online lobby banner must never sit over mobile skills.
+      const onlineBanner = document.querySelector(".online-connection");
+      if (onlineBanner) {
+        onlineBanner.hidden = true;
+        onlineBanner.textContent = "";
+      }
+      document.querySelector(".online-panel")?.setAttribute("hidden", "");
+      // fluid-bg is a second WebGL surface — kill it during match on phones.
+      const fluid = document.querySelector("fluid-bg");
+      if (fluid) {
+        fluid.style.display = "none";
+        fluid.setAttribute("hidden", "");
+        try { fluid.remove(); } catch { /* keep hidden if removal is blocked */ }
+      }
+      document.querySelector(".fx-grain")?.setAttribute("hidden", "");
+      await lockLandscapeOrientation();
+      updateLandscapeGate();
+      // Canvas size can change after rotate/fullscreen.
+      try { renderer?.resize?.(); } catch {}
+    }
+
+    async function leaveMatchPresentation() {
+      document.documentElement.classList.remove("is-match-active", "needs-landscape");
+      document.body.classList.remove("is-match-active");
+      const gate = document.getElementById("landscape-gate");
+      if (gate) {
+        gate.hidden = true;
+        gate.setAttribute("aria-hidden", "true");
+        gate.dataset.pausedForRotate = "0";
+      }
+      try { screen.orientation?.unlock?.(); } catch {}
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+      } catch {}
+    }
+
+    function setupLandscapeGate() {
+      const gateAction = document.getElementById("landscape-gate-action");
+      gateAction?.addEventListener("click", async () => {
+        await lockLandscapeOrientation();
+        updateLandscapeGate();
+        try { renderer?.resize?.(); } catch {}
+      });
+      const refresh = () => {
+        updateLandscapeGate();
+        try { renderer?.resize?.(); } catch {}
+      };
+      addEventListener("orientationchange", () => setTimeout(refresh, 80));
+      addEventListener("resize", refresh);
+      screen.orientation?.addEventListener?.("change", refresh);
     }
 
     function openGuide() {
@@ -58,19 +190,23 @@
 
     function setupInput() {
       addEventListener("keydown", (event) => {
+        if (game.mode === "playing") void sfx.start().catch(() => {});
         if (UI.guide.open) {
           if (event.code === "KeyH") closeGuide();
           return;
         }
         const gameKeys = [
           "KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyF", "KeyE", "KeyR",
+          "KeyJ", "KeyK", "KeyL", "Semicolon", "Numpad1", "Numpad2", "Numpad3", "Numpad4",
           "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "Enter",
           "Numpad0", "ShiftLeft", "ShiftRight"
         ];
         if (gameKeys.includes(event.code) && game.mode === "playing") event.preventDefault();
-        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Numpad0", "ShiftRight"].includes(event.code)
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", "Numpad0", "ShiftRight",
+          "KeyJ", "KeyK", "KeyL", "Semicolon", "Numpad1", "Numpad2", "Numpad3", "Numpad4"].includes(event.code)
           && game.mode === "playing") {
           game.activatePlayerTwo();
+          configurePlayerView(1, { shared: true, localMultiplayer: true });
         }
         game.keys.add(event.code);
         if (event.repeat) return;
@@ -82,48 +218,128 @@
         else if (event.code === "ShiftLeft") game.castAbility(1);
         else if (event.code === "Enter" || event.code === "Numpad0") game.placeBomb(game.players[1]);
         else if (event.code === "ShiftRight") game.requestDash(game.players[1]);
+        else if (["KeyJ", "Numpad1"].includes(event.code)) game.castAbility(0, game.players[1]);
+        else if (["KeyK", "Numpad2"].includes(event.code)) game.castAbility(1, game.players[1]);
+        else if (["KeyL", "Numpad3"].includes(event.code)) game.castAbility(2, game.players[1]);
+        else if (["Semicolon", "Numpad4"].includes(event.code)) game.castAbility(3, game.players[1]);
         else if (event.code === "KeyP") game.togglePause();
         else if (event.code === "KeyH") openGuide();
       });
       addEventListener("keyup", (event) => game.keys.delete(event.code));
+      addEventListener("pointerdown", () => {
+        if (game.mode === "playing") void sfx.start().catch(() => {});
+      }, { passive: true });
+      addEventListener("wheel", (event) => {
+        if (!document.body.classList.contains("is-online-match") || game.mode !== "playing") return;
+        event.preventDefault();
+        const zoom = renderer.adjustViewZoom(event.deltaY < 0 ? 0.1 : -0.1);
+        UI.live.textContent = `Camera zoom · ${Math.round((zoom / 1.35) * 100)}%`;
+      }, { passive: false });
       addEventListener("blur", () => {
         game.keys.clear();
         game.touchDirs.clear();
+        resetTouchStick();
       });
 
-      $$(".touch-key[data-dir]").forEach((button) => {
-        const dir = button.dataset.dir;
-        const down = (event) => {
-          event.preventDefault();
-          button.setPointerCapture?.(event.pointerId);
-          game.touchDirs.add(dir);
-        };
-        const up = () => game.touchDirs.delete(dir);
-        button.addEventListener("pointerdown", down);
-        button.addEventListener("pointerup", up);
-        button.addEventListener("pointercancel", up);
-        button.addEventListener("lostpointercapture", up);
-      });
-      UI.touchBomb.addEventListener("pointerdown", (event) => {
+      setupTouchStick();
+      bindTouchAction(UI.touchBomb, () => game.placeBomb());
+      bindTouchAction(UI.touchQ, () => game.castAbility(0));
+      bindTouchAction(UI.touchDash, () => game.castAbility(1));
+      bindTouchAction(UI.touchMine, () => game.castAbility(2));
+      bindTouchAction(UI.touchUlt, () => game.castAbility(3));
+    }
+
+    function resetTouchStick() {
+      if (!game) return;
+      game.touchStick.x = 0;
+      game.touchStick.z = 0;
+      UI.touchStick?.classList.remove("is-active");
+      if (UI.touchStickKnob) UI.touchStickKnob.style.transform = "translate3d(0, 0, 0)";
+    }
+
+    function setupTouchStick() {
+      const stick = UI.touchStick;
+      const knob = UI.touchStickKnob;
+      if (!stick || !knob) return;
+
+      let activePointer = null;
+      const deadzone = 0.18;
+
+      const applyStick = (clientX, clientY) => {
+        const rect = stick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const maxRadius = Math.min(rect.width, rect.height) * 0.34;
+        let offsetX = clientX - centerX;
+        let offsetY = clientY - centerY;
+        const distance = Math.hypot(offsetX, offsetY);
+        if (distance > maxRadius && distance > 0) {
+          offsetX = (offsetX / distance) * maxRadius;
+          offsetY = (offsetY / distance) * maxRadius;
+        }
+        knob.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0)`;
+        // Screen Y grows down; arena forward (-Z) is stick up.
+        const nx = maxRadius > 0 ? offsetX / maxRadius : 0;
+        const nz = maxRadius > 0 ? offsetY / maxRadius : 0;
+        const magnitude = Math.hypot(nx, nz);
+        if (magnitude <= deadzone) {
+          game.touchStick.x = 0;
+          game.touchStick.z = 0;
+        } else {
+          game.touchStick.x = nx;
+          game.touchStick.z = nz;
+        }
+      };
+
+      stick.addEventListener("pointerdown", (event) => {
+        if (activePointer !== null) return;
         event.preventDefault();
-        game.placeBomb();
+        activePointer = event.pointerId;
+        stick.setPointerCapture?.(event.pointerId);
+        stick.classList.add("is-active");
+        applyStick(event.clientX, event.clientY);
+        if (game.mode === "playing") void sfx.start().catch(() => {});
       });
-      UI.touchDash.addEventListener("pointerdown", (event) => {
+
+      stick.addEventListener("pointermove", (event) => {
+        if (event.pointerId !== activePointer) return;
         event.preventDefault();
-        game.castAbility(1);
+        applyStick(event.clientX, event.clientY);
       });
-      UI.touchQ.addEventListener("pointerdown", (event) => {
+
+      const release = (event) => {
+        if (event && event.pointerId !== activePointer) return;
+        activePointer = null;
+        resetTouchStick();
+      };
+
+      // Listen at window capture phase so releasing a second finger cannot
+      // cancel the stick and a release outside its bounds can never leave it on.
+      addEventListener("pointerup", release, { capture: true });
+      addEventListener("pointercancel", release, { capture: true });
+      addEventListener("blur", () => release(), { passive: true });
+    }
+
+    function bindTouchAction(button, action) {
+      if (!button) return;
+      let activePointer = null;
+      const press = (event) => {
+        if (activePointer !== null) return;
         event.preventDefault();
-        game.castAbility(0);
-      });
-      UI.touchMine.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        game.castAbility(2);
-      });
-      UI.touchUlt.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        game.castAbility(3);
-      });
+        activePointer = event.pointerId;
+        button.classList.add("is-pressed");
+        if (game.mode === "playing") void sfx.start().catch(() => {});
+        action();
+      };
+      const unpress = (event) => {
+        if (event && event.pointerId !== activePointer) return;
+        activePointer = null;
+        button.classList.remove("is-pressed");
+      };
+      button.addEventListener("pointerdown", press);
+      addEventListener("pointerup", unpress, { capture: true });
+      addEventListener("pointercancel", unpress, { capture: true });
+      addEventListener("blur", () => unpress(), { passive: true });
     }
 
     const arenaPreviewTextures = new Map();
@@ -321,9 +537,16 @@
       };
       game = new Game(previewRenderer, sfx, new BrowserMatchPresentation());
       buildArenaPicker();
-      UI.championChoices.forEach((button) =>
-        button.addEventListener("click", () => game.selectChampion(button.dataset.champion))
-      );
+      UI.championChoices.forEach((button) => button.addEventListener("click", () => {
+        if (selectedLocalPlayer === 2) game.selectChampion2(button.dataset.champion);
+        else game.selectChampion(button.dataset.champion);
+        updatePlayerSelector(selectedLocalPlayer);
+      }));
+      UI.playerSelectorButtons.forEach((button) => button.addEventListener("click", () => {
+        const playerId = Number(button.dataset.selectPlayer) === 2 ? 2 : 1;
+        if (playerId === 2 && game.mode === "intro") game.activatePlayerTwo();
+        updatePlayerSelector(playerId);
+      }));
       try {
         renderer = new Renderer(UI.canvas);
         game.renderer = renderer;
@@ -359,6 +582,7 @@
         }
         UI.gpuLabel.textContent = `WebGL2 · ${renderer.ext ? "HDR" : "adaptive"}`;
         setupInput();
+        setupLandscapeGate();
         UI.start.addEventListener("click", beginGame);
         UI.restart.addEventListener("click", () => {
           UI.end.hidden = true;
@@ -366,6 +590,7 @@
           UI.chrome.setAttribute("aria-hidden", "false");
           UI.chrome.removeAttribute("inert");
           game.start();
+          void enterMatchPresentation();
         });
         UI.guideOpen.addEventListener("click", openGuide);
         UI.guideOpenIntro.addEventListener("click", openGuide);
@@ -380,6 +605,10 @@
         UI.dashAction.addEventListener("click", () => game.castAbility(1));
         UI.mineAction.addEventListener("click", () => game.castAbility(2));
         UI.ultAction.addEventListener("click", () => game.castAbility(3));
+        UI.playerTwoBombButton?.addEventListener("click", () => game.placeBomb(game.players[1]));
+        UI.playerTwoSkillButtons.forEach((button) => button.addEventListener("click", () => {
+          game.castAbility(Number(button.dataset.p2Slot), game.players[1]);
+        }));
         document.addEventListener("visibilitychange", () => {
           if (document.hidden && game.mode === "playing" && !game.paused) game.togglePause(true);
         });

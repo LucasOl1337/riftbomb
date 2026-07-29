@@ -1,0 +1,56 @@
+{
+  "controlsDisplay": "flex",
+  "stick": {
+    "x": 11.1875,
+    "y": 692.015625,
+    "width": 134.390625,
+    "height": 134.390625,
+    "top": 692.015625,
+    "right": 145.578125,
+    "bottom": 826.40625,
+    "left": 11.1875
+  },
+  "actions": {
+    "x": 212.421875,
+    "y": 660.015625,
+    "width": 166.390625,
+    "height": 166.390625,
+    "top": 660.015625,
+    "right": 378.8125,
+    "bottom": 826.40625,
+    "left": 212.421875
+  },
+  "buttons": [
+    {
+      "id": "touch-q",
+      "w": 57,
+      "h": 57,
+      "radius": "50%"
+    },
+    {
+      "id": "touch-dash",
+      "w": 57,
+      "h": 57,
+      "radius": "50%"
+    },
+    {
+      "id": "touch-mine",
+      "w": 57,
+      "h": 57,
+      "radius": "50%"
+    },
+    {
+      "id": "touch-ult",
+      "w": 57,
+      "h": 57,
+      "radius": "50%"
+    },
+    {
+      "id": "touch-bomb",
+      "w": 70,
+      "h": 70,
+      "radius": "50%"
+    }
+  ],
+  "stickHasKnob": true
+}

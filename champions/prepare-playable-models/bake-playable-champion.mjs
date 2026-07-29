@@ -24,71 +24,70 @@ if (!requestedChampion || !inputPath || !outputDirectory) {
 
 const champion = requestedChampion.toLowerCase();
 const fixedConfigs = {
+  katarina: {
+    displayName: "Katarina",
+    targetHeight: 2.08,
+    runtime: "vat-v1",
+    sourceUrl: "https://cdn.modelviewer.lol/lol/models/katarina/55000/model.glb",
+    actions: {
+      idle: "Idle1", run: "Run1", attack: "Attack1",
+      q: "Spell1", w: "Spell2", e: "Spell3", r: "Spell4"
+    }
+  },
   zed: {
     displayName: "Zed",
     targetHeight: 2.05,
-    poses: [
-      ["zed_idle1", 0.0], ["zed_idle1", 0.72],
-      ["zed_run", 0.0], ["zed_run", 0.45],
-      ["zed_spell3", 0.35], ["zed_spell4_leadin", 0.72]
-    ],
-    normalIdle: ["zed_idle1", 0.0],
-    normalSkill: ["zed_spell4_leadin", 0.72]
+    runtime: "vat-v1",
+    sourceUrl: "https://cdn.modelviewer.lol/lol/models/zed/238000/model.glb",
+    // Shadow-clone / ult clips inject skinned outliers that wreck raw min/max.
+    robustGround: true,
+    actions: {
+      idle: "Zed_idle1.anm", run: "Zed_run.anm", attack: "Zed_attack1.anm",
+      q: "Zed_spell1.anm", w: "Zed_spell2_cast.anm", e: "Zed_spell3.anm",
+      r: "Spell4", rStrike: "Spell4_Strike"
+    }
   },
   renekton: {
     displayName: "Renekton",
     targetHeight: 2.2,
-    poses: [
-      ["renekton_idle1", 0.0], ["renekton_idle1", 0.72],
-      ["renekton_run", 0.0], ["renekton_run", 0.12],
-      ["renekton_spell1", 0.35], ["renekton_spell4", 0.52]
-    ],
-    normalIdle: ["renekton_idle1", 0.0],
-    normalSkill: ["renekton_spell4", 0.52]
+    runtime: "vat-v1",
+    sourceUrl: "https://cdn.modelviewer.lol/lol/models/renekton/58000/model.glb",
+    actions: {
+      idle: "Idle1", run: "Run", attack: "Attack1",
+      q: "Spell1", w: "Spell2", e: "Spell3", r: "Spell4"
+    }
   },
   vladimir: {
     displayName: "Vladimir",
     targetHeight: 2.08,
     runtime: "vat-v1",
-    animations: [
-      { key: "idle", name: "vladimir_idle1", frameCount: 8, loop: true },
-      { key: "run", name: "vladimir_run", frameCount: 10, loop: true },
-      { key: "attack", name: "vladimir_attack1", frameCount: 6, loop: false },
-      { key: "q", name: "vladimir_spell1", frameCount: 8, loop: false },
-      { key: "poolDown", name: "vladimir_spell2_down", frameCount: 6, loop: false },
-      { key: "poolUp", name: "vladimir_spell2_up", frameCount: 6, loop: false },
-      { key: "e", name: "vladimir_spell3_cast", frameCount: 8, loop: false },
-      { key: "r", name: "vladimir_spell4", frameCount: 8, loop: false }
-    ],
-    poses: [
-      ["vladimir_idle1", 0.0], ["vladimir_idle1", 0.74],
-      ["vladimir_run", 0.0], ["vladimir_run", 0.62],
-      ["vladimir_spell1", 0.58], ["vladimir_spell4", 0.48]
-    ],
-    normalIdle: ["vladimir_idle1", 0.0],
-    normalSkill: ["vladimir_spell4", 0.48]
+    sourceUrl: "https://cdn.modelviewer.lol/lol/models/vladimir/8000/model.glb",
+    actions: {
+      idle: "Idle1", run: "Run", attack: "Attack1", q: "Spell1",
+      pool: "Spell2", poolDown: "Spell2Down", poolUp: "Spell2Up",
+      e: "Vladimir_spell3_cast.anm", r: "Spell4"
+    }
   },
   gangplank: {
     displayName: "Gangplank",
     targetHeight: 2.12,
-    // Khada glTF clip names. Prefer standing-height frames (Idle has deep outlier verts).
-    poses: [
-      ["Idle1", 0.0], ["Idle1", 0.55],
-      ["Run_Haste", 0.12], ["Run_Haste", 0.4],
-      ["Gangplank_spell1.anm", 0.55], ["Gangplank_spell4.anm", 0.35]
-    ],
-    normalIdle: ["Idle1", 0.0],
-    normalSkill: ["Gangplank_spell4.anm", 0.35],
+    runtime: "vat-v1",
+    sourceUrl: "https://cdn.modelviewer.lol/lol/models/gangplank/41000/model.glb",
+    actions: {
+      idle: "Idle1", run: "Run_Haste", attack: "Attack1",
+      q: "Gangplank_spell1.anm", w: "Gangplank_Spell2.anm",
+      e: "Gangplank_spell3.anm", r: "Gangplank_spell4.anm"
+    },
     // Do NOT invertUvV: upload already uses UNPACK_FLIP_Y (same as Katarina/Renekton).
     // invertUvV + flip double-samples the atlas and turns GP into a dark leather blob.
     invertUvV: false,
     // Absolute minY on Idle includes skinned outliers ~1.7u under the feet — use percentiles.
     robustGround: true,
-    sourceLabel: "Khada Gangplank GLB (Skin07 body mesh + clips; crate mesh excluded)"
+    sourceLabel: "Khada Model Viewer Gangplank base GLB (body mesh + all clips; crate excluded)"
   }
 };
 
-if (champion !== "katarina" && !fixedConfigs[champion]) {
+if (!fixedConfigs[champion]) {
   throw new Error(`Unsupported champion: ${requestedChampion}`);
 }
 
@@ -99,18 +98,7 @@ const gltf = await new Promise((resolve, reject) => {
 });
 const clips = new Map(gltf.animations.map((clip) => [clip.name, clip]));
 
-const lotusPoseTime = clips.has("spell4") ? 1.2 : 0.4;
-const config = champion === "katarina" ? {
-  displayName: "Katarina",
-  targetHeight: 2.08,
-  poses: [
-    ["katarina_idle1", 0.0], ["katarina_idle1", 0.47],
-    ["katarina_run", 0.0], ["katarina_run", 0.4],
-    ["grounded_cast_from_idle_b", 0.0], ["katarina_spell4", lotusPoseTime]
-  ],
-  normalIdle: ["katarina_idle1", 0.0],
-  normalSkill: ["katarina_spell4", lotusPoseTime]
-} : fixedConfigs[champion];
+const config = fixedConfigs[champion];
 
 const meshes = [];
 gltf.scene.traverse((node) => {
@@ -128,8 +116,7 @@ gltf.scene.traverse((node) => {
 });
 if (!meshes.length) throw new Error(`No playable ${config.displayName} skinned meshes found`);
 
-const usesBattleQueenAtlas = champion === "katarina" &&
-  meshes.some((mesh) => mesh.material?.name === "Main_Mat");
+const usesBattleQueenAtlas = false;
 const resolveClipName = (name) => {
   if (champion === "katarina") {
     return [name, name.replace(/^katarina_/, "")].find((candidate) => clips.has(candidate));
@@ -233,13 +220,35 @@ const sampleSmoothNormals = (name, time) => {
 };
 
 if (config.runtime === "vat-v1") {
-  const animationSpecs = config.animations.map((spec) => {
-    const actualName = resolveClipName(spec.name);
-    const clip = clips.get(actualName);
-    if (!clip) throw new Error(`Missing animation clip: ${spec.name}`);
-    return { ...spec, actualName, clip };
+  const coreFrameCounts = {
+    idle: 8, run: 10, attack: 6, q: 8, w: 8, e: 8, r: 8,
+    rStrike: 6, pool: 8, poolDown: 6, poolUp: 6
+  };
+  const actionBySource = new Map(
+    Object.entries(config.actions).map(([action, source]) => [source, action])
+  );
+  for (const [action, source] of Object.entries(config.actions)) {
+    if (!clips.has(source)) throw new Error(`Missing ${action} animation clip: ${source}`);
+  }
+  const orderedClips = [
+    clips.get(config.actions.idle),
+    ...gltf.animations.filter((clip) => clip.name !== config.actions.idle)
+  ];
+  const animationSpecs = orderedClips.map((clip) => {
+    const action = actionBySource.get(clip.name);
+    const loop = action === "idle" || action === "run" ||
+      /(?:idle|run|loop|dance|laugh|taunt|joke)/i.test(clip.name);
+    const supportingFrameCount = Math.max(4, Math.min(8, Math.round(clip.duration * 2)));
+    return {
+      key: clip.name,
+      name: clip.name,
+      actualName: clip.name,
+      clip,
+      frameCount: action ? coreFrameCounts[action] : supportingFrameCount,
+      loop
+    };
   });
-  const referencePositions = samplePose(animationSpecs[0].name, 0);
+  const referencePositions = samplePose(config.actions.idle, 0);
   let sourceHeight = 0;
   for (const positions of referencePositions) {
     for (let index = 1; index < positions.length; index += 3) {
@@ -250,6 +259,32 @@ if (config.runtime === "vat-v1") {
   const positionFrames = [];
   const normalFrames = [];
   const animationClips = {};
+
+  const clampSpatialOutliers = (meshPositions) => {
+    const samples = [[], [], []];
+    for (const values of meshPositions) {
+      for (let index = 0; index < values.length; index += 3) {
+        for (let axis = 0; axis < 3; axis += 1) samples[axis].push(values[index + axis]);
+      }
+    }
+    const limits = samples.map((values) => {
+      values.sort((a, b) => a - b);
+      const low = percentile(values, 0.005);
+      const high = percentile(values, 0.995);
+      const span = Math.max(1e-4, high - low);
+      return [low - span * 2, high + span * 2];
+    });
+    for (const values of meshPositions) {
+      for (let index = 0; index < values.length; index += 3) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          values[index + axis] = Math.max(
+            limits[axis][0],
+            Math.min(limits[axis][1], values[index + axis])
+          );
+        }
+      }
+    }
+  };
 
   for (const spec of animationSpecs) {
     const startFrame = positionFrames.length;
@@ -262,10 +297,11 @@ if (config.runtime === "vat-v1") {
           meshPositions[index] *= unitScale;
         }
       }
+      clampSpatialOutliers(positions);
       positionFrames.push(positions);
       normalFrames.push(sampleSmoothNormals(spec.name, sampleTime));
     }
-    animationClips[spec.key] = {
+      animationClips[spec.key] = {
       source: spec.actualName,
       startFrame,
       frameCount: spec.frameCount,
@@ -281,21 +317,68 @@ if (config.runtime === "vat-v1") {
   const indexCount = meshes.reduce((sum, mesh) => sum + mesh.geometry.index.count, 0);
   if (vertexCount >= 65536) throw new Error("Model exceeds Uint16 index range");
 
-  const positionMin = [Infinity, Infinity, Infinity];
-  const positionMax = [-Infinity, -Infinity, -Infinity];
-  for (const frame of positionFrames) {
+  // Build VAT bounds from the idle clip only, then pad for combat motion.
+  // Zed Q/W/R (and several supporting clips) leave whole vertex islands at
+  // ±1e4 after skinning — including them in min/max collapses the body.
+  const idleClip = animationClips[config.actions.idle] ||
+    animationClips[Object.keys(animationClips).find((key) => /idle/i.test(key)) || ""];
+  const axisSamples = [[], [], []];
+  const idleFrameCount = idleClip ? idleClip.frameCount : 1;
+  const idleStart = idleClip ? idleClip.startFrame : 0;
+  for (let frameOffset = 0; frameOffset < idleFrameCount; frameOffset += 1) {
+    const frame = positionFrames[idleStart + frameOffset];
     for (const meshPositions of frame) {
       for (let index = 0; index < meshPositions.length; index += 3) {
         for (let axis = 0; axis < 3; axis += 1) {
-          positionMin[axis] = Math.min(positionMin[axis], meshPositions[index + axis]);
-          positionMax[axis] = Math.max(positionMax[axis], meshPositions[index + axis]);
+          axisSamples[axis].push(meshPositions[index + axis]);
         }
       }
     }
   }
+  const positionMin = [0, 0, 0];
+  const positionMax = [0, 0, 0];
+  const height = config.targetHeight || 2;
+  for (let axis = 0; axis < 3; axis += 1) {
+    const values = axisSamples[axis];
+    values.sort((a, b) => a - b);
+    const low = percentile(values, 0.01);
+    const high = percentile(values, 0.99);
+    const center = (low + high) * 0.5;
+    const half = Math.max((high - low) * 0.5, height * (axis === 1 ? 0.15 : 0.2));
+    // Idle box padded so run/attack still fit; hard-cap so one exploded prop
+    // cannot re-open a multi-kilometer range.
+    const pad = axis === 1 ? height * 0.35 : height * 0.85;
+    positionMin[axis] = Math.max(center - half - pad, low - pad);
+    positionMax[axis] = Math.min(center + half + pad, high + pad);
+  }
+  // Keep feet near the idle contact plane.
+  const foot = percentile(axisSamples[1], 0.02);
+  positionMin[1] = Math.min(positionMin[1], foot - height * 0.05);
+  positionMax[1] = Math.max(positionMax[1], percentile(axisSamples[1], 0.99) + height * 0.2);
+  // Absolute safety cap relative to idle center (stops any residual runaway).
+  const idleCenter = axisSamples.map((values) => percentile(values, 0.5));
+  positionMin[0] = Math.max(positionMin[0], idleCenter[0] - height * 1.6);
+  positionMax[0] = Math.min(positionMax[0], idleCenter[0] + height * 1.6);
+  positionMin[1] = Math.max(positionMin[1], idleCenter[1] - height * 1.2);
+  positionMax[1] = Math.min(positionMax[1], idleCenter[1] + height * 1.4);
+  positionMin[2] = Math.max(positionMin[2], idleCenter[2] - height * 1.6);
+  positionMax[2] = Math.min(positionMax[2], idleCenter[2] + height * 1.6);
   const positionRange = positionMax.map((maximum, axis) =>
     Math.max(1e-6, maximum - positionMin[axis])
   );
+  // Re-clamp every sample into the robust global box before quantization.
+  for (const frame of positionFrames) {
+    for (const meshPositions of frame) {
+      for (let index = 0; index < meshPositions.length; index += 3) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          meshPositions[index + axis] = Math.max(
+            positionMin[axis],
+            Math.min(positionMax[axis], meshPositions[index + axis]),
+          );
+        }
+      }
+    }
+  }
 
   const frameCount = positionFrames.length;
   const quantizedPositions = new Uint16Array(frameCount * vertexCount * 4);
@@ -346,15 +429,20 @@ if (config.runtime === "vat-v1") {
   }
 
   const skeletonBoneCount = Math.max(...meshes.map((mesh) => mesh.skeleton.bones.length));
-  const animationDiagnostics = animationSpecs.map((spec) => ({
-    requestedName: spec.name,
-    actualName: spec.actualName,
-    duration: spec.clip.duration,
-    trackCount: spec.clip.tracks.length,
-    coverage: spec.clip.tracks.length / Math.max(1, skeletonBoneCount * 3)
-  }));
+  const animationDiagnostics = animationSpecs.map((spec) => {
+    const animatedNodes = new Set(spec.clip.tracks.map((track) =>
+      track.name.replace(/\.(?:position|quaternion|scale)$/, "")
+    ));
+    return {
+      requestedName: spec.name,
+      actualName: spec.actualName,
+      duration: spec.clip.duration,
+      trackCount: spec.clip.tracks.length,
+      coverage: animatedNodes.size / Math.max(1, skeletonBoneCount)
+    };
+  });
   const source = config.sourceLabel ||
-    `Classic ${config.displayName} game mesh and matching base rig`;
+    `Khada Model Viewer ${config.displayName} base GLB with all animation clips`;
 
   await fs.mkdir(outputDirectory, { recursive: true });
   await Promise.all([
@@ -376,7 +464,9 @@ if (config.runtime === "vat-v1") {
     ),
     fs.writeFile(path.join(outputDirectory, `${champion}-model-metadata.json`), JSON.stringify({
       runtime: config.runtime,
+      completeClipCatalog: true,
       source,
+      sourceUrl: config.sourceUrl,
       unitScale,
       vertexCount,
       indexCount,
@@ -387,6 +477,7 @@ if (config.runtime === "vat-v1") {
       materials: meshes.map((mesh) => mesh.material?.name ?? "unknown"),
       skeletonBoneCount,
       animationDiagnostics,
+      animationActions: config.actions,
       animationClips
     }, null, 2))
   ]);

@@ -31,6 +31,13 @@ test("loads the online duel layer into the reconstructed game", async () => {
   assert.doesNotMatch(page, /<script>[\s\S]*<\/script>/);
 });
 
+test("uses one authoritative WebSocket transport", async () => {
+  const duel = await readFile(new URL("public/online-duel.js", root), "utf8");
+
+  assert.match(duel, /new WebSocket\(AUTHORITATIVE_SERVER_URL\)/);
+  assert.doesNotMatch(duel, /RTCPeerConnection|iceGatheringState|state\.inputChannel|state\.snapshots/);
+});
+
 test("packages every web part behind a self-consistent dynamic manifest", async () => {
   const partsDirectory = new URL("public/riftbomb-parts/", root);
   const manifest = JSON.parse(
@@ -69,13 +76,15 @@ test("keeps arena WebP files out of the initial online payload", async () => {
   assert.match(game, /\/arena-textures\/crate\.webp/);
 
   const textures = [
-    ["game/Assets/textures/crates/crate-albedo.webp", "crate.webp"],
-    ["game/Assets/textures/crates/crate-top-albedo.webp", "crate-top.webp"],
-    ["game/Assets/textures/ground/floor-lattice.webp", "floor-lattice.webp"],
-    ["game/Assets/textures/ground/floor-clearing.webp", "floor-clearing.webp"],
-    ["game/Assets/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
-    ["game/Assets/textures/walls/wall-lattice.webp", "wall.webp"],
-    ["game/Assets/textures/walls/wall-top-lattice.webp", "wall-top.webp"],
+    ["game/arena-appearance/textures/crates/crate-albedo.webp", "crate.webp"],
+    ["game/arena-appearance/textures/crates/crate-top-albedo.webp", "crate-top.webp"],
+    ["game/arena-appearance/textures/ground/floor-lattice.webp", "floor-lattice.webp"],
+    ["game/arena-appearance/textures/ground/floor-clearing.webp", "floor-clearing.webp"],
+    ["game/arena-appearance/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
+    ["game/arena-appearance/textures/ground/floor-forts.webp", "floor-forts.webp"],
+    ["game/arena-appearance/textures/ground/floor-pit.webp", "floor-pit.webp"],
+    ["game/arena-appearance/textures/walls/wall-lattice.webp", "wall.webp"],
+    ["game/arena-appearance/textures/walls/wall-top-lattice.webp", "wall-top.webp"],
   ];
   assert.equal(
     (game.match(/\/arena-textures\/[^"]+\.webp/g) || []).length,
@@ -150,22 +159,68 @@ test("loads only the playable champion models selected in the lobby", async () =
       const normals = await readFile(
         new URL(`${modelDirectory}/${champion}-model-normals.bin`, root),
       );
-      assert.deepEqual(Buffer.from(payload.frames, "base64"), frames);
-      assert.deepEqual(Buffer.from(payload.normals, "base64"), normals);
+      // Online ships VAT pose data as separate .bin assets (Workers 25 MiB/file cap).
+      assert.equal(payload.frames, undefined);
+      assert.equal(payload.normals, undefined);
+      assert.equal(payload.framesUrl, `/champion-models/${champion}-frames.bin`);
+      assert.equal(payload.normalsUrl, `/champion-models/${champion}-normals.bin`);
+      const packedFrames = await readFile(
+        new URL(`public/champion-models/${champion}-frames.bin`, root),
+      );
+      const packedNormals = await readFile(
+        new URL(`public/champion-models/${champion}-normals.bin`, root),
+      );
+      assert.deepEqual(packedFrames, frames);
+      assert.deepEqual(packedNormals, normals);
+      assert.ok(script.length < 25 * 1024 * 1024, `${champion}.js must stay under Workers asset limit`);
+      assert.ok(packedFrames.byteLength < 25 * 1024 * 1024);
+      assert.ok(packedNormals.byteLength < 25 * 1024 * 1024);
       assert.equal(payload.animation.runtime, "vat-v1");
       assert.equal(payload.animation.frameCount, metadata.frameCount);
+      assert.ok(payload.animation.actions, `${champion} must ship animation.actions`);
+      assert.deepEqual(payload.animation.actions, metadata.animationActions);
+      assert.ok(payload.animation.clips, `${champion} must ship animation.clips`);
     }
   }
 });
 
-test("ships host-authoritative room and snapshot behavior", async () => {
+test("ships server-authoritative room and snapshot behavior", async () => {
   const client = await readFile(new URL("public/online-duel.js", root), "utf8");
-  assert.match(client, /RTCPeerConnection/);
+  const server = await readFile(new URL("server/src/server.mjs", root), "utf8");
+  const rooms = await readFile(new URL("server/src/authoritative-rooms.mjs", root), "utf8");
+  const worker = await readFile(new URL("worker/index.ts", root), "utf8");
+  const adapter = await readFile(new URL("..\/game\/create-authoritative-duel.mjs", root), "utf8");
+  assert.match(client, /AUTHORITATIVE_SERVER_URL/);
+  assert.match(client, /connectAuthoritative/);
+  assert.match(client, /new WebSocket/);
   assert.match(client, /action: "create"/);
-  assert.match(client, /SNAPSHOT_INTERVAL/);
   assert.match(client, /state\.role === "guest"/);
   assert.match(client, /game\.p2Human = false/);
   assert.match(client, /ensureChampionModels\(\[state\.hostChampion, state\.guestChampion\]\)/);
+  assert.match(client, /configurePlayerView\?\.\(state\.role === "guest" \? 2 : 1/);
+  assert.match(client, /const abilityKeys = \{ KeyQ: 0, KeyF: 1, KeyE: 2, KeyR: 3 \}/);
+  assert.match(client, /guestAction\("ability", abilityKeys\[event\.code\]\)/);
+  assert.match(client, /CREATE CHALLENGE LINK/);
+  assert.match(client, /INVITE_MATCH_TARGET = 10/);
+  assert.match(client, /url\.searchParams\.set\("p1", state\.hostChampion\)/);
+  assert.match(client, /url\.searchParams\.set\("p2", state\.guestChampion\)/);
+  assert.match(client, /setTimeout\(\(\) => joinRoom\(parentRoom\.toUpperCase\(\)/);
+  assert.match(client, /function startOnlineMatch/);
+  assert.match(client, /type === "rematch"/);
+  assert.match(client, /shareReady/);
+  assert.match(client, /matchTarget: state\.matchTarget/);
+  assert.match(client, /function interpolateRemoteHost/);
+  assert.match(client, /pendingGuestBombs\.push/);
+  assert.match(client, /game\.placeBomb\(guest\)/);
+  assert.match(rooms, /TICK_RATE = 60/);
+  assert.match(rooms, /SNAPSHOT_RATE = 30/);
+  assert.match(rooms, /createAuthoritativeDuel/);
+  assert.match(server, /x-riftbomb-proxy/);
+  assert.match(server, /type: "ping"/);
+  assert.match(client, /type: "pong"/);
+  assert.match(worker, /url\.pathname === "\/game-ws"/);
+  assert.match(worker, /GAME_SERVER_PROXY_SECRET/);
+  assert.match(adapter, /run-champion-bomb-duel\.js/);
 });
 
 test("declares persistent signaling storage", async () => {
@@ -178,6 +233,8 @@ test("declares persistent signaling storage", async () => {
   assert.match(route, /CREATE TABLE IF NOT EXISTS pvp_rooms/);
   assert.match(route, /ROOM_LIFETIME_MS/);
   assert.match(route, /invalid_host_token/);
+  assert.match(route, /action === "publish-offer"/);
+  assert.match(route, /preparing: true/);
   assert.match(route, /let schemaReady: Promise<void> \| null = null/);
   assert.match(route, /if \(!schemaReady\)/);
   assert.equal(

@@ -1,6 +1,21 @@
 import fs from "node:fs/promises";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
+// GLTFLoader expects these browser globals even when we only inspect embedded
+// textures from Node. The image pixels are irrelevant to mesh/animation metadata.
+globalThis.self ??= globalThis;
+if (typeof globalThis.Image === "undefined") {
+  globalThis.Image = class Image {
+    set src(_value) {
+      queueMicrotask(() => {
+        this.width = 1;
+        this.height = 1;
+        this.onload?.();
+      });
+    }
+  };
+}
+
 const input = process.argv[2];
 if (!input) throw new Error("Usage: node inspect-game-model.mjs <model.glb>");
 

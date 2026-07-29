@@ -1,141 +1,315 @@
 {
-  "source": "Classic Renekton game mesh and matching base rig",
-  "unitScale": 0.018872496260134552,
+  "runtime": "vat-v1",
+  "completeClipCatalog": true,
+  "source": "Khada Model Viewer Renekton base GLB with all animation clips",
+  "sourceUrl": "https://cdn.modelviewer.lol/lol/models/renekton/58000/model.glb",
+  "unitScale": 2.220293782374381,
   "vertexCount": 5044,
   "indexCount": 22419,
-  "strideFloats": 26,
+  "strideFloats": 2,
+  "frameCount": 127,
+  "textureDimensions": [
+    5044,
+    127
+  ],
+  "positionBounds": {
+    "min": [
+      -2.5368075370788574,
+      -4.80894115639785e-8,
+      -4.290408611297607
+    ],
+    "max": [
+      3.1932339668273926,
+      6.307353496551514,
+      4.325793266296387
+    ],
+    "range": [
+      5.73004150390625,
+      6.307353544640925,
+      8.616201877593994
+    ]
+  },
   "materials": [
     "renekton_base_MD_02_lambert2"
   ],
   "skeletonBoneCount": 71,
   "animationDiagnostics": [
     {
-      "requestedName": "renekton_idle1",
-      "actualName": "renekton_idle1",
-      "duration": 3.1666667461395264,
+      "requestedName": "Idle1",
+      "actualName": "Idle1",
+      "duration": 3.1666650772094727,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "renekton_run",
-      "actualName": "renekton_run",
-      "duration": 0.774193525314331,
+      "requestedName": "Attack1",
+      "actualName": "Attack1",
+      "duration": 1.0999996662139893,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Attack2",
+      "actualName": "Attack2",
+      "duration": 1.1666662693023682,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Channel",
+      "actualName": "Channel",
+      "duration": 0.9677414894104004,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Channel_Wndup",
+      "actualName": "Channel_Wndup",
+      "duration": 0.9677414894104004,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Crit",
+      "actualName": "Crit",
+      "duration": 1.0000003576278687,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "renekton_spell1",
-      "actualName": "renekton_spell1",
-      "duration": 0.8387096524238586,
+      "requestedName": "Dance",
+      "actualName": "Dance",
+      "duration": 7.999993801116943,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Death",
+      "actualName": "Death",
+      "duration": 3.0666651725769043,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "renekton_spell4",
-      "actualName": "renekton_spell4",
-      "duration": 0.9677419066429138,
+      "requestedName": "Idle2",
+      "actualName": "Idle2",
+      "duration": 2.4999990463256836,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Idle3",
+      "actualName": "Idle3",
+      "duration": 5.4333295822143555,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Joke",
+      "actualName": "Joke",
+      "duration": 5.333329677581787,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Run",
+      "actualName": "Run",
+      "duration": 0.774193286895752,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell1",
+      "actualName": "Spell1",
+      "duration": 0.8387093544006348,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell2",
+      "actualName": "Spell2",
+      "duration": 1.100000262260437,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell2U",
+      "actualName": "Spell2U",
+      "duration": 1.3666666746139526,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell3",
+      "actualName": "Spell3",
+      "duration": 0.7419352531433105,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell4",
+      "actualName": "Spell4",
+      "duration": 0.9677414894104004,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Laugh",
+      "actualName": "Laugh",
+      "duration": 4.133330821990967,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Taunt",
+      "actualName": "Taunt",
+      "duration": 7.333327770233154,
       "trackCount": 213,
       "coverage": 1
     }
   ],
-  "poseSpecs": [
-    [
-      "renekton_idle1",
-      0
-    ],
-    [
-      "renekton_idle1",
-      0.72
-    ],
-    [
-      "renekton_run",
-      0
-    ],
-    [
-      "renekton_run",
-      0.12
-    ],
-    [
-      "renekton_spell1",
-      0.35
-    ],
-    [
-      "renekton_spell4",
-      0.52
-    ]
-  ],
-  "bounds": [
-    {
-      "min": [
-        -1.3572198152542114,
-        -9.919089993815078e-10,
-        -1.7968206405639648
-      ],
-      "max": [
-        1.3448491096496582,
-        2.200000047683716,
-        1.3252075910568237
-      ]
+  "animationActions": {
+    "idle": "Idle1",
+    "run": "Run",
+    "attack": "Attack1",
+    "q": "Spell1",
+    "w": "Spell2",
+    "e": "Spell3",
+    "r": "Spell4"
+  },
+  "animationClips": {
+    "Idle1": {
+      "source": "Idle1",
+      "startFrame": 0,
+      "frameCount": 8,
+      "duration": 3.1666650772094727,
+      "loop": true
     },
-    {
-      "min": [
-        -1.862773060798645,
-        -3.7338379610396544e-10,
-        -1.7272796630859375
-      ],
-      "max": [
-        1.3674566745758057,
-        2.264338493347168,
-        1.245319128036499
-      ]
+    "Attack1": {
+      "source": "Attack1",
+      "startFrame": 8,
+      "frameCount": 6,
+      "duration": 1.0999996662139893,
+      "loop": false
     },
-    {
-      "min": [
-        -1.2142367362976074,
-        1.4990101382394982e-9,
-        -1.6601624488830566
-      ],
-      "max": [
-        1.451690912246704,
-        2.1693363189697266,
-        1.5822546482086182
-      ]
+    "Attack2": {
+      "source": "Attack2",
+      "startFrame": 14,
+      "frameCount": 4,
+      "duration": 1.1666662693023682,
+      "loop": false
     },
-    {
-      "min": [
-        -1.202659249305725,
-        -5.193258600932893e-10,
-        -1.6804895401000977
-      ],
-      "max": [
-        1.3833616971969604,
-        1.9915900230407715,
-        1.6380363702774048
-      ]
+    "Channel": {
+      "source": "Channel",
+      "startFrame": 18,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
     },
-    {
-      "min": [
-        -2.030815362930298,
-        -1.7138921393211604e-8,
-        -0.6680213809013367
-      ],
-      "max": [
-        0.953405499458313,
-        2.6441643238067627,
-        3.6474361419677734
-      ]
+    "Channel_Wndup": {
+      "source": "Channel_Wndup",
+      "startFrame": 22,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
     },
-    {
-      "min": [
-        -1.2261238098144531,
-        2.0512162801633593e-10,
-        -1.0233510732650757
-      ],
-      "max": [
-        1.929165005683899,
-        2.6873862743377686,
-        1.3938485383987427
-      ]
+    "Crit": {
+      "source": "Crit",
+      "startFrame": 26,
+      "frameCount": 4,
+      "duration": 1.0000003576278687,
+      "loop": false
+    },
+    "Dance": {
+      "source": "Dance",
+      "startFrame": 30,
+      "frameCount": 8,
+      "duration": 7.999993801116943,
+      "loop": true
+    },
+    "Death": {
+      "source": "Death",
+      "startFrame": 38,
+      "frameCount": 6,
+      "duration": 3.0666651725769043,
+      "loop": false
+    },
+    "Idle2": {
+      "source": "Idle2",
+      "startFrame": 44,
+      "frameCount": 5,
+      "duration": 2.4999990463256836,
+      "loop": true
+    },
+    "Idle3": {
+      "source": "Idle3",
+      "startFrame": 49,
+      "frameCount": 8,
+      "duration": 5.4333295822143555,
+      "loop": true
+    },
+    "Joke": {
+      "source": "Joke",
+      "startFrame": 57,
+      "frameCount": 8,
+      "duration": 5.333329677581787,
+      "loop": true
+    },
+    "Run": {
+      "source": "Run",
+      "startFrame": 65,
+      "frameCount": 10,
+      "duration": 0.774193286895752,
+      "loop": true
+    },
+    "Spell1": {
+      "source": "Spell1",
+      "startFrame": 75,
+      "frameCount": 8,
+      "duration": 0.8387093544006348,
+      "loop": false
+    },
+    "Spell2": {
+      "source": "Spell2",
+      "startFrame": 83,
+      "frameCount": 8,
+      "duration": 1.100000262260437,
+      "loop": false
+    },
+    "Spell2U": {
+      "source": "Spell2U",
+      "startFrame": 91,
+      "frameCount": 4,
+      "duration": 1.3666666746139526,
+      "loop": false
+    },
+    "Spell3": {
+      "source": "Spell3",
+      "startFrame": 95,
+      "frameCount": 8,
+      "duration": 0.7419352531433105,
+      "loop": false
+    },
+    "Spell4": {
+      "source": "Spell4",
+      "startFrame": 103,
+      "frameCount": 8,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Laugh": {
+      "source": "Laugh",
+      "startFrame": 111,
+      "frameCount": 8,
+      "duration": 4.133330821990967,
+      "loop": true
+    },
+    "Taunt": {
+      "source": "Taunt",
+      "startFrame": 119,
+      "frameCount": 8,
+      "duration": 7.333327770233154,
+      "loop": true
     }
-  ]
+  }
 }

@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "bake": "node bake-playable-champion.mjs",
-    "check": "node check-pose-integrity.mjs"
+    "check": "node check-pose-integrity.mjs",
+    "import:modelviewer": "node import-modelviewer-roster.mjs"
   },
   "dependencies": {
     "three": "^0.179.1"

@@ -8,10 +8,11 @@ const trackedPaths = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" 
   .filter(Boolean);
 
 const isContentPath = (trackedPath) =>
-  trackedPath.startsWith("game/Assets/")
+  trackedPath.startsWith("game/arena-appearance/")
   || /^champions\/(?!prepare-playable-models\/)[^/]+\//.test(trackedPath);
 
-const isIndependentProjectPath = (trackedPath) => trackedPath.startsWith("online/");
+const isIndependentProjectPath = (trackedPath) =>
+  trackedPath.startsWith("online/") || trackedPath.startsWith(".github/");
 const isGeographyExempt = (trackedPath) =>
   isContentPath(trackedPath) || isIndependentProjectPath(trackedPath);
 
@@ -68,12 +69,13 @@ test("the product map exposes the game, every champion, and the course by name",
     "game/play-riftbomb.html",
     "game/run-champion-bomb-duel.js",
     "game/draw-bomber-rift.js",
+    "game/arena-appearance/package-arena-appearance.mjs",
     "game/play-rift-sfx.js",
     "champions/katarina/playable-model/katarina-model-metadata.json",
     "champions/zed/playable-model/zed-model-metadata.json",
     "champions/renekton/playable-model/renekton-model-metadata.json",
     "champions/vladimir/playable-model/vladimir-model-metadata.json",
-    "champions/ziggs/reconstruction/ziggs-spec.json",
+    "champions/gangplank/playable-model/gangplank-model-metadata.json",
     "architecture-course/course-map.html",
     "online/.openai/hosting.json",
     "online/app/api/pvp/route.ts",

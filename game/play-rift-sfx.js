@@ -316,10 +316,11 @@
         if (!this.ctx || this.ctx.state !== "running") return;
         const time = this.ctx.currentTime;
         const power = clamp(strength, 0.55, 1.25);
-        this.pulse(0.36 * power);
+        // Keep the blast shape; another ~50% cut so bombs sit under combat SFX.
+        this.pulse(0.09 * power);
         this.noiseBurst(time, {
           duration: 0.11,
-          gain: 0.3 * power,
+          gain: 0.075 * power,
           attack: 0.0015,
           filter: "highpass",
           frequency: 7600,
@@ -327,10 +328,10 @@
           drive: 22,
           reverb: 0.32
         });
-        this.toneSweep(time + 0.004, { from: 82, to: 23, duration: 0.92, gain: 0.34 * power, reverb: 0.24 });
+        this.toneSweep(time + 0.004, { from: 82, to: 23, duration: 0.92, gain: 0.085 * power, reverb: 0.24 });
         this.noiseBurst(time + 0.008, {
           duration: 1.05,
-          gain: 0.3 * power,
+          gain: 0.075 * power,
           attack: 0.012,
           filter: "lowpass",
           frequency: 2500,
@@ -343,7 +344,7 @@
           const delay = 0.1 + index * 0.065 + Math.random() * 0.05;
           this.noiseBurst(time + delay, {
             duration: 0.08 + Math.random() * 0.13,
-            gain: (0.05 + Math.random() * 0.04) * power,
+            gain: (0.012 + Math.random() * 0.01) * power,
             frequency: 900 + Math.random() * 2600,
             endFrequency: 170 + Math.random() * 360,
             q: 1.2,
