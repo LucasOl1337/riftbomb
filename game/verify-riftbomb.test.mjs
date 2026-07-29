@@ -36,6 +36,7 @@ test("the readable combat layer preserves the canonical 100 HP rules", async () 
   assert.match(combat, /arenaBombDamage: 35/);
   assert.match(combat, /globalThis\.RIFTBOMB_COMBAT = RIFTBOMB_COMBAT/);
   assert.match(combat, /match\.hitContestant = function hitContestantWithDamage/);
+  assert.match(combat, /storedBefore \+ legacyDamage \* 0\.48/);
 });
 
 test("the built game is one offline HTML artifact", async () => {
