@@ -43,3 +43,15 @@
 - **Responsivo / screenshots:** não aplicável, pois a mudança cria endpoints textuais de SEO e não altera a renderização desktop ou mobile. Playwright headless, scripts `hostile-ui` e `headless_shell` não foram usados.
 - **Branch:** `swarm/riftbomb/landing` sobre `dffc91e`; nenhum merge, push, PR ou deploy foi realizado.
 - **Próximo passo:** quando `online/app/page.tsx` e `online/app/globals.css` estiverem livres, reforçar a hierarquia comercial do hero e validar desktop/mobile em navegador visível.
+
+## 2026-07-29 19:26:25 -03:00 — entregue
+
+- **Antes:** a entrada publicada ainda usava o favicon azul genérico herdado do esqueleto inicial, sem relação visual com a marca exibida no cabeçalho do Riftbomb.
+- **Decisão:** fazer uma única melhoria visual isolável, sem tocar no WIP central: trocar o ícone por um monograma `R` geométrico inspirado no losango ciano e dourado já usado pela interface.
+- **Depois:** a aba e os atalhos que consomem `/favicon.svg` passam a apresentar uma marca própria, com fundo escuro, contorno ciano, detalhe dourado e monograma de alto contraste.
+- **Arquivos da entrega:** `online/public/favicon.svg`; este ledger registra a rodada, mas não é contado como entrega de produto.
+- **Evidência:** o SVG passou no parse XML e foi rasterizado para inspeção em 512 px e 32 px; a versão de 32 px manteve o monograma legível. Após o build, `online/public/favicon.svg` e `online/dist/client/favicon.svg` tiveram o mesmo SHA-256 `74B1E4D63F285653CBF84325D4FDE68D52F12012C25A7B9F153FB9F4F21B2797`. `git diff --check` não encontrou erros.
+- **Validação:** `npm test` na raiz passou 81/81; `npm test` em `online/` passou build, validação do artefato e 21/21 testes; `npm test` em `online/server/` passou 10/10 testes.
+- **Responsivo / screenshots:** screenshots de viewport não se aplicam a um favicon; a evidência visual foi feita no próprio asset em tamanho cheio e no tamanho típico de aba HiDPI. Playwright headless, scripts `hostile-ui` e `headless_shell` não foram usados.
+- **Branch:** `swarm/riftbomb/landing` sobre `a083546`; nenhum merge, push, PR ou deploy foi realizado.
+- **Próximo passo:** quando `online/app/page.tsx` e `online/app/globals.css` estiverem livres, reforçar a proposta de valor e o CTA do hero, com validação desktop/mobile em navegador visível.
