@@ -7,6 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "benchmark:room-clock": "node scripts/benchmark-room-clock.mjs",
     "start": "node src/server.mjs",
     "benchmark:serialization": "node scripts/benchmark-json-transport.mjs",
     "test": "npm run test:core && npm run test:serialization && npm run test:transport && npm run test:rematch",

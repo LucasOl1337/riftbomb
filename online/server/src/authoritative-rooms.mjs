@@ -6,6 +6,7 @@ import {
 
 const TICK_RATE = 60;
 const SNAPSHOT_RATE = 30;
+const ROOMS_PER_TURN = 8;
 const CHAMPIONS = new Set(["katarina", "zed", "renekton", "vladimir", "gangplank"]);
 const ARENAS = new Set(["lattice", "clearing", "labyrinth", "forts", "pit"]);
 
@@ -21,9 +22,24 @@ export function validPreset(value = {}) {
 }
 
 export class AuthoritativeRooms {
-  constructor({ rooms, broadcast }) {
+  constructor({
+    rooms,
+    broadcast,
+    scheduleInterval = setInterval,
+    cancelInterval = clearInterval,
+    scheduleImmediate = setImmediate,
+    now = () => performance.now()
+  }) {
     this.rooms = rooms;
     this.broadcast = broadcast;
+    this.scheduleInterval = scheduleInterval;
+    this.cancelInterval = cancelInterval;
+    this.scheduleImmediate = scheduleImmediate;
+    this.now = now;
+    this.tickTimer = null;
+    this.snapshotTimer = null;
+    this.tickQueueActive = false;
+    this.snapshotQueueActive = false;
   }
 
   create(code, preset) {
@@ -34,8 +50,7 @@ export class AuthoritativeRooms {
       players: [null, null],
       inputs: [0, 0],
       sequence: 0,
-      tickTimer: null,
-      snapshotTimer: null,
+      lastTick: 0,
       createdAt: Date.now(),
       lastActivity: Date.now(),
       gridSignature: ""
@@ -56,14 +71,69 @@ export class AuthoritativeRooms {
   }
 
   stopMatch(room) {
-    clearInterval(room.tickTimer);
-    clearInterval(room.snapshotTimer);
-    room.tickTimer = null;
-    room.snapshotTimer = null;
     room.game = null;
     room.sequence = 0;
     room.inputs = [0, 0];
+    room.lastTick = 0;
     room.gridSignature = "";
+    this.stopClockIfIdle();
+  }
+
+  startClock() {
+    if (!this.tickTimer) {
+      this.tickTimer = this.scheduleInterval(() => {
+        const now = this.now();
+        this.runRoomQueue("tickQueueActive", (room) => {
+          if (!room.game) return;
+          const dt = Math.min(0.05, Math.max(0, (now - room.lastTick) / 1000));
+          room.lastTick = now;
+          applyInputMask(room.game, 1, room.inputs[0]);
+          applyInputMask(room.game, 2, room.inputs[1]);
+          room.game.update(dt);
+          room.lastActivity = Date.now();
+        });
+      }, 1000 / TICK_RATE);
+    }
+    if (!this.snapshotTimer) {
+      this.snapshotTimer = this.scheduleInterval(() => {
+        this.runRoomQueue("snapshotQueueActive", (room) => {
+          if (!room.game) return;
+          const gridSignature = JSON.stringify(room.game.grid);
+          const includeGrid = gridSignature !== room.gridSignature || room.sequence % 60 === 0;
+          room.gridSignature = gridSignature;
+          this.broadcast(room, {
+            type: "snapshot",
+            data: serializeAuthoritativeSnapshot(room.game, ++room.sequence, includeGrid)
+          });
+        });
+      }, 1000 / SNAPSHOT_RATE);
+    }
+  }
+
+  runRoomQueue(activeFlag, visit) {
+    if (this[activeFlag]) return;
+    this[activeFlag] = true;
+    const rooms = this.rooms.values();
+    const drain = () => {
+      for (let count = 0; count < ROOMS_PER_TURN; count += 1) {
+        const next = rooms.next();
+        if (next.done) {
+          this[activeFlag] = false;
+          return;
+        }
+        visit(next.value);
+      }
+      this.scheduleImmediate(drain);
+    };
+    drain();
+  }
+
+  stopClockIfIdle() {
+    if ([...this.rooms.values()].some((room) => room.game)) return;
+    this.cancelInterval(this.tickTimer);
+    this.cancelInterval(this.snapshotTimer);
+    this.tickTimer = null;
+    this.snapshotTimer = null;
   }
 
   async start(room, { rematch = false } = {}) {
@@ -76,29 +146,8 @@ export class AuthoritativeRooms {
       room.sequence = 0;
       room.inputs = [0, 0];
       room.gridSignature = "";
-
-      let lastTick = performance.now();
-      room.tickTimer = setInterval(() => {
-        if (!room.game) return;
-        const now = performance.now();
-        const dt = Math.min(0.05, Math.max(0, (now - lastTick) / 1000));
-        lastTick = now;
-        applyInputMask(room.game, 1, room.inputs[0]);
-        applyInputMask(room.game, 2, room.inputs[1]);
-        room.game.update(dt);
-        room.lastActivity = Date.now();
-      }, 1000 / TICK_RATE);
-
-      room.snapshotTimer = setInterval(() => {
-        if (!room.game) return;
-        const gridSignature = JSON.stringify(room.game.grid);
-        const includeGrid = gridSignature !== room.gridSignature || room.sequence % 60 === 0;
-        room.gridSignature = gridSignature;
-        this.broadcast(room, {
-          type: "snapshot",
-          data: serializeAuthoritativeSnapshot(room.game, ++room.sequence, includeGrid)
-        });
-      }, 1000 / SNAPSHOT_RATE);
+      room.lastTick = this.now();
+      this.startClock();
       this.broadcast(room, { ...this.lobbyMessage(room), type: rematch ? "rematch" : "start" });
     } catch (error) {
       console.error("startMatch failed", room.code, error);
