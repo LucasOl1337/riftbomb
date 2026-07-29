@@ -46,6 +46,8 @@ test("loads the online duel layer into the reconstructed game", async () => {
   assert.match(packager, /riftbomb\.html/);
   assert.match(packager, /PART_SIZE/);
   assert.match(packager, /manifest\.json/);
+  assert.match(packager, /rootBuildReady = process\.argv\[2\] === "--root-build-ready"/);
+  assert.match(packager, /if \(!rootBuildReady\)/);
   assert.match(packager, /arenaTextureOutputDirectory/);
   assert.match(packager, /championModelOutputDirectory/);
   assert.doesNotMatch(page, /<script>[\s\S]*<\/script>/);

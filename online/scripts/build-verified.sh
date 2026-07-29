@@ -18,7 +18,7 @@ if [[ ! -x "${vinext}" ]]; then
   exit 69
 fi
 
-node "${script_dir}/package-riftbomb.mjs"
+node "${script_dir}/package-riftbomb.mjs" "$@"
 
 echo "Running bounded vinext build..."
 timeout \
