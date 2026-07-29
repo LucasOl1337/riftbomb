@@ -55,3 +55,15 @@
 - **Responsivo / screenshots:** screenshots de viewport não se aplicam a um favicon; a evidência visual foi feita no próprio asset em tamanho cheio e no tamanho típico de aba HiDPI. Playwright headless, scripts `hostile-ui` e `headless_shell` não foram usados.
 - **Branch:** `swarm/riftbomb/landing` sobre `a083546`; nenhum merge, push, PR ou deploy foi realizado.
 - **Próximo passo:** quando `online/app/page.tsx` e `online/app/globals.css` estiverem livres, reforçar a proposta de valor e o CTA do hero, com validação desktop/mobile em navegador visível.
+
+## 2026-07-29 19:45:36 -03:00 — entregue
+
+- **Antes:** a landing já tinha um favicon próprio, mas o caminho convencional `/apple-touch-icon.png` não existia; ao salvar o Riftbomb na tela inicial de um iPhone ou iPad, o sistema ainda precisava improvisar uma miniatura da página.
+- **Decisão:** fazer uma única melhoria visual isolável sem tocar no WIP central: publicar um bitmap de instalação 180×180 derivado do monograma oficial, com fundo opaco para receber corretamente o recorte nativo do iOS.
+- **Depois:** atalhos adicionados à tela inicial passam a encontrar uma marca Riftbomb nítida, em sRGB, com o losango ciano/dourado e o `R` de alto contraste.
+- **Arquivos da entrega:** `online/public/apple-touch-icon.png`; este ledger registra a rodada, mas não é contado como entrega de produto.
+- **Evidência:** o PNG foi inspecionado visualmente em resolução nativa e validado como `180x180`, `sRGB`, `TrueColor`, sem canal alfa. Após o build, a fonte e `online/dist/client/apple-touch-icon.png` tiveram o mesmo SHA-256 `05009C51FD2EC8C644E7C22FC4BD219C55732A491D99C707C13CA0CCDAAFFD49`; `git diff --check` não encontrou erros, apenas avisos LF/CRLF em WIP preexistente.
+- **Validação:** `npm test` na raiz passou 85/85; `npm test` em `online/` passou build, validação do artefato e 21/21 testes; `npm test` em `online/server/` passou 10/10 testes.
+- **Responsivo / screenshots:** screenshots de viewport não se aplicam a um ícone de instalação; a evidência visual foi feita no próprio bitmap de 180×180. Playwright headless, scripts `hostile-ui` e `headless_shell` não foram usados.
+- **Branch:** `swarm/riftbomb/landing` sobre `813f420`; nenhum merge, push, PR ou deploy foi realizado.
+- **Próximo passo:** quando `online/app/page.tsx` e `online/app/globals.css` estiverem livres, reforçar a proposta de valor e o CTA do hero, com validação desktop/mobile em navegador visível.
