@@ -1,6 +1,5 @@
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
-import { applyPlayerAction } from "../../../game/create-authoritative-duel.mjs";
 import { AuthoritativeRooms, isChampion, validPreset } from "./authoritative-rooms.mjs";
 import { createJsonTransport } from "./json-transport.mjs";
 
@@ -64,7 +63,7 @@ function handleMessage(socket, raw) {
   room.lastActivity = Date.now();
 
   if (message.type === "input") room.inputs[index] = Number(message.mask) & 15;
-  if (message.type === "action" && room.game) applyPlayerAction(room.game, index + 1, message);
+  if (message.type === "action") authoritativeRooms.applyPlayerAction(room, index + 1, message);
   if (message.type === "guest-config" && index === 1 && !room.game) {
     room.players[1].ready = Boolean(message.ready);
     if (isChampion(message.champion)) room.preset.guestChampion = message.champion;
