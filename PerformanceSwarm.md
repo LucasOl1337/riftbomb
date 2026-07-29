@@ -6,17 +6,17 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **15/20 — Observabilidade de performance (disponível)**
-- Última rodada concluída: **14/20 — Memória e CPU**
-- Próxima rodada planejada: **15/20 — Observabilidade de performance**
-- Worktree isolada: `C:/Users/user/.codex/worktrees/c9d5/riftbomb`
-- Branch local: `automation/perf-sequential-r14-memory-cpu`
+- Rodada atual: **16/20 — Segurança vs performance (disponível)**
+- Última rodada concluída: **15/20 — Observabilidade de performance**
+- Próxima rodada planejada: **16/20 — Segurança vs performance**
+- Worktree isolada: `C:/Users/user/.codex/worktrees/r15p/riftbomb`
+- Branch local: `automation/perf-sequential-r15-observability`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
 - Runtime medido: Node `v24.14.0`, npm `11.18.0`, Windows/PowerShell
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 14 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 15 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -81,6 +81,7 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 | Intervals registrados com 128 partidas | ≤ 4 | 256 antes da rodada 11; 2 atuais | atende com 2 de margem |
 | Atraso p95 do event loop com 128 partidas, benchmark local | ≤ 4 ms | 7,029 ms antes da rodada 11; 2,890 ms atual | 1,110 ms |
 | Verificação de grade estável, 384.000 snapshots | ≤ 300 ms de mediana; 0 strings temporárias | 982,999 ms e 384.000 strings antes; 199,591 ms e 0 strings atuais | 100,409 ms; sem strings efêmeras |
+| Overhead dos contadores do relógio a 90 Hz | ≤ 0,001 ms/s | 4,108 ns/ciclo; estimados 0,000370 ms/s atuais | 0,000630 ms/s de margem |
 | Boot do servidor até `listen`, mediana contrafactual local | ≤ 175 ms | 164,645 ms eager antes; 157,526 ms lazy atual | 17,474 ms |
 | Primeira partida após boot lazy, mediana local | ≤ 20 ms | 12,273 ms atual | 7,727 ms |
 
@@ -98,6 +99,7 @@ Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanho
 - Lobby: `online/app/page.tsx` (27.064 B) e `online/app/riftbomb-client.ts` (6.654 B).
 - Salas/API: `online/app/api/pvp/route.ts`; persistência, projeções SQL e benchmark em `online/app/api/pvp/room-storage.ts` e `online/scripts/benchmark-pvp-read.mjs`.
 - Transporte: `online/server/src/server.mjs` (6.917 B).
+- Telemetria operacional: `/health` combina `performance.eventLoopUtilization()` sob demanda com contadores agregados de `AuthoritativeRooms`; não expõe códigos, presets, tokens ou payloads de sala.
 - Codificação WebSocket: `online/server/src/json-transport.mjs`; reutiliza o JSON somente durante o broadcast corrente e mantém readiness/backpressure antes de codificar.
 - Relógio/snapshots: `online/server/src/authoritative-rooms.mjs` (3.612 B).
 
@@ -152,6 +154,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 12/20 | Concluída | Runtime do duelo, `node:vm` e `node:fs/promises` saíram do grafo de boot e são carregados uma vez na primeira partida | 27 pares intercalados: boot mediano 164,645 → 157,526 ms (-7,119 ms / -4,32%); primeira partida +0,867 ms | `9b90a2d` |
 | 13/20 | Concluída | Gate agregado reutiliza o `riftbomb.html` que acabou de construir, enquanto `npm test` online isolado continua reconstruindo a raiz por padrão | Build raiz no fluxo raiz + online: 2 → 1; mediana 28.266,6 → 18.689,4 ms (-9.577,2 ms / -33,9%) em 3/3 | `069ed98` |
 | 14/20 | Concluída | Cache estrutural exato substitui `JSON.stringify` da grade em todo snapshot estável, preservando mutações e refresh periódico | 384.000 verificações: mediana 982,999 → 199,591 ms (-79,70% / 4,93x); strings temporárias 384.000 → 0 | `8c05e87` |
+| 15/20 | Concluída | `/health` passou a expor dez sinais agregados de capacidade, relógio e event loop, sem identificadores de sala ou credenciais | Antes: somente total de salas; depois: 10 sinais, com 4,108 ns/ciclo de overhead mediano em nove pares | `40461a2` |
 
 ## Escopos reivindicados
 
@@ -159,11 +162,16 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 15:** adicionar observabilidade de performance com overhead limitado, priorizando contadores/timers do servidor que tornem atraso do event loop, salas ativas ou snapshots descartados visíveis sem logar payloads sensíveis.
+1. **Rodada 16:** auditar o caminho de mensagens WebSocket sob abuso e, com benchmark, limitar trabalho excessivo sem remover autenticação, validação, backpressure ou o transporte autoritativo único.
 2. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates. A rodada 10 adotou apenas reutilização efêmera do payload dentro do mesmo broadcast, sem guardar snapshots entre ticks.
 3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
 ## Evidências e limitações
+
+- Rodada 15: `/health` preserva `ok`, `rooms`, `authority` e `region` e adiciona **10 sinais**: partidas ativas, dois estados de relógio, quatro contadores de ciclos, snapshots produzidos, clientes WebSocket e utilização do event loop. O teste HTTP confirmou uma partida/dois clientes e ausência do código `ABC234` e do segredo de proxy na resposta.
+- Benchmark reproduzível `npm run benchmark:telemetry`, com aquecimento e **nove pares intercalados de 1.000.000 ciclos**: mediana anterior **25,619 ms** versus instrumentada **29,727 ms**; delta **4,108 ns/ciclo**, estimado em **0,000370 ms/s** nos dois relógios (90 Hz). É um microbenchmark local de overhead do contador, não CPU de produção.
+- O payload ilustrativo de `/health` cresceu de **67 para 306 B** (+239 B) com dez sinais; isso afeta apenas sondagens de saúde, permanece `no-store` e não entra no transporte do jogo.
+- Validação da rodada 15: raiz **42/42**, online **17/17**, servidor **11/11** somando os grupos; lint online com **0 erros** e quatro avisos conhecidos de `<img>`. `git diff --check` passou. Playwright/headless não foi usado.
 
 - `npm run build` raiz passou 3/3; `npm test` raiz passou 3/3 com 41 testes por execução.
 - `node --test tests/*.test.mjs` em `online/` passou 3/3 com 11 testes; o wrapper `npm test` não chegou aos testes porque o script bash falhou em CRLF.
