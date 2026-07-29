@@ -6,17 +6,17 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **20/20 — Polimento final e relatório (disponível)**
-- Última rodada concluída: **19/20 — Segunda passada nos top 3 wins**
-- Próxima rodada planejada: **20/20 — Polimento final e relatório**
-- Worktree isolada: `C:/Users/user/.codex/worktrees/a1a3/riftbomb`
-- Branch local: `automation/perf-sequential-r19-top-wins`
-- Base: `2b6af7467cb056e5a398f0a2706b9322d10197ad`
+- Rodada atual: **20/20 — Polimento final e relatório (concluída)**
+- Última rodada concluída: **20/20 — Polimento final e relatório**
+- Próxima rodada planejada: **ciclo sequencial concluído; aguardar coletor humano**
+- Worktree isolada: `C:/Users/user/.codex/worktrees/r20p/riftbomb`
+- Branch local: `automation/perf-sequential-r20-final-report`
+- Base: `8584b6b89ed7c5d43006c7ea6d2784ae2204afc0`
 - Runtime medido: Node `v24.14.0`, npm `11.18.0`, Windows/PowerShell; build online sob WSL Node `v22.22.1`
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 19 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 20 e o ciclo sequencial foram concluídos; o ledger está liberado para o coletor humano.
 
 ## Baseline inicial
 
@@ -58,22 +58,22 @@ Playwright/headless não foi executado, conforme `STOP-HEADLESS-PLAYWRIGHT.md`.
 - `online/dist`: baseline de **83.971.289 B / 88 arquivos**; build atual **65.270.569 B**. O delta total inclui limpeza de artefatos antigos, portanto o ganho causal usado é o inventário de modelos acima.
 - Artefato offline gerado: **107.716.723 B**; ele é um produto offline único, não o payload inicial publicado.
 
-## Métrica principal e budgets iniciais
+## Métrica principal e budgets finais
 
 Métrica principal: **bytes não comprimidos e número de requests necessários para reconstruir `/riftbomb.html` antes dos assets selecionados**, acompanhados pela mediana histórica de `data-riftbomb-ready-ms` quando houver medição em navegador visível.
 
-| Budget inicial | Limite | Baseline | Margem |
+| Budget | Limite | Estado final | Margem |
 |---|---:|---:|---:|
-| Payload estático crítico do jogo | ≤ 800.000 B | 743.151 B frio no build da rodada 19; até 72.981 B sem a parte numa revisita quente | 56.849 B no frio |
+| Payload estático crítico do jogo | ≤ 800.000 B | 743.151 B no build LF da rodada 19; 743.190 B no artefato final sob checkout CRLF; até 73.020 B sem a parte numa revisita quente | ≥ 56.810 B no frio |
 | Requests estáticos críticos do jogo | ≤ 8 frio; ≤ 5 na revisita da mesma versão | 5 frio; até 4 na revisita | 3 frio; revisita supera o alvo em 1 request |
 | Texturas de arena solicitadas no boot | ≤ 5 arquivos / ≤ 2.700.000 B | 17 / 5.149.084 B antes; 5 / 2.634.254 B atual, com guard executável em 5/5 arenas | 65.746 B de margem |
 | JS do shell `/`, não comprimido | ≤ 350.000 B | 289.213 B atual (331.629 B inicial) | 60.787 B |
 | CSS do shell `/`, não comprimido | ≤ 25.000 B | 23.301 B | 1.699 B |
 | VAT publicado de Katarina | ≤ 25.000.000 B | 24.938.550 B atual (33.251.400 B inicial) | 61.450 B |
-| Build raiz, mediana local | ≤ 3.500 ms | 2.954,2 ms | 545,8 ms |
-| Teste raiz completo, mediana local | ≤ 7.500 ms | 6.587,3 ms | 912,7 ms |
+| Build raiz, mediana local | ≤ 3.500 ms | 2.738,222 ms final (2.954,2 ms inicial) | 761,778 ms |
+| Teste raiz completo, mediana local | ≤ 7.500 ms | 5.238,931 ms final, 43/43 (6.587,3 ms inicial, 41/41) | 2.261,069 ms |
 | Gate agregado raiz + online, mediana local | ≤ 22.000 ms | 18.689,4 ms após a rodada 13 (28.266,6 ms antes) | 3.310,6 ms |
-| Teste do servidor, mediana local | ≤ 4.000 ms | 3.056,6 ms | 943,4 ms |
+| Teste do servidor, mediana local | ≤ 4.000 ms | 4.716,110 ms final, 14 contratos (3.056,6 ms inicial, 3 grupos) | excede em 716,110 ms; cobertura cresceu e a comparação não isola runtime |
 | `POST /api/pvp` create, mediana publicada | ≤ 50 ms | 28,0 ms histórico | 22,0 ms |
 | Chamadas D1 sequenciais no create aquecido | ≤ 1 | 2 antes da rodada 8; 1 atual | atende |
 | `POST /api/pvp` join, mediana publicada | ≤ 30 ms | 14,4 ms histórico | 15,6 ms |
@@ -87,7 +87,42 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 | Boot do servidor até `listen`, mediana contrafactual local | ≤ 175 ms | 164,645 ms eager antes; 157,526 ms lazy atual | 17,474 ms |
 | Primeira partida após boot lazy, mediana local | ≤ 20 ms | 12,273 ms atual | 7,727 ms |
 
-Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanhos em disco, sem compressão HTTP; latências de API são históricas e precisam ser remedidas antes de qualquer nova alegação de ganho.
+Os budgets são guardrails, não alegações de SLA. Bytes são tamanhos em disco, sem compressão HTTP; latências de API são históricas e precisam ser remedidas antes de qualquer nova alegação de ganho.
+
+## Scorecard final — antes × depois
+
+| Dimensão | Antes | Depois | Ganho ou garantia acumulada |
+|---|---:|---:|---|
+| JS do shell `/` | 331.629 B raw / 103.296 B gzip | 289.213 B raw / 89.968 B gzip | -42.416 B raw e -13.328 B gzip (-12,8%/-12,9%) |
+| Atualizações React para 10.001 snapshots iguais | 10.001 | 1 | -99,99% dos caminhos redundantes, com os 15 campos do contrato cobertos |
+| VATs dos cinco campeões | 74.278.392 B | 55.708.794 B | -18.569.598 B (-25%) sem perder canais úteis, frames ou precisão |
+| Requests críticos frios de `/riftbomb.html` | 6 | 5 | -1 request (-16,67%); revisita da mesma versão cai a até 4 |
+| Parte do jogo transferida na revisita | até 670.170 B atuais | 0 B quando fresca | namespace SHA-256 imutável elimina 1 revalidação e a transferência da parte atual |
+| Inicializações WebGL decorativas no task crítico | 1 | 0 | fundo preservado em idle; partida pode cancelar a montagem pendente |
+| Texturas de arena no boot | 17 requests / 5.149.084 B | 5 requests / 2.634.254 B | -70,59% requests e -48,84% bytes; budget executado para 5/5 arenas |
+| Chamadas D1 na criação aquecida | 2 | 1 | -50% round-trips sem remover cleanup, retry ou transação |
+| Valores materializados na leitura de sala com SDP máximo | 64.175 B | 32.079 B host / 32.080 B convidado | ≈-50%, mantendo uma consulta por PK |
+| Serializações por broadcast para dois jogadores | 40.000 | 20.000 | -50%; mediana proxy 448,27 → 226,33 ms (-49,5%) |
+| Timers em 128 partidas | 256 | 2 | -99,22%; atraso p95 7,029 → 2,890 ms (-58,88%) |
+| Verificações de grade estável | 982,999 ms / 384.000 strings | 199,591 ms / 0 strings | -79,70%, 4,93x, sem alocações de string por snapshot |
+| Boot do servidor até `listen` | 164,645 ms eager | 157,526 ms lazy | -7,119 ms (-4,32%); primeira partida paga +0,867 ms uma vez |
+| Gate agregado raiz + online | 28.266,6 ms | 18.689,4 ms | -9.577,2 ms (-33,9%) ao remover build duplicado |
+| Flood de 200.000 frames por socket | 200.000 parses / 436,003 ms | 240 parses / 5,766 ms | -98,68% no proxy, preservando auth, `maxPayload`, validação e backpressure |
+| Sinais agregados em `/health` | somente total de salas | 10 sinais | capacidade, clocks e event loop observáveis sem códigos, tokens ou payloads |
+
+## Validação final da rodada 20
+
+| Gate | Resultado final | Evidência |
+|---|---:|---|
+| Build raiz | 3/3 | 2.790,777 / 2.576,020 / 2.738,222 ms; mediana 2.738,222 ms |
+| Teste raiz com build | 43/43 em 3/3 | 5.185,961 / 5.238,931 / 5.435,958 ms; mediana 5.238,931 ms |
+| Online | 19/19 | build verificado + testes em 12.346,765 ms |
+| Servidor autoritativo | 14/14 em 3/3 | 4.690,347 / 4.736,182 / 4.716,110 ms; mediana 4.716,110 ms |
+| Lint online | 0 erros | 11.437,208 ms; quatro avisos históricos/intencionais de `<img>` |
+| Artefato crítico | 5 requests / 743.190 B | HTML 1.070 B + loader 3.536 B + CSS 11.921 B + JS 56.493 B + parte 670.170 B |
+| Integridade | ok | `git diff --check`; manifest e parte mantêm SHA-256 e fallback externo |
+
+Playwright/headless não foi executado. Não houve deploy, push, PR ou merge.
 
 ## Mapa de arquivos e caminhos quentes
 
@@ -162,18 +197,28 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 17/20 | Concluída | Renderer e seletor carregam somente as cinco texturas da arena ativa; previews não selecionados começam com layout/cores e hidratam sob interação | Boot: 17 → 5 requests; 5.149.084 → 2.634.254 B (-2.514.830 B / -48,84%) em 3/3 inventários | `ee00e78` |
 | 18/20 | Concluída | Guard de regressão mede todas as arenas nos WebPs-fonte e aplica os budgets de requests e bytes no gate raiz | Cobertura executável: 0 → 5/5 arenas; pior caso estável em 3/3, 5 requests / 2.634.254 B, margem 65.746 B | `23c213d` |
 | 19/20 | Concluída | Manifesto do jogo incorporado pelo empacotador no shell gerado; loader mantém fallback externo e validação SHA-256 | Cadeia manifesto→parte: 2 → 1 requests; proxy de 50 ms/resposta, mediana 109,931 → 55,395 ms; payload crítico +170 B | `fc94cc3` |
+| 20/20 | Concluída | Scorecard final, budgets atuais, gates finais, limitações e prioridades remanescentes consolidados sem nova mudança de runtime | 20/20 rodadas documentadas; raiz 43/43 em 3/3, online 19/19, servidor 14/14 em 3/3, lint 0 erros | `PENDENTE_COMMIT_R20` |
 
 ## Escopos reivindicados
 
 Nenhum escopo ativo.
 
-## Pendências e próxima recomendação
+## Ciclo concluído e próximas recomendações
 
-1. **Rodada 20:** consolidar o relatório final das 19 rodadas, atualizar os budgets com os artefatos mais recentes e destacar os dois gargalos remanescentes: payload do campeão selecionado e latência publicada de `/api/pvp`. Não iniciar uma nova otimização ampla nessa rodada.
-2. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates. A rodada 10 adotou apenas reutilização efêmera do payload dentro do mesmo broadcast, sem guardar snapshots entre ticks.
-3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
+1. **Payload do campeão selecionado:** Katarina ainda soma 25.316.996 B em três arquivos publicados, com VAT de 24.938.550 B a apenas 61.450 B do budget. A próxima investigação deve medir primeiro frame por campeão e avaliar quantização, compressão ou streaming por clip sem perder precisão, animações ou compatibilidade WebGL.
+2. **Latência publicada de `/api/pvp`:** o GET 404 histórico teve mediana de 612 ms, enquanto create/join mantêm medianas históricas de 28,0/14,4 ms. Remedir produção e decompor Worker/D1/cold start antes de editar; não cachear offer/answer mutáveis sem invalidação síncrona entre isolates.
+3. **Browser visível e rede real:** repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção o cache da parte fingerprintada, o manifest incorporado e a montagem ociosa do fundo; este ciclo não afirma LCP/INP.
+4. **Custo do gate do servidor:** a suíte final de 14 contratos teve mediana de 4.716,110 ms, 716,110 ms acima do budget inicial de 4.000 ms. A cobertura cresceu desde os três grupos iniciais, portanto decompor processos/setup antes de atribuir o delta ao runtime ou elevar o budget.
+5. O ciclo está pronto para o coletor humano. Não houve push, deploy, PR ou merge; integrar os commits locais na ordem registrada pelo histórico.
 
 ## Evidências e limitações
+
+- Rodada 20: foi criada a worktree isolada `C:/Users/user/.codex/worktrees/r20p/riftbomb`, branch `automation/perf-sequential-r20-final-report`, a partir de `8584b6b`; a landing compartilhada não foi tocada. O único arquivo intencionalmente alterado foi `PerformanceSwarm.md`.
+- O artefato final reconstruído contém **5 requests / 743.190 B** no caminho crítico frio: HTML 1.070 B, loader 3.536 B, CSS 11.921 B, JS 56.493 B e parte 670.170 B. O build LF da rodada 19 media 743.151 B; os 39 B adicionais vêm de CRLF no checkout Windows e não mudam o grafo nem o budget de 800.000 B.
+- Build raiz em 3/3: **2.790,777 / 2.576,020 / 2.738,222 ms**, mediana **2.738,222 ms**. Teste raiz com build em 3/3: **5.185,961 / 5.238,931 / 5.435,958 ms**, mediana **5.238,931 ms**, sempre **43/43**.
+- Gate online: build verificado e **19/19** em **12.346,765 ms**. Servidor em 3/3: **4.690,347 / 4.736,182 / 4.716,110 ms**, mediana **4.716,110 ms**, sempre **14/14**. Lint online: **0 erros**, quatro avisos históricos de `<img>`, **11.437,208 ms**. `git diff --check` passou.
+- Limitações da rodada 20: o relatório consolida benchmarks locais acumulados com metodologias diferentes; não soma proxies como se fossem um único tempo de usuário. Não houve navegador visível, deploy ou nova medição publicada de Web Vitals/API. Playwright/headless não foi usado.
+- Arquivo da rodada 20: `PerformanceSwarm.md`; commit local `PENDENTE_COMMIT_R20`.
 
 - Rodada 19: `online/scripts/package-riftbomb.mjs` passou a gerar `online/public/riftbomb.html` a partir de `online/riftbomb-shell.html` e incorpora nele exatamente o mesmo manifesto escrito em `riftbomb-parts/manifest.json`. O loader usa os metadados incorporados no caminho normal e só busca o JSON externo para compatibilidade com shells antigos/sem atributo; tamanho total, `partsPath` fingerprintado e SHA-256 continuam validados antes de `document.write`.
 - Inventário causal com a mesma parte de 670.170 B, repetido **3/3**: requests estáticos críticos **6 → 5 (-16,67%)**; bytes raw **742.981 → 743.151 B (+170 B / +0,023%)**. O pequeno aumento troca 170 B por retirar uma dependência serial e mantém 56.849 B de margem no budget de 800.000 B.
