@@ -1,5 +1,7 @@
 import {
   createPersistedRoom,
+  readPersistedGuestRoom,
+  readPersistedHostRoom,
   type D1Database,
 } from "./room-storage";
 
@@ -203,22 +205,10 @@ export async function GET(request: Request): Promise<Response> {
     if (!validCode(code)) return response({ error: "invalid_room" }, 400);
 
     const now = Date.now();
-    const room = await db
-      .prepare(
-        "SELECT host_token, offer, answer, expires_at FROM pvp_rooms WHERE code = ? AND expires_at >= ?",
-      )
-      .bind(code, now)
-      .first<{
-        host_token: string;
-        offer: string;
-        answer: string | null;
-        expires_at: number;
-      }>();
-
-    if (!room) return response({ error: "room_not_found" }, 404);
-
     if (hostToken) {
-      if (hostToken !== room.host_token) {
+      const room = await readPersistedHostRoom(db, code, hostToken, now);
+      if (!room) return response({ error: "room_not_found" }, 404);
+      if (!room.is_host) {
         return response({ error: "invalid_host_token" }, 403);
       }
       return response({
@@ -227,7 +217,9 @@ export async function GET(request: Request): Promise<Response> {
       });
     }
 
-    if (room.answer) return response({ error: "room_full" }, 409);
+    const room = await readPersistedGuestRoom(db, code, now);
+    if (!room) return response({ error: "room_not_found" }, 404);
+    if (room.has_answer) return response({ error: "room_full" }, 409);
     const offer = JSON.parse(room.offer) as SessionDescription | null;
     if (!offer) return response({ preparing: true, expiresAt: room.expires_at });
     return response({

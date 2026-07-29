@@ -14,6 +14,45 @@ export type D1Database = {
   batch(statements: D1Statement[]): Promise<D1Result[]>;
 };
 
+export type HostRoomLookup = {
+  is_host: number;
+  answer: string | null;
+  expires_at: number;
+};
+
+export type GuestRoomLookup = {
+  offer: string;
+  has_answer: number;
+  expires_at: number;
+};
+
+export async function readPersistedHostRoom(
+  db: D1Database,
+  code: string,
+  hostToken: string,
+  now: number,
+): Promise<HostRoomLookup | null> {
+  return db
+    .prepare(
+      "SELECT host_token = ? AS is_host, answer, expires_at FROM pvp_rooms WHERE code = ? AND expires_at >= ?",
+    )
+    .bind(hostToken, code, now)
+    .first<HostRoomLookup>();
+}
+
+export async function readPersistedGuestRoom(
+  db: D1Database,
+  code: string,
+  now: number,
+): Promise<GuestRoomLookup | null> {
+  return db
+    .prepare(
+      "SELECT offer, answer IS NOT NULL AS has_answer, expires_at FROM pvp_rooms WHERE code = ? AND expires_at >= ?",
+    )
+    .bind(code, now)
+    .first<GuestRoomLookup>();
+}
+
 type CreateRoomOptions = {
   now: number;
   expiresAt: number;
