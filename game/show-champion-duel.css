@@ -600,7 +600,6 @@
     .icon-button,
     .ability,
     .guide-button,
-    .pause-button,
     .primary,
     .secondary,
     .touch-key,
@@ -833,32 +832,6 @@
     .guide-button:hover {
       color: white;
       border-color: var(--line);
-    }
-
-    .pause-button {
-      position: absolute;
-      left: clamp(1rem, 2.5vw, 2.2rem);
-      bottom: clamp(2.9rem, 7vh, 3.8rem);
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      min-height: 2.7rem;
-      padding: 0 0.9rem;
-      border: 1px solid var(--line);
-      background: var(--panel);
-      color: var(--phosphor);
-      transition: color 160ms ease, border-color 160ms ease;
-    }
-
-    .pause-button svg {
-      width: 1rem;
-      height: 1rem;
-      fill: currentColor;
-    }
-
-    .pause-button:hover {
-      color: white;
-      border-color: var(--hazard);
     }
 
     .event-feed {
@@ -1839,7 +1812,6 @@
       .boss-panel { top: 3rem; width: min(18rem, 42vw); }
       .ability-dock,
       .guide-button,
-      .pause-button,
       .minimap { display: none; }
       .event-feed { top: 14%; left: 50%; transform: translateX(-50%); width: min(28rem, 70vw); }
 
@@ -2158,7 +2130,6 @@
            (orientation: portrait) and (max-width: 42rem) {
       html.is-match-active .ability-dock,
       html.is-match-active .guide-button,
-      html.is-match-active .pause-button,
       html.is-match-active .minimap {
         display: none;
       }
@@ -2213,7 +2184,6 @@
       .icon-button,
       .ability,
       .guide-button,
-      .pause-button,
       .touch-key,
       .touch-btn {
         border: 1px solid ButtonText;

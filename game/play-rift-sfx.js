@@ -558,12 +558,6 @@
           this._routeBus = "ui";
         }
       }
-
-      async togglePause(paused) {
-        if (!this.ctx) return;
-        if (paused && this.ctx.state === "running") await this.ctx.suspend();
-        if (!paused && this.ctx.state === "suspended") await this.ctx.resume();
-      }
     }
 
     // Exposed for settings UI / debugging (also on the instance).

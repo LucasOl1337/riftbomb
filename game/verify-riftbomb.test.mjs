@@ -94,11 +94,9 @@ test("match rules cross one presentation seam without requiring a DOM", async ()
     prepareRound: () => events.push(["round"]),
     announce: (message) => events.push(["announce", message]),
     update: (match) => events.push(["update", match.selectedChampion]),
-    finish: () => events.push(["finish"]),
-    setPaused: (paused) => events.push(["paused", paused])
+    finish: () => events.push(["finish"])
   };
-  const sfx = { togglePause: (paused) => events.push(["sfx", paused]) };
-  const match = new context.Game({}, sfx, presentation);
+  const match = new context.Game({}, {}, presentation);
 
   assert.deepEqual(events.shift(), ["champion", "katarina"]);
   match.selectChampion("zed");
@@ -107,10 +105,7 @@ test("match rules cross one presentation seam without requiring a DOM", async ()
 
   events.length = 0;
   match.start();
-  match.togglePause();
   assert.ok(events.some(([event]) => event === "round"));
-  assert.ok(events.some(([event, value]) => event === "paused" && value === true));
-  assert.ok(events.some(([event, value]) => event === "sfx" && value === true));
 });
 
 test("player two can select a full champion kit and receive four local skill inputs", async () => {
@@ -119,7 +114,7 @@ test("player two can select a full champion kit and receive four local skill inp
   const context = vm.createContext({ console });
   vm.runInContext(`${rules}\nglobalThis.Game = Game;`, context);
   const presentation = {
-    selectChampion() {}, prepareRound() {}, announce() {}, update() {}, finish() {}, setPaused() {}
+    selectChampion() {}, prepareRound() {}, announce() {}, update() {}, finish() {}
   };
   const match = new context.Game({ ensureChampionModel() {} }, { effect() {} }, presentation);
 
@@ -235,8 +230,27 @@ test("match rules do not write browser presentation directly", async () => {
   assert.ok(!/syncChampionPresentation/.test(await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8")));
   assert.deepEqual(
     [...new Set(presentationCalls)].sort(),
-    ["announce", "finish", "prepareRound", "selectChampion", "setPaused", "update"]
+    ["announce", "finish", "prepareRound", "selectChampion", "update"]
   );
+});
+
+test("no pause control remains in the game modules", async () => {
+  const modules = [
+    "play-riftbomb.html",
+    "run-champion-bomb-duel.js",
+    "start-champion-duel.js",
+    "present-champion-bomb-duel.js",
+    "play-rift-sfx.js",
+    "draw-bomber-rift.js",
+    "show-champion-duel.css"
+  ];
+  for (const module of modules) {
+    const source = await readFile(path.join(gameDirectory, module), "utf8");
+    assert.ok(!source.includes("togglePause"), `${module} must not reference togglePause`);
+    assert.ok(!source.includes("setPaused"), `${module} must not reference setPaused`);
+    assert.ok(!/this\.paused|game\.paused/.test(source), `${module} must not track a paused flag`);
+    assert.ok(!source.includes("pause-button"), `${module} must not style a pause button`);
+  }
 });
 
 test("playable model bytes stay out of the renderer implementation", async () => {
