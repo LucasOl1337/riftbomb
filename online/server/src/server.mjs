@@ -3,6 +3,7 @@ import { performance } from "node:perf_hooks";
 import { WebSocketServer, WebSocket } from "ws";
 import { AuthoritativeRooms, isChampion, validPreset } from "./authoritative-rooms.mjs";
 import { createJsonTransport } from "./json-transport.mjs";
+import { createMessageRateLimiter } from "./message-rate-limit.mjs";
 
 const PORT = Number(process.env.PORT || 8788);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -14,6 +15,7 @@ const PROXY_SECRET = process.env.GAME_SERVER_PROXY_SECRET || "";
 const ROOM_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/;
 const rooms = new Map();
 const jsonTransport = createJsonTransport({ openState: WebSocket.OPEN });
+const allowMessage = createMessageRateLimiter();
 
 function send(socket, message) {
   return jsonTransport.send(socket, message);
@@ -56,6 +58,7 @@ function attachPlayerToRoom(socket, message, room, role) {
 }
 
 function handleMessage(socket, raw) {
+  if (!allowMessage(socket)) return;
   let message;
   try { message = JSON.parse(raw.toString()); } catch { return; }
   socket.lastSeen = Date.now();
