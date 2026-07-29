@@ -6,9 +6,9 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **4/20 — Frontend: render e hidratação (disponível)**
-- Última rodada concluída: **3/20 — Frontend: bundle e code-splitting**
-- Próxima rodada planejada: **4/20 — Frontend: render e hidratação**
+- Rodada atual: **5/20 — Frontend: assets (disponível)**
+- Última rodada concluída: **4/20 — Frontend: render e hidratação**
+- Próxima rodada planejada: **5/20 — Frontend: assets**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/f4aa/riftbomb`
 - Branch local: `automation/perf-sequential-r01-baseline`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 3 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 4 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -128,6 +128,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 1/20 | Concluída | Baseline de rotas, comandos, tempos, payloads, arquivos quentes e budgets | 3 execuções dos checks viáveis; inventário em bytes; scorecard histórico identificado | `b5da03b` |
 | 2/20 | Concluída | Ranking de gargalos de rede, assets, API, bundle e build; loader CPU rebaixado com benchmark | 3 amostras HTTP por recurso; 3 lotes de 100 operações do loader; 3 execuções dos gates | `2afaba7` |
 | 3/20 | Concluída | Remoção do runtime client-side de `next/image` do lobby para WebPs locais já otimizados | Chunk da página: 60.457 → 18.041 B raw e 19.337 → 6.009 B gzip; grafo JS: -42.416 B raw / -13.328 B gzip | `82de569` |
+| 4/20 | Concluída | Deduplicação de snapshots idênticos da ponte antes dos setters React | 10.001 mensagens iguais: 10.001 → 1 caminhos de atualização em 3/3 execuções (-99,99%); todos os 15 campos do contrato cobertos por teste | `e0a1d5e` |
 
 ## Escopos reivindicados
 
@@ -135,11 +136,10 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 4:** medir e reduzir trabalho repetido de render/hidratação no lobby; priorizar o iframe carregado durante a configuração e os mapas/listas refeitos em cada mudança de estado somente se profiling objetivo confirmar impacto.
-2. **Rodada 5:** reduzir o payload do campeão escolhido, começando por Katarina (33,63 MB) e preservando o carregamento seletivo já existente.
-3. **Rodada 6:** definir cache longo e imutável para recursos versionados; manter o manifest com invalidação segura. Confirmar em produção que visitas repetidas eliminam revalidações desnecessárias.
-4. **Rodada 8/9:** decompor a consulta `/api/pvp`; a amostra de sala inexistente teve mediana de 612 ms, mas não substitui benchmark de create/join.
-5. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Esta rodada não afirma LCP/INP.
+1. **Rodada 5:** reduzir o payload do campeão escolhido, começando por Katarina (33,63 MB) e preservando o carregamento seletivo já existente.
+2. **Rodada 6:** definir cache longo e imutável para recursos versionados; manter o manifest com invalidação segura. Confirmar em produção que visitas repetidas eliminam revalidações desnecessárias.
+3. **Rodada 8/9:** decompor a consulta `/api/pvp`; a amostra de sala inexistente teve mediana de 612 ms, mas não substitui benchmark de create/join.
+4. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Esta rodada não afirma LCP/INP.
 
 ## Evidências e limitações
 
@@ -156,3 +156,7 @@ Nenhum escopo ativo.
 - A remoção é segura para o payload de imagem: os quatro usos já passavam `unoptimized` para WebPs locais e dimensões explícitas. O `<img>` nativo mantém os mesmos URLs, `width`, `height`, `loading="lazy"` e `decoding="async"`; portanto, o ganho vem da retirada do runtime, não de reduzir qualidade ou antecipar bytes.
 - Validação da rodada 3: `npm test` raiz passou **41/41**; `npm test` em `online/` passou **11/11** com build verificado; `npm test` em `online/server/` passou os **3/3** grupos; lint online terminou sem erros e com quatro avisos esperados de `@next/next/no-img-element` sobre a escolha intencional. Playwright headless não foi usado.
 - A medição de bytes é determinística no artefato local, por isso não exige média de três execuções. Não houve navegador visível nesta rodada; nenhum ganho de LCP/INP foi alegado.
+- Rodada 4: o emissor chama `updateLobbyDisplay()` (que já publica) e em seguida publica novamente em ações como seleção de Champion e arena do anfitrião. O receptor agora compara os 15 campos primitivos de `RuntimeState` e retorna antes dos setters quando o snapshot consecutivo é idêntico; mensagens com qualquer campo alterado continuam sendo aceitas.
+- O benchmark determinístico foi repetido 3 vezes: uma mensagem inicial mais 10.000 clones idênticos percorriam o caminho de atualização React **10.001 vezes** antes e **1 vez** depois (**-99,99%**). Este é um proxy controlado de trabalho de render, não uma alegação de INP medida em navegador.
+- Validação da rodada 4: `npm test` raiz passou **41/41**; `npm test` em `online/` passou **12/12** com build verificado; `npm test` em `online/server/` passou os **3/3** grupos; lint online terminou sem erros e manteve apenas quatro avisos conhecidos da rodada 3. Playwright headless não foi usado.
+- O guard acrescentou **477 B raw / 131 B gzip** ao chunk da página (18.041 → 18.518 B raw; 6.009 → 6.140 B gzip), troca explícita por eliminar renders redundantes. Os artefatos gerados `game/arena-appearance/load-arena-appearance.js` e `riftbomb.html` permaneceram fora do commit seletivo.
