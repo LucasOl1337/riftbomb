@@ -109,8 +109,21 @@ globalThis.RIFTBOMB_COMBAT = RIFTBOMB_COMBAT;
 
     const originalHitSkill = match.hitSkill.bind(match);
     match.hitSkill = function hitSkillInHp(player, damage, source, label, quiet = false) {
+      const legacyDamage = Math.abs(Number(damage) || 0) <= 1 ? Number(damage) || 0 : (Number(damage) || 0) / RIFTBOMB_COMBAT.legacyScale;
       const appliedDamage = toHpPoints(damage);
+      const activeZedMark = source?.champion === "zed" && label !== "Death Mark"
+        ? this.zedMarks.find((candidate) => candidate.ownerId === source.id && candidate.targetId === player.id && !candidate.detonated)
+        : null;
+      const storedBefore = activeZedMark?.stored ?? 0;
       const connected = originalHitSkill(player, appliedDamage, source, label, quiet);
+
+      // The legacy implementation stores a fraction of Zed's damage for Death Mark.
+      // Restore that fractional bookkeeping after the integer HP hit is applied so
+      // the migration does not silently increase every marked combo to the cap.
+      if (connected && activeZedMark && !activeZedMark.detonated) {
+        activeZedMark.stored = Math.min(0.3, storedBefore + legacyDamage * 0.48);
+      }
+
       if (connected && player.alive && !quiet) {
         this.presentation.announce(`${label} · ${formatHp(player)} remaining`);
         this.presentation.update(this);
