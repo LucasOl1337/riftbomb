@@ -12,7 +12,6 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import Image from "next/image";
 import {
   ARENAS,
   CHAMPIONS,
@@ -709,12 +708,13 @@ export default function Home() {
                       aria-pressed={champion === item.id}
                       title={item.name}
                     >
-                      <Image
+                      <img
                         src={item.portrait}
                         alt=""
                         width={38}
                         height={38}
-                        unoptimized
+                        loading="lazy"
+                        decoding="async"
                       />
                       <span>{item.name}</span>
                     </button>
@@ -741,12 +741,13 @@ export default function Home() {
                         aria-pressed={rivalChampion === item.id}
                         title={item.name}
                       >
-                        <Image
+                        <img
                           src={item.portrait}
                           alt=""
                           width={38}
                           height={38}
-                          unoptimized
+                          loading="lazy"
+                          decoding="async"
                         />
                         <span>{item.name}</span>
                       </button>
@@ -827,7 +828,7 @@ export default function Home() {
             <div className="party-slots">
               <article className="party-player is-present">
                 <span className="party-player__portrait">
-                  <Image
+                  <img
                     src={
                       isGuest
                         ? championById(runtime.hostChampion).portrait
@@ -836,7 +837,8 @@ export default function Home() {
                     alt=""
                     width={49}
                     height={49}
-                    unoptimized
+                    loading="lazy"
+                    decoding="async"
                   />
                   <i />
                 </span>
@@ -856,12 +858,13 @@ export default function Home() {
               >
                 <span className="party-player__portrait">
                   {runtime.rivalConnected || isGuest || showRivalPicker ? (
-                    <Image
+                    <img
                       src={selectedRival.portrait}
                       alt=""
                       width={49}
                       height={49}
-                      unoptimized
+                      loading="lazy"
+                      decoding="async"
                     />
                   ) : (
                     <Icon>
