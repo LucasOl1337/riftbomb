@@ -1216,7 +1216,7 @@
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
           gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
 
-        const textureLoads = [];
+        this.arenaTextureLoaders = Object.create(null);
         const make = (key, aliases, fallbackRgba) => {
           const texture = gl.createTexture();
           gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -1228,34 +1228,39 @@
           // Mid-brown fallback (not near-black) so missing load is still readable
           gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
             gl.UNSIGNED_BYTE, new Uint8Array(fallbackRgba));
-          textureLoads.push(new Promise((resolve) => {
-            const image = new Image();
-            image.decoding = "async";
-            image.onload = () => {
-              gl.bindTexture(gl.TEXTURE_2D, texture);
-              gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-              // Linear RGBA — sRGB path crushed dark forest wood to pure black under fog
-              gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
-              gl.generateMipmap(gl.TEXTURE_2D);
-              gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-              const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
-              if (anisotropic) {
-                const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-                gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, max));
+          let loadPromise;
+          this.arenaTextureLoaders[key] = () => {
+            if (loadPromise) return loadPromise;
+            loadPromise = new Promise((resolve) => {
+              const image = new Image();
+              image.decoding = "async";
+              image.onload = () => {
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+                // Linear RGBA — sRGB path crushed dark forest wood to pure black under fog
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                gl.generateMipmap(gl.TEXTURE_2D);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+                const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
+                if (anisotropic) {
+                  const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+                  gl.texParameterf(gl.TEXTURE_2D, anisotropic.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(16, max));
+                }
+                for (const alias of aliases) this.arenaTextureReady[alias] = true;
+                resolve(true);
+              };
+              image.onerror = () => {
+                console.error(`Arena texture ${key} failed to decode.`);
+                resolve(false);
+              };
+              if (sources[key]) image.src = sources[key];
+              else {
+                console.warn(`Arena texture source missing: ${key}`);
+                resolve(false);
               }
-              for (const alias of aliases) this.arenaTextureReady[alias] = true;
-              resolve(true);
-            };
-            image.onerror = () => {
-              console.error(`Arena texture ${key} failed to decode.`);
-              resolve(false);
-            };
-            if (sources[key]) image.src = sources[key];
-            else {
-              console.warn(`Arena texture source missing: ${key}`);
-              resolve(false);
-            }
-          }));
+            });
+            return loadPromise;
+          };
           return texture;
         };
         // Modular kit: each of the five arenas owns floor + wall side + wall top.
@@ -1307,7 +1312,7 @@
           const texture = make(sourceKey, aliases, fallbacks[sourceKey] || [80, 80, 80, 255]);
           for (const alias of aliases) this.arenaTextures[alias] = texture;
         }
-        this.arenaTexturesReady = Promise.all(textureLoads);
+        this.arenaTexturesReady = Promise.resolve([]);
         // Aliases used by draw path
         this.arenaTextures.wall = this.arenaTextures.wallLattice;
         this.arenaTextures.wallTop = this.arenaTextures.wallTopLattice;
@@ -1320,6 +1325,16 @@
           this.arenaTextures.wallLattice,
           null
         ];
+      }
+
+      ensureArenaTextures(theme) {
+        const keys = RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(theme);
+        const loads = keys
+          .map((key) => this.arenaTextureLoaders[key])
+          .filter(Boolean)
+          .map((load) => load());
+        this.arenaTexturesReady = Promise.all(loads);
+        return this.arenaTexturesReady;
       }
 
       /** Bind floor/wall albedos for the active arena theme (layout + look). */

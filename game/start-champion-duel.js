@@ -48,7 +48,7 @@
       void sfx.start().catch((error) => console.warn("Audio will resume after player input:", error));
       const assetResults = await Promise.allSettled([
         renderer.ensureChampionModels(game.players.map((player) => player.champion)),
-        renderer.arenaTexturesReady
+        renderer.ensureArenaTextures(game.arenaTemplate().theme)
       ]);
       for (const result of assetResults) {
         if (result.status === "rejected") {
@@ -381,7 +381,7 @@
       context.restore();
     }
 
-    async function paintArenaPreview(canvas, grid, arena) {
+    async function paintArenaPreview(canvas, grid, arena, loadTextures = true) {
       const theme = game.arenaTemplate(arena.id).theme;
       const sources = {
         floor: ARENA_TEXTURES[theme.floor],
@@ -390,9 +390,11 @@
         crate: ARENA_TEXTURES.crate,
         crateTop: ARENA_TEXTURES.crateTop
       };
-      const textureEntries = await Promise.all(
-        Object.entries(sources).map(async ([key, source]) => [key, await loadArenaPreviewTexture(source)])
-      );
+      const textureEntries = loadTextures
+        ? await Promise.all(
+          Object.entries(sources).map(async ([key, source]) => [key, await loadArenaPreviewTexture(source)])
+        )
+        : Object.keys(sources).map((key) => [key, null]);
       if (!canvas.isConnected) return;
       const textures = Object.fromEntries(textureEntries);
       const dpr = Math.min(devicePixelRatio || 1, 2);
@@ -479,13 +481,20 @@
       context.strokeRect(0.5, 0.5, width - 1, height - 1);
     }
 
-    function createArenaPreview(grid, arena) {
+    function createArenaPreview(grid, arena, loadImmediately = false) {
       const canvas = document.createElement("canvas");
       canvas.className = "arena-mini";
       canvas.dataset.arena = arena.id;
       canvas.setAttribute("aria-hidden", "true");
-      void paintArenaPreview(canvas, grid, arena);
-      return canvas;
+      let requested = false;
+      const request = () => {
+        if (requested) return;
+        requested = true;
+        void paintArenaPreview(canvas, grid, arena);
+      };
+      if (loadImmediately) request();
+      else void paintArenaPreview(canvas, grid, arena, false);
+      return { canvas, request };
     }
 
     function buildArenaPicker() {
@@ -509,13 +518,21 @@
         previewLabel.className = "arena-preview-label micro";
         previewLabel.textContent = "REAL ARENA VIEW";
         previewLabel.setAttribute("aria-hidden", "true");
-        previewShell.append(createArenaPreview(game.previewGrid(arena.id), arena), previewLabel);
+        const preview = createArenaPreview(
+          game.previewGrid(arena.id),
+          arena,
+          arena.id === game.selectedArena
+        );
+        previewShell.append(preview.canvas, previewLabel);
         const title = document.createElement("strong");
         title.textContent = arena.label;
         const blurb = document.createElement("small");
         blurb.textContent = arena.blurb;
         button.append(previewShell, title, blurb);
+        button.addEventListener("pointerenter", preview.request, { once: true });
+        button.addEventListener("focus", preview.request, { once: true });
         button.addEventListener("click", () => {
+          preview.request();
           game.selectArena(arena.id);
           UI.arenaChoices.forEach((choice) => {
             choice.setAttribute("aria-checked", String(choice.dataset.arena === arena.id));
