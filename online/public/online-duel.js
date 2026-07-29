@@ -257,7 +257,7 @@
     hostStateLabel.textContent = state.inviteMode
       ? state.connected && state.guestReady ? "AUTO START" : "PRESET LOCKED"
       : state.role === "host" && state.connected && state.guestReady ? "READY TO START" : "ADMIN";
-    guestStateLabel.textContent = !state.connected ? "WAITING" : state.guestReady ? "READY" : "CHOOSING";
+    guestStateLabel.textContent = !state.rivalConnected ? "WAITING" : state.guestReady ? "READY" : "CHOOSING";
     guestStateLabel.dataset.ready = String(state.guestReady);
     readyButton.textContent = state.guestReady ? "READY ✓" : "I'M READY";
     readyButton.dataset.ready = String(state.guestReady);
@@ -271,6 +271,8 @@
     if (state.role === "host") {
       UI.start.disabled = !state.connected || !state.guestReady;
       UI.start.textContent = !state.connected
+        ? "CONNECTING TO SÃO PAULO SERVER…"
+        : !state.rivalConnected
         ? "WAITING FOR PLAYER 2…"
         : state.inviteMode
           ? "STARTING CHALLENGE AUTOMATICALLY…"
