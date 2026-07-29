@@ -6,9 +6,9 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **12/20 — Cold start / boot (disponível)**
-- Última rodada concluída: **11/20 — Backend: concorrência e filas**
-- Próxima rodada planejada: **12/20 — Cold start / boot**
+- Rodada atual: **13/20 — Build e CI (disponível)**
+- Última rodada concluída: **12/20 — Cold start / boot**
+- Próxima rodada planejada: **13/20 — Build e CI**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/b17b/riftbomb`
 - Branch local: `automation/perf-sequential-r01-baseline`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 11 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 12 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -79,6 +79,8 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 | Valores materializados por leitura de sala com SDP máximo | ≤ 33.000 B | 64.175 B antes da rodada 9; 32.080 B máximo atual | 920 B |
 | Intervals registrados com 128 partidas | ≤ 4 | 256 antes da rodada 11; 2 atuais | atende com 2 de margem |
 | Atraso p95 do event loop com 128 partidas, benchmark local | ≤ 4 ms | 7,029 ms antes da rodada 11; 2,890 ms atual | 1,110 ms |
+| Boot do servidor até `listen`, mediana contrafactual local | ≤ 175 ms | 164,645 ms eager antes; 157,526 ms lazy atual | 17,474 ms |
+| Primeira partida após boot lazy, mediana local | ≤ 20 ms | 12,273 ms atual | 7,727 ms |
 
 Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanhos em disco, sem compressão HTTP; latências de API são históricas e precisam ser remedidas antes de qualquer nova alegação de ganho.
 
@@ -145,6 +147,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 9/20 | Concluída | Projeções SQL distintas para host/convidado removem o SDP e os valores de autenticação não usados sem adicionar round-trip | Linha com SDPs máximos: 64.175 → 32.079 B no host e 32.080 B no convidado (≈-50%); 1 chamada e plano por PK mantidos em 3/3 | `de2bfe5` |
 | 10/20 | Concluída | Codificação JSON reutilizada dentro de cada broadcast autoritativo para host e convidado, sem cache persistente de estado mutável | 40.000 → 20.000 serializações (-50%); proxy de 1.041 B, mediana 448,27 → 226,33 ms (-49,5%) em 3/3 | `d4a38b4` |
 | 11/20 | Concluída | Dois relógios compartilhados substituem timers por sala; filas limitadas a oito salas cedem o event loop sem acumular ciclos atrasados | 128 salas: intervals 256 → 2; callbacks medianos 20.630 → 2.997 (-85,47%); p95 7,029 → 2,890 ms (-58,88%); snapshots medianos 7.059 → 7.680 | `8fe1241` |
+| 12/20 | Concluída | Runtime do duelo, `node:vm` e `node:fs/promises` saíram do grafo de boot e são carregados uma vez na primeira partida | 27 pares intercalados: boot mediano 164,645 → 157,526 ms (-7,119 ms / -4,32%); primeira partida +0,867 ms | `9b90a2d` |
 
 ## Escopos reivindicados
 
@@ -152,7 +155,7 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 12:** decompor o boot do servidor autoritativo e do Worker, medindo import, listen/ready e inicializações sob demanda; só adiar imports quando o caminho frio demonstrar custo relevante.
+1. **Rodada 13:** decompor `npm test`/build online e raiz; medir etapas repetidas e eliminar apenas trabalho redundante ou habilitar cache seguro com evidência em três execuções.
 2. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates. A rodada 10 adotou apenas reutilização efêmera do payload dentro do mesmo broadcast, sem guardar snapshots entre ticks.
 3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
@@ -211,3 +214,8 @@ Nenhum escopo ativo.
 - Estresse pós-mudança no teto de 256 salas, 3/3: somente **2 intervals**, p95 **2,230 / 2,014 / 2,016 ms**, utilização **65,09 / 61,00 / 62,17%** e 14.856 / 15.440 / 15.272 snapshots em cerca de 2 s. Não há baseline de 256 salas, portanto esses números validam capacidade, mas não são usados para calcular ganho.
 - Validação da rodada 11: testes focados passaram **6/6**; `npm test` raiz passou **42/42**; `npm test` em `online/` passou **17/17** com build verificado; `npm test` em `online/server/` passou **5/5**; lint terminou com **0 erros** e quatro avisos conhecidos. `git diff --check` passou. Playwright/headless não foi usado.
 - Limitação da rodada 11: o benchmark usa partidas e serialização reais, mas sockets em memória e uma única máquina local; não mede latência de rede nem CPU do host publicado. As amostras de 2 s apresentam ruído de scheduler, por isso a comparação usa medianas de três execuções.
+- Rodada 12: `server.mjs` e `authoritative-rooms.mjs` deixaram de importar estaticamente `game/create-authoritative-duel.mjs`; o módulo, `node:vm` e `node:fs/promises` entram sob demanda na primeira partida. `AuthoritativeRooms` memoiza uma única Promise, inclusive quando duas salas começam juntas, e também concentra a aplicação de ações no runtime já carregado.
+- Benchmark contrafactual executável em `npm run benchmark:boot`, três lotes de nove pares intercalados (27 processos por modo): boot eager anterior **164,645 ms** de mediana versus lazy atual **157,526 ms**, ganho de **7,119 ms (-4,32%)**. Cada subprocesso usa o mesmo servidor e difere apenas pela pré-importação do módulo de duelo antes do `listen`.
+- O preço deslocado foi medido pelo fluxo WebSocket real host + guest até `start`: mediana **11,406 → 12,273 ms**, acréscimo de **0,867 ms (+7,60%)** somente na primeira partida; as seguintes reutilizam a Promise memoizada. O teste específico prova carregamento zero no lobby e uma única chamada para dois starts concorrentes.
+- Validação da rodada 12: teste específico passou **2/2**; `npm test` em `online/server/` passou **7/7 em 3/3 execuções**; `npm test` raiz passou **42/42**; `npm test` em `online/` passou **17/17** com build; lint terminou com **0 erros** e quatro avisos conhecidos. `git diff --check` passou. Playwright/headless não foi usado.
+- Limitação da rodada 12: os tempos incluem criação de subprocesso e scheduler do Windows; por isso o resultado usa pares eager/lazy intercalados e mediana agregada, não a primeira comparação isolada contaminada. Não houve deploy, e nenhuma redução de cold start do host publicado é alegada. O marcador histórico de 87,7 ms em `PERFORMANCE.md` mede boot do frontend, não este servidor.
