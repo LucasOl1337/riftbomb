@@ -5,6 +5,8 @@
   "scripts": {
     "build:arena-appearance": "node game/arena-appearance/package-arena-appearance.mjs",
     "build": "npm run build:arena-appearance && node game/assemble-riftbomb.mjs",
-    "test": "npm run build && node --test game/verify-riftbomb.test.mjs champions/prepare-playable-models/verify-playable-models.test.mjs architecture-course/verify-course-links.test.mjs verify-repository-geography.test.mjs bot-opponent/verify-perception.test.mjs bot-opponent/verify-world-view.test.mjs bot-opponent/verify-baseline-policy.test.mjs"
+    "test:source": "node --test game/verify-riftbomb.test.mjs champions/prepare-playable-models/verify-playable-models.test.mjs architecture-course/verify-course-links.test.mjs verify-repository-geography.test.mjs bot-opponent/verify-perception.test.mjs bot-opponent/verify-world-view.test.mjs bot-opponent/verify-baseline-policy.test.mjs",
+    "test": "npm run build && npm run test:source",
+    "test:all": "npm run build && npm run test:source && npm --prefix online run test:root-ready && npm --prefix online/server test"
   }
 }

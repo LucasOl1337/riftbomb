@@ -57,10 +57,17 @@ const arenaTextureFiles = Object.freeze({
   wallTopPit: ["walls/wall-top-pit.webp", "wall-top-pit.webp"],
 });
 
-const buildCommand = process.platform === "win32"
-  ? ["cmd.exe", ["/d", "/s", "/c", "npm run build"]]
-  : ["npm", ["run", "build"]];
-execFileSync(buildCommand[0], buildCommand[1], { cwd: repositoryRoot, stdio: "inherit" });
+const rootBuildReady = process.argv[2] === "--root-build-ready";
+if (process.argv.length > (rootBuildReady ? 3 : 2)) {
+  throw new Error("Usage: package-riftbomb.mjs [--root-build-ready]");
+}
+
+if (!rootBuildReady) {
+  const buildCommand = process.platform === "win32"
+    ? ["cmd.exe", ["/d", "/s", "/c", "npm run build"]]
+    : ["npm", ["run", "build"]];
+  execFileSync(buildCommand[0], buildCommand[1], { cwd: repositoryRoot, stdio: "inherit" });
+}
 
 function replaceOnce(source, before, after) {
   const first = source.indexOf(before);
