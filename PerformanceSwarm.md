@@ -6,9 +6,9 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **7/20 — Frontend: third-party e scripts (disponível)**
-- Última rodada concluída: **6/20 — Frontend: rede e cache HTTP**
-- Próxima rodada planejada: **7/20 — Frontend: third-party e scripts**
+- Rodada atual: **8/20 — Backend: latência de API (disponível)**
+- Última rodada concluída: **7/20 — Frontend: third-party e scripts**
+- Próxima rodada planejada: **8/20 — Backend: latência de API**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/f4aa/riftbomb`
 - Branch local: `automation/perf-sequential-r01-baseline`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 6 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 7 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -51,8 +51,8 @@ Playwright/headless não foi executado, conforme `STOP-HEADLESS-PLAYWRIGHT.md`.
 
 ### Payloads e requests estáticos
 
-- Jogo publicado local até reconstruir o documento: **740.689 B não comprimidos em 6 requests frios** (`807` HTML + `3.327` loader + `263` manifest + `667.878` parte + `11.921` CSS + `56.493` JS). O acréscimo de 838 B sobre o baseline inicial compra o contrato de versionamento/cache.
-- Manifest atual: uma parte de **667.878 B** sob `/riftbomb-parts/<sha256>/part-00`; limite configurado por parte: 4 MiB. Em revisita da mesma versão, essa parte permanece fresca por um ano e sai do cache do navegador, removendo **1 revalidação e até 667.878 B de transferência** do caminho crítico.
+- Jogo publicado local até reconstruir o documento: **741.346 B não comprimidos em 6 requests frios** (`807` HTML + `3.327` loader + `263` manifest + `668.535` parte + `11.921` CSS + `56.493` JS). A rodada 7 adicionou 657 B para retirar a inicialização WebGL decorativa do task crítico.
+- Manifest atual: uma parte de **668.535 B** sob `/riftbomb-parts/<sha256>/part-00`; limite configurado por parte: 4 MiB. Em revisita da mesma versão, essa parte permanece fresca por um ano e sai do cache do navegador, removendo **1 revalidação e até 668.535 B de transferência** do caminho crítico.
 - Shell `/`: o grafo JS (`index`, runtime, framework e page) caiu de **331.629 B raw / 103.296 B gzip** para **289.213 B raw / 89.968 B gzip** na rodada 3; CSS permaneceu em **23.301 B raw / 5.666 B gzip**. Fontes e imagens são adicionais e condicionais ao HTML/render.
 - Assets publicados: texturas de arena **5.149.084 B / 17 arquivos**; modelos de campeão caíram de **75.414.049 B** para **56.844.566 B / 15 arquivos** na rodada 5; continuam carregados sob demanda pela escolha do duelo.
 - `online/dist`: baseline de **83.971.289 B / 88 arquivos**; build atual **65.270.569 B**. O delta total inclui limpeza de artefatos antigos, portanto o ganho causal usado é o inventário de modelos acima.
@@ -64,7 +64,7 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 
 | Budget inicial | Limite | Baseline | Margem |
 |---|---:|---:|---:|
-| Payload estático crítico do jogo | ≤ 800.000 B | 740.689 B frio; até 72.811 B sem a parte numa revisita quente | 59.311 B no frio |
+| Payload estático crítico do jogo | ≤ 800.000 B | 741.346 B frio; até 72.811 B sem a parte numa revisita quente | 58.654 B no frio |
 | Requests estáticos críticos do jogo | ≤ 8 frio; ≤ 5 na revisita da mesma versão | 6 frio; até 5 na revisita | 2 frio; parte quente atende o alvo |
 | JS do shell `/`, não comprimido | ≤ 350.000 B | 289.213 B atual (331.629 B inicial) | 60.787 B |
 | CSS do shell `/`, não comprimido | ≤ 25.000 B | 23.301 B | 1.699 B |
@@ -82,6 +82,7 @@ Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanho
 - Registro/editáveis do jogo: `game/play-riftbomb.html` (28.743 B) e módulos sob `game/`.
 - Build offline: `game/assemble-riftbomb.mjs`; gera o arquivo LFS `riftbomb.html`.
 - Aparência/asset bundling: `game/arena-appearance/package-arena-appearance.mjs` e `game/arena-appearance/load-arena-appearance.js`.
+- Fundo decorativo: `game/animate-bomber-rift-background.js` define o custom element; `game/arena-appearance/defer-bomber-rift-background.js` só conecta o segundo WebGL em idle, com timeout de 1 s.
 - Empacotamento publicado: `online/scripts/package-riftbomb.mjs`; separa jogo, texturas e modelos e publica as partes no namespace do SHA-256.
 - Loader publicado: `online/public/riftbomb-loader.js`; exige `partsPath` igual ao SHA-256 do manifest, faz fetch paralelo, concatenação, SHA-256, decode e `document.write`.
 - Política HTTP estática: `online/public/_headers`; somente partes fingerprintadas recebem cache imutável, enquanto o manifest permanece `no-store`.
@@ -133,6 +134,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 4/20 | Concluída | Deduplicação de snapshots idênticos da ponte antes dos setters React | 10.001 mensagens iguais: 10.001 → 1 caminhos de atualização em 3/3 execuções (-99,99%); todos os 15 campos do contrato cobertos por teste | `e0a1d5e` |
 | 5/20 | Concluída | Remoção sem perda do quarto canal constante dos VATs publicados; runtime mantém compatibilidade RGB/RGBA | Katarina VAT: 33.251.400 → 24.938.550 B (-8.312.850 B / -25%); cinco VATs: -18.569.598 B | `5112417` |
 | 6/20 | Concluída | Fingerprint SHA-256 nas partes do jogo e cache imutável restrito ao namespace versionado; manifest permanece `no-store` | Worker local: header da parte confirmado 3/3 como `max-age=31556952, immutable`; revisita elimina 1 revalidação e até 667.878 B de transferência | `3d9b2c7` |
+| 7/20 | Concluída | Fundo WebGL decorativo tornado inerte durante o parse e montado em idle; início da partida cancela a montagem pendente | Inicializações WebGL antes do idle: 1 → 0 em 3/3 no proxy instrumentado; zero scripts/origens remotos; custo de payload +657 B | `187be3b` |
 
 ## Escopos reivindicados
 
@@ -140,9 +142,9 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 7:** inventariar scripts third-party realmente presentes no shell e no jogo; se não houver custo relevante, adaptar a rodada para scripts próprios bloqueantes no boot, com evidência antes/depois.
-2. **Rodada 8/9:** decompor a consulta `/api/pvp`; a amostra de sala inexistente teve mediana de 612 ms, mas não substitui benchmark de create/join.
-3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção que a segunda visita não solicita a parte fingerprintada; a rodada 6 não afirma LCP/INP.
+1. **Rodada 8:** decompor a consulta `/api/pvp`; a amostra de sala inexistente teve mediana de 612 ms, mas não substitui benchmark de create/join.
+2. **Rodada 9:** usar a decomposição da API para decidir se query, índice ou acesso ao D1 merece intervenção segura.
+3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
 ## Evidências e limitações
 
@@ -175,3 +177,9 @@ Nenhum escopo ativo.
 - Impacto determinístico na revisita da mesma versão: a parte de **667.878 B** fica fresca no cache por um ano, portanto o navegador pode reconstruir o jogo com **1 revalidação de rede a menos e até 667.878 B a menos transferidos**. A carga fria permanece em seis requests e cresceu **838 B** (739.851 → 740.689 B, +0,11%) por causa do caminho/versionamento explícito.
 - Validação da rodada 6: `npm test` raiz passou **41/41 em 3/3** (5.467,4 / 5.632,7 / 5.882,8 ms; mediana 5.632,7 ms); `npm test` em `online/` passou **13/13 em 3/3**, além de uma execução final após o ajuste do benchmark; `npm test` em `online/server/` passou os **3/3 grupos em 3/3** (3.005,9 / 2.720,1 / 2.734,6 ms; mediana 2.734,6 ms); lint terminou em 7.824,5 ms com **0 erros** e quatro avisos conhecidos.
 - Limitação da rodada 6: nenhum deploy foi feito, logo o header novo foi verificado no runtime local do Wrangler, não em `bombpvp.com`. A economia de request/bytes é consequência direta e padronizada do cache fresco imutável, mas não substitui Network/LCP medidos em navegador visível; Playwright/headless não foi usado.
+- Rodada 7: o inventário estático encontrou **0 tags de script externas** e nenhum import/fetch/WebSocket remoto literal no runtime normal do jogo/shell. A biblioteca de fundo embutida ainda contém **1 origem potencial** para um iframe de fallback quando WebGL nativo falha; ela não é carregada no caminho nativo medido e fica registrada como pendência, sem alegação de custo zero em todos os dispositivos.
+- Antes, `<fluid-bg>` já estava conectado quando `customElements.define` executava, portanto o upgrade síncrono criava contexto WebGL, compilava shaders e iniciava RAF antes dos módulos essenciais seguintes. Depois, o elemento fica inerte em `<template>` e é conectado por `requestIdleCallback`, com fallback `setTimeout(0)` e timeout de 1 s; se a partida começar primeiro, o template é removido e o segundo WebGL nunca nasce.
+- Proxy determinístico repetido 3 vezes: inicializações WebGL antes do idle **1/1/1 → 0/0/0**. O mock incluiu deliberadamente 25 ms de custo para tornar a fronteira visível (medianas 25,824 → 0,817 ms), portanto esses milissegundos **não** são alegados como latência real de navegador; a evidência causal é a contagem 1 → 0 e o teste executável do agendamento.
+- O trade-off foi **+657 B** na parte publicada (667.878 → 668.535 B; +0,10%), mantendo o payload frio em 741.346 B, abaixo do budget de 800.000 B. Não houve request adicional.
+- Validação da rodada 7: `npm test` raiz passou **42/42 em 3/3 após o teste final** (7.297,4 / 6.690,0 / 5.357,1 ms; mediana 6.690,0 ms); `npm test` em `online/` passou **13/13 em 3/3** (13.724,9 / 12.982,8 / 13.110,2 ms; mediana 13.110,2 ms); lint online terminou em 7.678 ms com **0 erros** e quatro avisos conhecidos. O servidor não foi alterado; Playwright/headless não foi usado.
+- Limitação da rodada 7: sem navegador visível, não há alegação de LCP/INP ou milissegundos reais de GPU. O ganho é a remoção estrutural e testada do trabalho WebGL do task crítico, preservando o efeito após idle.
