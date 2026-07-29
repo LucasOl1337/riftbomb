@@ -6,9 +6,9 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **3/20 — Frontend: bundle e code-splitting (disponível)**
-- Última rodada concluída: **2/20 — Inventário de gargalos**
-- Próxima rodada planejada: **3/20 — Frontend: bundle e code-splitting**
+- Rodada atual: **4/20 — Frontend: render e hidratação (disponível)**
+- Última rodada concluída: **3/20 — Frontend: bundle e code-splitting**
+- Próxima rodada planejada: **4/20 — Frontend: render e hidratação**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/f4aa/riftbomb`
 - Branch local: `automation/perf-sequential-r01-baseline`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 2 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 3 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -53,7 +53,7 @@ Playwright/headless não foi executado, conforme `STOP-HEADLESS-PLAYWRIGHT.md`.
 
 - Jogo publicado até reconstruir o documento: **739.851 B não comprimidos em 6 requests** (`807` HTML + `3.315` loader + `164` manifest + `667.151` parte + `11.921` CSS + `56.493` JS).
 - Manifest atual: uma parte de **667.151 B**; limite configurado por parte: 4 MiB.
-- Shell `/`: **331.629 B de JS não comprimido** no grafo atual (`index`, runtime, framework e page) e **23.301 B de CSS**. Fontes e imagens são adicionais e condicionais ao HTML/render.
+- Shell `/`: o grafo JS (`index`, runtime, framework e page) caiu de **331.629 B raw / 103.296 B gzip** para **289.213 B raw / 89.968 B gzip** na rodada 3; CSS permaneceu em **23.301 B raw / 5.666 B gzip**. Fontes e imagens são adicionais e condicionais ao HTML/render.
 - Assets publicados: texturas de arena **5.149.084 B / 17 arquivos**; modelos de campeão **75.414.049 B / 15 arquivos**; carregados sob demanda pela escolha do duelo.
 - `online/dist`: **83.971.289 B / 88 arquivos**. Os maiores são `katarina-frames.bin` (22.167.600 B) e `katarina-normals.bin` (11.083.800 B).
 - Artefato offline gerado: **107.716.723 B**; ele é um produto offline único, não o payload inicial publicado.
@@ -66,7 +66,7 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 |---|---:|---:|---:|
 | Payload estático crítico do jogo | ≤ 800.000 B | 739.851 B | 60.149 B |
 | Requests estáticos críticos do jogo | ≤ 8 | 6 | 2 |
-| JS do shell `/`, não comprimido | ≤ 350.000 B | 331.629 B | 18.371 B |
+| JS do shell `/`, não comprimido | ≤ 350.000 B | 289.213 B atual (331.629 B inicial) | 60.787 B |
 | CSS do shell `/`, não comprimido | ≤ 25.000 B | 23.301 B | 1.699 B |
 | Build raiz, mediana local | ≤ 3.500 ms | 2.954,2 ms | 545,8 ms |
 | Teste raiz completo, mediana local | ≤ 7.500 ms | 6.587,3 ms | 912,7 ms |
@@ -127,6 +127,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 |---|---|---|---|---|
 | 1/20 | Concluída | Baseline de rotas, comandos, tempos, payloads, arquivos quentes e budgets | 3 execuções dos checks viáveis; inventário em bytes; scorecard histórico identificado | `b5da03b` |
 | 2/20 | Concluída | Ranking de gargalos de rede, assets, API, bundle e build; loader CPU rebaixado com benchmark | 3 amostras HTTP por recurso; 3 lotes de 100 operações do loader; 3 execuções dos gates | `2afaba7` |
+| 3/20 | Concluída | Remoção do runtime client-side de `next/image` do lobby para WebPs locais já otimizados | Chunk da página: 60.457 → 18.041 B raw e 19.337 → 6.009 B gzip; grafo JS: -42.416 B raw / -13.328 B gzip | `82de569` |
 
 ## Escopos reivindicados
 
@@ -134,7 +135,7 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 3:** reduzir o grafo JS do shell ou impedir entrega antecipada de código fora da primeira interação. Medir os mesmos chunks raw/gzip antes/depois; não atacar os ~2,8 ms de CPU do loader.
+1. **Rodada 4:** medir e reduzir trabalho repetido de render/hidratação no lobby; priorizar o iframe carregado durante a configuração e os mapas/listas refeitos em cada mudança de estado somente se profiling objetivo confirmar impacto.
 2. **Rodada 5:** reduzir o payload do campeão escolhido, começando por Katarina (33,63 MB) e preservando o carregamento seletivo já existente.
 3. **Rodada 6:** definir cache longo e imutável para recursos versionados; manter o manifest com invalidação segura. Confirmar em produção que visitas repetidas eliminam revalidações desnecessárias.
 4. **Rodada 8/9:** decompor a consulta `/api/pvp`; a amostra de sala inexistente teve mediana de 612 ms, mas não substitui benchmark de create/join.
@@ -151,3 +152,7 @@ Nenhum escopo ativo.
 - Na rodada 2, `npm test` online passou 3/3 com 11 testes por execução ao priorizar `C:/Program Files/Git/bin` no `PATH`; o `bash.exe` padrão do Windows continua resolvendo para WSL e falha antes do build neste ambiente.
 - `npm run lint` online passou em 12,98 s. O servidor autoritativo passou 3/3; o gate raiz passou 3/3 com 41 testes por execução (mediana 5,94 s nesta sessão).
 - A soma de medianas HTTP (**~1.549 ms**) é um indicador de prioridade da dependência serial, não uma medição direta de waterfall. Compressão, conexão reutilizada e execução do navegador podem alterar o resultado real.
+- Rodada 3: o chunk `page-*.js` caiu de **60.457 B raw / 19.337 B gzip** para **18.041 B raw / 6.009 B gzip** (respectivamente **-70,2%** e **-68,9%**). No mesmo conjunto de quatro assets usado pelo baseline (`index`, runtime, framework e page), o grafo caiu de **331.629 B / 103.296 B gzip** para **289.213 B / 89.968 B gzip** (**-12,8% raw / -12,9% gzip**).
+- A remoção é segura para o payload de imagem: os quatro usos já passavam `unoptimized` para WebPs locais e dimensões explícitas. O `<img>` nativo mantém os mesmos URLs, `width`, `height`, `loading="lazy"` e `decoding="async"`; portanto, o ganho vem da retirada do runtime, não de reduzir qualidade ou antecipar bytes.
+- Validação da rodada 3: `npm test` raiz passou **41/41**; `npm test` em `online/` passou **11/11** com build verificado; `npm test` em `online/server/` passou os **3/3** grupos; lint online terminou sem erros e com quatro avisos esperados de `@next/next/no-img-element` sobre a escolha intencional. Playwright headless não foi usado.
+- A medição de bytes é determinística no artefato local, por isso não exige média de três execuções. Não houve navegador visível nesta rodada; nenhum ganho de LCP/INP foi alegado.
