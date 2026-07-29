@@ -313,25 +313,33 @@
         resetTouchStick();
       };
 
-      stick.addEventListener("pointerup", release);
-      stick.addEventListener("pointercancel", release);
-      stick.addEventListener("lostpointercapture", release);
+      // Listen at window capture phase so releasing a second finger cannot
+      // cancel the stick and a release outside its bounds can never leave it on.
+      addEventListener("pointerup", release, { capture: true });
+      addEventListener("pointercancel", release, { capture: true });
+      addEventListener("blur", () => release(), { passive: true });
     }
 
     function bindTouchAction(button, action) {
       if (!button) return;
+      let activePointer = null;
       const press = (event) => {
+        if (activePointer !== null) return;
         event.preventDefault();
+        activePointer = event.pointerId;
         button.classList.add("is-pressed");
-        button.setPointerCapture?.(event.pointerId);
         if (game.mode === "playing") void sfx.start().catch(() => {});
         action();
       };
-      const unpress = () => button.classList.remove("is-pressed");
+      const unpress = (event) => {
+        if (event && event.pointerId !== activePointer) return;
+        activePointer = null;
+        button.classList.remove("is-pressed");
+      };
       button.addEventListener("pointerdown", press);
-      button.addEventListener("pointerup", unpress);
-      button.addEventListener("pointercancel", unpress);
-      button.addEventListener("lostpointercapture", unpress);
+      addEventListener("pointerup", unpress, { capture: true });
+      addEventListener("pointercancel", unpress, { capture: true });
+      addEventListener("blur", () => unpress(), { passive: true });
     }
 
     const arenaPreviewTextures = new Map();

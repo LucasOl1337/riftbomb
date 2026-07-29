@@ -145,6 +145,31 @@ test("online camera starts with the full arena and supports mouse-wheel zoom", a
   assert.match(controls, /Audio will resume after player input/);
 });
 
+test("mobile rendering stays legible and malformed animation metadata cannot stop the frame", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+
+  assert.match(renderer, /this\.maxScale = this\.mobilePerf \? 1\.2/);
+  assert.match(renderer, /this\.minScale = this\.mobilePerf \? 0\.75/);
+  assert.match(renderer, /this\.mobilePerf[\s\S]{0,100}\? Math\.min\(devicePixelRatio \|\| 1, 1\)/);
+  assert.match(renderer, /if \(!animation\?\.clips \|\| !animation\?\.actions\) return null/);
+  assert.match(renderer, /if \(!frame \|\| frame\.hidden\) return false/);
+  assert.doesNotMatch(renderer, /Missing VAT (?:animation clip|action mapping)/);
+});
+
+test("mobile controls remain match-only, multitouch-safe, and zoom-accessible", async () => {
+  const document = await readFile(sourcePath, "utf8");
+  const controls = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
+  const styles = await readFile(path.join(gameDirectory, "show-champion-duel.css"), "utf8");
+
+  assert.match(styles, /html\.is-match-active \.touch-controls/);
+  assert.match(styles, /html:not\(\.is-match-active\) \.touch-controls/);
+  assert.match(styles, /\.touch-actions \{[\s\S]*?pointer-events: auto/);
+  assert.match(styles, /\.touch-btn \{[\s\S]*?pointer-events: auto/);
+  assert.match(controls, /let activePointer = null;[\s\S]*?addEventListener\("pointerup", release, \{ capture: true \}\)/);
+  assert.doesNotMatch(controls, /button\.setPointerCapture/);
+  assert.doesNotMatch(document, /user-scalable=no|maximum-scale=1/);
+});
+
 test("match rules do not write browser presentation directly", async () => {
   const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
   const presentationCalls = [...rules.matchAll(/this\.presentation\.([A-Za-z]+)\(/g)]

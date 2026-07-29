@@ -425,13 +425,14 @@
         });
         if (!gl) throw new Error("WebGL2 is unavailable in this browser.");
         this.gl = gl;
-        // Phone/tablet: cap DPR hard. Retina 3x + full post + float FBO is why mobile freezes.
+        // Keep one backing pixel per CSS pixel on phones by default. The adaptive
+        // scaler may still step down under sustained load, but never starts blurry.
         this.mobilePerf = mobilePerfTarget;
-        this.maxScale = this.mobilePerf ? 0.78 : Math.min(devicePixelRatio || 1, 1.45);
-        this.minScale = this.mobilePerf ? 0.48 : 0.7;
-        this.pixelBudget = this.mobilePerf ? 960 * 540 : 2560 * 1440;
+        this.maxScale = this.mobilePerf ? 1.2 : Math.min(devicePixelRatio || 1, 1.45);
+        this.minScale = this.mobilePerf ? 0.75 : 0.7;
+        this.pixelBudget = this.mobilePerf ? 1280 * 720 : 2560 * 1440;
         this.scale = this.mobilePerf
-          ? Math.min(devicePixelRatio || 1, 0.68)
+          ? Math.min(devicePixelRatio || 1, 1)
           : Math.min(devicePixelRatio || 1, 1.45);
         this.targetScale = this.scale;
         this.frameSamples = [];
@@ -1229,7 +1230,7 @@
         const fallbacks = {
           crate: [120, 82, 48, 255],
           crateTop: [90, 62, 40, 255],
-          floorLattice: [28, 68, 58, 255],
+          floorLattice: [22, 72, 36, 255],
           floorClearing: [26, 58, 82, 255],
           floorLabyrinth: [18, 48, 56, 255],
           floorForts: [58, 40, 32, 255],
@@ -2000,8 +2001,8 @@ drawKatarinaFallback(player, t, beat) {
       }
 
       sampleVatClip(animation, key, progress) {
-        const clip = animation.clips[key];
-        if (!clip) throw new Error(`Missing VAT animation clip: ${key}`);
+        const clip = animation?.clips?.[key];
+        if (!clip || !Number.isFinite(clip.frameCount) || clip.frameCount < 1) return null;
         const phase = clip.loop
           ? ((progress % 1) + 1) % 1
           : clamp(progress, 0, 1);
@@ -2020,12 +2021,14 @@ drawKatarinaFallback(player, t, beat) {
 
       sampleChampionAction(animation, action, progress) {
         const clipKey = animation.actions?.[action];
-        if (!clipKey) throw new Error(`Missing VAT action mapping: ${action}`);
-        return { ...this.sampleVatClip(animation, clipKey, progress), key: action, clipKey };
+        if (!clipKey) return null;
+        const sample = this.sampleVatClip(animation, clipKey, progress);
+        return sample ? { ...sample, key: action, clipKey } : null;
       }
 
       resolveChampionAnimation(player, t, key) {
         const animation = this[`${key}Animation`];
+        if (!animation?.clips || !animation?.actions) return null;
         const poolRemaining = player.vladimirPool || 0;
         let desired;
         const action = (name, remaining, duration) => this.sampleChampionAction(
@@ -2033,6 +2036,24 @@ drawKatarinaFallback(player, t, beat) {
           name,
           clamp(1 - remaining / duration, 0, 1)
         );
+        const locomotion = () => {
+          const preferred = player.moving ? "run" : "idle";
+          const available = animation.actions[preferred]
+            ? preferred
+            : animation.actions.idle
+              ? "idle"
+              : animation.actions.run
+                ? "run"
+                : Object.keys(animation.actions)[0];
+          if (!available) return null;
+          const clip = animation.clips[animation.actions[available]];
+          if (!clip?.duration) return null;
+          const speed = available === "run" ? 1.52 : 1;
+          const phase = prefersReducedMotion
+            ? 0.35
+            : (t * speed + player.id * 0.173) / clip.duration;
+          return this.sampleChampionAction(animation, available, phase);
+        };
         if (key === "vladimir" && poolRemaining > 0) {
           if (poolRemaining > 1.18) {
             desired = this.sampleChampionAction(
@@ -2081,14 +2102,13 @@ drawKatarinaFallback(player, t, beat) {
         } else if (player.castAnim > 0) {
           desired = action("q", player.castAnim, player.castDuration || 0.5);
         } else {
-          const locomotion = player.moving ? "run" : "idle";
-          const clip = animation.clips[animation.actions[locomotion]];
-          const speed = locomotion === "run" ? 1.52 : 1;
-          const phase = prefersReducedMotion
-            ? 0.35
-            : (t * speed + player.id * 0.173) / clip.duration;
-          desired = this.sampleChampionAction(animation, locomotion, phase);
+          desired = locomotion();
         }
+
+        // A malformed or partially loaded action catalog must never stop the
+        // render loop. Fall back to locomotion, or omit only this champion frame.
+        if (!desired) desired = locomotion();
+        if (!desired) return null;
 
         const stateKey = `${key}:${player.id}`;
         let state = this.championAnimationStates.get(stateKey);
@@ -2119,7 +2139,7 @@ drawKatarinaFallback(player, t, beat) {
 
       prepareCpuAnimatedChampion(player, t, key) {
         const frame = this.resolveChampionAnimation(player, t, key);
-        if (frame.hidden) return false;
+        if (!frame || frame.hidden) return false;
         this.updateCpuAnimatedChampion(key, frame);
         return true;
       }
@@ -3207,7 +3227,7 @@ drawKatarinaFallback(player, t, beat) {
     }
 
     Renderer.colors = {
-      floor: hexToRgb("#14382c"),
+      floor: hexToRgb("#164a28"),
       lane: hexToRgb("#7a7d6a"),
       river: hexToRgb("#1a757e"),
       riverLight: hexToRgb("#4dcecf"),
@@ -3262,7 +3282,7 @@ drawKatarinaFallback(player, t, beat) {
       gangplankGold: hexToRgb("#d4a84b"),
       gangplankOrange: hexToRgb("#e07028"),
       gangplankDark: hexToRgb("#1a120c"),
-      gangplankSea: hexToRgb("#2a6b7c"),
+      gangplankSea: hexToRgb("#2a6b7c"),
       voidling: hexToRgb("#be3f4a"),
       hunter: hexToRgb("#d35b4f"),
       minionRed: hexToRgb("#ad2638"),
