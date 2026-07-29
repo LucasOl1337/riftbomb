@@ -1,0 +1,27 @@
+[Unit]
+Description=Riftbomb authoritative multiplayer server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=riftbomb
+Group=riftbomb
+WorkingDirectory=/opt/riftbomb
+Environment=NODE_ENV=production
+Environment=PORT=8788
+Environment=WS_PATH=/riftbomb-ws
+Environment=MAX_ROOMS=256
+EnvironmentFile=/etc/riftbomb-game.env
+ExecStart=/usr/bin/node online/server/src/server.mjs
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/opt/riftbomb
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

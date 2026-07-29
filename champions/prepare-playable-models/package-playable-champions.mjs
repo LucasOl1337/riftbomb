@@ -35,6 +35,7 @@ export async function packagePlayableChampions(repositoryRoot) {
           textureDimensions: metadata.textureDimensions,
           positionMin: metadata.positionBounds.min,
           positionRange: metadata.positionBounds.range,
+          actions: metadata.animationActions,
           clips: metadata.animationClips
         }
       });

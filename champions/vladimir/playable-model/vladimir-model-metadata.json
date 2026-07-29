@@ -1,30 +1,32 @@
 {
   "runtime": "vat-v1",
-  "source": "Classic Vladimir game mesh and matching base rig",
-  "unitScale": 0.013043901957309471,
+  "completeClipCatalog": true,
+  "source": "Khada Model Viewer Vladimir base GLB with all animation clips",
+  "sourceUrl": "https://cdn.modelviewer.lol/lol/models/vladimir/8000/model.glb",
+  "unitScale": 1.5345765907277942,
   "vertexCount": 3338,
   "indexCount": 12270,
   "strideFloats": 2,
-  "frameCount": 60,
+  "frameCount": 164,
   "textureDimensions": [
     3338,
-    60
+    164
   ],
   "positionBounds": {
     "min": [
-      -1.2539445161819458,
-      -5.641204481321438e-8,
+      -1.4335840940475464,
+      -1.4673837256395927e-7,
       -1.5453654527664185
     ],
     "max": [
-      1.4335840940475464,
+      1.4150928258895874,
       2.7060277462005615,
-      1.1868648529052734
+      2.497117757797241
     ],
     "range": [
-      2.687528610229492,
-      2.7060278026126063,
-      2.732230305671692
+      2.848676919937134,
+      2.706027892938934,
+      4.04248321056366
     ]
   },
   "materials": [
@@ -33,118 +35,381 @@
   "skeletonBoneCount": 71,
   "animationDiagnostics": [
     {
-      "requestedName": "vladimir_idle1",
-      "actualName": "vladimir_idle1",
-      "duration": 1.6666667461395264,
+      "requestedName": "Idle1",
+      "actualName": "Idle1",
+      "duration": 1.6666663885116577,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Attack1",
+      "actualName": "Attack1",
+      "duration": 0.9677414894104004,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Attack2",
+      "actualName": "Attack2",
+      "duration": 0.9677414894104004,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Attack3",
+      "actualName": "Attack3",
+      "duration": 0.9677414894104004,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Attack4",
+      "actualName": "Attack4",
+      "duration": 0.9677414894104004,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Channel",
+      "actualName": "Channel",
+      "duration": 1.0000003576278687,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "vladimir_run",
-      "actualName": "vladimir_run",
-      "duration": 1.6000001430511475,
+      "requestedName": "Channel_Wndup",
+      "actualName": "Channel_Wndup",
+      "duration": 1.0000003576278687,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "vladimir_attack1",
-      "actualName": "vladimir_attack1",
-      "duration": 0.9677419066429138,
+      "requestedName": "Crit",
+      "actualName": "Crit",
+      "duration": 0.9677414894104004,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Dance",
+      "actualName": "Dance",
+      "duration": 4.733333110809326,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "vladimir_spell1",
-      "actualName": "vladimir_spell1",
+      "requestedName": "Death",
+      "actualName": "Death",
+      "duration": 4.666663646697998,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "vladimir_idle1_underground.anm",
+      "actualName": "vladimir_idle1_underground.anm",
+      "duration": 1.6666663885116577,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Idle2",
+      "actualName": "Idle2",
+      "duration": 2.9999985694885254,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Idle3",
+      "actualName": "Idle3",
+      "duration": 3.999997615814209,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Laugh",
+      "actualName": "Laugh",
+      "duration": 5.166666507720947,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Run",
+      "actualName": "Run",
+      "duration": 1.5999997854232788,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Run2",
+      "actualName": "Run2",
+      "duration": 0.8000002503395081,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell1",
+      "actualName": "Spell1",
       "duration": 1.3333333730697632,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell2",
+      "actualName": "Spell2",
+      "duration": 3.5,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "vladimir_spell2_down",
-      "actualName": "vladimir_spell2_down",
-      "duration": 3.4666669368743896,
+      "requestedName": "Spell2Down",
+      "actualName": "Spell2Down",
+      "duration": 3.5,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "vladimir_spell2_up",
-      "actualName": "vladimir_spell2_up",
-      "duration": 0.9666666984558105,
+      "requestedName": "Spell2Up",
+      "actualName": "Spell2Up",
+      "duration": 1,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "vladimir_spell3_cast",
-      "actualName": "vladimir_spell3_cast",
-      "duration": 1.433333396911621,
+      "requestedName": "Spell3_Idle",
+      "actualName": "Spell3_Idle",
+      "duration": 3.3333332538604736,
       "trackCount": 213,
       "coverage": 1
     },
     {
-      "requestedName": "vladimir_spell4",
-      "actualName": "vladimir_spell4",
-      "duration": 0.9677419066429138,
+      "requestedName": "Spell4",
+      "actualName": "Spell4",
+      "duration": 0.9677414894104004,
+      "trackCount": 142,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Taunt",
+      "actualName": "Taunt",
+      "duration": 4.833333492279053,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Vladimir_spell3_cast.anm",
+      "actualName": "Vladimir_spell3_cast.anm",
+      "duration": 1.4666666984558105,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell3_Run",
+      "actualName": "Spell3_Run",
+      "duration": 3.3333332538604736,
+      "trackCount": 213,
+      "coverage": 1
+    },
+    {
+      "requestedName": "Spell3_Run_Cast",
+      "actualName": "Spell3_Run_Cast",
+      "duration": 1.466666579246521,
       "trackCount": 213,
       "coverage": 1
     }
   ],
+  "animationActions": {
+    "idle": "Idle1",
+    "run": "Run",
+    "attack": "Attack1",
+    "q": "Spell1",
+    "pool": "Spell2",
+    "poolDown": "Spell2Down",
+    "poolUp": "Spell2Up",
+    "e": "Vladimir_spell3_cast.anm",
+    "r": "Spell4"
+  },
   "animationClips": {
-    "idle": {
-      "source": "vladimir_idle1",
+    "Idle1": {
+      "source": "Idle1",
       "startFrame": 0,
       "frameCount": 8,
-      "duration": 1.6666667461395264,
+      "duration": 1.6666663885116577,
       "loop": true
     },
-    "run": {
-      "source": "vladimir_run",
+    "Attack1": {
+      "source": "Attack1",
       "startFrame": 8,
-      "frameCount": 10,
-      "duration": 1.6000001430511475,
-      "loop": true
-    },
-    "attack": {
-      "source": "vladimir_attack1",
-      "startFrame": 18,
       "frameCount": 6,
-      "duration": 0.9677419066429138,
+      "duration": 0.9677414894104004,
       "loop": false
     },
-    "q": {
-      "source": "vladimir_spell1",
-      "startFrame": 24,
+    "Attack2": {
+      "source": "Attack2",
+      "startFrame": 14,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Attack3": {
+      "source": "Attack3",
+      "startFrame": 18,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Attack4": {
+      "source": "Attack4",
+      "startFrame": 22,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Channel": {
+      "source": "Channel",
+      "startFrame": 26,
+      "frameCount": 4,
+      "duration": 1.0000003576278687,
+      "loop": false
+    },
+    "Channel_Wndup": {
+      "source": "Channel_Wndup",
+      "startFrame": 30,
+      "frameCount": 4,
+      "duration": 1.0000003576278687,
+      "loop": false
+    },
+    "Crit": {
+      "source": "Crit",
+      "startFrame": 34,
+      "frameCount": 4,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Dance": {
+      "source": "Dance",
+      "startFrame": 38,
+      "frameCount": 8,
+      "duration": 4.733333110809326,
+      "loop": true
+    },
+    "Death": {
+      "source": "Death",
+      "startFrame": 46,
+      "frameCount": 8,
+      "duration": 4.666663646697998,
+      "loop": false
+    },
+    "vladimir_idle1_underground.anm": {
+      "source": "vladimir_idle1_underground.anm",
+      "startFrame": 54,
+      "frameCount": 4,
+      "duration": 1.6666663885116577,
+      "loop": true
+    },
+    "Idle2": {
+      "source": "Idle2",
+      "startFrame": 58,
+      "frameCount": 6,
+      "duration": 2.9999985694885254,
+      "loop": true
+    },
+    "Idle3": {
+      "source": "Idle3",
+      "startFrame": 64,
+      "frameCount": 8,
+      "duration": 3.999997615814209,
+      "loop": true
+    },
+    "Laugh": {
+      "source": "Laugh",
+      "startFrame": 72,
+      "frameCount": 8,
+      "duration": 5.166666507720947,
+      "loop": true
+    },
+    "Run": {
+      "source": "Run",
+      "startFrame": 80,
+      "frameCount": 10,
+      "duration": 1.5999997854232788,
+      "loop": true
+    },
+    "Run2": {
+      "source": "Run2",
+      "startFrame": 90,
+      "frameCount": 4,
+      "duration": 0.8000002503395081,
+      "loop": true
+    },
+    "Spell1": {
+      "source": "Spell1",
+      "startFrame": 94,
       "frameCount": 8,
       "duration": 1.3333333730697632,
       "loop": false
     },
-    "poolDown": {
-      "source": "vladimir_spell2_down",
-      "startFrame": 32,
-      "frameCount": 6,
-      "duration": 3.4666669368743896,
-      "loop": false
-    },
-    "poolUp": {
-      "source": "vladimir_spell2_up",
-      "startFrame": 38,
-      "frameCount": 6,
-      "duration": 0.9666666984558105,
-      "loop": false
-    },
-    "e": {
-      "source": "vladimir_spell3_cast",
-      "startFrame": 44,
+    "Spell2": {
+      "source": "Spell2",
+      "startFrame": 102,
       "frameCount": 8,
-      "duration": 1.433333396911621,
+      "duration": 3.5,
       "loop": false
     },
-    "r": {
-      "source": "vladimir_spell4",
-      "startFrame": 52,
-      "frameCount": 8,
-      "duration": 0.9677419066429138,
+    "Spell2Down": {
+      "source": "Spell2Down",
+      "startFrame": 110,
+      "frameCount": 6,
+      "duration": 3.5,
       "loop": false
+    },
+    "Spell2Up": {
+      "source": "Spell2Up",
+      "startFrame": 116,
+      "frameCount": 6,
+      "duration": 1,
+      "loop": false
+    },
+    "Spell3_Idle": {
+      "source": "Spell3_Idle",
+      "startFrame": 122,
+      "frameCount": 7,
+      "duration": 3.3333332538604736,
+      "loop": true
+    },
+    "Spell4": {
+      "source": "Spell4",
+      "startFrame": 129,
+      "frameCount": 8,
+      "duration": 0.9677414894104004,
+      "loop": false
+    },
+    "Taunt": {
+      "source": "Taunt",
+      "startFrame": 137,
+      "frameCount": 8,
+      "duration": 4.833333492279053,
+      "loop": true
+    },
+    "Vladimir_spell3_cast.anm": {
+      "source": "Vladimir_spell3_cast.anm",
+      "startFrame": 145,
+      "frameCount": 8,
+      "duration": 1.4666666984558105,
+      "loop": false
+    },
+    "Spell3_Run": {
+      "source": "Spell3_Run",
+      "startFrame": 153,
+      "frameCount": 7,
+      "duration": 3.3333332538604736,
+      "loop": true
+    },
+    "Spell3_Run_Cast": {
+      "source": "Spell3_Run_Cast",
+      "startFrame": 160,
+      "frameCount": 4,
+      "duration": 1.466666579246521,
+      "loop": true
     }
   }
 }

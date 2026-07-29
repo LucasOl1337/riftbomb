@@ -1,0 +1,87 @@
+{
+  "exists": true,
+  "display": "flex",
+  "position": "fixed",
+  "width": 390,
+  "height": 105,
+  "bottomGap": 77,
+  "dpad": {
+    "x": 14,
+    "y": 673,
+    "w": 144,
+    "h": 95
+  },
+  "actions": {
+    "x": 225,
+    "y": 662,
+    "w": 151,
+    "h": 105
+  },
+  "abilityDockDisplay": "none",
+  "keys": [
+    {
+      "text": "▲",
+      "label": "Move up",
+      "w": 46,
+      "h": 46,
+      "visible": true
+    },
+    {
+      "text": "◀",
+      "label": "Move left",
+      "w": 46,
+      "h": 46,
+      "visible": true
+    },
+    {
+      "text": "▼",
+      "label": "Move down",
+      "w": 46,
+      "h": 46,
+      "visible": true
+    },
+    {
+      "text": "▶",
+      "label": "Move right",
+      "w": 46,
+      "h": 46,
+      "visible": true
+    },
+    {
+      "text": "Q",
+      "label": "Bouncing Blade",
+      "w": 46,
+      "h": 46,
+      "visible": true
+    },
+    {
+      "text": "F",
+      "label": "Preparation",
+      "w": 46,
+      "h": 46,
+      "visible": true
+    },
+    {
+      "text": "E",
+      "label": "Shunpo",
+      "w": 46,
+      "h": 46,
+      "visible": true
+    },
+    {
+      "text": "R",
+      "label": "Death Lotus",
+      "w": 46,
+      "h": 46,
+      "visible": true
+    },
+    {
+      "text": "✦",
+      "label": "Place arena bomb",
+      "w": 52,
+      "h": 52,
+      "visible": true
+    }
+  ],
+  "mode": null
+}

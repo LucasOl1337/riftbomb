@@ -44,10 +44,26 @@ test("the built game is one offline HTML artifact", async () => {
   assert.match(document, /boot\(\);/);
   assert.match(document, /var FluidBg=/);
   assert.match(document, /const PLAYABLE_CHAMPIONS = Object\.freeze/);
+  assert.match(document, /const RIFTBOMB_BOTS = \(\(\) =>/);
   assert.doesNotMatch(document, /<(?:script|img)[^>]+src=["'](?!data:)/i);
   assert.doesNotMatch(document, /<link[^>]+href=/i);
-  assert.doesNotMatch(document, /\b(?:fetch|XMLHttpRequest|WebSocket)\s*\(/);
+  // Online packaging may hydrate VAT frames/normals via fetch(url). Offline
+  // payloads keep those fields as embedded base64, so the network branch is dead.
+  assert.doesNotMatch(document, /\b(?:XMLHttpRequest|WebSocket)\s*\(/);
   assert.doesNotMatch(document, /url\(["']?https?:/i);
+  assert.match(document, /loadPackedBinary/);
+  assert.doesNotMatch(document, /framesUrl\s*:/);
+  assert.doesNotMatch(document, /normalsUrl\s*:/);
+});
+
+test("the solo CPU enters through bot-opponent instead of being duplicated in match rules", async () => {
+  const sourceDocument = await readFile(sourcePath, "utf8");
+  const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
+
+  assert.match(sourceDocument, /load-baseline-bot\.js/);
+  assert.match(rules, /RIFTBOMB_BOTS\.buildWorldView\(this, dt, bot\.id\)/);
+  assert.match(rules, /this\.botPolicy\.think\(view, dt\)/);
+  assert.doesNotMatch(rules, /const choices = \[\s*\{ dx: 1, dz: 0 \}/);
 });
 
 test("match rules cross one presentation seam without requiring a DOM", async () => {
@@ -81,6 +97,54 @@ test("match rules cross one presentation seam without requiring a DOM", async ()
   assert.ok(events.some(([event, value]) => event === "sfx" && value === true));
 });
 
+test("player two can select a full champion kit and receive four local skill inputs", async () => {
+  const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
+  const controls = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
+  const context = vm.createContext({ console });
+  vm.runInContext(`${rules}\nglobalThis.Game = Game;`, context);
+  const presentation = {
+    selectChampion() {}, prepareRound() {}, announce() {}, update() {}, finish() {}, setPaused() {}
+  };
+  const match = new context.Game({ ensureChampionModel() {} }, { effect() {} }, presentation);
+
+  match.selectChampion2("zed");
+  assert.equal(match.selectedChampion2, "zed");
+  assert.equal(match.players[1].champion, "zed");
+  assert.equal(match.players[1].name, "Red Zed");
+
+  match.mode = "playing";
+  match.p2Human = true;
+  match.players[1].skillsUnlocked = [true, true, true, true];
+  const casts = [];
+  match.castZedQ = (player) => casts.push([player.id, 0]);
+  match.castZedW = (player) => casts.push([player.id, 1]);
+  match.castZedE = (player) => casts.push([player.id, 2]);
+  match.castZedR = (player) => casts.push([player.id, 3]);
+  for (let slot = 0; slot < 4; slot += 1) match.castAbility(slot, match.players[1]);
+  assert.deepEqual(casts, [[2, 0], [2, 1], [2, 2], [2, 3]]);
+
+  assert.match(controls, /\["KeyJ", "Numpad1"\].*castAbility\(0, game\.players\[1\]\)/s);
+  assert.match(controls, /\["Semicolon", "Numpad4"\].*castAbility\(3, game\.players\[1\]\)/s);
+  assert.match(controls, /shared: true, localMultiplayer: true/);
+  assert.match(controls, /renderer\?\.setViewPlayer\(shared \? 0 : localPlayerId\)/);
+  assert.doesNotMatch(controls, /secondaryRenderer|is-local-split/);
+});
+
+test("online camera starts with the full arena and supports mouse-wheel zoom", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const controls = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
+  assert.match(renderer, /this\.viewZoom = 0/);
+  assert.match(renderer, /adjustViewZoom\(delta\)/);
+  assert.match(renderer, /maximum useful arena remains visible/);
+  assert.match(renderer, /focusPlayer\.x \* followZoom/);
+  assert.match(renderer, /CPU-streamed poses still need a fixed contact shadow/);
+  assert.match(controls, /addEventListener\("wheel"/);
+  assert.match(controls, /is-online-match/);
+  assert.match(controls, /renderer\.adjustViewZoom/);
+  assert.doesNotMatch(controls, /Promise\.allSettled\(\[\s*sfx\.start\(\)/);
+  assert.match(controls, /Audio will resume after player input/);
+});
+
 test("match rules do not write browser presentation directly", async () => {
   const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
   const presentationCalls = [...rules.matchAll(/this\.presentation\.([A-Za-z]+)\(/g)]
@@ -103,42 +167,46 @@ test("playable model bytes stay out of the renderer implementation", async () =>
   assert.ok(renderer.length < 1_000_000, "renderer should not carry packaged model bytes");
 });
 
-test("Vladimir maps gameplay actions to a textured CPU-streamed animation mesh", async () => {
+test("the full roster maps Model Viewer clips to CPU-streamed animation meshes", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
   const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
-  const metadata = JSON.parse(
-    await readFile(
-      path.join(repositoryRoot, "champions", "vladimir", "playable-model",
-        "vladimir-model-metadata.json"),
+  const expectedClipCounts = { katarina: 25, zed: 40, renekton: 19, vladimir: 26, gangplank: 32 };
+  for (const [champion, expectedClipCount] of Object.entries(expectedClipCounts)) {
+    const metadata = JSON.parse(await readFile(
+      path.join(repositoryRoot, "champions", champion, "playable-model",
+        `${champion}-model-metadata.json`),
       "utf8"
-    )
-  );
-
-  assert.equal(metadata.runtime, "vat-v1");
-  assert.equal(metadata.skeletonBoneCount, 71);
-  assert.ok(metadata.frameCount >= 56);
-  assert.deepEqual(
-    Object.keys(metadata.animationClips),
-    ["idle", "run", "attack", "q", "poolDown", "poolUp", "e", "r"]
-  );
+    ));
+    assert.equal(metadata.runtime, "vat-v1");
+    assert.equal(metadata.completeClipCatalog, true);
+    assert.match(metadata.sourceUrl, /cdn\.modelviewer\.lol/);
+    assert.equal(Object.keys(metadata.animationClips).length, expectedClipCount);
+    for (const actionSource of Object.values(metadata.animationActions)) {
+      assert.ok(metadata.animationClips[actionSource], `${champion} action clip ${actionSource} exists`);
+    }
+  }
   assert.match(renderer, /createCpuAnimatedChampionModel/);
   assert.match(renderer, /updateCpuAnimatedChampion/);
   assert.match(renderer, /drawCpuAnimatedChampion/);
-  assert.match(renderer, /Vladimir's baked UVs are already in the atlas orientation/);
+  assert.match(renderer, /resolveChampionAnimation/);
+  assert.match(renderer, /Model Viewer glTF UVs are already in atlas orientation/);
   assert.match(renderer, /resolveVladimirAnimation/);
   assert.match(rules, /vladimirAttackAnim/);
   assert.match(rules, /vladimirQAnim/);
 });
 
-test("arena themes share seven GPU texture allocations", async () => {
+test("arena themes share nine GPU texture allocations", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
-  const packedTextures = await readFile(path.join(gameDirectory, "load-arena-textures.js"), "utf8");
+  const packedTextures = await readFile(
+    path.join(gameDirectory, "arena-appearance", "load-arena-appearance.js"),
+    "utf8"
+  );
 
   assert.match(renderer, /const textureGroups = \{/);
   assert.match(renderer, /for \(const \[sourceKey, aliases\] of Object\.entries\(textureGroups\)\)/);
   assert.equal(
     [...packedTextures.matchAll(/data:image\/webp;base64,/g)].length,
-    7,
+    9,
     "the offline build must embed each authored arena source once"
   );
 });
@@ -150,12 +218,13 @@ test("arena render does not reference an undeclared turret color", async () => {
   assert.match(renderer, /\[turret\.x, 0\.22, turret\.z\][\s\S]{0,100}C\.arenaStone/);
 });
 
-test("the build retains the six playable champions and duel rules", async () => {
+test("the build retains the five playable champions and duel rules", async () => {
   const document = await readFile(releasePath, "utf8");
 
-  for (const champion of ["Katarina", "Zed", "Renekton", "Vladimir", "Gangplank", "Ziggs"]) {
+  for (const champion of ["Katarina", "Zed", "Renekton", "Vladimir", "Gangplank"]) {
     assert.ok(document.includes(champion), `${champion} must remain in the build`);
   }
+  assert.doesNotMatch(document, /\bZiggs\b/);
 
   assert.match(document, /first to 3/i);
   assert.match(document, /Breakable Hextech blocks/);

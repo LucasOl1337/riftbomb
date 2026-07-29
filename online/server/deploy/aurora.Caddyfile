@@ -1,0 +1,24 @@
+{
+	email lucasplays2000@gmail.com
+}
+
+aurora.simple-ai.cc {
+	encode gzip zstd
+
+	handle /riftbomb-ws {
+		reverse_proxy http://127.0.0.1:8788
+	}
+
+	handle {
+		reverse_proxy http://127.0.0.1:20129 {
+			transport http {
+				read_timeout 5m
+				dial_timeout 5s
+			}
+		}
+	}
+}
+
+:8081 {
+	respond /health "ok" 200
+}

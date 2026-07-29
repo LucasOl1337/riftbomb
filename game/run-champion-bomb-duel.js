@@ -252,6 +252,8 @@
         this.daggerId = 0;
         this.shadowId = 0;
         this.selectedChampion = "katarina";
+        this.selectedChampion2 = "zed";
+        this.localPlayerId = 1;
         this.selectedArena = ARENA_TEMPLATES[0].id;
         this.round = 0;
         this.wave = 1;
@@ -270,10 +272,16 @@
         this.seed = 0xA57A2026;
         this.keys = new Set();
         this.touchDirs = new Set();
+        // Analog stick for mobile (-1..1). Zero when released.
+        this.touchStick = { x: 0, z: 0 };
         this.statusTimer = 0;
         this.p2Human = false;
         this.generateMap();
         this.resetPlayers();
+        this.botPolicy = typeof RIFTBOMB_BOTS === "undefined"
+          ? null
+          : RIFTBOMB_BOTS.createBaselinePolicy({ random: () => 0 });
+        this.resetBotPolicy();
       }
 
       random() {
@@ -388,14 +396,19 @@
         const r = id === 1 ? this.rows - 2 : 1;
         const c = id === 1 ? 1 : this.cols - 2;
         const [x, z] = this.worldFromCell(r, c);
-        const champion = id === 1 ? this.selectedChampion : "ziggs";
+        const champion = id === 1 ? this.selectedChampion : this.selectedChampion2;
+        const championNames = {
+          katarina: "Katarina",
+          zed: "Zed",
+          renekton: "Renekton",
+          vladimir: "Vladimir",
+          gangplank: "Gangplank"
+        };
         return {
           id,
           champion,
           side: id === 1 ? "blue" : "red",
-          name: id === 1
-            ? ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir", gangplank: "Gangplank" }[champion] || "Blue Ziggs")
-            : "Red Ziggs",
+          name: `${id === 1 ? "Blue" : "Red"} ${championNames[champion] || "Katarina"}`,
           x, z,
           health: 1,
           maxHealth: 1,
@@ -405,10 +418,7 @@
           range: 2,
           shield: 0,
           // Start with arena bomb only — Q/W/E/R unlock from crate skill drops.
-          // Ziggs: slot 0 is the bomb (always on); slot 1 is Satchel (locked).
-          skillsUnlocked: champion === "ziggs"
-            ? [true, false, false, false]
-            : [false, false, false, false],
+          skillsUnlocked: [false, false, false, false],
           invulnerable: 1.25,
           hurt: 0,
           dashCooldown: 0,
@@ -458,14 +468,33 @@
       resetPlayers() {
         this.players = [this.createPlayer(1), this.createPlayer(2)];
         this.player = this.players[0];
+        this.resetBotPolicy();
         this.presentation.selectChampion(this.selectedChampion);
       }
 
+      resetBotPolicy() {
+        if (!this.botPolicy) return;
+        const bot = this.players[1];
+        this.botPolicy.reset({ random: () => 0 });
+        this.botPolicy.memory.think = bot?.aiThink ?? 0.15;
+        this.botPolicy.memory.lastDx = bot?.aiDx ?? 0;
+        this.botPolicy.memory.lastDz = bot?.aiDz ?? 1;
+      }
+
       selectChampion(champion) {
-        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;
+        if (!["katarina", "zed", "renekton", "vladimir", "gangplank"].includes(champion) || this.mode !== "intro") return;
         this.selectedChampion = champion;
         void this.renderer.ensureChampionModel?.(champion);
         this.resetPlayers();
+        this.presentation.update(this);
+      }
+
+      selectChampion2(champion) {
+        if (!["katarina", "zed", "renekton", "vladimir", "gangplank"].includes(champion) || this.mode !== "intro") return;
+        this.selectedChampion2 = champion;
+        void this.renderer.ensureChampionModel?.(champion);
+        this.resetPlayers();
+        if (this.p2Human) this.presentation.announce(`Player 2 ready · ${this.players[1].name} is local`);
         this.presentation.update(this);
       }
 
@@ -521,7 +550,7 @@
           p2.aiDx = 0;
           p2.aiDz = 0;
         }
-        this.presentation.announce("Player 2 joined · Red Ziggs is local");
+        this.presentation.announce(`Player 2 joined · ${p2.name} is local`);
         this.presentation.update(this);
       }
 
@@ -583,10 +612,8 @@
         return true;
       }
 
-      requestDash(player = this.player) {
-        if (this.mode !== "playing" || this.paused || this.roundLocked || !player?.alive ||
-            player.dashCooldown > 0 || player.champion !== "ziggs") return;
-        player.dashRequested = true;
+      requestDash(_player = this.player) {
+        // Legacy satchel dash removed with the bomber kit.
       }
 
       executeDash(player) {
@@ -602,15 +629,11 @@
 
       isSkillUnlocked(player, slot) {
         if (!player?.skillsUnlocked) return true;
-        if (player.champion === "ziggs" && slot === 0) return true;
         return Boolean(player.skillsUnlocked[slot]);
       }
 
       lockedSkillSlots(player) {
         if (!player) return [];
-        if (player.champion === "ziggs") {
-          return player.skillsUnlocked[1] ? [] : [1];
-        }
         return [0, 1, 2, 3].filter((slot) => !player.skillsUnlocked[slot]);
       }
 
@@ -620,28 +643,15 @@
           zed: ["Razor Shuriken", "Living Shadow", "Shadow Slash", "Death Mark"],
           renekton: ["Cull the Meek", "Ruthless Predator", "Slice and Dice", "Dominus"],
           vladimir: ["Transfusion", "Sanguine Pool", "Tides of Blood", "Hemoplague"],
-          gangplank: ["Parrrley", "Remove Scurvy", "Powder Keg", "Cannon Barrage"],
-          ziggs: ["Bomb", "Satchel burst", "Blast range", "Speed"]
+          gangplank: ["Parrrley", "Remove Scurvy", "Powder Keg", "Cannon Barrage"]
         };
-        return (kits[player.champion] || kits.ziggs)[slot] || `Skill ${slot + 1}`;
+        return (kits[player.champion] || kits.katarina)[slot] || `Skill ${slot + 1}`;
       }
 
       castAbility(slot, player = this.player) {
         if (!player?.alive || this.mode !== "playing" || this.paused || this.roundLocked) return false;
         if (player.vladimirPool > 0) return false;
         this.dropOwnerId = player.id;
-        if (player.champion === "ziggs") {
-          if (slot === 0) return this.placeBomb(player);
-          if (slot === 1) {
-            if (!this.isSkillUnlocked(player, 1)) {
-              this.presentation.announce("Satchel locked · break crates");
-              return false;
-            }
-            this.requestDash(player);
-            return true;
-          }
-          return false;
-        }
         if (!this.isSkillUnlocked(player, slot)) {
           this.presentation.announce(`${this.skillSlotLabel(player, slot)} locked · break crates`);
           return false;
@@ -798,7 +808,7 @@
         if (player.rCooldown > 0 || player.ultChannel > 0) return false;
         const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
         if (!rival || Math.hypot(rival.x - player.x, rival.z - player.z) > this.tile * 3.35) {
-          this.presentation.announce("Death Lotus needs Red Ziggs nearby");
+          this.presentation.announce("Death Lotus needs the rival nearby");
           return false;
         }
         player.rCooldown = 28;
@@ -987,7 +997,7 @@
         if (player.rCooldown > 0) return false;
         const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
         if (!rival || Math.hypot(rival.x - player.x, rival.z - player.z) > this.tile * 4.5) {
-          this.presentation.announce("Death Mark needs Red Ziggs in range");
+          this.presentation.announce("Death Mark needs the rival in range");
           return false;
         }
         const fromX = player.x;
@@ -1586,10 +1596,18 @@
         let dx = 0;
         let dz = 0;
         if (player.id === 1) {
-          if (this.keys.has("KeyA") || this.touchDirs.has("left")) dx -= 1;
-          if (this.keys.has("KeyD") || this.touchDirs.has("right")) dx += 1;
-          if (this.keys.has("KeyW") || this.touchDirs.has("up")) dz -= 1;
-          if (this.keys.has("KeyS") || this.touchDirs.has("down")) dz += 1;
+          const stickX = this.touchStick?.x || 0;
+          const stickZ = this.touchStick?.z || 0;
+          const stickMag = Math.hypot(stickX, stickZ);
+          if (stickMag > 0.18) {
+            dx = stickX;
+            dz = stickZ;
+          } else {
+            if (this.keys.has("KeyA") || this.touchDirs.has("left")) dx -= 1;
+            if (this.keys.has("KeyD") || this.touchDirs.has("right")) dx += 1;
+            if (this.keys.has("KeyW") || this.touchDirs.has("up")) dz -= 1;
+            if (this.keys.has("KeyS") || this.touchDirs.has("down")) dz += 1;
+          }
         } else if (this.p2Human) {
           if (this.keys.has("ArrowLeft")) dx -= 1;
           if (this.keys.has("ArrowRight")) dx += 1;
@@ -2013,59 +2031,16 @@
 
       updateBot(dt) {
         const bot = this.players[1];
-        const rival = this.players[0];
-        if (!bot?.alive || !rival?.alive) return;
-        bot.aiCommit = Math.max(0, bot.aiCommit - dt);
-        bot.aiThink -= dt;
-        if (bot.aiThink > 0) return;
-        bot.aiThink = 0.16 + this.random() * 0.16;
-        const cell = this.cellFromWorld(bot.x, bot.z);
-        const [cellX, cellZ] = this.worldFromCell(cell.r, cell.c);
-        const nearCenter = Math.hypot(bot.x - cellX, bot.z - cellZ) < 0.16;
-        const currentDanger = this.dangerAt(cell.r, cell.c);
-        if (!nearCenter || (bot.aiCommit > 0 && currentDanger === 0)) return;
-        const choices = [
-          { dx: 1, dz: 0 }, { dx: -1, dz: 0 },
-          { dx: 0, dz: 1 }, { dx: 0, dz: -1 },
-          { dx: 0, dz: 0 }
-        ].filter((choice) => {
-          if (!choice.dx && !choice.dz) return true;
-          const [x, z] = this.worldFromCell(cell.r + choice.dz, cell.c + choice.dx);
-          const passable = this.bombs.filter((bomb) => bomb.passOwners?.has(bot.id));
-          return !this.isBlocked(x, z, 0.27, passable);
-        });
-
-        const nearestPickup = (r, c) => this.pickups.reduce((best, pickup) =>
-          Math.min(best, Math.abs(pickup.r - r) + Math.abs(pickup.c - c)), 12);
-        let best = choices[0] || { dx: 0, dz: 0 };
-        let bestScore = -Infinity;
-        for (const choice of choices) {
-          const r = cell.r + choice.dz;
-          const c = cell.c + choice.dx;
-          const [x, z] = this.worldFromCell(r, c);
-          const danger = this.dangerAt(r, c);
-          const distance = Math.hypot(x - rival.x, z - rival.z);
-          const pickupDistance = nearestPickup(r, c);
-          const reverse = choice.dx === -bot.aiDx && choice.dz === -bot.aiDz ? 0.35 : 0;
-          const score = -danger * 120 - distance * 0.7 - pickupDistance * 0.95 - reverse + this.random() * 1.8;
-          if (score > bestScore) {
-            bestScore = score;
-            best = choice;
-          }
-        }
-        bot.aiDx = best.dx;
-        bot.aiDz = best.dz;
-        bot.aiCommit = currentDanger > 0 ? 0.38 : 0.58;
-
-        const adjacentBreakable = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dr, dc]) =>
-          this.grid[cell.r + dr]?.[cell.c + dc] === 2
-        );
-        const aligned = (cell.r === this.cellFromWorld(rival.x, rival.z).r ||
-          cell.c === this.cellFromWorld(rival.x, rival.z).c) &&
-          Math.hypot(bot.x - rival.x, bot.z - rival.z) < this.tile * 4.2;
-        if (this.roundAge > 1.4 && currentDanger === 0 &&
-            ((adjacentBreakable && this.random() < 0.18) || (aligned && this.random() < 0.26))) {
-          if (this.placeBomb(bot)) bot.aiCommit = 0;
+        if (!bot || !this.botPolicy) return;
+        const view = RIFTBOMB_BOTS.buildWorldView(this, dt, bot.id);
+        const intent = this.botPolicy.think(view, dt);
+        bot.aiDx = intent.dx;
+        bot.aiDz = intent.dz;
+        bot.aiCommit = this.botPolicy.memory.commit;
+        bot.aiThink = this.botPolicy.memory.think;
+        if (intent.plantBomb && this.placeBomb(bot)) {
+          this.botPolicy.memory.commit = 0;
+          bot.aiCommit = 0;
         }
       }
 
@@ -2306,7 +2281,10 @@
       }
 
       spawnParticles(x, y, z, color, count, life, size) {
-        const limit = innerWidth < 600 ? Math.ceil(count * 0.62) : count;
+        // Only the renderer mobile profile may cut VFX — never window width alone (PC windows).
+        const mobile = Boolean(this.renderer?.mobilePerf);
+        const density = mobile ? 0.32 : 1;
+        const limit = Math.max(2, Math.ceil(count * density));
         for (let i = 0; i < limit; i++) {
           const angle = this.random() * TAU;
           const speed = 0.8 + this.random() * 3.8;
@@ -2316,13 +2294,16 @@
             vy: 1.1 + this.random() * 3.7,
             vz: Math.sin(angle) * speed,
             age: 0,
-            life: life * (0.7 + this.random() * 0.55),
+            life: life * (0.7 + this.random() * 0.55) * (mobile ? 0.82 : 1),
             size: size * (0.65 + this.random() * 0.8),
             alpha: 0.7 + this.random() * 0.3,
             color
           });
         }
-        if (this.particles.length > 520) this.particles.splice(0, this.particles.length - 520);
+        const maxParticles = mobile ? 110 : 520;
+        if (this.particles.length > maxParticles) {
+          this.particles.splice(0, this.particles.length - maxParticles);
+        }
       }
 
       updateParticles(dt) {

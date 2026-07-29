@@ -6,9 +6,31 @@
     const lerp = (a, b, t) => a + (b - a) * t;
     const TAU = Math.PI * 2;
     const prefersReducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Strict phone/tablet only — never treat desktop touchscreens / hover:none as mobile.
+    // (Earlier heuristics wrongly dropped PC resolution/HDR and made the arena look soft.)
+    function detectMobilePerfTarget() {
+      const ua = navigator.userAgent || "";
+      if (/Android.+Mobile|iPhone|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true;
+      // iPadOS / Android tablets: coarse pointer and no mouse/fine pointer.
+      if (/iPad|Android/i.test(ua)
+        && matchMedia("(pointer: coarse)").matches
+        && !matchMedia("(pointer: fine)").matches) {
+        return true;
+      }
+      // Fallback: phone-sized short side, coarse-only, no fine pointer (rare hybrids).
+      const shortSide = Math.min(screen.width || 0, screen.height || 0);
+      if (shortSide > 0 && shortSide <= 500
+        && matchMedia("(pointer: coarse)").matches
+        && !matchMedia("(pointer: fine)").matches
+        && matchMedia("(hover: none)").matches) {
+        return true;
+      }
+      return false;
+    }
+    const mobilePerfTarget = detectMobilePerfTarget();
     const modelReviewTarget = new URLSearchParams(location.search).get("model") || "";
     const modelReviewPose = new URLSearchParams(location.search).get("pose") || "idle";
-    const modelReviewMode = ["ziggs", "katarina", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron"].includes(modelReviewTarget);
+    const modelReviewMode = ["katarina", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron"].includes(modelReviewTarget);
 
     const UI = {
       app: $("#app"),
@@ -21,6 +43,8 @@
       guideOpenIntro: $("#open-guide-intro"),
       guideClose: $("#close-guide"),
       championChoices: $$(".champion-choice"),
+      playerSelectorButtons: $$("[data-select-player]"),
+      playerConfigLabel: $("#player-config-label"),
       arenaChoices: $$(".arena-choice"),
       championPortrait: $("#champion-portrait"),
       playerName: $("#player-name"),
@@ -66,11 +90,24 @@
       ultIcon: $("#slot-r-icon"),
       ultKey: $("#slot-r-key"),
       ultFill: $("#ult-fill"),
+      touchControls: $("#touch-controls"),
+      touchStick: $("#touch-stick"),
+      touchStickKnob: $("#touch-stick-knob"),
       touchQ: $("#touch-q"),
+      touchQArt: $("#touch-q-art"),
       touchBomb: $("#touch-bomb"),
       touchDash: $("#touch-dash"),
+      touchDashArt: $("#touch-dash-art"),
       touchMine: $("#touch-mine"),
+      touchMineArt: $("#touch-mine-art"),
       touchUlt: $("#touch-ult"),
+      touchUltArt: $("#touch-ult-art"),
+      playerTwoHud: $("#player-two-hud"),
+      playerTwoName: $("#player-two-name"),
+      playerTwoHealth: $("#player-two-health"),
+      playerTwoHealthFill: $("#player-two-health-fill"),
+      playerTwoSkillButtons: $$("[data-p2-slot]"),
+      playerTwoBombButton: $("[data-p2-action='bomb']"),
       minimapPlayer: $("#minimap-player"),
       minimapEnemies: $("#minimap-enemies"),
       end: $("#end-screen"),
@@ -85,8 +122,6 @@
       bpmLabel: $("#bpm-label"),
       fxLabel: $("#fx-label")
     };
-
-    const ZIGGS_PORTRAIT = UI.championPortrait.src;
     const KATARINA_ASSETS = {
       portrait: "",
       passive: "data:image/png;base64,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",
@@ -390,12 +425,22 @@
         });
         if (!gl) throw new Error("WebGL2 is unavailable in this browser.");
         this.gl = gl;
-        this.scale = Math.min(devicePixelRatio || 1, 1.45);
+        // Phone/tablet: cap DPR hard. Retina 3x + full post + float FBO is why mobile freezes.
+        this.mobilePerf = mobilePerfTarget;
+        this.maxScale = this.mobilePerf ? 0.78 : Math.min(devicePixelRatio || 1, 1.45);
+        this.minScale = this.mobilePerf ? 0.48 : 0.7;
+        this.pixelBudget = this.mobilePerf ? 960 * 540 : 2560 * 1440;
+        this.scale = this.mobilePerf
+          ? Math.min(devicePixelRatio || 1, 0.68)
+          : Math.min(devicePixelRatio || 1, 1.45);
         this.targetScale = this.scale;
         this.frameSamples = [];
         this.lastQualityCheck = performance.now();
+        this.particleData = null;
         this.shocks = [];
         this.cameraShake = 0;
+        this.viewPlayerId = 0;
+        this.viewZoom = 0;
         this.lastViewProjection = new Float32Array(16);
         this.mainProgram = this.createProgram(Renderer.mainVertex, Renderer.mainFragment);
         this.arenaFxProgram = this.createProgram(Renderer.arenaFxVertex, Renderer.arenaFxFragment);
@@ -440,14 +485,17 @@
           cylinder: this.createMesh(buildCylinder()),
           cone: this.createMesh(buildCylinder(16, 0.06, 1)),
           torus: this.createMesh(buildTorus()),
-          skillDisc: this.createMesh(buildSkillDisc(56)),
-          skillCoin: this.createMesh(buildSkillCoin(48))
+          skillDisc: this.createMesh(buildSkillDisc(this.mobilePerf ? 24 : 56)),
+          skillCoin: this.createMesh(buildSkillCoin(this.mobilePerf ? 20 : 48))
         };
         this.championModelInitialised = new Set();
         this.championModelLoadPromises = {};
-        this.vladimirAnimationStates = new Map();
-        for (const champion of ["katarina", "zed", "renekton", "vladimir", "gangplank"]) {
-          if (PLAYABLE_CHAMPIONS[champion]) this.initialiseChampionModel(champion);
+        this.championAnimationStates = new Map();
+        // Desktop can warm the catalog; mobile only loads the champions in the match.
+        if (!this.mobilePerf) {
+          for (const champion of ["katarina", "zed", "renekton", "vladimir", "gangplank"]) {
+            if (PLAYABLE_CHAMPIONS[champion]) this.initialiseChampionModel(champion);
+          }
         }
         this.createArenaTextures();
         this.createSkillIconTextures();
@@ -455,7 +503,7 @@
         this.particleBuffer = gl.createBuffer();
         gl.bindVertexArray(this.particleVao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.particleBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, 8 * 4, gl.DYNAMIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, 8 * 4 * (this.mobilePerf ? 128 : 16), gl.DYNAMIC_DRAW);
         const pLoc = gl.getAttribLocation(this.particleProgram, "aPosition");
         const sLoc = gl.getAttribLocation(this.particleProgram, "aSize");
         const cLoc = gl.getAttribLocation(this.particleProgram, "aColor");
@@ -473,7 +521,8 @@
         this.depthBuffer = null;
         this.width = 0;
         this.height = 0;
-        this.ext = gl.getExtension("EXT_color_buffer_float");
+        // Half-float HDR FBO is a common mobile stall path — keep 8-bit on phones.
+        this.ext = this.mobilePerf ? null : gl.getExtension("EXT_color_buffer_float");
         this.hitPulse = 0;
         this.lost = false;
         canvas.addEventListener("webglcontextlost", (event) => {
@@ -483,23 +532,40 @@
         canvas.addEventListener("webglcontextrestored", () => location.reload());
       }
 
+      setViewPlayer(playerId = 0) {
+        this.viewPlayerId = playerId === 2 ? 2 : playerId === 1 ? 1 : 0;
+      }
+
+      adjustViewZoom(delta) {
+        this.viewZoom = clamp(this.viewZoom + delta, 0, 1.35);
+        return this.viewZoom;
+      }
+
       initialiseChampionModel(champion) {
-        if (champion === "ziggs") return Promise.resolve(true);
         if (this.championModelInitialised.has(champion)) {
           return this[`${champion}ModelReadyPromise`] || Promise.resolve(Boolean(this[`${champion}Ready`]));
         }
         const packed = PLAYABLE_CHAMPIONS[champion];
         if (!packed) return Promise.resolve(false);
         this.championModelInitialised.add(champion);
+        if (packed.animation?.runtime === "vat-v1") {
+          // Stream the decoded pose through the proven vertex path used by Vladimir.
+          // This keeps the source VAT deterministic across WebGL drivers.
+          const animatedFallbackColors = {
+            katarina: [42, 8, 18, 255],
+            zed: [14, 13, 17, 255],
+            renekton: [24, 26, 21, 255],
+            vladimir: [48, 5, 18, 255],
+            gangplank: [92, 58, 28, 255]
+          };
+          return this.createCpuAnimatedChampionModel(
+            champion,
+            packed,
+            animatedFallbackColors[champion]
+          );
+        }
         if (champion === "katarina") return this.createKatarinaModel();
         if (champion === "zed") return this.createZedModel();
-        if (champion === "vladimir" && packed.animation?.runtime === "vat-v1") {
-          // Vladimir has a small enough mesh to stream one decoded animation pose per
-          // player.  Do not use the old vertex-animation-texture path here: it was
-          // fragile across drivers and made it impossible to prove the final draw
-          // matched the source model.
-          return this.createCpuAnimatedChampionModel(champion, packed, [48, 5, 18, 255]);
-        }
         const fallbackColors = {
           renekton: [24, 26, 21, 255],
           vladimir: [48, 5, 18, 255],
@@ -515,7 +581,6 @@
       }
 
       ensureChampionModel(champion) {
-        if (champion === "ziggs") return Promise.resolve(true);
         if (!["katarina", "zed", "renekton", "vladimir", "gangplank"].includes(champion)) {
           return Promise.resolve(false);
         }
@@ -705,18 +770,38 @@
         return this.zedModelReadyPromise;
       }
 
-      createCpuAnimatedChampionModel(key, packed, fallbackRgba) {
+      decodePackedBinary(value) {
+        if (value instanceof Uint8Array) return value;
+        if (value instanceof ArrayBuffer) return new Uint8Array(value);
+        if (typeof value !== "string" || !value) {
+          throw new Error("Packed model binary is missing");
+        }
+        const binary = atob(value);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes;
+      }
+
+      async loadPackedBinary(value, url, label) {
+        if (value) return this.decodePackedBinary(value);
+        if (!url) throw new Error(`${label} binary is missing`);
+        const request = globalThis["fetch"];
+        if (typeof request !== "function") throw new Error(`${label} network loader is unavailable`);
+        const response = await request(url);
+        if (!response.ok) {
+          throw new Error(`${label} failed to load (${response.status})`);
+        }
+        return new Uint8Array(await response.arrayBuffer());
+      }
+
+      async createCpuAnimatedChampionModel(key, packed, fallbackRgba) {
         const gl = this.gl;
-        const decode = (base64) => {
-          const binary = atob(base64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          return bytes;
-        };
-        const vertexBytes = decode(packed.vertices);
-        const indexBytes = decode(packed.indices);
-        const frameBytes = decode(packed.frames);
-        const normalBytes = decode(packed.normals);
+        const vertexBytes = this.decodePackedBinary(packed.vertices);
+        const indexBytes = this.decodePackedBinary(packed.indices);
+        const [frameBytes, normalBytes] = await Promise.all([
+          this.loadPackedBinary(packed.frames, packed.framesUrl, `${key} frames`),
+          this.loadPackedBinary(packed.normals, packed.normalsUrl, `${key} normals`),
+        ]);
         const animation = packed.animation;
         const vertexCount = animation.vertexCount;
         const sourceUv = new Float32Array(
@@ -782,9 +867,8 @@
           image.decoding = "async";
           image.onload = () => {
             gl.bindTexture(gl.TEXTURE_2D, texture);
-            // Vladimir's baked UVs are already in the atlas orientation. Flipping
-            // the image samples unrelated pieces of the atlas and destroys the
-            // red/black character material.
+            // Model Viewer glTF UVs are already in atlas orientation. Flipping the
+            // extracted image samples unrelated pieces of the champion atlas.
             gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
             gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
@@ -807,18 +891,14 @@
         return this[`${key}ModelReadyPromise`];
       }
 
-      createVatChampionModel(key, packed, fallbackRgba) {
+      async createVatChampionModel(key, packed, fallbackRgba) {
         const gl = this.gl;
-        const decode = (base64) => {
-          const binary = atob(base64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          return bytes;
-        };
-        const vertexBytes = decode(packed.vertices);
-        const indexBytes = decode(packed.indices);
-        const frameBytes = decode(packed.frames);
-        const normalBytes = decode(packed.normals);
+        const vertexBytes = this.decodePackedBinary(packed.vertices);
+        const indexBytes = this.decodePackedBinary(packed.indices);
+        const [frameBytes, normalBytes] = await Promise.all([
+          this.loadPackedBinary(packed.frames, packed.framesUrl, `${key} frames`),
+          this.loadPackedBinary(packed.normals, packed.normalsUrl, `${key} normals`),
+        ]);
         const animation = packed.animation;
         const [textureWidth, textureHeight] = animation.textureDimensions;
         const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
@@ -1134,9 +1214,11 @@
         const textureGroups = {
           crate: ["crate"],
           crateTop: ["crateTop"],
-          floorLattice: ["floorLattice", "floorPit"],
+          floorLattice: ["floorLattice"],
           floorClearing: ["floorClearing"],
-          floorLabyrinth: ["floorLabyrinth", "floorForts"],
+          floorLabyrinth: ["floorLabyrinth"],
+          floorForts: ["floorForts"],
+          floorPit: ["floorPit"],
           wallLattice: ["wallLattice", "wallClearing", "wallLabyrinth", "wallForts", "wallPit"],
           wallTopLattice: [
             "wallTopLattice", "wallTopClearing", "wallTopLabyrinth", "wallTopForts", "wallTopPit",
@@ -1167,7 +1249,7 @@
         };
         this.arenaTextureReady = Object.fromEntries(keys.map((key) => [key, false]));
         this.arenaTextures = {};
-        // Seven authored sources, seven GPU allocations. Shared theme names remain aliases.
+        // Nine authored sources, nine GPU allocations. Shared wall theme names remain aliases.
         for (const [sourceKey, aliases] of Object.entries(textureGroups)) {
           const texture = make(sourceKey, aliases, fallbacks[sourceKey] || [80, 80, 80, 255]);
           for (const alias of aliases) this.arenaTextures[alias] = texture;
@@ -1339,7 +1421,7 @@
         const cssW = Math.max(1, this.canvas.clientWidth);
         const cssH = Math.max(1, this.canvas.clientHeight);
         const pixels = cssW * cssH * this.scale * this.scale;
-        const budget = 2560 * 1440;
+        const budget = this.pixelBudget || 2560 * 1440;
         const scale = pixels > budget ? this.scale * Math.sqrt(budget / pixels) : this.scale;
         const w = Math.max(1, Math.round(cssW * scale));
         const h = Math.max(1, Math.round(cssH * scale));
@@ -1620,125 +1702,7 @@
         gl.disable(gl.BLEND);
       }
 
-      drawZiggs(player, t, beat) {
-        const C = player.side === "red" ? Renderer.redColors : Renderer.colors;
-        const blink = (player.invulnerable > 0 && Math.floor(player.invulnerable * 12) % 2 === 0) || player.hurt > 0;
-        const bob = Math.sin(t * 7.2) * 0.035 + (player.dashing > 0 ? 0.08 : 0);
-        const stride = Math.sin(t * 11.5) * 0.18;
-        const dashGlow = player.dashing > 0 ? 3.2 : 0.75;
-        const fur = blink ? C.white : C.ziggsFur;
-        const face = blink ? C.white : C.ziggsFace;
-        const part = (mesh, local, scale, color, material = 0, emissive = 0,
-          rz = 0, rx = 0, ryOffset = 0, alpha = 1) =>
-          this.drawPart(mesh, player, player.facing, local, scale, color, material,
-            emissive, rz, rx, ryOffset, alpha);
-
-        part("sphere", [0, 0.035, 0], [0.67, 0.035, 0.67], C.blueSide, 4, 0.75 + beat, 0, 0, 0, 0.42);
-        part("sphere", [0, 0.075, 0], [0.48, 0.045, 0.38], C.ziggsShadow, 0, 0.02, 0, 0, 0, 0.82);
-
-        // Rear mega-bomb: its round mass and cream retaining strap are a primary Ziggs silhouette cue.
-        part("sphere", [0.72, 0.76 + bob, -0.12], [0.38, 0.41, 0.38],
-          C.ziggsBombRed, 0, 0.12 + beat * 0.06);
-        part("cube", [0.72, 0.76 + bob, 0.23], [0.35, 0.045, 0.04],
-          C.ziggsBombTrim, 2, 0.28, 0.08);
-        part("cube", [0.72, 0.76 + bob, 0.235], [0.045, 0.36, 0.04],
-          C.ziggsBombTrim, 2, 0.28, -0.06);
-        part("cylinder", [0.72, 1.15 + bob, -0.12], [0.1, 0.11, 0.1],
-          C.ziggsIron, 0, 0.12, 0.08);
-        part("crystal", [0.77, 1.31 + bob, -0.08], [0.055, 0.18, 0.055],
-          C.ziggsFuse, 3, 2.1 + beat, 0.34);
-
-        // Compact limbs and pointed boots keep the yordle proportion instead of a human mannequin.
-        part("cylinder", [-0.17, 0.3 + bob, 0.01], [0.1, 0.21, 0.1],
-          C.ziggsCoatDark, 0, 0.08, -0.22 + stride);
-        part("cylinder", [0.17, 0.3 + bob, 0.01], [0.1, 0.21, 0.1],
-          C.ziggsCoatDark, 0, 0.08, 0.22 - stride);
-        part("cone", [-0.2, 0.15 + bob, 0.16], [0.15, 0.2, 0.18],
-          C.ziggsBoot, 0, 0.08, 0.18 + stride);
-        part("cone", [0.2, 0.15 + bob, 0.16], [0.15, 0.2, 0.18],
-          C.ziggsBoot, 0, 0.08, -0.18 - stride);
-
-        part("sphere", [0, 0.57 + bob, 0], [0.35, 0.38, 0.29],
-          C.ziggsCoat, 2, dashGlow + beat * 0.26);
-        part("cube", [0, 0.61 + bob, 0.28], [0.23, 0.055, 0.035],
-          C.ziggsCoatTrim, 0, 0.3);
-        part("cylinder", [-0.34, 0.59 + bob, 0.02], [0.09, 0.25, 0.09],
-          C.ziggsCoatDark, 0, 0.08, -0.73 - stride * 0.7);
-        part("cylinder", [0.34, 0.59 + bob, 0.02], [0.09, 0.25, 0.09],
-          C.ziggsCoatDark, 0, 0.08, 0.73 + stride * 0.7);
-        part("cylinder", [-0.47, 0.47 + bob, 0.1], [0.13, 0.07, 0.13],
-          C.ziggsCuff, 2, 0.35, -0.72);
-        part("cylinder", [0.47, 0.47 + bob, 0.1], [0.13, 0.07, 0.13],
-          C.ziggsCuff, 2, 0.35, 0.72);
-        part("sphere", [-0.5, 0.43 + bob, 0.13], [0.14, 0.13, 0.15],
-          C.ziggsGlove, 0, 0.1);
-        part("sphere", [0.5, 0.43 + bob, 0.13], [0.14, 0.13, 0.15],
-          C.ziggsGlove, 0, 0.1);
-
-        // Likeness-first head block derived from the img2threejs character intake.
-        part("sphere", [0, 1.02 + bob, 0.02], [0.5, 0.43, 0.41],
-          face, 0, 0.12 + beat * 0.04);
-        part("crystal", [-0.49, 1.11 + bob, -0.01], [0.18, 0.43, 0.16],
-          fur, 2, 0.34, -1.03, 0.04);
-        part("crystal", [0.49, 1.11 + bob, -0.01], [0.18, 0.43, 0.16],
-          fur, 2, 0.34, 1.03, -0.04);
-        part("crystal", [-0.43, 0.93 + bob, 0.16], [0.19, 0.29, 0.12],
-          C.ziggsFurLight, 2, 0.3, -0.86, -0.1);
-        part("crystal", [0.43, 0.93 + bob, 0.16], [0.19, 0.29, 0.12],
-          C.ziggsFurLight, 2, 0.3, 0.86, -0.1);
-
-        // Segmented aviator cap, forehead clamp, and fuse bomb.
-        part("sphere", [0, 1.3 + bob, -0.02], [0.46, 0.2, 0.38],
-          C.ziggsHelmet, 2, 0.16);
-        part("cube", [0, 1.39 + bob, 0.1], [0.11, 0.13, 0.34],
-          C.ziggsHelmetDark, 0, 0.12);
-        part("cube", [0, 1.23 + bob, 0.38], [0.12, 0.09, 0.045],
-          C.ziggsBombTrim, 2, 0.38);
-        part("sphere", [0, 1.58 + bob, -0.04], [0.16, 0.17, 0.16],
-          C.ziggsBombRed, 0, 0.2 + beat * 0.08);
-        part("crystal", [0.055, 1.78 + bob, -0.02], [0.045, 0.16, 0.045],
-          C.ziggsFuse, 3, 3.4 + beat * 2, 0.42);
-
-        // The grin is a dark crescent populated by repeated bright teeth.
-        part("sphere", [0, 0.86 + bob, 0.385], [0.34, 0.13, 0.055],
-          C.ziggsMouth, 0, 0.02, 0, -0.12);
-        for (let i = -3; i <= 3; i++) {
-          const x = i * 0.075;
-          const y = 0.875 + Math.abs(i) * 0.009;
-          part("cube", [x, y + bob, 0.438], [0.028, 0.043, 0.022],
-            C.ziggsTeeth, 0, 0.28, i * 0.025);
-        }
-        part("sphere", [0, 0.995 + bob, 0.438], [0.055, 0.045, 0.04],
-          C.ziggsNose, 0, 0.2);
-
-        // Nested red housings, brass rims, emissive lime lenses, and specular dots.
-        for (const side of [-1, 1]) {
-          part("torus", [side * 0.215, 1.095 + bob, 0.39], [0.235, 0.235, 0.095],
-            C.ziggsGoggleRed, 2, 0.42, 0, -0.32);
-          part("torus", [side * 0.215, 1.095 + bob, 0.425], [0.195, 0.195, 0.075],
-            C.ziggsGoggleGold, 2, 0.72, 0, -0.32);
-          part("sphere", [side * 0.215, 1.095 + bob, 0.456], [0.15, 0.15, 0.045],
-            C.ziggsLens, 0, 0.82 + beat * 0.18, 0, -0.32);
-          part("sphere", [side * 0.175, 1.145 + bob, 0.495], [0.035, 0.035, 0.018],
-            C.white, 4, 0.7 + beat * 0.18, 0, -0.32);
-        }
-        part("cube", [0, 1.095 + bob, 0.43], [0.075, 0.035, 0.035],
-          C.ziggsGoggleGold, 2, 0.65);
-
-        if (player.shield > 0) {
-          this.drawShieldField(player, t, beat, 0.8 + bob, 0.76, 0.9);
-        }
-        if (player.dashing > 0) {
-          for (let i = 1; i <= 3; i++) {
-            this.draw("sphere",
-              [player.x - player.lastDx * i * 0.24, 0.5, player.z - player.lastDz * i * 0.24],
-              [0.42 - i * 0.07, 0.5 - i * 0.08, 0.42 - i * 0.07],
-              C.rift, 4, 2.2 - i * 0.45, player.facing, 0.25 - i * 0.045);
-          }
-        }
-      }
-
-      drawKatarinaFallback(player, t, beat) {
+drawKatarinaFallback(player, t, beat) {
         const C = Renderer.colors;
         const blink = (player.invulnerable > 0 && Math.floor(player.invulnerable * 12) % 2 === 0) || player.hurt > 0;
         const lotus = player.ultChannel > 0;
@@ -1757,7 +1721,7 @@
         // Blue-side selection ring and a thin Noxian red inner blade mark.
         part("sphere", [0, 0.035, 0], [0.69, 0.035, 0.69], C.blueSide, 4, 0.7 + beat, 0, 0, 0, 0.38);
         part("torus", [0, 0.07, 0], [0.48, 0.48, 0.055], C.katCrimson, 4, 1.2 + beat, 0, 0, 0, 0.62);
-        part("sphere", [0, 0.08, 0], [0.42, 0.035, 0.34], C.ziggsShadow, 0, 0.02, 0, 0, 0, 0.84);
+        part("sphere", [0, 0.08, 0], [0.42, 0.035, 0.34], C.shadow, 0, 0.02, 0, 0, 0, 0.84);
 
         // Long assassin proportions, plated boots and asymmetric thigh armor.
         part("cylinder", [-0.18, 0.46 + bob, 0], [0.105, 0.34, 0.105], C.katLeather, 0, 0.06, -0.08 + stride);
@@ -1840,6 +1804,7 @@
           this.drawKatarinaFallback(player, t, beat);
           return;
         }
+        if (this.katarinaCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "katarina")) return;
 
         const gl = this.gl;
         const C = Renderer.colors;
@@ -1865,7 +1830,7 @@
           C.katCrimsonDark, 4, 0.45 + beat * 0.16 + lotus * 2.4,
           -t * 2.2, 0.66, 0, Math.PI * 0.5);
         this.draw("sphere", [player.x, 0.075, player.z], [0.48, 0.035, 0.36],
-          C.ziggsShadow, 0, 0.02, 0, 0.88);
+          C.shadow, 0, 0.02, 0, 0.88);
 
         // The mesh and animations now come from the same Battle Queen rig, so
         // its authored forward axis can follow gameplay directly.
@@ -1945,6 +1910,7 @@
             C.zedCrimson, 3, 1.8 + beat, player.facing, shadow ? 0.5 : 1);
           return;
         }
+        if (this.zedCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "zed")) return;
 
         const gl = this.gl;
         const teleport = player.zedUltAnim > 0 ? 1 : 0;
@@ -1979,7 +1945,7 @@
             C.zedShadow, 4, 0.3, 0, 0.7 * fade);
         }
         this.draw("sphere", [player.x, 0.074, player.z], [0.48, 0.034, 0.36],
-          C.ziggsShadow, 0, 0.02, 0, shadow ? 0.68 : 0.88);
+          C.shadow, 0, 0.02, 0, shadow ? 0.68 : 0.88);
 
         const scale = modelReviewMode ? 1.14 : 1;
         const model = modelMatrix(player.x, 0.02 + bob, player.z, scale, scale, scale, player.facing || 0);
@@ -2052,62 +2018,80 @@
         };
       }
 
-      resolveVladimirAnimation(player, t) {
-        const animation = this.vladimirAnimation;
+      sampleChampionAction(animation, action, progress) {
+        const clipKey = animation.actions?.[action];
+        if (!clipKey) throw new Error(`Missing VAT action mapping: ${action}`);
+        return { ...this.sampleVatClip(animation, clipKey, progress), key: action, clipKey };
+      }
+
+      resolveChampionAnimation(player, t, key) {
+        const animation = this[`${key}Animation`];
         const poolRemaining = player.vladimirPool || 0;
         let desired;
-        if (poolRemaining > 0) {
+        const action = (name, remaining, duration) => this.sampleChampionAction(
+          animation,
+          name,
+          clamp(1 - remaining / duration, 0, 1)
+        );
+        if (key === "vladimir" && poolRemaining > 0) {
           if (poolRemaining > 1.18) {
-            desired = this.sampleVatClip(
-              animation,
-              "poolDown",
+            desired = this.sampleChampionAction(
+              animation, "poolDown",
               clamp((1.45 - poolRemaining) / 0.27, 0, 1)
             );
           } else if (poolRemaining < 0.24) {
-            desired = this.sampleVatClip(
-              animation,
-              "poolUp",
+            desired = this.sampleChampionAction(
+              animation, "poolUp",
               clamp(1 - poolRemaining / 0.24, 0, 1)
             );
           } else {
-            this.vladimirAnimationStates.delete(player.id);
+            this.championAnimationStates.delete(`${key}:${player.id}`);
             return { hidden: true, key: "pool" };
           }
-        } else if (player.vladimirQAnim > 0) {
-          desired = this.sampleVatClip(
-            animation,
-            "q",
-            1 - player.vladimirQAnim / 0.56
-          );
-        } else if (player.vladimirEAnim > 0) {
-          desired = this.sampleVatClip(
-            animation,
-            "e",
-            1 - player.vladimirEAnim / 0.62
-          );
-        } else if (player.vladimirUltAnim > 0) {
-          desired = this.sampleVatClip(
-            animation,
-            "r",
-            1 - player.vladimirUltAnim / 0.66
-          );
-        } else if (player.vladimirAttackAnim > 0) {
-          desired = this.sampleVatClip(
-            animation,
-            "attack",
-            1 - player.vladimirAttackAnim / 0.42
-          );
+        } else if (key === "vladimir" && player.vladimirQAnim > 0) {
+          desired = action("q", player.vladimirQAnim, 0.56);
+        } else if (key === "vladimir" && player.vladimirEAnim > 0) {
+          desired = action("e", player.vladimirEAnim, 0.62);
+        } else if (key === "vladimir" && player.vladimirUltAnim > 0) {
+          desired = action("r", player.vladimirUltAnim, 0.66);
+        } else if (key === "vladimir" && player.vladimirAttackAnim > 0) {
+          desired = action("attack", player.vladimirAttackAnim, 0.42);
+        } else if (key === "katarina" && player.ultChannel > 0) {
+          desired = action("r", player.ultChannel, 1.65);
+        } else if (key === "katarina" && player.spin > 0) {
+          desired = action("w", player.spin, 0.58);
+        } else if (key === "katarina" && player.dashing > 0) {
+          desired = action("e", player.dashing, 0.18);
+        } else if (key === "zed" && player.zedUltAnim > 0) {
+          desired = action("r", player.zedUltAnim, 0.68);
+        } else if (key === "zed" && player.zedSlashAnim > 0) {
+          desired = action("e", player.zedSlashAnim, 0.52);
+        } else if (key === "renekton" && player.renektonUltAnim > 0) {
+          desired = action("r", player.renektonUltAnim, 0.72);
+        } else if (key === "renekton" && player.renektonDashAnim > 0) {
+          desired = action("e", player.renektonDashAnim, 0.46);
+        } else if (key === "renekton" && player.renektonSlashAnim > 0) {
+          desired = action("q", player.renektonSlashAnim, 0.58);
+        } else if (key === "gangplank" && player.gangplankUltAnim > 0) {
+          desired = action("r", player.gangplankUltAnim, 0.7);
+        } else if (key === "gangplank" && player.gangplankKegAnim > 0) {
+          desired = action("e", player.gangplankKegAnim, 0.42);
+        } else if (key === "gangplank" && player.gangplankShotAnim > 0) {
+          desired = action("q", player.gangplankShotAnim, 0.48);
+        } else if (player.castAnim > 0) {
+          desired = action("q", player.castAnim, player.castDuration || 0.5);
         } else {
-          const key = player.moving ? "run" : "idle";
-          const clip = animation.clips[key];
-          const speed = key === "run" ? 1.52 : 1;
+          const locomotion = player.moving ? "run" : "idle";
+          const clip = animation.clips[animation.actions[locomotion]];
+          const speed = locomotion === "run" ? 1.52 : 1;
           const phase = prefersReducedMotion
             ? 0.35
             : (t * speed + player.id * 0.173) / clip.duration;
-          desired = this.sampleVatClip(animation, key, phase);
+          desired = this.sampleChampionAction(animation, locomotion, phase);
         }
 
-        let state = this.vladimirAnimationStates.get(player.id);
+        const stateKey = `${key}:${player.id}`;
+        let state = this.championAnimationStates.get(stateKey);
         if (!state) {
           state = {
             key: desired.key,
@@ -2115,7 +2099,7 @@
             previous: desired,
             current: desired
           };
-          this.vladimirAnimationStates.set(player.id, state);
+          this.championAnimationStates.set(stateKey, state);
         } else if (state.key !== desired.key) {
           state.previous = state.current;
           state.key = desired.key;
@@ -2127,6 +2111,17 @@
           : clamp((t - state.changedAt) / 0.12, 0, 1);
         if (transition >= 1) state.previous = desired;
         return { ...desired, previous: state.previous, transition, hidden: false };
+      }
+
+      resolveVladimirAnimation(player, t) {
+        return this.resolveChampionAnimation(player, t, "vladimir");
+      }
+
+      prepareCpuAnimatedChampion(player, t, key) {
+        const frame = this.resolveChampionAnimation(player, t, key);
+        if (frame.hidden) return false;
+        this.updateCpuAnimatedChampion(key, frame);
+        return true;
       }
 
       updateCpuAnimatedChampion(key, frame) {
@@ -2167,9 +2162,18 @@
 
       drawCpuAnimatedChampion(player, t, beat, key, style, options = {}) {
         if (!this[`${key}Ready`]) return this.drawVatChampion(player, t, beat, key, style, options);
-        const frame = this.resolveVladimirAnimation(player, t);
+        const frame = this.resolveChampionAnimation(player, t, key);
         if (frame.hidden) return false;
         this.updateCpuAnimatedChampion(key, frame);
+        const C = Renderer.colors;
+        // CPU-streamed poses still need a fixed contact shadow. Without it, a
+        // grounded mesh reads as floating whenever the camera angle changes.
+        this.draw("sphere", [player.x, 0.035, player.z], [0.74, 0.035, 0.74],
+          C.blueSide, 4, 0.8 + beat, t, 0.38);
+        this.draw("torus", [player.x, 0.064, player.z], [0.56, 0.052, 0.56],
+          C.vladimirCrimson, 4, 0.68 + beat * 0.2, -t * 1.9, 0.72, 0, Math.PI * 0.5);
+        this.draw("sphere", [player.x, 0.073, player.z], [0.5, 0.034, 0.38],
+          C.vladimirBloodDark, 0, 0.025, 0, 0.88);
         const gl = this.gl;
         const model = modelMatrix(player.x, 0.02, player.z,
           options.scale || 1, options.scale || 1, options.scale || 1, player.facing || 0);
@@ -2235,7 +2239,7 @@
           return false;
         }
 
-        const frame = this.resolveVladimirAnimation(player, t);
+        const frame = this.resolveChampionAnimation(player, t, key);
         if (frame.hidden) return false;
         const gl = this.gl;
         const animation = this[`${key}Animation`];
@@ -2439,6 +2443,7 @@
           ? Math.sin(ultProgress * Math.PI)
           : dominus ? 0.12 + Math.sin(t * 2.8) * 0.035 : 0;
         const scale = (modelReviewMode ? 1.08 : 0.92) * (dominus ? 1.16 : 1);
+        if (this.renektonCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "renekton")) return;
         this.drawPackedChampion(player, t, beat, "renekton", 2, {
           scale,
           ult: ultPose,
@@ -2505,6 +2510,7 @@
           ? clamp(1 - player.gangplankUltAnim / 0.7, 0, 1)
           : 0;
         const ultPose = player.gangplankUltAnim > 0 ? Math.sin(ultProgress * Math.PI) : 0;
+        if (this.gangplankCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "gangplank")) return;
         this.drawPackedChampion(player, t, beat, "gangplank", 4, {
           scale: modelReviewMode ? 1.14 : 1.05,
           ult: ultPose,
@@ -2650,10 +2656,10 @@
         const compact = aspect < 0.8;
         const t = now * 0.001;
         const beat = sfx.visualPulse();
-        const essentialShake = prefersReducedMotion ? 0 : this.cameraShake;
+        const essentialShake = (prefersReducedMotion || this.mobilePerf) ? 0 : this.cameraShake;
         const shakeX = Math.sin(t * 61) * essentialShake * 0.2;
         const shakeZ = Math.cos(t * 47) * essentialShake * 0.16;
-        const orbit = prefersReducedMotion ? 0 : Math.sin(t * 0.16) * 0.32;
+        const orbit = prefersReducedMotion || this.mobilePerf ? 0 : Math.sin(t * 0.16) * 0.32;
         const reviewCamera = modelReviewTarget === "baron"
           ? { eye: [0, 3.75, 7.2], target: [0, 1.2, 0], fov: 0.68 }
           : modelReviewTarget === "herald"
@@ -2665,15 +2671,42 @@
               : ["katarina", "zed", "vladimir"].includes(modelReviewTarget)
                 ? { eye: [0, 2.48, 5.65], target: [0, 1.2, 0], fov: 0.57 }
               : { eye: [0, 2.65, 4.45], target: [0, 0.88, 0], fov: 0.58 };
+        const focusPlayer = !modelReviewMode && this.viewPlayerId
+          ? game.players?.find((player) => player.id === this.viewPlayerId)
+          : null;
+        const overviewEye = compact
+          ? [shakeX + orbit, 19.5, 15.5 + shakeZ]
+          : [shakeX + orbit, 14.6, 13.4 + shakeZ];
+        const overviewTarget = [0, 0.2, compact ? 0.05 : 0.12];
+        // Keep the widest zoom centered on the whole arena, then progressively
+        // converge on the local player. At close zoom the champion is centered;
+        // at overview zoom the maximum useful arena remains visible.
+        const closeEye = compact
+          ? [shakeX + orbit, 12.2, 9.8 + shakeZ]
+          : [shakeX + orbit, 8.8, 7.6 + shakeZ];
+        const zoom = focusPlayer ? this.viewZoom : 0;
+        const followZoom = clamp((zoom - 0.1) / 0.9, 0, 1);
+        const framedX = focusPlayer ? focusPlayer.x * followZoom : 0;
+        const framedZ = focusPlayer ? focusPlayer.z * followZoom : 0;
+        const zoomEye = overviewEye.map((value, index) => lerp(value, closeEye[index], zoom));
         const eye = modelReviewMode
           ? reviewCamera.eye
-          : compact
-            ? [shakeX + orbit, 19.5, 15.5 + shakeZ]
-            : [shakeX + orbit, 14.6, 13.4 + shakeZ];
+          : focusPlayer
+            ? [zoomEye[0] + framedX, zoomEye[1], zoomEye[2] + framedZ]
+            : overviewEye;
         const target = modelReviewMode
           ? reviewCamera.target
-          : [0, 0.2, compact ? 0.05 : 0.12];
-        const projection = mat4Perspective(modelReviewMode ? reviewCamera.fov : (compact ? 0.84 : 0.74), aspect, 0.1, 70);
+          : focusPlayer
+            ? [overviewTarget[0] + framedX, overviewTarget[1], overviewTarget[2] + framedZ]
+            : overviewTarget;
+        const projection = mat4Perspective(
+          modelReviewMode ? reviewCamera.fov : focusPlayer
+            ? lerp(compact ? 0.84 : 0.74, compact ? 0.7 : 0.62, zoom)
+            : (compact ? 0.84 : 0.74),
+          aspect,
+          0.1,
+          70
+        );
         const view = mat4LookAt(eye, target);
         const vp = mat4Multiply(projection, view);
         this.lastViewProjection = vp;
@@ -2981,9 +3014,7 @@
         }
 
         const player = game.player;
-        if (modelReviewMode && modelReviewTarget === "ziggs" && player) {
-          this.drawZiggs({ ...player, x: 0, z: 0, facing: 0, invulnerable: 0, dashing: 0 }, t, beat);
-        } else if (modelReviewMode && modelReviewTarget === "katarina" && player) {
+        if (modelReviewMode && modelReviewTarget === "katarina" && player) {
           this.drawKatarina({
             ...player,
             champion: "katarina",
@@ -3072,7 +3103,6 @@
             else if (contestant.champion === "renekton") this.drawRenekton(contestant, t, beat);
             else if (contestant.champion === "vladimir") this.drawVladimir(contestant, t, beat);
             else if (contestant.champion === "gangplank") this.drawGangplank(contestant, t, beat);
-            else this.drawZiggs(contestant, t, beat);
           }
         }
 
@@ -3090,17 +3120,17 @@
         gl.uniform2f(this.postUniforms.uResolution, this.width, this.height);
         gl.uniform1f(this.postUniforms.uTime, t);
         gl.uniform1f(this.postUniforms.uBeat, beat);
-        gl.uniform1f(this.postUniforms.uEnergy, sfx.intensity);
-        gl.uniform1f(this.postUniforms.uHit, this.hitPulse);
+        gl.uniform1f(this.postUniforms.uEnergy, this.mobilePerf ? sfx.intensity * 0.55 : sfx.intensity);
+        gl.uniform1f(this.postUniforms.uHit, this.mobilePerf ? this.hitPulse * 0.55 : this.hitPulse);
         gl.uniform1f(this.postUniforms.uHealth, player ? player.health / player.maxHealth : 1);
-        gl.uniform1f(this.postUniforms.uReduced, prefersReducedMotion ? 1 : 0);
-        const shocks = this.shocks.slice(0, 4);
+        gl.uniform1f(this.postUniforms.uReduced, (prefersReducedMotion || this.mobilePerf) ? 1 : 0);
+        const shocks = this.mobilePerf ? this.shocks.slice(0, 2) : this.shocks.slice(0, 4);
         for (let i = 0; i < 4; i++) {
           const s = shocks[i];
           const loc = this.postUniforms[`uShock${i}`];
           if (s) {
             const uv = projectPoint(vp, [s.x, 0.2, s.z]);
-            gl.uniform4f(loc, uv[0], uv[1], s.age, s.strength);
+            gl.uniform4f(loc, uv[0], uv[1], s.age, this.mobilePerf ? s.strength * 0.7 : s.strength);
           } else {
             gl.uniform4f(loc, -2, -2, 2, 0);
           }
@@ -3109,16 +3139,28 @@
         gl.bindVertexArray(null);
 
         // Real skill icons as DOM discs over the WebGL pedestals
-        if (!modelReviewMode) this.syncSkillTokenDom(game.pickups, t);
+        if (!modelReviewMode) {
+          // DOM layout thrash is expensive on phones — refresh less often.
+          if (!this.mobilePerf || (now - (this.lastSkillTokenSync || 0)) > 48) {
+            this.syncSkillTokenDom(game.pickups, t);
+            this.lastSkillTokenSync = now;
+          }
+        }
 
         const frameMs = dt * 1000;
         this.frameSamples.push(frameMs);
-        if (this.frameSamples.length > 120) this.frameSamples.shift();
-        if (now - this.lastQualityCheck > 2600 && this.frameSamples.length > 30) {
+        if (this.frameSamples.length > (this.mobilePerf ? 45 : 120)) this.frameSamples.shift();
+        const qualityInterval = this.mobilePerf ? 900 : 2600;
+        if (now - this.lastQualityCheck > qualityInterval && this.frameSamples.length > 12) {
           const avg = this.frameSamples.reduce((a, b) => a + b, 0) / this.frameSamples.length;
-          if (avg > 22 && this.scale > 0.7) this.scale = Math.max(0.7, this.scale - 0.12);
-          else if (avg < 15 && this.scale < Math.min(devicePixelRatio || 1, 1.45)) this.scale += 0.06;
-          UI.gpuLabel.textContent = `WebGL2 · ${Math.round(this.scale * 100)}%`;
+          const maxScale = this.maxScale ?? Math.min(devicePixelRatio || 1, 1.45);
+          const minScale = this.minScale ?? 0.7;
+          if (avg > (this.mobilePerf ? 18 : 22) && this.scale > minScale) {
+            this.scale = Math.max(minScale, this.scale - (this.mobilePerf ? 0.1 : 0.12));
+          } else if (avg < (this.mobilePerf ? 14 : 15) && this.scale < maxScale) {
+            this.scale = Math.min(maxScale, this.scale + (this.mobilePerf ? 0.04 : 0.06));
+          }
+          UI.gpuLabel.textContent = `WebGL2 · ${Math.round(this.scale * 100)}%${this.mobilePerf ? " · mobile" : ""}`;
           this.lastQualityCheck = now;
           this.frameSamples.length = 0;
         }
@@ -3127,14 +3169,20 @@
       drawParticles(particles, vp, t) {
         if (!particles.length) return;
         const gl = this.gl;
-        const data = new Float32Array(particles.length * 8);
+        const maxDraw = this.mobilePerf ? 80 : particles.length;
+        const list = particles.length > maxDraw ? particles.slice(particles.length - maxDraw) : particles;
+        const needed = list.length * 8;
+        if (!this.particleData || this.particleData.length < needed) {
+          this.particleData = new Float32Array(Math.max(needed, this.mobilePerf ? 640 : 256));
+        }
+        const data = this.particleData;
         let o = 0;
-        for (const p of particles) {
+        for (const p of list) {
           const life = clamp(1 - p.age / p.life, 0, 1);
           data[o++] = p.x;
           data[o++] = p.y;
           data[o++] = p.z;
-          data[o++] = p.size * life;
+          data[o++] = p.size * life * (this.mobilePerf ? 0.92 : 1);
           data[o++] = p.color[0];
           data[o++] = p.color[1];
           data[o++] = p.color[2];
@@ -3149,8 +3197,8 @@
         gl.uniform1f(this.particleUniforms.uTime, t);
         gl.bindVertexArray(this.particleVao);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.particleBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
-        gl.drawArrays(gl.POINTS, 0, particles.length);
+        gl.bufferData(gl.ARRAY_BUFFER, data.subarray(0, needed), gl.DYNAMIC_DRAW);
+        gl.drawArrays(gl.POINTS, 0, list.length);
         gl.bindVertexArray(null);
         gl.depthMask(true);
         gl.disable(gl.BLEND);
@@ -3214,29 +3262,7 @@
       gangplankGold: hexToRgb("#d4a84b"),
       gangplankOrange: hexToRgb("#e07028"),
       gangplankDark: hexToRgb("#1a120c"),
-      gangplankSea: hexToRgb("#2a6b7c"),
-      ziggsFur: hexToRgb("#c58a45"),
-      ziggsFurLight: hexToRgb("#f0d28a"),
-      ziggsFace: hexToRgb("#7a3e2f"),
-      ziggsShadow: hexToRgb("#07151b"),
-      ziggsCoat: hexToRgb("#304a69"),
-      ziggsCoatDark: hexToRgb("#17283f"),
-      ziggsCoatTrim: hexToRgb("#a4b4bf"),
-      ziggsBoot: hexToRgb("#332724"),
-      ziggsGlove: hexToRgb("#4b2d28"),
-      ziggsCuff: hexToRgb("#688397"),
-      ziggsHelmet: hexToRgb("#6f2027"),
-      ziggsHelmetDark: hexToRgb("#16263c"),
-      ziggsGoggleRed: hexToRgb("#8e2828"),
-      ziggsGoggleGold: hexToRgb("#c78b3e"),
-      ziggsLens: hexToRgb("#45d34f"),
-      ziggsMouth: hexToRgb("#260d14"),
-      ziggsTeeth: hexToRgb("#fff3d1"),
-      ziggsNose: hexToRgb("#b8643f"),
-      ziggsBombRed: hexToRgb("#7b201e"),
-      ziggsBombTrim: hexToRgb("#d1ad78"),
-      ziggsIron: hexToRgb("#26282d"),
-      ziggsFuse: hexToRgb("#ffb33d"),
+      gangplankSea: hexToRgb("#2a6b7c"),
       voidling: hexToRgb("#be3f4a"),
       hunter: hexToRgb("#d35b4f"),
       minionRed: hexToRgb("#ad2638"),
@@ -3273,21 +3299,13 @@
       ember: hexToRgb("#e44b55"),
       ice: hexToRgb("#8ee5df"),
       mint: hexToRgb("#59f2b2"),
-      white: hexToRgb("#ffffff")
+      white: hexToRgb("#ffffff"),
+      shadow: hexToRgb("#07151b")
     };
 
     Renderer.redColors = {
       ...Renderer.colors,
       blueSide: Renderer.colors.redSide,
-      ziggsCoat: hexToRgb("#7d2635"),
-      ziggsCoatDark: hexToRgb("#3a1524"),
-      ziggsCoatTrim: hexToRgb("#d4a46c"),
-      ziggsCuff: hexToRgb("#a44850"),
-      ziggsHelmet: hexToRgb("#3a213f"),
-      ziggsHelmetDark: hexToRgb("#1c1128"),
-      ziggsGoggleRed: hexToRgb("#521b31"),
-      ziggsLens: hexToRgb("#ff9b38"),
-      ziggsFuse: hexToRgb("#ff5c45")
     };
 
     Renderer.mainVertex = `#version 300 es
@@ -3353,7 +3371,8 @@
 
       // Fake surface normal from albedo luminance (cheap height-map relief).
       vec3 bumpFromAlbedo(sampler2D map, vec2 uv, vec3 N, float strength) {
-        vec2 texel = vec2(1.0 / 512.0);
+        // Floor/wall albedos are now 1024+ — sample a true texel, not a soft 512 blob.
+        vec2 texel = vec2(1.0 / 1024.0);
         float hC = lum(texture(map, uv).rgb);
         float hX = lum(texture(map, uv + vec2(texel.x * 2.0, 0.0)).rgb);
         float hY = lum(texture(map, uv + vec2(0.0, texel.y * 2.0)).rgb);
@@ -3421,13 +3440,13 @@
             vec3 Nb = mix(NbSide, NbTop, topFace);
             N = normalize(mix(N, Nb, 0.3));
           } else {
-            // FLOOR: one continuous material field across the board. Geometry still
-            // registers every gameplay cell, but authored macro-shapes do not repeat.
-            uv = clamp(vWorld.xz * 0.066 + 0.5, 0.0, 1.0);
+            // FLOOR: continuous board field + multi-scale detail so 1024 albedo
+            // reads at crate/wall clarity from gameplay distance.
+            uv = clamp(vWorld.xz * 0.072 + 0.5, 0.0, 1.0);
             mapUv = uv;
-            albedo = texture(uAlbedo, uv).rgb;
-            vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 0.8);
-            N = normalize(mix(N, Nb, 0.2));
+            albedo = sampleAlbedoDetail(uAlbedo, uv, 5.5, 0.28);
+            vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 1.15);
+            N = normalize(mix(N, Nb, 0.32));
           }
           mapped = 1.0;
           // Recompute lighting terms after bump

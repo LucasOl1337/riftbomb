@@ -84,9 +84,35 @@
     }
 
     /* Match active: kill intro atmosphere, solid tactical void under canvas */
-    html:has(.chrome:not(.is-hidden)) fluid-bg {
-      opacity: 0;
-      visibility: hidden;
+    html:has(.chrome:not(.is-hidden)) fluid-bg,
+    html.is-match-active fluid-bg {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      display: none !important;
+      pointer-events: none !important;
+    }
+
+    html.is-match-active .fx-grain {
+      display: none !important;
+    }
+
+    /* Cleaner mobile arena: solid void, less CRT noise fighting the WebGL pass. */
+    @media (pointer: coarse), (hover: none) {
+      fluid-bg {
+        opacity: 0.03;
+      }
+
+      html.is-match-active #app,
+      html:has(.chrome:not(.is-hidden)) #app {
+        background: #07090d;
+      }
+
+      html.is-match-active .frame,
+      html:has(.chrome:not(.is-hidden)) .frame {
+        box-shadow:
+          inset 0 0 0 1px rgb(10 10 10 / 92%),
+          inset 0 0 3.5rem rgb(10 10 10 / 55%);
+      }
     }
 
     html:has(.chrome:not(.is-hidden)) .scrim {
@@ -585,7 +611,8 @@
     .pause-button,
     .primary,
     .secondary,
-    .touch-key {
+    .touch-key,
+    .touch-btn {
       border: 0;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
@@ -1084,6 +1111,101 @@
       /* brutalist: no translucency */
     }
 
+    .player-selector {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      width: min(46rem, 94vw);
+      margin: 0.85rem auto 0;
+      background: var(--line);
+    }
+
+    .player-selector button {
+      min-height: 2.45rem;
+      border: 0;
+      background: var(--panel);
+      color: var(--phosphor);
+      font: 800 0.68rem/1 var(--data);
+      letter-spacing: 0.08em;
+      cursor: pointer;
+    }
+
+    .player-selector button[aria-pressed="true"] {
+      background: var(--hazard);
+      color: white;
+    }
+
+    .player-two-hud {
+      position: fixed;
+      z-index: 5;
+      right: 1rem;
+      bottom: 1rem;
+      width: calc(50% - 2rem);
+      padding: 0.55rem;
+      border: 1px solid #8e2c2c;
+      background: rgb(10 10 10 / 92%);
+      pointer-events: auto;
+    }
+
+    .player-two-hud[hidden] { display: none; }
+
+    .player-two-hud__head {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      color: #ff8b80;
+      font: 800 0.64rem/1 var(--data);
+      letter-spacing: 0.08em;
+    }
+
+    .player-two-health {
+      height: 0.3rem;
+      margin: 0.38rem 0;
+      overflow: hidden;
+      background: #301010;
+    }
+
+    .player-two-health > span {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #ef4c42;
+      transform-origin: left;
+    }
+
+    .player-two-skills {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.3rem;
+    }
+
+    .player-two-skills button {
+      min-width: 0;
+      min-height: 2.8rem;
+      padding: 0.3rem;
+      border: 1px solid #4e2828;
+      background: #171010;
+      color: #f4ceca;
+      cursor: pointer;
+    }
+
+    .player-two-skills button:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+
+    .player-two-skills kbd,
+    .player-two-skills span { display: block; }
+    .player-two-skills kbd { color: #ff6b5f; font-size: 0.54rem; }
+    .player-two-skills span { margin-top: 0.25rem; font-size: 0.58rem; overflow: hidden; text-overflow: ellipsis; }
+
+    body.is-local-multiplayer .ability-dock {
+      left: 25%;
+      max-width: calc(50% - 1.5rem);
+    }
+
+    body.is-local-multiplayer .player-two-hud { display: block; }
+
     .champion-select > .micro {
       display: grid;
       place-items: center;
@@ -1117,10 +1239,6 @@
       background: var(--ink);
       color: var(--phosphor);
       box-shadow: none;
-    }
-
-    .champion-choice[data-champion="ziggs"][aria-pressed="true"] {
-      background: var(--ink);
     }
 
     .champion-choice[data-champion="zed"][aria-pressed="true"],
@@ -1496,6 +1614,105 @@
       display: none;
     }
 
+    .touch-stick,
+    .touch-btn {
+      display: none;
+    }
+
+    .landscape-gate {
+      display: none;
+      position: fixed;
+      z-index: 80;
+      inset: 0;
+      place-items: center;
+      padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+        max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+      background:
+        radial-gradient(circle at 50% 30%, rgb(70 12 18 / 55%), transparent 48%),
+        rgb(6 6 6 / 94%);
+      color: var(--phosphor);
+      text-align: center;
+    }
+
+    .landscape-gate:not([hidden]) {
+      display: grid;
+    }
+
+    .landscape-gate__card {
+      width: min(22rem, 100%);
+      padding: 1.4rem 1.15rem 1.2rem;
+      border: 1px solid var(--line);
+      border-top: 3px solid var(--hazard);
+      background: var(--panel);
+      box-shadow: 0 1.2rem 2.4rem rgb(0 0 0 / 55%);
+    }
+
+    .landscape-gate__kicker {
+      color: var(--hazard);
+      margin: 0.85rem 0 0.35rem;
+    }
+
+    .landscape-gate__card h2 {
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(1.35rem, 6vw, 1.9rem);
+      letter-spacing: -0.03em;
+      text-transform: uppercase;
+      color: white;
+    }
+
+    .landscape-gate__copy {
+      margin: 0.55rem auto 1rem;
+      max-width: 28ch;
+      font-size: 0.86rem;
+      line-height: 1.45;
+      color: #bdbdbd;
+    }
+
+    .landscape-gate__phone {
+      width: 3.1rem;
+      height: 5.1rem;
+      margin: 0 auto;
+      border: 2px solid var(--hazard);
+      border-radius: 0.55rem;
+      background: var(--void);
+      position: relative;
+      animation: landscape-phone-tilt 1.4s ease-in-out infinite;
+    }
+
+    .landscape-gate__phone-screen {
+      position: absolute;
+      inset: 0.45rem 0.35rem 0.7rem;
+      background: linear-gradient(180deg, #2a2a2a, #111);
+    }
+
+    .landscape-gate__phone::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: 0.22rem;
+      width: 0.7rem;
+      height: 0.18rem;
+      transform: translateX(-50%);
+      background: var(--line);
+    }
+
+    @keyframes landscape-phone-tilt {
+      0%, 100% { transform: rotate(0deg); }
+      40% { transform: rotate(90deg); }
+      70% { transform: rotate(90deg); }
+    }
+
+    html.needs-landscape .touch-controls,
+    html.needs-landscape .chrome {
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    html.needs-landscape #arena {
+      filter: blur(2px) saturate(0.7) brightness(0.55);
+    }
+
     .sr-only {
       position: absolute !important;
       width: 1px !important;
@@ -1531,6 +1748,7 @@
       }
     }
 
+    /* Phone menus can stay portrait; match chrome is landscape-first. */
     @media (max-width: 42rem), (pointer: coarse) {
       .champion-select {
         width: 100%;
@@ -1560,121 +1778,357 @@
         padding: 0.4rem;
       }
 
-      .topbar {
-        top: 0.75rem;
-        left: 0.75rem;
-        right: 0.75rem;
-      }
-
-      .brand-copy span { display: none; }
-      .brand-mark { width: 1.85rem; }
-      .player-card {
-        top: 0.75rem;
-        right: 0.75rem;
-        bottom: auto;
-        left: auto;
-        width: 9.2rem;
-        min-height: 3.35rem;
-        padding: 0.55rem 0.62rem 0.65rem 3.25rem;
-        transform: none;
-      }
-      .champion-portrait {
-        left: 0.35rem;
-        bottom: 0.35rem;
-        width: 2.55rem;
-        height: 2.55rem;
-      }
-      .player-line > .micro { display: none; }
-      .score-stack { top: 4.5rem; left: 0.85rem; width: 8rem; }
-      .score-meta { display: grid; gap: 0.18rem; }
-      .boss-panel { top: 4.55rem; width: min(22rem, 62vw); }
-      .ability-dock,
-      .guide-button,
-      .pause-button,
-      .minimap { display: none; }
-      .event-feed { top: 16%; }
-
-      .touch-controls {
-        position: fixed;
-        z-index: 5;
-        inset: auto 0 4.8rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: end;
-        padding: 0 0.85rem;
-        pointer-events: none;
-      }
-
-      .dpad {
-        display: grid;
-        grid-template-columns: repeat(3, 2.85rem);
-        grid-template-rows: repeat(2, 2.85rem);
-        gap: 0.22rem;
-        pointer-events: auto;
-      }
-
-      .touch-actions {
-        display: grid;
-        grid-template-columns: repeat(3, 2.85rem);
-        align-items: end;
-        gap: 0.45rem;
-        pointer-events: auto;
-      }
-
-      .touch-key {
-        display: grid;
-        place-items: center;
-        width: 2.85rem;
-        aspect-ratio: 1;
-        border: 1px solid var(--line);
-        border-radius: 0;
-        background: var(--panel);
-        color: var(--phosphor);
-        box-shadow: none;
-        /* brutalist: no translucency */
-        touch-action: none;
-      }
-
-      .touch-key[data-dir="up"] { grid-column: 2; }
-      .touch-key[data-dir="left"] { grid-column: 1; grid-row: 2; }
-      .touch-key[data-dir="down"] { grid-column: 2; grid-row: 2; }
-      .touch-key[data-dir="right"] { grid-column: 3; grid-row: 2; }
-
-      .touch-key.bomb {
-        width: 3.25rem;
-        border-color: var(--hazard);
-        background: rgb(83 52 15 / 52%);
-        color: var(--gold);
-      }
-
-      .touch-key.dash {
-        color: var(--ice);
-      }
-
-      .touch-key.kat-q,
-      .touch-key.mine {
-        color: #ff8190;
-        border-color: rgb(228 75 85 / 35%);
-        background: rgb(63 11 25 / 58%);
-      }
-
-      .touch-key.ult {
-        color: var(--gold);
-        border-color: rgb(228 75 85 / 35%);
-        background: rgb(74 20 28 / 58%);
-      }
-
-      .touch-key.mine {
-        color: #78d79b;
-      }
-
-      .guide-grid { grid-template-columns: 1fr; }
-      .guide-section.wide { grid-column: auto; }
       .intro { padding: 0.75rem 0.65rem 1rem; }
       .intro h1 { font-size: clamp(2.4rem, 14vw, 4.8rem); }
       .intro-lede { font-size: 0.8rem; max-width: 34rem; margin-top: 0.55rem; }
       .intro-notes { display: none; }
       .legal { font-size: 0.46rem; margin-top: 0.55rem; }
+    }
+
+    /* Match HUD + controls: landscape phone / short height (sideways play). */
+    @media (orientation: landscape) and (pointer: coarse),
+           (orientation: landscape) and (max-height: 520px) {
+      .topbar {
+        top: max(0.35rem, env(safe-area-inset-top));
+        left: max(0.55rem, env(safe-area-inset-left));
+        right: max(0.55rem, env(safe-area-inset-right));
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .brand-copy span { display: none; }
+      .brand-mark { width: 1.55rem; }
+      .brand-copy strong { font-size: 0.78rem; }
+
+      .wave-ribbon {
+        min-width: 0;
+        padding: 0.28rem 0.7rem 0.35rem;
+      }
+
+      .wave-ribbon strong { font-size: 0.72rem; }
+
+      .player-card {
+        position: fixed;
+        top: max(0.35rem, env(safe-area-inset-top));
+        right: max(0.45rem, env(safe-area-inset-right));
+        bottom: auto;
+        left: auto;
+        width: 8.4rem;
+        min-height: 2.9rem;
+        padding: 0.4rem 0.5rem 0.45rem 2.85rem;
+        transform: none;
+        z-index: 5;
+      }
+
+      .champion-portrait {
+        left: 0.28rem;
+        bottom: 0.28rem;
+        width: 2.2rem;
+        height: 2.2rem;
+      }
+
+      .player-line > .micro { display: none; }
+      .score-stack {
+        top: max(2.7rem, calc(env(safe-area-inset-top) + 2.2rem));
+        left: max(0.55rem, env(safe-area-inset-left));
+        width: 7.2rem;
+      }
+      .score { font-size: clamp(1.5rem, 6vh, 2.2rem); }
+      .score-meta { display: grid; gap: 0.1rem; font-size: 0.55rem; }
+      .boss-panel { top: 3rem; width: min(18rem, 42vw); }
+      .ability-dock,
+      .guide-button,
+      .pause-button,
+      .minimap { display: none; }
+      .event-feed { top: 14%; left: 50%; transform: translateX(-50%); width: min(28rem, 70vw); }
+
+      /*
+       * Wild Rift-style mobile chrome:
+       * left translucent stick, right skill arc + large attack (bomb).
+       */
+      .touch-controls {
+        position: fixed;
+        z-index: 12;
+        inset: auto 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 0.25rem;
+        padding:
+          0
+          max(0.55rem, env(safe-area-inset-right))
+          max(0.3rem, env(safe-area-inset-bottom))
+          max(0.55rem, env(safe-area-inset-left));
+        pointer-events: none;
+      }
+
+      .touch-stick {
+        display: grid;
+        place-items: center;
+        width: clamp(7.2rem, 28vh, 9rem);
+        height: clamp(7.2rem, 28vh, 9rem);
+        margin: 0 0 0.15rem 0.1rem;
+        pointer-events: auto;
+        touch-action: none;
+        user-select: none;
+      }
+
+      .touch-stick__base {
+        position: relative;
+        width: 88%;
+        height: 88%;
+        border-radius: 50%;
+        border: 2px solid rgb(120 220 255 / 38%);
+        background:
+          radial-gradient(circle at 50% 45%, rgb(70 160 210 / 18%), rgb(6 14 22 / 22%) 58%, rgb(0 0 0 / 18%) 100%);
+        box-shadow:
+          0 0 0 1px rgb(80 190 255 / 18%),
+          0 0 1.4rem rgb(40 160 220 / 22%),
+          inset 0 0 1.2rem rgb(40 140 200 / 16%);
+      }
+
+      .touch-stick__ring {
+        position: absolute;
+        inset: 0.55rem;
+        border-radius: 50%;
+        border: 2px solid rgb(110 220 255 / 42%);
+        box-shadow: 0 0 0.8rem rgb(70 200 255 / 25%);
+        pointer-events: none;
+      }
+
+      .touch-stick__knob {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 2.85rem;
+        height: 2.85rem;
+        margin: -1.425rem 0 0 -1.425rem;
+        border-radius: 50%;
+        border: 2px solid rgb(190 245 255 / 70%);
+        background:
+          radial-gradient(circle at 35% 28%, #f4fcff, #8fd4ef 46%, #2a6f92 100%);
+        box-shadow:
+          0 0 0.7rem rgb(90 210 255 / 45%),
+          0 0.2rem 0.55rem rgb(0 0 0 / 45%),
+          inset 0 1px 0 rgb(255 255 255 / 65%);
+        transform: translate3d(0, 0, 0);
+        will-change: transform;
+        pointer-events: none;
+      }
+
+      .touch-stick.is-active .touch-stick__base {
+        border-color: rgb(140 235 255 / 70%);
+        box-shadow:
+          0 0 0 2px rgb(90 210 255 / 28%),
+          0 0 1.6rem rgb(60 200 255 / 35%),
+          inset 0 0 1.2rem rgb(50 170 230 / 22%);
+      }
+
+      .touch-actions {
+        position: relative;
+        width: clamp(10.6rem, 38vh, 13.2rem);
+        height: clamp(10.6rem, 38vh, 13.2rem);
+        margin: 0 0.1rem 0.05rem 0;
+        pointer-events: auto;
+        touch-action: none;
+      }
+
+      .touch-btn {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        width: clamp(3.15rem, 11.2vh, 3.85rem);
+        height: clamp(3.15rem, 11.2vh, 3.85rem);
+        padding: 0;
+        border-radius: 50%;
+        border: 2.5px solid rgb(212 175 88 / 78%);
+        background:
+          radial-gradient(circle at 35% 28%, rgb(55 62 78 / 88%), rgb(12 16 26 / 92%) 72%);
+        color: #fff;
+        box-shadow:
+          0 0 0 1px rgb(0 0 0 / 45%),
+          0 0.25rem 0.75rem rgb(0 0 0 / 42%),
+          inset 0 1px 0 rgb(255 255 255 / 16%);
+        overflow: hidden;
+        touch-action: none;
+        user-select: none;
+        transition: transform 80ms ease, filter 80ms ease, opacity 120ms ease;
+      }
+
+      .touch-btn::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1px rgb(255 220 140 / 18%);
+        pointer-events: none;
+      }
+
+      .touch-btn__art {
+        position: absolute;
+        inset: 0.2rem;
+        border-radius: 50%;
+        background-position: center;
+        background-size: cover;
+        background-repeat: no-repeat;
+        filter: saturate(1.12) contrast(1.06);
+        pointer-events: none;
+      }
+
+      .touch-btn:not(.has-art) .touch-btn__art {
+        display: none;
+      }
+
+      .touch-btn__glyph {
+        position: relative;
+        z-index: 1;
+        font: 800 0.72rem/1 var(--data);
+        letter-spacing: 0.04em;
+        text-shadow: 0 1px 2px rgb(0 0 0 / 85%);
+        pointer-events: none;
+      }
+
+      .touch-btn__label {
+        position: absolute;
+        bottom: 0.34rem;
+        z-index: 1;
+        font: 800 0.4rem/1 var(--data);
+        letter-spacing: 0.14em;
+        color: #ffe2a0;
+        text-shadow: 0 1px 2px rgb(0 0 0 / 85%);
+        pointer-events: none;
+      }
+
+      .touch-btn--skill .touch-btn__glyph {
+        opacity: 0.95;
+      }
+
+      .touch-btn.has-art .touch-btn__glyph {
+        position: absolute;
+        right: 0.12rem;
+        bottom: 0.1rem;
+        font-size: 0.42rem;
+        opacity: 0.95;
+        background: rgb(0 0 0 / 62%);
+        border: 1px solid rgb(212 175 88 / 40%);
+        border-radius: 999px;
+        padding: 0.1rem 0.2rem;
+      }
+
+      /* Large WR-style attack button — bomb is the primary mobile action. */
+      .touch-btn--bomb {
+        width: clamp(4.3rem, 15.5vh, 5.35rem);
+        height: clamp(4.3rem, 15.5vh, 5.35rem);
+        border-width: 3px;
+        border-color: rgb(230 190 95 / 88%);
+        background:
+          radial-gradient(circle at 34% 28%, rgb(90 72 28 / 92%), rgb(28 18 8 / 94%) 70%);
+        color: #ffe2a0;
+        box-shadow:
+          0 0 0 1px rgb(0 0 0 / 50%),
+          0 0 1rem rgb(230 170 50 / 28%),
+          0 0.3rem 0.9rem rgb(0 0 0 / 48%),
+          inset 0 1px 0 rgb(255 230 160 / 28%);
+      }
+
+      .touch-btn--bomb .touch-btn__glyph {
+        font-size: 1.35rem;
+        margin-bottom: 0.42rem;
+      }
+
+      .touch-btn--ult {
+        border-color: rgb(230 150 70 / 85%);
+        box-shadow:
+          0 0 0 1px rgb(0 0 0 / 45%),
+          0 0 0.85rem rgb(255 120 40 / 22%),
+          0 0.25rem 0.75rem rgb(0 0 0 / 42%),
+          inset 0 1px 0 rgb(255 255 255 / 16%);
+      }
+
+      /*
+       * WR ability arc (bottom-right):
+       * bomb = main attack (lowest-right)
+       * Q/F/E/R fan above-left of attack
+       */
+      #touch-bomb {
+        right: 1%;
+        bottom: 1%;
+        left: auto;
+        top: auto;
+        transform: none;
+      }
+
+      #touch-q {
+        right: 46%;
+        bottom: 3%;
+        left: auto;
+        top: auto;
+      }
+
+      #touch-dash {
+        right: 66%;
+        bottom: 26%;
+        left: auto;
+        top: auto;
+      }
+
+      #touch-mine {
+        right: 52%;
+        bottom: 50%;
+        left: auto;
+        top: auto;
+      }
+
+      #touch-ult {
+        right: 24%;
+        bottom: 62%;
+        left: auto;
+        top: auto;
+      }
+
+      .touch-btn.is-pressed,
+      .touch-btn:active {
+        transform: scale(0.92);
+        filter: brightness(1.14);
+      }
+
+      #touch-bomb.is-pressed,
+      #touch-bomb:active {
+        transform: scale(0.92);
+      }
+
+      .touch-btn.is-locked,
+      .touch-btn:disabled {
+        opacity: 0.38;
+        filter: grayscale(0.62) brightness(0.82);
+      }
+
+      .touch-btn.is-locked::after,
+      .touch-btn:disabled::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background:
+          linear-gradient(135deg, transparent 46%, rgb(255 255 255 / 28%) 48%, transparent 50%),
+          rgb(0 0 0 / 32%);
+        pointer-events: none;
+      }
+
+      .guide-grid { grid-template-columns: 1fr; }
+      .guide-section.wide { grid-column: auto; }
+    }
+
+    /* Portrait match on phone: block play until sideways. */
+    @media (orientation: portrait) and (pointer: coarse),
+           (orientation: portrait) and (max-width: 42rem) {
+      html.is-match-active .ability-dock,
+      html.is-match-active .guide-button,
+      html.is-match-active .pause-button,
+      html.is-match-active .minimap {
+        display: none;
+      }
     }
 
     @media (max-height: 48rem) {
@@ -1699,15 +2153,11 @@
       }
 
       .fx-grain { display: none; }
+      .landscape-gate__phone { animation: none; transform: rotate(90deg); }
     }
 
-    /* Ziggs keeps Bomberman's lethal pip; champions expose their five-part duel health. */
-    .hearts .heart:nth-child(n + 2) { display: none; }
-
-    html[data-champion="katarina"] .hearts .heart,
-    html[data-champion="zed"] .hearts .heart,
-    html[data-champion="renekton"] .hearts .heart,
-    html[data-champion="vladimir"] .hearts .heart { display: block; }
+    /* All playable champions use the five-segment duel health bar. */
+    .hearts .heart { display: block; }
 
     .ability.stat[disabled] {
       opacity: 1;
@@ -1731,7 +2181,8 @@
       .ability,
       .guide-button,
       .pause-button,
-      .touch-key {
+      .touch-key,
+      .touch-btn {
         border: 1px solid ButtonText;
       }
     }

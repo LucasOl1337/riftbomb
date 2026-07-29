@@ -12,7 +12,12 @@ const gameSource = path.join(repositoryRoot, "riftbomb.html");
 const outputDirectory = path.join(onlineRoot, "public", "riftbomb-parts");
 const arenaTextureOutputDirectory = path.join(onlineRoot, "public", "arena-textures");
 const championModelOutputDirectory = path.join(onlineRoot, "public", "champion-models");
-const arenaTextureBundleSource = path.join(repositoryRoot, "game", "load-arena-textures.js");
+const arenaTextureBundleSource = path.join(
+  repositoryRoot,
+  "game",
+  "arena-appearance",
+  "load-arena-appearance.js"
+);
 const championModelBundleSource = path.join(
   repositoryRoot,
   "game",
@@ -26,21 +31,28 @@ const playableChampions = Object.freeze([
   "vladimir",
   "gangplank",
 ]);
-const arenaTextureSourceDirectory = path.join(repositoryRoot, "game", "Assets", "textures");
+const arenaTextureSourceDirectory = path.join(
+  repositoryRoot,
+  "game",
+  "arena-appearance",
+  "textures",
+);
 const arenaTextureFiles = Object.freeze({
   crateSide: ["crates/crate-albedo.webp", "crate.webp"],
   crateTop: ["crates/crate-top-albedo.webp", "crate-top.webp"],
   floorLattice: ["ground/floor-lattice.webp", "floor-lattice.webp"],
   floorClearing: ["ground/floor-clearing.webp", "floor-clearing.webp"],
   floorLabyrinth: ["ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
+  floorForts: ["ground/floor-forts.webp", "floor-forts.webp"],
+  floorPit: ["ground/floor-pit.webp", "floor-pit.webp"],
   wallSide: ["walls/wall-lattice.webp", "wall.webp"],
   wallTop: ["walls/wall-top-lattice.webp", "wall-top.webp"],
 });
 
-execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build"], {
-  cwd: repositoryRoot,
-  stdio: "inherit",
-});
+const buildCommand = process.platform === "win32"
+  ? ["cmd.exe", ["/d", "/s", "/c", "npm run build"]]
+  : ["npm", ["run", "build"]];
+execFileSync(buildCommand[0], buildCommand[1], { cwd: repositoryRoot, stdio: "inherit" });
 
 function replaceOnce(source, before, after) {
   const first = source.indexOf(before);
@@ -52,72 +64,6 @@ function replaceOnce(source, before, after) {
 
 const replacements = [
   [
-    'UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · Red Ziggs`;',
-    'UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · ${p2.name}`;',
-  ],
-  [
-    '`Round ${String(match.round).padStart(2, "0")} · ${match.p2Human ? "Local versus" : "CPU controls Red"}`;',
-    '`Round ${String(match.round).padStart(2, "0")} · ${match.p2Human ? "Player 2 online/local" : "CPU controls Red"}`;',
-  ],
-  [
-    '        this.selectedChampion = "katarina";\n        this.selectedArena = ARENA_TEMPLATES[0].id;',
-    '        this.selectedChampion = "katarina";\n        this.selectedChampion2 = "ziggs";\n        this.selectedArena = ARENA_TEMPLATES[0].id;',
-  ],
-  [
-    '        const champion = id === 1 ? this.selectedChampion : "ziggs";',
-    [
-      '        const champion = id === 1 ? this.selectedChampion : this.selectedChampion2;',
-      '        const championNames = {',
-      '          katarina: "Katarina",',
-      '          zed: "Zed",',
-      '          renekton: "Renekton",',
-      '          vladimir: "Vladimir",',
-      '          gangplank: "Gangplank",',
-      '          ziggs: "Ziggs"',
-      '        };',
-    ].join("\n"),
-  ],
-  [
-    [
-      '          name: id === 1',
-      '            ? ({ katarina: "Katarina", zed: "Zed", renekton: "Renekton", vladimir: "Vladimir", gangplank: "Gangplank" }[champion] || "Blue Ziggs")',
-      '            : "Red Ziggs",',
-    ].join("\n"),
-    '          name: `${id === 1 ? "Blue" : "Red"} ${championNames[champion] || "Ziggs"}`,',
-  ],
-  [
-    [
-      '      selectChampion(champion) {',
-      '        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;',
-      '        this.selectedChampion = champion;',
-      '        void this.renderer.ensureChampionModel?.(champion);',
-      '        this.resetPlayers();',
-      '        this.presentation.update(this);',
-      '      }',
-    ].join("\n"),
-    [
-      '      selectChampion(champion) {',
-      '        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;',
-      '        this.selectedChampion = champion;',
-      '        void this.renderer.ensureChampionModel?.(champion);',
-      '        this.resetPlayers();',
-      '        this.presentation.update(this);',
-      '      }',
-      '',
-      '      selectChampion2(champion) {',
-      '        if (!["katarina", "zed", "renekton", "vladimir", "gangplank", "ziggs"].includes(champion) || this.mode !== "intro") return;',
-      '        this.selectedChampion2 = champion;',
-      '        void this.renderer.ensureChampionModel(champion);',
-      '        this.resetPlayers();',
-      '        this.presentation.update(this);',
-      '      }',
-    ].join("\n"),
-  ],
-  [
-    'this.presentation.announce("Player 2 joined · Red Ziggs is local");',
-    'this.presentation.announce(`Player 2 joined · ${p2.name} is local`);',
-  ],
-  [
     'this.presentation.announce("Death Lotus needs Red Ziggs nearby");',
     'this.presentation.announce("Death Lotus needs the rival nearby");',
   ],
@@ -126,24 +72,18 @@ const replacements = [
     'this.presentation.announce("Death Mark needs the rival in range");',
   ],
   [
-    [
-      '      UI.live.textContent = game.player.champion !== "ziggs"',
-      '        ? `Rift Bomber · ${arenaName}. ${game.player.name} uses WASD, Q/F/E/R and Space. Red Ziggs uses arrows and Enter.`',
-      '        : `Rift Bomber · ${arenaName}. Blue Ziggs uses WASD, Q and Shift. Red Ziggs uses arrows and Enter.`;',
-    ].join("\n"),
-    [
-      '      UI.live.textContent =',
-      '        `Rift Bomber · ${arenaName}. ${game.players[0].name} versus ${game.players[1].name}.`;',
-    ].join("\n"),
+    'this.presentation.announce("Player 2 joined · Red Ziggs is local");',
+    'this.presentation.announce(`Player 2 joined · ${p2.name} is local`);',
   ],
 ];
 
-let onlineGame = await readFile(gameSource, "utf8");
+let onlineGame = (await readFile(gameSource, "utf8")).replace(/\r\n/g, "\n");
 for (const [before, after] of replacements) {
-  onlineGame = replaceOnce(onlineGame, before, after);
+  if (after.includes("selectChampion2(champion)") && onlineGame.includes("selectChampion2(champion)")) continue;
+  if (onlineGame.includes(before)) onlineGame = replaceOnce(onlineGame, before, after);
 }
 
-const embeddedArenaTextures = await readFile(arenaTextureBundleSource, "utf8");
+const embeddedArenaTextures = (await readFile(arenaTextureBundleSource, "utf8")).replace(/\r\n/g, "\n");
 const arenaTextureAliasesAt = embeddedArenaTextures.indexOf(
   "const ARENA_TEXTURES = Object.freeze({",
 );
@@ -173,6 +113,10 @@ onlineGame = replaceOnce(
   ].join("\n"),
 );
 
+// Workers static assets hard-cap at 25 MiB per file. VAT frames/normals are
+// shipped as separate .bin assets so base64 JS never blows past that limit.
+const WORKERS_ASSET_MAX_BYTES = 25 * 1024 * 1024;
+
 async function playableChampionPayload(champion) {
   const directory = path.join(championSourceDirectory, champion, "playable-model");
   const [vertices, indices, texture, metadataSource] = await Promise.all([
@@ -187,14 +131,31 @@ async function playableChampionPayload(champion) {
     indices: indices.toString("base64"),
     texture: `data:image/webp;base64,${texture.toString("base64")}`,
   };
+  const binaryAssets = [];
   if (metadata.runtime === "vat-v1") {
     const [frames, normals] = await Promise.all([
       readFile(path.join(directory, `${champion}-model-frames.bin`)),
       readFile(path.join(directory, `${champion}-model-normals.bin`)),
     ]);
+    const framesName = `${champion}-frames.bin`;
+    const normalsName = `${champion}-normals.bin`;
+    for (const [label, buffer] of [
+      [framesName, frames],
+      [normalsName, normals],
+    ]) {
+      if (buffer.byteLength >= WORKERS_ASSET_MAX_BYTES) {
+        throw new Error(
+          `${label} is ${buffer.byteLength} bytes; Workers assets must stay under ${WORKERS_ASSET_MAX_BYTES}`,
+        );
+      }
+    }
+    binaryAssets.push(
+      { name: framesName, buffer: frames },
+      { name: normalsName, buffer: normals },
+    );
     Object.assign(payload, {
-      frames: frames.toString("base64"),
-      normals: normals.toString("base64"),
+      framesUrl: `/champion-models/${framesName}`,
+      normalsUrl: `/champion-models/${normalsName}`,
       animation: {
         runtime: metadata.runtime,
         vertexCount: metadata.vertexCount,
@@ -206,10 +167,10 @@ async function playableChampionPayload(champion) {
       },
     });
   }
-  return payload;
+  return { payload, binaryAssets };
 }
 
-const championModelPayloads = Object.fromEntries(
+const championModelBundles = Object.fromEntries(
   await Promise.all(
     playableChampions.map(async (champion) => [
       champion,
@@ -217,7 +178,7 @@ const championModelPayloads = Object.fromEntries(
     ]),
   ),
 );
-const embeddedChampionModels = await readFile(championModelBundleSource, "utf8");
+const embeddedChampionModels = (await readFile(championModelBundleSource, "utf8")).replace(/\r\n/g, "\n");
 const onlineChampionModelSources = Object.fromEntries(
   playableChampions.map((champion) => [
     champion,
@@ -256,16 +217,27 @@ await Promise.all(
 await rm(championModelOutputDirectory, { recursive: true, force: true });
 await mkdir(championModelOutputDirectory, { recursive: true });
 await Promise.all(
-  playableChampions.map((champion) =>
-    writeFile(
-      path.join(championModelOutputDirectory, `${champion}.js`),
+  playableChampions.flatMap((champion) => {
+    const { payload, binaryAssets } = championModelBundles[champion];
+    const scriptBytes = Buffer.from(
       [
         '"use strict";',
-        `window.RIFTBOMB_PLAYABLE_CHAMPIONS.${champion} = Object.freeze(${JSON.stringify(championModelPayloads[champion])});`,
+        `window.RIFTBOMB_PLAYABLE_CHAMPIONS.${champion} = Object.freeze(${JSON.stringify(payload)});`,
         "",
       ].join("\n"),
-    ),
-  ),
+    );
+    if (scriptBytes.byteLength >= WORKERS_ASSET_MAX_BYTES) {
+      throw new Error(
+        `${champion}.js is ${scriptBytes.byteLength} bytes; Workers assets must stay under ${WORKERS_ASSET_MAX_BYTES}`,
+      );
+    }
+    return [
+      writeFile(path.join(championModelOutputDirectory, `${champion}.js`), scriptBytes),
+      ...binaryAssets.map(({ name, buffer }) =>
+        writeFile(path.join(championModelOutputDirectory, name), buffer),
+      ),
+    ];
+  }),
 );
 
 for (let index = 0; index < partCount; index += 1) {

@@ -1,7 +1,7 @@
 "use strict";
 
     class BrowserMatchPresentation {
-      selectChampion(selectedChampion) {
+      selectChampion(selectedChampion, playerId = 1) {
         const presentations = {
           katarina: {
             name: "Katarina", alt: "Katarina, a Lâmina Sinistra", portrait: KATARINA_PORTRAIT,
@@ -32,35 +32,28 @@
             passive: GANGPLANK_ASSETS.passive,
             art: [GANGPLANK_ASSETS.q, GANGPLANK_ASSETS.w, GANGPLANK_ASSETS.e, GANGPLANK_ASSETS.r],
             abilities: ["Parrrley", "Remove Scurvy", "Powder Keg", "Cannon Barrage"]
-          },
-          ziggs: {
-            name: "Blue Ziggs", alt: "Ziggs, o Especialista em Hexplosivos", portrait: ZIGGS_PORTRAIT,
-            passive: null, art: null, abilities: ["Place bomb", "Satchel burst", "Current blast range", "Current speed and shield"]
           }
         };
-        const presentation = presentations[selectedChampion];
-        const skillChampion = selectedChampion !== "ziggs";
+        const presentation = presentations[selectedChampion] || presentations.katarina;
         const championName = presentation.name;
+        const matchTarget = this.matchTarget || 3;
         document.documentElement.dataset.champion = selectedChampion;
         UI.championChoices.forEach((button) =>
           button.setAttribute("aria-pressed", String(button.dataset.champion === selectedChampion))
         );
         UI.championPortrait.src = presentation.portrait;
         UI.championPortrait.alt = presentation.alt;
-        UI.playerName.textContent = `P1 / ${championName.toUpperCase()}`;
-        UI.matchSubtitle.textContent = skillChampion
-          ? `${championName} vs Ziggs · first to 3`
-          : "Ziggs mirror match · first to 3";
-        UI.abilityDock.setAttribute("aria-label", skillChampion ? `${championName} abilities` : "Blue Ziggs arena stats");
-        UI.start.textContent = `>>> DEPLOY ${championName.toUpperCase()}`;
+        UI.playerName.textContent = `P${playerId} / ${championName.toUpperCase()}`;
+        UI.matchSubtitle.textContent = `${championName} ready · first to ${matchTarget}`;
+        UI.abilityDock.setAttribute("aria-label", `${championName} abilities`);
+        UI.start.textContent = `>>> DEPLOY P${playerId} ${championName.toUpperCase()}`;
 
         const icons = [UI.bombIcon, UI.dashIcon, UI.mineIcon, UI.ultIcon];
         const art = presentation.art;
-        const glyphs = ["✦", "⌁", "↔", "⬡"];
         icons.forEach((icon, index) => {
-          icon.classList.toggle("has-art", skillChampion);
-          icon.style.backgroundImage = skillChampion ? `url(${art[index]})` : "";
-          icon.textContent = skillChampion ? "" : glyphs[index];
+          icon.classList.toggle("has-art", true);
+          icon.style.backgroundImage = `url(${art[index]})`;
+          icon.textContent = "";
         });
         for (const [key, config] of Object.entries(presentations)) {
           if (!config.passive) continue;
@@ -73,23 +66,70 @@
         }
 
         UI.bombKey.textContent = "Q";
-        UI.dashKey.textContent = skillChampion ? "F" : "⇧";
-        UI.mineKey.textContent = skillChampion ? "E" : "+";
-        UI.ultKey.textContent = skillChampion ? "R" : "◆";
+        UI.dashKey.textContent = "F";
+        UI.mineKey.textContent = "E";
+        UI.ultKey.textContent = "R";
         UI.bombAction.setAttribute("aria-label", `${presentation.abilities[0]}. Q key.`);
-        UI.dashAction.setAttribute("aria-label", `${presentation.abilities[1]}. ${skillChampion ? "F" : "Left Shift"} key.`);
+        UI.dashAction.setAttribute("aria-label", `${presentation.abilities[1]}. F key.`);
         UI.mineAction.setAttribute("aria-label", presentation.abilities[2]);
         UI.ultAction.setAttribute("aria-label", presentation.abilities[3]);
-        UI.mineAction.classList.toggle("stat", !skillChampion);
-        UI.ultAction.classList.toggle("stat", !skillChampion);
-        UI.touchQ.hidden = !skillChampion;
-        UI.touchMine.hidden = !skillChampion;
-        UI.touchUlt.hidden = !skillChampion;
-        UI.touchDash.textContent = skillChampion ? "F" : "⌁";
-        UI.touchQ.setAttribute("aria-label", presentation.abilities[0]);
-        UI.touchDash.setAttribute("aria-label", presentation.abilities[1]);
-        UI.touchMine.setAttribute("aria-label", presentation.abilities[2]);
-        UI.touchUlt.setAttribute("aria-label", presentation.abilities[3]);
+        UI.mineAction.classList.remove("stat");
+        UI.ultAction.classList.remove("stat");
+        this.paintTouchAbility(UI.touchQ, UI.touchQArt, presentation.abilities[0], art[0], "Q");
+        this.paintTouchAbility(UI.touchDash, UI.touchDashArt, presentation.abilities[1], art[1], "F");
+        this.paintTouchAbility(UI.touchMine, UI.touchMineArt, presentation.abilities[2], art[2], "E");
+        this.paintTouchAbility(UI.touchUlt, UI.touchUltArt, presentation.abilities[3], art[3], "R");
+        if (UI.touchBomb) UI.touchBomb.setAttribute("aria-label", "Place arena bomb");
+      }
+
+      paintTouchAbility(button, artNode, abilityName, artUrl, glyph) {
+        if (!button) return;
+        button.hidden = false;
+        button.setAttribute("aria-label", abilityName);
+        const glyphNode = button.querySelector(".touch-btn__glyph");
+        if (glyphNode) glyphNode.textContent = glyph;
+        const hasArt = Boolean(artUrl)
+          && !String(artUrl).includes("[image content")
+          && String(artUrl).length > 24;
+        button.classList.toggle("has-art", hasArt);
+        if (artNode) {
+          if (hasArt) artNode.style.backgroundImage = `url(${artUrl})`;
+          else artNode.style.removeProperty("background-image");
+        }
+      }
+
+      syncTouchActionState(button, sourceButton) {
+        if (!button || !sourceButton) return;
+        button.disabled = sourceButton.disabled;
+        button.classList.toggle("is-locked", sourceButton.classList.contains("is-locked"));
+      }
+
+      updateSecondaryHud(match, player) {
+        if (!UI.playerTwoHud || !player) return;
+        const localMultiplayer = document.body.classList.contains("is-local-multiplayer");
+        UI.playerTwoHud.hidden = !localMultiplayer;
+        if (!localMultiplayer) return;
+        const health = clamp(player.health / player.maxHealth, 0, 1);
+        UI.playerTwoName.textContent = `P2 · ${player.name.toUpperCase()}`;
+        UI.playerTwoHealth.textContent = player.alive ? `${Math.ceil(health * 100)}%` : "ELIMINATED";
+        UI.playerTwoHealthFill.style.transform = `scaleX(${health})`;
+        const cooldowns = [player.qCooldown, player.wCooldown, player.eCooldown, player.rCooldown];
+        const unlocked = player.skillsUnlocked || [true, true, true, true];
+        UI.playerTwoSkillButtons.forEach((button, slot) => {
+          const name = match.skillSlotLabel(player, slot);
+          button.disabled = !player.alive || match.roundLocked || !unlocked[slot];
+          button.dataset.lock = unlocked[slot] ? "open" : "crate";
+          const label = button.querySelector("span");
+          if (label) label.textContent = !unlocked[slot]
+            ? `${name} · locked`
+            : cooldowns[slot] > 0
+              ? `${name} · ${cooldowns[slot].toFixed(1)}s`
+              : `${name} · ready`;
+        });
+        const bombsAvailable = Math.max(0, player.maxBombs - match.activeBombsFor(player));
+        UI.playerTwoBombButton.disabled = !player.alive || match.roundLocked || bombsAvailable <= 0;
+        const bombLabel = UI.playerTwoBombButton.querySelector("span");
+        if (bombLabel) bombLabel.textContent = `Bomb · ${bombsAvailable}`;
       }
 
       prepareRound() {
@@ -105,25 +145,29 @@
       }
 
       update(match) {
-        const p1 = match.players[0];
-        const p2 = match.players[1];
+        this.matchTarget = match.matchTarget || 3;
+        const blue = match.players[0];
+        const red = match.players[1];
+        const localPlayerId = match.localPlayerId === 2 ? 2 : 1;
+        const p1 = localPlayerId === 2 ? red : blue;
+        const p2 = localPlayerId === 2 ? blue : red;
         if (!p1 || !p2) return;
+        this.updateSecondaryHud(match, red);
+        UI.playerName.textContent = `P${localPlayerId} / ${p1.name.toUpperCase()}`;
         const crates = match.grid.reduce((sum, row) => sum + row.filter((tile) => tile === 2).length, 0);
         UI.score.textContent = String(crates).padStart(3, "0");
         UI.waveNumber.textContent = String(match.round);
         UI.enemyCount.textContent = String(Math.ceil(match.roundTime)).padStart(2, "0");
         const arenaLabel = match.arenaTemplate ? match.arenaTemplate().label : "Arena";
-        UI.matchSubtitle.textContent = p1.champion !== "ziggs"
-          ? `${p1.name} vs Ziggs · ${arenaLabel} · first to 3`
-          : `Ziggs mirror · ${arenaLabel} · first to 3`;
-        UI.matchScoreline.textContent = `${p1.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · Red Ziggs`;
+        UI.matchSubtitle.textContent = `${blue.name} versus ${red.name} · ${arenaLabel} · first to ${match.matchTarget}`;
+        UI.matchScoreline.textContent = `${blue.name} · ${match.roundWins[0]} — ${match.roundWins[1]} · ${red.name}`;
         UI.waveLabel.textContent = match.roundLocked
           ? (match.pendingMatchWinner ? "Match point converted" : `Round ${String(match.round).padStart(2, "0")} complete`)
-          : `Round ${String(match.round).padStart(2, "0")} · ${match.p2Human ? "Local versus" : "CPU controls Red"}`;
+          : `Round ${String(match.round).padStart(2, "0")} · ${match.p2Human ? "Player 2 online/local" : "CPU controls Red"}`;
         UI.playerCard.dataset.worldX = p1.x.toFixed(3);
         UI.playerCard.dataset.worldZ = p1.z.toFixed(3);
         UI.playerCard.dataset.passableBombs = String(
-          match.bombs.filter((bomb) => !bomb.exploded && bomb.passOwners?.has(1)).length
+          match.bombs.filter((bomb) => !bomb.exploded && bomb.passOwners?.has(p1.id)).length
         );
         UI.playerCard.dataset.redWorldX = p2.x.toFixed(3);
         UI.playerCard.dataset.redWorldZ = p2.z.toFixed(3);
@@ -140,7 +184,7 @@
         );
         UI.healthFill.style.transform = `scaleX(${healthRatio})`;
         UI.combo.classList.add("is-live");
-        UI.comboLabel.textContent = `P2 · ${match.p2Human ? "LOCAL" : "CPU"}`;
+        UI.comboLabel.textContent = `RIVAL · ${p2.name.toUpperCase()} · ${match.p2Human ? "HUMAN" : "CPU"}`;
         const available = Math.max(0, p1.maxBombs - match.activeBombsFor(p1));
         const locked = !p1.alive || match.roundLocked || p1.ultChannel > 0 || p1.vladimirPool > 0;
         const unlocked = p1.skillsUnlocked || [true, true, true, true];
@@ -321,26 +365,29 @@
           UI.playerCard.dataset.rCooldown = p1.rCooldown.toFixed(3);
           UI.playerCard.dataset.barrels = String(barrels);
         } else {
+          // Unknown champion fallback — treat as Katarina dock layout.
           UI.resourceFill.style.transform = "scaleX(0.82)";
-          UI.bombLabel.textContent = `Bomb · ${available}/${p1.maxBombs} ready`;
-          UI.dashLabel.textContent = !unlocked[1]
-            ? "Satchel"
-            : p1.dashCooldown > 0 ? `Satchel · ${p1.dashCooldown.toFixed(1)}s` : "Satchel · ready";
-          UI.bombFill.style.transform = `scaleX(${available > 0 ? 1 : 0})`;
-          UI.dashFill.style.transform = `scaleX(${unlocked[1] ? 1 - clamp(p1.dashCooldown / 5, 0, 1) : 0})`;
-          UI.rangeLabel.textContent = `Blast · ${p1.range} tiles`;
-          UI.mineFill.style.transform = `scaleX(${clamp(p1.range / 6, 0, 1)})`;
-          UI.shieldLabel.textContent = p1.shield > 0
-            ? `Shield · ${p1.shield} charge${p1.shield > 1 ? "s" : ""}`
-            : `Speed · ${(p1.speed / 3.45).toFixed(1)}×`;
-          UI.ultFill.style.transform = `scaleX(${p1.shield > 0 ? p1.shield / 2 : clamp((p1.speed - 3.2) / 1.55, 0.12, 1)})`;
-          UI.bombAction.disabled = available <= 0 || locked;
-          UI.bombAction.classList.remove("is-locked");
-          gateSkill(UI.dashAction, 1, p1.dashCooldown > 0);
-          UI.mineAction.disabled = true;
-          UI.ultAction.disabled = true;
-          UI.mineAction.classList.add("is-locked");
-          UI.ultAction.classList.add("is-locked");
+          UI.bombLabel.textContent = skillLabel("Ability Q", p1.qCooldown, unlocked[0]);
+          UI.dashLabel.textContent = skillLabel("Ability F", p1.wCooldown, unlocked[1]);
+          UI.rangeLabel.textContent = skillLabel("Ability E", p1.eCooldown, unlocked[2]);
+          UI.shieldLabel.textContent = skillLabel("Ability R", p1.rCooldown, unlocked[3]);
+          UI.bombFill.style.transform = `scaleX(${unlocked[0] ? 1 - clamp(p1.qCooldown / 5, 0, 1) : 0})`;
+          UI.dashFill.style.transform = `scaleX(${unlocked[1] ? 1 - clamp(p1.wCooldown / 8, 0, 1) : 0})`;
+          UI.mineFill.style.transform = `scaleX(${unlocked[2] ? 1 - clamp(p1.eCooldown / 8, 0, 1) : 0})`;
+          UI.ultFill.style.transform = `scaleX(${unlocked[3] ? 1 - clamp(p1.rCooldown / 28, 0, 1) : 0})`;
+          gateSkill(UI.bombAction, 0, p1.qCooldown > 0);
+          gateSkill(UI.dashAction, 1, p1.wCooldown > 0);
+          gateSkill(UI.mineAction, 2, p1.eCooldown > 0);
+          gateSkill(UI.ultAction, 3, p1.rCooldown > 0);
+        }
+
+        this.syncTouchActionState(UI.touchQ, UI.bombAction);
+        this.syncTouchActionState(UI.touchDash, UI.dashAction);
+        this.syncTouchActionState(UI.touchMine, UI.mineAction);
+        this.syncTouchActionState(UI.touchUlt, UI.ultAction);
+        if (UI.touchBomb) {
+          UI.touchBomb.disabled = UI.arenaBombAction.disabled;
+          UI.touchBomb.classList.toggle("is-locked", false);
         }
 
         const maxX = match.tile * (match.cols - 1) / 2;
@@ -355,7 +402,8 @@
       }
 
       finish(winner, roundWins, elapsed) {
-        UI.endResult.textContent = "First to three · match complete";
+        const target = Number(this.matchTarget) > 0 ? Number(this.matchTarget) : 3;
+        UI.endResult.textContent = `First to ${target} · match complete`;
         UI.endTitle.textContent = `${winner.name} wins`;
         UI.endScore.textContent = String(roundWins[0]);
         UI.endChain.textContent = String(roundWins[1]);

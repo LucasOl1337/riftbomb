@@ -29,7 +29,7 @@ O controlador de CPU de um contestant na Match (hoje o Red / P2 até handoff hum
 _Avoid_: NPC genérico, AI agent, enemy script
 
 **Bot policy**:
-O algoritmo em `BOTS/` que, a partir de um snapshot da arena, emite intenções (mover, bomba, skill).
+O algoritmo em `bot-opponent/` que, a partir de um snapshot da arena, emite intenções (mover, bomba, skill).
 _Avoid_: Brain, neural net (salvo se existir de verdade)
 
 **Intent**:

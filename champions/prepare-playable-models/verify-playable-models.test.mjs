@@ -28,6 +28,11 @@ test("the packaged catalog comes from each champion playable model", async () =>
       await readFile(path.join(modelDirectory, `${champion}-model-metadata.json`), "utf8")
     );
     if (metadata.runtime === "vat-v1") {
+      assert.equal(metadata.completeClipCatalog, true);
+      assert.match(metadata.sourceUrl, /cdn\.modelviewer\.lol/);
+      for (const actionSource of Object.values(metadata.animationActions)) {
+        assert.ok(metadata.animationClips[actionSource]);
+      }
       for (const artifact of ["frames.bin", "normals.bin"]) {
         const bytes = await readFile(path.join(modelDirectory, `${champion}-model-${artifact}`));
         assert.ok(
