@@ -28,17 +28,35 @@ const D1_ID = "0d1c4351-7070-4d8f-8035-d5e1ae291a61";
 const WORKER_NAME = "riftbomb-online";
 const DOMAIN = "bombpvp.com";
 
-function firstCredentialValue(value) {
-  return value?.trim().split(/\s+/u).find(Boolean) || "";
+function credentialParts(value) {
+  return (value || "")
+    .trim()
+    .split(/\s+/u)
+    .flatMap((part) => part.split("="))
+    .map((part) => part.replace(/^[`"',:]+|[`"',;]+$/gu, ""))
+    .filter(Boolean);
+}
+
+function cloudflareApiTokenValue(value) {
+  const candidates = credentialParts(value).filter(
+    (part) =>
+      part !== ACCOUNT_ID &&
+      !/^(?:Bearer|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|riftbomb-github-deploy)$/iu.test(
+        part,
+      ),
+  );
+  return candidates.sort((left, right) => right.length - left.length)[0] || "";
 }
 
 function normalizeCloudflareEnvironment() {
-  const token = firstCredentialValue(process.env.CLOUDFLARE_API_TOKEN);
+  const token = cloudflareApiTokenValue(process.env.CLOUDFLARE_API_TOKEN);
   if (token) {
     process.env.CLOUDFLARE_API_TOKEN = token;
   }
   process.env.CLOUDFLARE_ACCOUNT_ID =
-    firstCredentialValue(process.env.CLOUDFLARE_ACCOUNT_ID) || ACCOUNT_ID;
+    credentialParts(process.env.CLOUDFLARE_ACCOUNT_ID).find((part) =>
+      /^[a-f0-9]{32}$/iu.test(part),
+    ) || ACCOUNT_ID;
 }
 
 function run(command, args, options = {}) {
