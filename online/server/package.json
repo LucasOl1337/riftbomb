@@ -8,8 +8,10 @@
   },
   "scripts": {
     "start": "node src/server.mjs",
-    "test": "npm run test:core && npm run test:transport && npm run test:rematch",
+    "benchmark:serialization": "node scripts/benchmark-json-transport.mjs",
+    "test": "npm run test:core && npm run test:serialization && npm run test:transport && npm run test:rematch",
     "test:core": "node --test tests/authoritative-core.test.mjs",
+    "test:serialization": "node --test tests/json-transport.test.mjs",
     "test:transport": "node --test --test-name-pattern=websocket tests/authoritative-server.test.mjs",
     "test:rematch": "node --test --test-name-pattern=rematch tests/authoritative-server.test.mjs"
   },
