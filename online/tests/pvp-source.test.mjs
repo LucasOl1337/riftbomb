@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, webcrypto } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
+import vm from "node:vm";
 
 const root = new URL("../", import.meta.url);
 
@@ -36,6 +37,7 @@ test("loads the online duel layer into the reconstructed game", async () => {
   );
 
   assert.match(page, /src="\/riftbomb-loader\.js"/);
+  assert.match(page, /data-riftbomb-manifest='/);
   assert.match(loader, /online-duel\.css/);
   assert.match(loader, /authoritative-audio\.js/);
   assert.match(loader, /online-duel\.js/);
@@ -51,6 +53,91 @@ test("loads the online duel layer into the reconstructed game", async () => {
   assert.match(packager, /arenaTextureOutputDirectory/);
   assert.match(packager, /championModelOutputDirectory/);
   assert.doesNotMatch(page, /<script>[\s\S]*<\/script>/);
+});
+
+test("embeds the packaged manifest to remove its serial boot request", async () => {
+  const page = await readFile(new URL("public/riftbomb.html", root), "utf8");
+  const loader = await readFile(new URL("public/riftbomb-loader.js", root), "utf8");
+  const manifest = JSON.parse(
+    await readFile(new URL("public/riftbomb-parts/manifest.json", root), "utf8"),
+  );
+  const embedded = page.match(/data-riftbomb-manifest='([^']+)'/);
+
+  assert.ok(embedded, "generated shell must carry the packaged manifest");
+  assert.deepEqual(JSON.parse(embedded[1]), manifest);
+  assert.match(loader, /document\.currentScript\?\.dataset\.riftbombManifest/);
+  assert.match(loader, /if \(embeddedManifest\)/);
+  assert.match(loader, /fetch\("\/riftbomb-parts\/manifest\.json"/);
+});
+
+test("uses the embedded manifest normally and keeps the external fallback", async () => {
+  const loader = await readFile(new URL("public/riftbomb-loader.js", root), "utf8");
+  const { directory, manifest, names } = await readPackagedGameParts();
+  const parts = new Map(
+    await Promise.all(names.map(async (name) => [name, await readFile(new URL(name, directory))])),
+  );
+
+  async function runLoader(embeddedManifest) {
+    const requests = [];
+    let resolveCompleted;
+    let rejectCompleted;
+    const completed = new Promise((resolve, reject) => {
+      resolveCompleted = resolve;
+      rejectCompleted = reject;
+    });
+    const progress = {};
+    const status = {};
+    const document = {
+      currentScript: { dataset: embeddedManifest ? { riftbombManifest: embeddedManifest } : {} },
+      getElementById(id) {
+        return id === "progress" ? progress : status;
+      },
+      open() {},
+      write(game) {
+        assert.match(game, /<!doctype html>/i);
+      },
+      close() {
+        resolveCompleted();
+      },
+      documentElement: { dataset: {} },
+    };
+    const context = {
+      console: { error: rejectCompleted },
+      crypto: webcrypto,
+      document,
+      fetch: async (url) => {
+        requests.push(url);
+        if (url === "/riftbomb-parts/manifest.json") {
+          return { ok: true, json: async () => manifest };
+        }
+        const part = parts.get(url.split("/").at(-1));
+        assert.ok(part, `unexpected loader request: ${url}`);
+        return {
+          ok: true,
+          arrayBuffer: async () => part.buffer.slice(
+            part.byteOffset,
+            part.byteOffset + part.byteLength,
+          ),
+        };
+      },
+      location: { search: "" },
+      performance,
+      TextDecoder,
+      URLSearchParams,
+    };
+    context.globalThis = context;
+    vm.runInNewContext(loader, context);
+    await completed;
+    return requests;
+  }
+
+  const embeddedRequests = await runLoader(JSON.stringify(manifest));
+  const fallbackRequests = await runLoader();
+
+  assert.equal(embeddedRequests.length, manifest.partCount);
+  assert.doesNotMatch(embeddedRequests.join("\n"), /manifest\.json/);
+  assert.equal(fallbackRequests.length, manifest.partCount + 1);
+  assert.equal(fallbackRequests[0], "/riftbomb-parts/manifest.json");
 });
 
 test("uses one authoritative WebSocket transport", async () => {

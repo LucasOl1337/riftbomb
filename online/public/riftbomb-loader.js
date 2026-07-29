@@ -3,13 +3,19 @@
   const status = document.getElementById("status");
   const bootStartedAt = performance.now();
   const benchmarkRun = new URLSearchParams(location.search).get("perf-run");
+  const embeddedManifest = document.currentScript?.dataset.riftbombManifest;
 
   try {
-    const manifestResponse = await fetch("/riftbomb-parts/manifest.json", {
-      cache: "no-store",
-    });
-    if (!manifestResponse.ok) throw new Error("Manifesto da arena indisponível");
-    const manifest = await manifestResponse.json();
+    let manifest;
+    if (embeddedManifest) {
+      manifest = JSON.parse(embeddedManifest);
+    } else {
+      const manifestResponse = await fetch("/riftbomb-parts/manifest.json", {
+        cache: "no-store",
+      });
+      if (!manifestResponse.ok) throw new Error("Manifesto da arena indisponível");
+      manifest = await manifestResponse.json();
+    }
     if (
       manifest.version !== 2
       || !Number.isSafeInteger(manifest.partCount)
