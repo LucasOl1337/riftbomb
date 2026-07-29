@@ -4,6 +4,7 @@ import { performance } from "node:perf_hooks";
 import { WebSocketServer, WebSocket } from "ws";
 import { AuthoritativeRooms, isChampion, validPreset } from "./authoritative-rooms.mjs";
 import { createJsonTransport } from "./json-transport.mjs";
+import { createMessageRateLimiter } from "./message-rate-limit.mjs";
 
 const PORT = Number(process.env.PORT || 8788);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -17,6 +18,7 @@ const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const rooms = new Map();
 const quickMatchQueue = [];
 const jsonTransport = createJsonTransport({ openState: WebSocket.OPEN });
+const allowMessage = createMessageRateLimiter();
 
 function send(socket, message) {
   return jsonTransport.send(socket, message);
@@ -125,6 +127,7 @@ function parseClientMessage(raw) {
 }
 
 function handleMessage(socket, raw) {
+  if (!allowMessage(socket)) return;
   const message = parseClientMessage(raw);
   if (!message) return;
   socket.lastSeen = Date.now();
