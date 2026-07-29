@@ -6,17 +6,17 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **16/20 — Segurança vs performance (disponível)**
-- Última rodada concluída: **15/20 — Observabilidade de performance**
-- Próxima rodada planejada: **16/20 — Segurança vs performance**
-- Worktree isolada: `C:/Users/user/.codex/worktrees/r15p/riftbomb`
-- Branch local: `automation/perf-sequential-r15-observability`
+- Rodada atual: **17/20 — Mobile / rede lenta (disponível)**
+- Última rodada concluída: **16/20 — Segurança vs performance**
+- Próxima rodada planejada: **17/20 — Mobile / rede lenta**
+- Worktree isolada: `C:/Users/user/.codex/worktrees/1c0f/riftbomb`
+- Branch local: `automation/perf-sequential-r16-security-performance`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
 - Runtime medido: Node `v24.14.0`, npm `11.18.0`, Windows/PowerShell
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 15 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 16 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -77,6 +77,7 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 | Chamadas D1 sequenciais no create aquecido | ≤ 1 | 2 antes da rodada 8; 1 atual | atende |
 | `POST /api/pvp` join, mediana publicada | ≤ 30 ms | 14,4 ms histórico | 15,6 ms |
 | Serializações JSON por broadcast para dois jogadores | ≤ 1 | 2 antes da rodada 10; 1 atual | atende |
+| Mensagens WebSocket processadas por cliente | ≤ 120/s sustentadas; burst ≤ 240 antes de conversão/parsing | ilimitadas antes; token bucket 120/s e 240 atual | trabalho de CPU por socket fica limitado sem remover `maxPayload` ou autenticação |
 | Valores materializados por leitura de sala com SDP máximo | ≤ 33.000 B | 64.175 B antes da rodada 9; 32.080 B máximo atual | 920 B |
 | Intervals registrados com 128 partidas | ≤ 4 | 256 antes da rodada 11; 2 atuais | atende com 2 de margem |
 | Atraso p95 do event loop com 128 partidas, benchmark local | ≤ 4 ms | 7,029 ms antes da rodada 11; 2,890 ms atual | 1,110 ms |
@@ -98,7 +99,8 @@ Os budgets são guardrails iniciais, não alegações de SLA. Bytes são tamanho
 - Política HTTP estática: `online/public/_headers`; somente partes fingerprintadas recebem cache imutável, enquanto o manifest permanece `no-store`.
 - Lobby: `online/app/page.tsx` (27.064 B) e `online/app/riftbomb-client.ts` (6.654 B).
 - Salas/API: `online/app/api/pvp/route.ts`; persistência, projeções SQL e benchmark em `online/app/api/pvp/room-storage.ts` e `online/scripts/benchmark-pvp-read.mjs`.
-- Transporte: `online/server/src/server.mjs` (6.917 B).
+- Transporte: `online/server/src/server.mjs` (7.318 B); autenticação do proxy e `maxPayload` continuam no upgrade WebSocket, e o token bucket entra antes de `toString`/`JSON.parse`.
+- Limite de mensagens: `online/server/src/message-rate-limit.mjs` (987 B); mantém buckets fracos isolados por socket, burst de 240 e refill de 120/s.
 - Telemetria operacional: `/health` combina `performance.eventLoopUtilization()` sob demanda com contadores agregados de `AuthoritativeRooms`; não expõe códigos, presets, tokens ou payloads de sala.
 - Codificação WebSocket: `online/server/src/json-transport.mjs`; reutiliza o JSON somente durante o broadcast corrente e mantém readiness/backpressure antes de codificar.
 - Relógio/snapshots: `online/server/src/authoritative-rooms.mjs` (3.612 B).
@@ -155,6 +157,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 13/20 | Concluída | Gate agregado reutiliza o `riftbomb.html` que acabou de construir, enquanto `npm test` online isolado continua reconstruindo a raiz por padrão | Build raiz no fluxo raiz + online: 2 → 1; mediana 28.266,6 → 18.689,4 ms (-9.577,2 ms / -33,9%) em 3/3 | `069ed98` |
 | 14/20 | Concluída | Cache estrutural exato substitui `JSON.stringify` da grade em todo snapshot estável, preservando mutações e refresh periódico | 384.000 verificações: mediana 982,999 → 199,591 ms (-79,70% / 4,93x); strings temporárias 384.000 → 0 | `8c05e87` |
 | 15/20 | Concluída | `/health` passou a expor dez sinais agregados de capacidade, relógio e event loop, sem identificadores de sala ou credenciais | Antes: somente total de salas; depois: 10 sinais, com 4,108 ns/ciclo de overhead mediano em nove pares | `40461a2` |
+| 16/20 | Concluída | Token bucket por socket limita floods antes de conversão/parsing sem remover autenticação do proxy, `maxPayload`, validação autoritativa ou backpressure | 200.000 frames: parses 200.000 → 240; mediana 436,003 → 5,766 ms (-98,68%); overhead permitido 26,169 ns/mensagem em nove pares | `86a0f1e` |
 
 ## Escopos reivindicados
 
@@ -162,11 +165,17 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 16:** auditar o caminho de mensagens WebSocket sob abuso e, com benchmark, limitar trabalho excessivo sem remover autenticação, validação, backpressure ou o transporte autoritativo único.
+1. **Rodada 17:** validar mobile/rede lenta com os proxies reproduzíveis disponíveis, priorizando o carregamento do modelo selecionado e a reconstrução do jogo sem iniciar Playwright/headless.
 2. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates. A rodada 10 adotou apenas reutilização efêmera do payload dentro do mesmo broadcast, sem guardar snapshots entre ticks.
 3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
 ## Evidências e limitações
+
+- Rodada 16: o servidor aceitava frames sem limite de frequência; `maxPayload: 32_768` restringia apenas o tamanho individual. O token bucket novo admite burst de **240 mensagens** e repõe **120/s por socket**, descartando excesso antes de `Buffer.toString()` e `JSON.parse()`; autenticação por segredo do proxy, limite de payload, validações autoritativas e backpressure não foram removidos.
+- Benchmark reproduzível `npm run benchmark:message-rate-limit`, com aquecimento e **nove pares intercalados** sobre 200.000 frames de 1 KiB: trabalho de parsing **200.000 → 240 (-99,88%)**; mediana **436,003 → 5,766 ms (-98,68%)**. Em 1.000.000 de mensagens admitidas, o custo incremental mediano do bucket foi **26,169 ns/mensagem**.
+- O cliente publicado deduplica inputs com `lastSentInput` e só transmite quando o bitmask muda; o budget de 120/s com burst 240 fica acima da cadência normal observada. Testes específicos passaram **3/3**, incluindo refill, teto de burst, isolamento por socket e configuração inválida.
+- Validação da rodada 16: servidor **14/14**, raiz **42/42**, online build manual equivalente + artifact check + **17/17**, lint online com **0 erros** e quatro avisos conhecidos. O wrapper `npm test` online continuou bloqueado antes do build pelo CRLF conhecido de `build-verified.sh`; o mesmo empacotamento, `vinext build`, validação do Worker e testes foram executados separadamente. `git diff --check` passou; Playwright/headless não foi usado.
+- Limitação da rodada 16: o benchmark usa buffers de 1 KiB e loop local, não sockets ou CPU publicados. O ganho causal é o limite de parses por socket; uma abertura distribuída de muitas conexões continua dependendo da autenticação do proxy e da capacidade de infraestrutura.
 
 - Rodada 15: `/health` preserva `ok`, `rooms`, `authority` e `region` e adiciona **10 sinais**: partidas ativas, dois estados de relógio, quatro contadores de ciclos, snapshots produzidos, clientes WebSocket e utilização do event loop. O teste HTTP confirmou uma partida/dois clientes e ausência do código `ABC234` e do segredo de proxy na resposta.
 - Benchmark reproduzível `npm run benchmark:telemetry`, com aquecimento e **nove pares intercalados de 1.000.000 ciclos**: mediana anterior **25,619 ms** versus instrumentada **29,727 ms**; delta **4,108 ns/ciclo**, estimado em **0,000370 ms/s** nos dois relógios (90 Hz). É um microbenchmark local de overhead do contador, não CPU de produção.
