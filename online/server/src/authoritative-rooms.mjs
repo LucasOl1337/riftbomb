@@ -49,6 +49,7 @@ export class AuthoritativeRooms {
       type: "lobby",
       ...room.preset,
       guestReady: Boolean(room.players[1]?.ready),
+      guestConnected: Boolean(room.players[1]?.socket),
       inviteMode: room.preset.matchTarget === 10,
       serverAuthoritative: true
     };

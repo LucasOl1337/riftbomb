@@ -49,6 +49,7 @@
     hostToken: "",
     socket: null,
     connected: false,
+    rivalConnected: false,
     guestReady: false,
     inviteMode: false,
     inviteUrl: "",
@@ -266,7 +267,7 @@
     copyButton.disabled = !shareReady || (state.inviteMode && !state.inviteUrl);
     inviteUrlOutput.hidden = !state.inviteMode || state.role !== "host" || !shareReady || !state.inviteUrl;
     inviteUrlOutput.value = shareReady ? state.inviteUrl : "";
-    lobbyBox.dataset.stage = state.guestReady ? "ready" : state.connected ? "connected" : "created";
+    lobbyBox.dataset.stage = state.guestReady ? "ready" : state.rivalConnected ? "connected" : "created";
     if (state.role === "host") {
       UI.start.disabled = !state.connected || !state.guestReady;
       UI.start.textContent = !state.connected
@@ -375,8 +376,10 @@
           return;
         }
         if (message.type === "presence" && message.connected === false) {
+          state.rivalConnected = false;
           setStatus(`Player ${message.playerId} disconnected. Waiting briefly for reconnection.`, "error");
           updateConnection("waiting", `ONLINE · LOBBY ${state.roomCode} · RECONNECTING PLAYER ${message.playerId}`);
+          updateLobbyDisplay();
           return;
         }
         handleControl(message);
@@ -396,6 +399,7 @@
     const transportOpen = state.socket?.readyState === WebSocket.OPEN;
     if (state.connected || !transportOpen) return;
     state.connected = true;
+    if (state.role === "guest") state.rivalConnected = true;
     setBusy(false);
     if (state.role === "host") {
       state.hostChampion = game.selectedChampion;
@@ -424,6 +428,7 @@
   function handleDisconnect() {
     if (state.role === "offline" || !state.connected) return;
     state.connected = false;
+    state.rivalConnected = false;
     game.paused = false;
     updateConnection("disconnected", "ONLINE CONNECTION LOST · RELOAD TO REJOIN");
     if (state.role === "host") {
@@ -488,6 +493,7 @@
     state.inviteMode = Boolean(message.inviteMode);
     state.matchTarget = message.matchTarget === INVITE_MATCH_TARGET ? INVITE_MATCH_TARGET : 3;
     state.guestReady = Boolean(message.guestReady);
+    state.rivalConnected = state.role === "guest" || Boolean(message.guestConnected);
     void renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
     if (game.mode === "intro") {
       game.selectedChampion = state.hostChampion;
@@ -848,7 +854,7 @@
     try { state.socket?.close(); } catch {}
     Object.assign(state, {
       socket: null,
-      connected: false, guestReady: false, hostToken: "", roomCode: "",
+      connected: false, rivalConnected: false, guestReady: false, hostToken: "", roomCode: "",
       inviteMode: false, inviteUrl: "", startInitiated: false, inviteAssetsReady: null, matchTarget: 3,
       receivedSequence: 0,
       localInput: { up: false, down: false, left: false, right: false },
