@@ -28,6 +28,19 @@ const D1_ID = "0d1c4351-7070-4d8f-8035-d5e1ae291a61";
 const WORKER_NAME = "riftbomb-online";
 const DOMAIN = "bombpvp.com";
 
+function firstCredentialValue(value) {
+  return value?.trim().split(/\s+/u).find(Boolean) || "";
+}
+
+function normalizeCloudflareEnvironment() {
+  const token = firstCredentialValue(process.env.CLOUDFLARE_API_TOKEN);
+  if (token) {
+    process.env.CLOUDFLARE_API_TOKEN = token;
+  }
+  process.env.CLOUDFLARE_ACCOUNT_ID =
+    firstCredentialValue(process.env.CLOUDFLARE_ACCOUNT_ID) || ACCOUNT_ID;
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: options.cwd ?? onlineRoot,
@@ -95,7 +108,7 @@ async function patchDistWrangler() {
 
 async function main() {
   const wantBuild = process.argv.includes("--build");
-  process.env.CLOUDFLARE_ACCOUNT_ID ||= ACCOUNT_ID;
+  normalizeCloudflareEnvironment();
 
   if (wantBuild) {
     console.log("Building verified online artifact...");
