@@ -6,17 +6,17 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Estado sequencial
 
-- Rodada atual: **13/20 — Build e CI (disponível)**
-- Última rodada concluída: **12/20 — Cold start / boot**
-- Próxima rodada planejada: **13/20 — Build e CI**
-- Worktree isolada: `C:/Users/user/.codex/worktrees/b17b/riftbomb`
-- Branch local: `automation/perf-sequential-r01-baseline`
+- Rodada atual: **14/20 — Memória e CPU (disponível)**
+- Última rodada concluída: **13/20 — Build e CI**
+- Próxima rodada planejada: **14/20 — Memória e CPU**
+- Worktree isolada: `C:/Users/user/.codex/worktrees/a24a/riftbomb`
+- Branch local: `automation/perf-sequential-r13-build-ci`
 - Base: `8a259be1666088ab733ca9f7028100253f46774c`
 - Runtime medido: Node `v24.14.0`, npm `11.18.0`, Windows/PowerShell
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 12 foi concluída e o escopo foi liberado.
+Nenhuma. A rodada 13 foi concluída e o escopo foi liberado.
 
 ## Baseline inicial
 
@@ -71,6 +71,7 @@ Métrica principal: **bytes não comprimidos e número de requests necessários 
 | VAT publicado de Katarina | ≤ 25.000.000 B | 24.938.550 B atual (33.251.400 B inicial) | 61.450 B |
 | Build raiz, mediana local | ≤ 3.500 ms | 2.954,2 ms | 545,8 ms |
 | Teste raiz completo, mediana local | ≤ 7.500 ms | 6.587,3 ms | 912,7 ms |
+| Gate agregado raiz + online, mediana local | ≤ 22.000 ms | 18.689,4 ms após a rodada 13 (28.266,6 ms antes) | 3.310,6 ms |
 | Teste do servidor, mediana local | ≤ 4.000 ms | 3.056,6 ms | 943,4 ms |
 | `POST /api/pvp` create, mediana publicada | ≤ 50 ms | 28,0 ms histórico | 22,0 ms |
 | Chamadas D1 sequenciais no create aquecido | ≤ 1 | 2 antes da rodada 8; 1 atual | atende |
@@ -148,6 +149,7 @@ O `vinext start` local serviu shell/loader/CSS/JS, mas retornou 404 para manifes
 | 10/20 | Concluída | Codificação JSON reutilizada dentro de cada broadcast autoritativo para host e convidado, sem cache persistente de estado mutável | 40.000 → 20.000 serializações (-50%); proxy de 1.041 B, mediana 448,27 → 226,33 ms (-49,5%) em 3/3 | `d4a38b4` |
 | 11/20 | Concluída | Dois relógios compartilhados substituem timers por sala; filas limitadas a oito salas cedem o event loop sem acumular ciclos atrasados | 128 salas: intervals 256 → 2; callbacks medianos 20.630 → 2.997 (-85,47%); p95 7,029 → 2,890 ms (-58,88%); snapshots medianos 7.059 → 7.680 | `8fe1241` |
 | 12/20 | Concluída | Runtime do duelo, `node:vm` e `node:fs/promises` saíram do grafo de boot e são carregados uma vez na primeira partida | 27 pares intercalados: boot mediano 164,645 → 157,526 ms (-7,119 ms / -4,32%); primeira partida +0,867 ms | `9b90a2d` |
+| 13/20 | Concluída | Gate agregado reutiliza o `riftbomb.html` que acabou de construir, enquanto `npm test` online isolado continua reconstruindo a raiz por padrão | Build raiz no fluxo raiz + online: 2 → 1; mediana 28.266,6 → 18.689,4 ms (-9.577,2 ms / -33,9%) em 3/3 | `069ed98` |
 
 ## Escopos reivindicados
 
@@ -155,7 +157,7 @@ Nenhum escopo ativo.
 
 ## Pendências e próxima recomendação
 
-1. **Rodada 13:** decompor `npm test`/build online e raiz; medir etapas repetidas e eliminar apenas trabalho redundante ou habilitar cache seguro com evidência em três execuções.
+1. **Rodada 14:** medir CPU e memória no caminho quente do jogo ou do servidor com um proxy reproduzível; priorizar parsing repetido, buffers grandes ou loops que ainda não foram cobertos pelas rodadas 10–12.
 2. Não cachear offer/answer mutáveis sem invalidação síncrona entre isolates. A rodada 10 adotou apenas reutilização efêmera do payload dentro do mesmo broadcast, sem guardar snapshots entre ticks.
 3. Quando houver navegador visível autorizado, repetir `data-riftbomb-ready-ms`, Network e o fluxo lobby → sala → primeiro frame. Confirmar em produção tanto o cache da parte fingerprintada quanto a montagem ociosa do fundo; as rodadas 6/7 não afirmam LCP/INP.
 
@@ -166,6 +168,9 @@ Nenhum escopo ativo.
 - `npm test` em `online/server/` passou 3/3.
 - Nenhuma medição de navegador foi inventada. O número de 87,7 ms e as latências de API vêm do scorecard versionado `PERFORMANCE.md`, não desta máquina.
 - A worktree recebeu regeneração de `game/arena-appearance/load-arena-appearance.js` e `riftbomb.html` durante a coleta. Esses artefatos não pertencem à entrega documental e não serão incluídos no commit seletivo.
+- Rodada 13: o fluxo comparável raiz + online caiu de **24.050,3 / 28.266,6 / 28.972,6 ms** (mediana **28.266,6 ms**) para **18.347,3 / 19.780,1 / 18.689,4 ms** (mediana **18.689,4 ms**), redução de **9.577,2 ms / 33,9%**. Cada amostra passou 42 testes raiz e 17 online.
+- O ganho vem de reduzir o build raiz de duas para uma execução somente em `npm run test:all`. `npm test` na raiz e em `online/` mantêm seus builds obrigatórios quando chamados isoladamente; o gate público isolado online foi exercitado após a mudança e mostrou o build raiz no log.
+- `npm run test:all` passou com 42 testes raiz, 17 online e 10 testes do servidor; uma execução completa levou 26.175,1 ms, mas não foi usada no delta porque o baseline comparável não incluía o servidor. `npm run lint` online terminou com zero erros e os quatro avisos de `<img>` já documentados. Playwright/headless não foi usado.
 - Esta rodada não mudou código de produto; o “depois” é a existência de um baseline/budgets reproduzíveis onde antes não havia coordenação do enxame.
 - Na rodada 2, `npm test` online passou 3/3 com 11 testes por execução ao priorizar `C:/Program Files/Git/bin` no `PATH`; o `bash.exe` padrão do Windows continua resolvendo para WSL e falha antes do build neste ambiente.
 - `npm run lint` online passou em 12,98 s. O servidor autoritativo passou 3/3; o gate raiz passou 3/3 com 41 testes por execução (mediana 5,94 s nesta sessão).
