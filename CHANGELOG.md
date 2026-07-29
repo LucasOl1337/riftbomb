@@ -2,6 +2,15 @@
 
 ## 2026-07-28
 
+### Combat HP clarity
+
+- Standardized playable champions on a visible `100 / 100 HP` scale.
+- Changed arena bombs from unconditional instant elimination to 35 damage.
+- Added exact P1 and P2 health readouts and critical-health signaling.
+- Preserved existing champion damage and healing through a documented legacy-value compatibility boundary.
+- Added the canonical combat and balance reference in [`docs/combat-system.md`](docs/combat-system.md).
+- Added implementation notes in [`PatchNotes/patch-note-2026-07-28-combat-hp.md`](PatchNotes/patch-note-2026-07-28-combat-hp.md).
+
 ### Release v1.2.0
 
 - Consolidated the five-arena visual foundation with all six measured
