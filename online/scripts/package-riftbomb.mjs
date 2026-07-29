@@ -9,6 +9,8 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const onlineRoot = path.resolve(scriptDirectory, "..");
 const repositoryRoot = path.resolve(onlineRoot, "..");
 const gameSource = path.join(repositoryRoot, "riftbomb.html");
+const shellSource = path.join(onlineRoot, "riftbomb-shell.html");
+const shellOutput = path.join(onlineRoot, "public", "riftbomb.html");
 const outputDirectory = path.join(onlineRoot, "public", "riftbomb-parts");
 const arenaTextureOutputDirectory = path.join(onlineRoot, "public", "arena-textures");
 const championModelOutputDirectory = path.join(onlineRoot, "public", "champion-models");
@@ -296,16 +298,25 @@ for (let index = 0; index < partCount; index += 1) {
   );
 }
 
-await writeFile(
-  path.join(outputDirectory, "manifest.json"),
-  `${JSON.stringify({
-    version: 2,
-    partCount,
-    partSize: PART_SIZE,
-    byteLength: game.length,
-    sha256,
-    partsPath,
-  }, null, 2)}\n`,
+const manifest = {
+  version: 2,
+  partCount,
+  partSize: PART_SIZE,
+  byteLength: game.length,
+  sha256,
+  partsPath,
+};
+const shell = replaceOnce(
+  await readFile(shellSource, "utf8"),
+  "__RIFTBOMB_MANIFEST__",
+  JSON.stringify(manifest).replaceAll("&", "&amp;").replaceAll("'", "&#39;"),
 );
+await Promise.all([
+  writeFile(
+    path.join(outputDirectory, "manifest.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  ),
+  writeFile(shellOutput, shell),
+]);
 
 console.log(`Packed Riftbomb into ${partCount} web parts.`);
