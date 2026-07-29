@@ -82,6 +82,43 @@ test("the decorative WebGL background waits until core boot can finish", async (
   assert.deepEqual(mounted, [{ nodeName: "FLUID-BG" }]);
 });
 
+test("arena textures load only for the selected or explored arena", async () => {
+  const document = await readFile(sourcePath, "utf8");
+  const planSource = await readFile(
+    path.join(gameDirectory, "arena-appearance", "plan-arena-texture-loads.js"),
+    "utf8"
+  );
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const controls = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
+  const context = vm.createContext({});
+  vm.runInContext(planSource, context);
+
+  const theme = {
+    floor: "floorClearing",
+    wall: "wallClearing",
+    wallTop: "wallTopClearing"
+  };
+  assert.deepEqual(
+    [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(theme)],
+    ["crate", "crateTop", "floorClearing", "wallClearing", "wallTopClearing"]
+  );
+  assert.deepEqual(
+    [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(null)],
+    ["crate", "crateTop", "floorLattice", "wallLattice", "wallTopLattice"]
+  );
+
+  assert.match(document, /load-arena-appearance\.js[\s\S]*plan-arena-texture-loads\.js[\s\S]*draw-bomber-rift\.js/);
+  assert.match(renderer, /this\.arenaTextureLoaders = Object\.create\(null\)/);
+  assert.match(renderer, /ensureArenaTextures\(theme\)/);
+  assert.match(renderer, /RIFTBOMB_ARENA_TEXTURE_PLAN\.forTheme\(theme\)/);
+  assert.match(controls, /renderer\.ensureArenaTextures\(game\.arenaTemplate\(\)\.theme\)/);
+  assert.match(controls, /arena\.id === game\.selectedArena/);
+  assert.match(controls, /paintArenaPreview\(canvas, grid, arena, false\)/);
+  assert.match(controls, /addEventListener\("pointerenter", preview\.request/);
+  assert.match(controls, /addEventListener\("focus", preview\.request/);
+  assert.doesNotMatch(controls, /renderer\.arenaTexturesReady/);
+});
+
 test("the readable combat layer preserves the canonical 100 HP rules", async () => {
   const document = await readFile(sourcePath, "utf8");
   const rules = await readFile(path.join(gameDirectory, "apply-combat-rules.js"), "utf8");
