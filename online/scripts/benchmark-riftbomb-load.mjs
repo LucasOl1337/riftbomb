@@ -6,9 +6,22 @@ for (let index = 2; index < process.argv.length; index += 2) {
 }
 
 const baseUrl = (args.get("--base-url") || "http://localhost:4173").replace(/\/$/, "");
-const partCount = Number(args.get("--parts") || 1);
+const requestedPartCount = args.get("--parts");
 const runs = Number(args.get("--runs") || 3);
 const mode = args.get("--mode") || "sequential";
+const manifestResponse = await fetch(`${baseUrl}/riftbomb-parts/manifest.json`, {
+  cache: "no-store",
+});
+if (!manifestResponse.ok) {
+  throw new Error(`manifest returned ${manifestResponse.status}`);
+}
+const manifest = await manifestResponse.json();
+const partsPath = manifest.partsPath;
+const partCount = Number(requestedPartCount || manifest.partCount);
+
+if (partsPath !== `/riftbomb-parts/${manifest.sha256}`) {
+  throw new Error("manifest partsPath is not fingerprinted by sha256");
+}
 
 if (!Number.isInteger(partCount) || partCount < 1) {
   throw new Error("--parts must be a positive integer");
@@ -23,7 +36,7 @@ if (!["sequential", "parallel"].includes(mode)) {
 async function fetchPart(index) {
   const name = String(index).padStart(2, "0");
   const startedAt = performance.now();
-  const response = await fetch(`${baseUrl}/riftbomb-parts/part-${name}`);
+  const response = await fetch(`${baseUrl}${partsPath}/part-${name}`);
   if (!response.ok) {
     throw new Error(`part-${name} returned ${response.status}`);
   }

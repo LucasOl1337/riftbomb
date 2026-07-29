@@ -1,0 +1,5 @@
+/riftbomb-parts/:version/*
+  Cache-Control: public, max-age=31556952, immutable
+
+/riftbomb-parts/manifest.json
+  Cache-Control: no-store

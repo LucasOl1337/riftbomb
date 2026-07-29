@@ -239,9 +239,11 @@ onlineGame = replaceOnce(
 const game = Buffer.from(onlineGame);
 const partCount = Math.ceil(game.length / PART_SIZE);
 const sha256 = createHash("sha256").update(game).digest("hex");
+const partsPath = `/riftbomb-parts/${sha256}`;
+const versionedPartsDirectory = path.join(outputDirectory, sha256);
 
 await rm(outputDirectory, { recursive: true, force: true });
-await mkdir(outputDirectory, { recursive: true });
+await mkdir(versionedPartsDirectory, { recursive: true });
 await rm(arenaTextureOutputDirectory, { recursive: true, force: true });
 await mkdir(arenaTextureOutputDirectory, { recursive: true });
 await Promise.all(
@@ -282,7 +284,7 @@ for (let index = 0; index < partCount; index += 1) {
   const name = `part-${String(index).padStart(2, "0")}`;
   const start = index * PART_SIZE;
   await writeFile(
-    path.join(outputDirectory, name),
+    path.join(versionedPartsDirectory, name),
     game.subarray(start, start + PART_SIZE),
   );
 }
@@ -290,11 +292,12 @@ for (let index = 0; index < partCount; index += 1) {
 await writeFile(
   path.join(outputDirectory, "manifest.json"),
   `${JSON.stringify({
-    version: 1,
+    version: 2,
     partCount,
     partSize: PART_SIZE,
     byteLength: game.length,
     sha256,
+    partsPath,
   }, null, 2)}\n`,
 );
 
