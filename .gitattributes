@@ -1,1 +1,1 @@
-riftbomb.html filter=lfs diff=lfs merge=lfs -text
+/riftbomb.html filter=lfs diff=lfs merge=lfs -text
