@@ -3282,7 +3282,7 @@ drawKatarinaFallback(player, t, beat) {
       gangplankGold: hexToRgb("#d4a84b"),
       gangplankOrange: hexToRgb("#e07028"),
       gangplankDark: hexToRgb("#1a120c"),
-      gangplankSea: hexToRgb("#2a6b7c"),
+      gangplankSea: hexToRgb("#2a6b7c"),
       voidling: hexToRgb("#be3f4a"),
       hunter: hexToRgb("#d35b4f"),
       minionRed: hexToRgb("#ad2638"),
