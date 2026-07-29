@@ -64,8 +64,6 @@
       bossFill: $("#boss-fill"),
       bossText: $("#boss-hp-text"),
       eventKicker: $("#event-kicker"),
-      pause: $("#pause-toggle"),
-      pauseIcon: $("#pause-icon"),
       abilityDock: $("#ability-dock"),
       arenaBombAction: $("#arena-bomb-action"),
       arenaBombLabel: $("#arena-bomb-label"),
@@ -91,6 +89,7 @@
       ultKey: $("#slot-r-key"),
       ultFill: $("#ult-fill"),
       touchControls: $("#touch-controls"),
+      touchMoveZone: $("#touch-move-zone"),
       touchStick: $("#touch-stick"),
       touchStickKnob: $("#touch-stick-knob"),
       touchQ: $("#touch-q"),
@@ -425,14 +424,16 @@
         });
         if (!gl) throw new Error("WebGL2 is unavailable in this browser.");
         this.gl = gl;
-        // Keep one backing pixel per CSS pixel on phones by default. The adaptive
-        // scaler may still step down under sustained load, but never starts blurry.
+        // Render at up to 2 backing pixels per CSS pixel on phones (DPR 2 cap),
+        // matching the menu previews. The adaptive scaler may still step down
+        // under sustained load, but never starts blurry; the pixel budget keeps
+        // weak devices protected.
         this.mobilePerf = mobilePerfTarget;
-        this.maxScale = this.mobilePerf ? 1.2 : Math.min(devicePixelRatio || 1, 1.45);
-        this.minScale = this.mobilePerf ? 0.75 : 0.7;
-        this.pixelBudget = this.mobilePerf ? 1280 * 720 : 2560 * 1440;
+        this.maxScale = this.mobilePerf ? Math.min(devicePixelRatio || 1, 2) : Math.min(devicePixelRatio || 1, 1.45);
+        this.minScale = this.mobilePerf ? 0.9 : 0.7;
+        this.pixelBudget = this.mobilePerf ? 1920 * 1080 : 2560 * 1440;
         this.scale = this.mobilePerf
-          ? Math.min(devicePixelRatio || 1, 1)
+          ? Math.min(devicePixelRatio || 1, 2)
           : Math.min(devicePixelRatio || 1, 1.45);
         this.targetScale = this.scale;
         this.frameSamples = [];
@@ -1244,6 +1245,7 @@
           }));
           return texture;
         };
+        // Modular kit: each of the five arenas owns floor + wall side + wall top.
         const textureGroups = {
           crate: ["crate"],
           crateTop: ["crateTop"],
@@ -1252,37 +1254,42 @@
           floorLabyrinth: ["floorLabyrinth"],
           floorForts: ["floorForts"],
           floorPit: ["floorPit"],
-          wallLattice: ["wallLattice", "wallClearing", "wallLabyrinth", "wallForts", "wallPit"],
-          wallTopLattice: [
-            "wallTopLattice", "wallTopClearing", "wallTopLabyrinth", "wallTopForts", "wallTopPit",
-            "wallTopStone", "wallTopMetal"
-          ]
+          wallLattice: ["wallLattice"],
+          wallClearing: ["wallClearing"],
+          wallLabyrinth: ["wallLabyrinth"],
+          wallForts: ["wallForts"],
+          wallPit: ["wallPit"],
+          wallTopLattice: ["wallTopLattice", "wallTopStone"],
+          wallTopClearing: ["wallTopClearing"],
+          wallTopLabyrinth: ["wallTopLabyrinth", "wallTopMetal"],
+          wallTopForts: ["wallTopForts"],
+          wallTopPit: ["wallTopPit"]
         };
         const keys = Object.values(textureGroups).flat();
         const fallbacks = {
           crate: [120, 82, 48, 255],
           crateTop: [90, 62, 40, 255],
-          floorLattice: [22, 72, 36, 255],
-          floorClearing: [26, 58, 82, 255],
-          floorLabyrinth: [18, 48, 56, 255],
-          floorForts: [58, 40, 32, 255],
-          floorPit: [42, 24, 20, 255],
+          floorLattice: [138, 90, 58, 255],
+          floorClearing: [40, 90, 96, 255],
+          floorLabyrinth: [28, 40, 52, 255],
+          floorForts: [52, 110, 48, 255],
+          floorPit: [28, 36, 58, 255],
           wallLattice: [74, 92, 100, 255],
-          wallClearing: [90, 122, 154, 255],
-          wallLabyrinth: [42, 58, 72, 255],
-          wallForts: [74, 64, 56, 255],
-          wallPit: [42, 36, 40, 255],
+          wallClearing: [150, 168, 170, 255],
+          wallLabyrinth: [36, 48, 62, 255],
+          wallForts: [180, 172, 150, 255],
+          wallPit: [42, 48, 68, 255],
           wallTopLattice: [48, 58, 64, 255],
-          wallTopClearing: [50, 70, 90, 255],
-          wallTopLabyrinth: [28, 40, 50, 255],
-          wallTopForts: [40, 36, 32, 255],
-          wallTopPit: [28, 26, 30, 255],
+          wallTopClearing: [200, 214, 210, 255],
+          wallTopLabyrinth: [40, 56, 72, 255],
+          wallTopForts: [210, 200, 176, 255],
+          wallTopPit: [48, 54, 72, 255],
           wallTopStone: [48, 52, 56, 255],
           wallTopMetal: [50, 56, 62, 255]
         };
         this.arenaTextureReady = Object.fromEntries(keys.map((key) => [key, false]));
         this.arenaTextures = {};
-        // Nine authored sources, nine GPU allocations. Shared wall theme names remain aliases.
+        // Modular kit: one GPU allocation per packed source group (floors + 3 wall pairs + crates).
         for (const [sourceKey, aliases] of Object.entries(textureGroups)) {
           const texture = make(sourceKey, aliases, fallbacks[sourceKey] || [80, 80, 80, 255]);
           for (const alias of aliases) this.arenaTextures[alias] = texture;
@@ -1580,37 +1587,31 @@
        * this coin (syncSkillTokenDom) — avoids broken mapId-4 white-blob path.
        */
       drawSkillPickup(pickup, t, beat) {
-        const C = Renderer.colors;
         const phase = t * 2.2 + (pickup.slot || 0) * 1.1 + (pickup.r || 0) * 0.17;
         const bob = 0.58 + Math.sin(phase) * 0.04;
-        const spin = t * 0.7 + (pickup.slot || 0);
-        const pulse = 1 + Math.sin(phase * 1.4) * 0.02;
-        // Hard industrial metal — hazard red rim only (no soft white/gold bloom)
-        const steel = [0.12, 0.12, 0.13];
-        const steelDeep = [0.06, 0.06, 0.07];
-        const hazard = C.ember || [0.9, 0.16, 0.16];
+        const spin = t * 0.55 + (pickup.slot || 0);
+        const pulse = 1 + Math.sin(phase * 1.4) * 0.015;
+        // Steel + thin gold bezel — no pink/red hazard ring
+        const steel = [0.16, 0.17, 0.19];
+        const steelDeep = [0.07, 0.07, 0.08];
+        const gold = [0.78, 0.62, 0.32];
         const x = pickup.x;
         const z = pickup.z;
-        const R = 0.4 * pulse;
+        const R = 0.38 * pulse;
 
-        // Hard contact plate (no soft glowing disc)
-        this.draw("cylinder", [x, 0.02, z], [0.34, 0.018, 0.34], steelDeep, 0, 0.05, spin);
-        this.draw("cylinder", [x, 0.035, z], [0.3, 0.012, 0.3], steel, 0, 0.08, spin);
+        this.draw("cylinder", [x, 0.018, z], [0.3, 0.014, 0.3], steelDeep, 0, 0.04, spin);
+        this.draw("cylinder", [x, 0.03, z], [0.26, 0.01, 0.26], steel, 0, 0.05, spin);
+        this.draw("cylinder", [x, 0.1, z], [0.09, 0.08, 0.09], steelDeep, 0, 0.08, spin);
+        this.draw("cylinder", [x, 0.2, z], [0.14, 0.03, 0.14], steel, 0, 0.1, spin);
+        this.draw("cylinder", [x, 0.24, z], [0.15, 0.012, 0.15], gold, 0, 0.18, spin);
 
-        // Pedestal stack — machined cylinders
-        this.draw("cylinder", [x, 0.1, z], [0.1, 0.09, 0.1], steelDeep, 0, 0.1, spin);
-        this.draw("cylinder", [x, 0.22, z], [0.16, 0.035, 0.16], steel, 0, 0.12, spin);
-        this.draw("cylinder", [x, 0.27, z], [0.18, 0.02, 0.18], hazard, 2, 0.35, spin);
-
-        // Coin body under DOM skill art
-        this.draw("skillCoin", [x, bob, z], [R, R * 0.32, R], steelDeep, 0, 0.14, spin);
-        this.draw("torus", [x, bob + R * 0.12, z],
-          [R * 1.02, 0.04, R * 1.02], hazard, 2, 0.55 + beat * 0.15, spin, 1, 0, Math.PI * 0.5);
-        this.draw("torus", [x, bob - R * 0.1, z],
-          [R * 0.98, 0.03, R * 0.98], steel, 0, 0.12, -spin, 1, 0, Math.PI * 0.5);
-        // Dark face plate under icon (never white emissive)
-        this.draw("skillDisc", [x, bob + R * 0.34, z],
-          [R * 0.86, 1, R * 0.86], steel, 0, 0.08, spin * 0.15, 1);
+        this.draw("skillCoin", [x, bob, z], [R, R * 0.28, R], steelDeep, 0, 0.1, spin);
+        this.draw("torus", [x, bob + R * 0.1, z],
+          [R * 1.0, 0.028, R * 1.0], gold, 0, 0.22 + beat * 0.08, spin, 1, 0, Math.PI * 0.5);
+        this.draw("torus", [x, bob - R * 0.08, z],
+          [R * 0.96, 0.022, R * 0.96], steel, 0, 0.08, -spin, 1, 0, Math.PI * 0.5);
+        this.draw("skillDisc", [x, bob + R * 0.3, z],
+          [R * 0.84, 1, R * 0.84], steelDeep, 0, 0.05, spin * 0.12, 1);
       }
 
       /**
@@ -1670,39 +1671,40 @@
       drawClassicPickup(pickup, t, beat) {
         const C = Renderer.colors;
         const phase = t * 2.5 + (pickup.r || 0) * 0.4 + (pickup.c || 0) * 0.3;
-        const bob = 0.42 + Math.sin(phase) * 0.07;
-        const spin = t * 1.4;
+        const bob = 0.44 + Math.sin(phase) * 0.05;
+        const spin = t * 1.15;
         const x = pickup.x;
         const z = pickup.z;
         const type = pickup.type;
-
-        this.draw("sphere", [x, 0.03, z], [0.4, 0.025, 0.4],
-          type === "shield" ? C.ice : type === "range" ? C.gold : type === "bomb" ? C.violet : C.mint,
-          4, 1.2 + beat * 0.3, 0, 0.32);
+        const steel = [0.14, 0.15, 0.17];
+        const steelDeep = [0.06, 0.06, 0.07];
+        // Hard contact plate only — no soft pink/violet ground bloom
+        this.draw("cylinder", [x, 0.016, z], [0.28, 0.012, 0.28], steelDeep, 0, 0.04, spin * 0.2);
+        this.draw("cylinder", [x, 0.028, z], [0.24, 0.01, 0.24], steel, 0, 0.05, spin * 0.2);
 
         if (type === "bomb") {
-          // Extra bomb capacity — mini bomb
-          this.draw("sphere", [x, bob, z], [0.22, 0.22, 0.22], C.bomb, 0, 0.15, spin);
-          this.draw("sphere", [x, bob, z], [0.2, 0.2, 0.2], C.violet, 3, 0.8 + beat, spin, 0.55);
-          this.draw("cylinder", [x, bob + 0.2, z], [0.06, 0.06, 0.06], C.bomb, 0, 0.2, spin);
-          this.draw("crystal", [x + 0.04, bob + 0.3, z], [0.04, 0.1, 0.04], C.gold, 3, 2.5 + beat, 0.4);
+          // Extra bomb capacity — readable mini bomb, dark body + fuse
+          this.draw("sphere", [x, bob, z], [0.2, 0.2, 0.2], C.bomb || [0.12, 0.12, 0.12], 0, 0.12, spin);
+          this.draw("sphere", [x, bob, z], [0.17, 0.17, 0.17], [0.28, 0.14, 0.42], 0, 0.35 + beat * 0.1, spin, 0.7);
+          this.draw("cylinder", [x, bob + 0.18, z], [0.05, 0.05, 0.05], steel, 0, 0.15, spin);
+          this.draw("crystal", [x + 0.03, bob + 0.28, z], [0.035, 0.09, 0.035], C.gold, 2, 1.4 + beat * 0.2, 0.35);
         } else if (type === "range") {
-          // Blast range — expanding rings + core
-          this.draw("sphere", [x, bob, z], [0.12, 0.12, 0.12], C.gold, 3, 2 + beat, spin);
-          this.draw("torus", [x, bob, z], [0.22, 0.035, 0.22], C.whiteGold, 4, 1.8 + beat, spin, 0.85, 0, Math.PI * 0.5);
-          this.draw("torus", [x, bob, z], [0.32, 0.025, 0.32], C.gold, 4, 1.2 + beat, -spin, 0.55, 0, Math.PI * 0.5);
+          // Blast range — gold rings, solid core
+          this.draw("sphere", [x, bob, z], [0.11, 0.11, 0.11], C.gold, 2, 0.9 + beat * 0.15, spin);
+          this.draw("torus", [x, bob, z], [0.2, 0.03, 0.2], C.whiteGold || C.gold, 2, 0.85 + beat * 0.1, spin, 0.9, 0, Math.PI * 0.5);
+          this.draw("torus", [x, bob, z], [0.3, 0.022, 0.3], C.gold, 2, 0.55 + beat * 0.1, -spin, 0.7, 0, Math.PI * 0.5);
         } else if (type === "speed") {
-          // Speed — chevron / wing
-          this.draw("cube", [x, bob, z], [0.1, 0.08, 0.28], C.mint, 2, 1.2 + beat, spin);
-          this.draw("cone", [x, bob, z + 0.18], [0.12, 0.16, 0.12], C.ice, 3, 1.6 + beat, spin + Math.PI);
-          this.draw("cone", [x, bob, z - 0.1], [0.1, 0.12, 0.1], C.mint, 2, 1 + beat, spin);
+          // Speed — mint arrow/chevron
+          this.draw("cube", [x, bob, z], [0.09, 0.07, 0.24], C.mint, 2, 0.7 + beat * 0.12, spin);
+          this.draw("cone", [x, bob, z + 0.16], [0.11, 0.14, 0.11], C.ice || C.mint, 2, 0.9 + beat * 0.12, spin + Math.PI);
+          this.draw("cone", [x, bob, z - 0.09], [0.08, 0.1, 0.08], C.mint, 2, 0.55 + beat * 0.1, spin);
         } else if (type === "shield") {
-          // Shield — bubble shell
-          this.draw("sphere", [x, bob, z], [0.24, 0.24, 0.24], C.ice, 4, 1.5 + beat, spin, 0.35);
-          this.draw("torus", [x, bob, z], [0.26, 0.04, 0.26], C.rift || C.ice, 4, 2 + beat, spin, 0.7, 0, Math.PI * 0.5);
-          this.draw("sphere", [x, bob + 0.02, z], [0.1, 0.1, 0.1], C.whiteGold, 3, 2.2 + beat, 0);
+          // Shield — ice shell, restrained glow
+          this.draw("sphere", [x, bob, z], [0.22, 0.22, 0.22], C.ice, 2, 0.55 + beat * 0.1, spin, 0.45);
+          this.draw("torus", [x, bob, z], [0.24, 0.03, 0.24], C.rift || C.ice, 2, 0.75 + beat * 0.12, spin, 0.8, 0, Math.PI * 0.5);
+          this.draw("sphere", [x, bob + 0.02, z], [0.08, 0.08, 0.08], C.whiteGold || C.gold, 2, 0.85 + beat * 0.1, 0);
         } else {
-          this.draw("crystal", [x, bob, z], [0.18, 0.32, 0.18], C.gold, 2, 2 + beat, spin);
+          this.draw("crystal", [x, bob, z], [0.16, 0.28, 0.16], C.gold, 2, 0.9 + beat * 0.15, spin);
         }
       }
 
@@ -3276,8 +3278,8 @@ drawKatarinaFallback(player, t, beat) {
     }
 
     Renderer.colors = {
-      floor: hexToRgb("#164a28"),
-      lane: hexToRgb("#7a7d6a"),
+      floor: hexToRgb("#8a5a3a"),
+      lane: hexToRgb("#a87850"),
       river: hexToRgb("#1a757e"),
       riverLight: hexToRgb("#4dcecf"),
       forest: hexToRgb("#2c6a42"),
@@ -3287,8 +3289,8 @@ drawKatarinaFallback(player, t, beat) {
       brushB: hexToRgb("#54894a"),
       bark: hexToRgb("#5a4a34"),
       stone: hexToRgb("#62706a"),
-      arenaFloorA: hexToRgb("#1c443a"),
-      arenaFloorB: hexToRgb("#163830"),
+      arenaFloorA: hexToRgb("#8a5a3a"),
+      arenaFloorB: hexToRgb("#6e452c"),
       arenaStone: hexToRgb("#4a5c64"),
       arenaStoneTop: hexToRgb("#82928c"),
       crate: hexToRgb("#5a3824"),

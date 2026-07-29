@@ -414,12 +414,4 @@
         UI.chrome.setAttribute("inert", "");
         setTimeout(() => UI.restart.focus(), 100);
       }
-
-      setPaused(paused) {
-        UI.pause.setAttribute("aria-pressed", String(paused));
-        UI.pause.setAttribute("aria-label", paused ? "Resume game" : "Pause game");
-        UI.pauseIcon.innerHTML = paused
-          ? '<path d="M8 5v14l11-7L8 5z"/>'
-          : '<path d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/>';
-      }
     }

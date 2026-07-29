@@ -1,7 +1,7 @@
 # Percepção do bot — o mundo, os inputs e a sequência
 
-**Status:** rascunho vivo — decidido e implementado **passo a passo com o time**, não de uma vez.  
-**Não cobre ainda:** política / como vira output.  
+**Status:** percepção e política baseline já estão no código; este documento segue como referência do modelo de percepção.
+**Política / output:** cobertos por `intents.md` e `baseline-policy.mjs`.
 **Fonte de verdade do estado:** `game/run-champion-bomb-duel.js` (Match / `Game`).
 
 ## O que já está fechado e no código
@@ -9,12 +9,14 @@
 | Passo | Detalhe | Código | Teste |
 |------:|---------|--------|-------|
 | 1 | Casca da arena: `cols`, `rows`, `tile`, cópia de `grid` | `sense-arena.mjs` → `senseArena` | `verify-perception.test.mjs` |
+| 2 | WorldView somente-leitura: self, rival, grid, bombas, blasts, pickups e meta, com cópias que não vazam para a Match | `build-world-view.mjs` | `verify-world-view.test.mjs` |
+| 3 | Política baseline consome a WorldView e emite intenções (andar, plantar bomba) | `baseline-policy.mjs` | `verify-baseline-policy.test.mjs` |
 
 Células: `0` livre · `1` sólido · `2` quebrável (`CELL` no mesmo arquivo).
 
-**Ainda não fechado:** players, bombas, tempo, kit, quando no frame, intents, política.
+**Ainda não fechado:** uso de skills pelo baseline (a política sempre emite `skill: null`).
 
-O texto longo abaixo é **nota de trabalho / inventário**, não decisão travada — cada bloco só vira “fechado” quando form para o código com teste.
+O texto longo abaixo é **nota de trabalho / inventário**, não decisão travada.
 
 ---
 

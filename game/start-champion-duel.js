@@ -4,7 +4,6 @@
     let sfx;
     let game;
     let lastFrame = performance.now();
-    let guidePausedGame = false;
     let selectedLocalPlayer = 1;
 
     function updatePlayerSelector(playerId) {
@@ -88,15 +87,6 @@
       gate.hidden = !show;
       gate.setAttribute("aria-hidden", String(!show));
       document.documentElement.classList.toggle("needs-landscape", show);
-      if (show) {
-        if (game?.mode === "playing" && !game.paused) {
-          game.togglePause(true);
-          gate.dataset.pausedForRotate = "1";
-        }
-      } else if (gate.dataset.pausedForRotate === "1") {
-        gate.dataset.pausedForRotate = "0";
-        if (game?.mode === "playing" && game.paused) game.togglePause(false);
-      }
     }
 
     async function lockLandscapeOrientation() {
@@ -151,7 +141,6 @@
       if (gate) {
         gate.hidden = true;
         gate.setAttribute("aria-hidden", "true");
-        gate.dataset.pausedForRotate = "0";
       }
       try { screen.orientation?.unlock?.(); } catch {}
       try {
@@ -176,16 +165,12 @@
     }
 
     function openGuide() {
-      guidePausedGame = game && game.mode === "playing" && !game.paused;
-      if (guidePausedGame) game.togglePause(true);
       UI.guide.showModal();
       UI.guideClose.focus();
     }
 
     function closeGuide() {
       UI.guide.close();
-      if (guidePausedGame && game.mode === "playing") game.togglePause(false);
-      guidePausedGame = false;
     }
 
     function setupInput() {
@@ -222,7 +207,6 @@
         else if (["KeyK", "Numpad2"].includes(event.code)) game.castAbility(1, game.players[1]);
         else if (["KeyL", "Numpad3"].includes(event.code)) game.castAbility(2, game.players[1]);
         else if (["Semicolon", "Numpad4"].includes(event.code)) game.castAbility(3, game.players[1]);
-        else if (event.code === "KeyP") game.togglePause();
         else if (event.code === "KeyH") openGuide();
       });
       addEventListener("keyup", (event) => game.keys.delete(event.code));
@@ -258,20 +242,36 @@
     }
 
     function setupTouchStick() {
+      const zone = UI.touchMoveZone;
       const stick = UI.touchStick;
       const knob = UI.touchStickKnob;
-      if (!stick || !knob) return;
+      if (!zone || !stick || !knob) return;
 
       let activePointer = null;
+      let anchorX = 0;
+      let anchorY = 0;
+      let maxRadius = 1;
       const deadzone = 0.18;
 
-      const applyStick = (clientX, clientY) => {
+      // Floating stick: it spawns centered on the touch point and every
+      // direction offset is measured from that anchor, not the element.
+      const spawnStick = (clientX, clientY) => {
         const rect = stick.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        const maxRadius = Math.min(rect.width, rect.height) * 0.34;
-        let offsetX = clientX - centerX;
-        let offsetY = clientY - centerY;
+        anchorX = clientX;
+        anchorY = clientY;
+        maxRadius = Math.min(rect.width, rect.height) * 0.34;
+        stick.classList.add("is-floating");
+        stick.style.transform = `translate3d(${clientX - rect.width / 2}px, ${clientY - rect.height / 2}px, 0)`;
+      };
+
+      const parkStick = () => {
+        stick.classList.remove("is-floating");
+        stick.style.transform = "";
+      };
+
+      const applyStick = (clientX, clientY) => {
+        let offsetX = clientX - anchorX;
+        let offsetY = clientY - anchorY;
         const distance = Math.hypot(offsetX, offsetY);
         if (distance > maxRadius && distance > 0) {
           offsetX = (offsetX / distance) * maxRadius;
@@ -291,17 +291,18 @@
         }
       };
 
-      stick.addEventListener("pointerdown", (event) => {
+      zone.addEventListener("pointerdown", (event) => {
         if (activePointer !== null) return;
         event.preventDefault();
         activePointer = event.pointerId;
-        stick.setPointerCapture?.(event.pointerId);
+        zone.setPointerCapture?.(event.pointerId);
+        spawnStick(event.clientX, event.clientY);
         stick.classList.add("is-active");
         applyStick(event.clientX, event.clientY);
         if (game.mode === "playing") void sfx.start().catch(() => {});
       });
 
-      stick.addEventListener("pointermove", (event) => {
+      zone.addEventListener("pointermove", (event) => {
         if (event.pointerId !== activePointer) return;
         event.preventDefault();
         applyStick(event.clientX, event.clientY);
@@ -311,6 +312,7 @@
         if (event && event.pointerId !== activePointer) return;
         activePointer = null;
         resetTouchStick();
+        parkStick();
       };
 
       // Listen at window capture phase so releasing a second finger cannot
@@ -599,7 +601,6 @@
           event.preventDefault();
           closeGuide();
         });
-        UI.pause.addEventListener("click", () => game.togglePause());
         UI.arenaBombAction.addEventListener("click", () => game.placeBomb());
         UI.bombAction.addEventListener("click", () => game.castAbility(0));
         UI.dashAction.addEventListener("click", () => game.castAbility(1));
@@ -609,9 +610,6 @@
         UI.playerTwoSkillButtons.forEach((button) => button.addEventListener("click", () => {
           game.castAbility(Number(button.dataset.p2Slot), game.players[1]);
         }));
-        document.addEventListener("visibilitychange", () => {
-          if (document.hidden && game.mode === "playing" && !game.paused) game.togglePause(true);
-        });
         requestAnimationFrame(frame);
       } catch (error) {
         console.error(error);

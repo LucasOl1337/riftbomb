@@ -4,10 +4,8 @@ game/load-playable-champion-models.js
 game/load-baseline-bot.js
 tools/cdtb-env/
 tools/cdragon-data/
-champions/ziggs/reconstruct-reference-model/.git/
 
 # Local packages and temporary output
-fluidpkg/
 *.tgz
 *.log
 *.tmp

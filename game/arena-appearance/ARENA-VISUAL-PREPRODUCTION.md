@@ -43,20 +43,17 @@ procedural motifs and palettes.
 | Budget | Target |
 | --- | ---: |
 | Environmental ambience | 1 draw call |
-| Authored floor textures loaded online | 3 WebP files |
-| Arena texture GPU allocations | 7 shared allocations |
+| Authored offline texture sources | 13 WebP embeds (2 crate + 5 floor + 3 wall + 3 wall-top) |
 | Active shockwaves | 4 maximum |
 | Low-tier arena ambience | Disabled |
 | Motion-reduced animation speed | Zero |
 
 ## Asset map
 
-- `raw-imagine/07-salt-lens-array-keyframe.png`
-- `raw-imagine/09-nacre-hollow-keyframe.png`
-- `raw-imagine/11-cinderfrost-works-keyframe.png`
-- `textures/ground/floor-lattice.webp`
-- `textures/ground/floor-clearing.webp`
-- `textures/ground/floor-labyrinth.webp`
+- Proof keyframes: `raw-imagine/proof-01-salt-lens.jpg`, `proof-02-nacre-hollow.jpg`, `proof-03-cinderfrost.jpg`
+- Floors: `textures/ground/floor-{lattice,clearing,labyrinth,forts,pit}.webp`
+- Walls: `textures/walls/wall-{lattice,clearing,labyrinth}.webp` + matching `wall-top-*`
+- See `MODULAR-KIT.md` for piece language and how to compose new places.
 
 ## Originality and commercial boundary
 

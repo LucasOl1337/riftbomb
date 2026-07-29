@@ -1,23 +1,23 @@
 # Bot opponent
 
-Sistema de oponentes controlados por IA do Riftbomb.
-
-Esta pasta concentra **requisitos, planejamento e decisões** do bot. Código de regras e partida continua em `game/` até existir um seam estável o bastante para extrair a política de IA sem reescrever a Match.
+Oponente controlado por CPU do Riftbomb. O bot percebe a Match por um snapshot
+somente-leitura (WorldView) e emite intenções; `game/` valida e aplica cada
+intenção pelas mesmas regras do input humano.
 
 ## Mapa
 
 | Arquivo | Conteúdo |
 |---------|----------|
-| [perception.md](./perception.md) | **Como o bot enxerga o mundo** — inputs, WorldView, sequência no frame |
+| [sense-arena.mjs](./sense-arena.mjs) | Casca da arena: copia `cols`, `rows`, `tile` e `grid` |
+| [build-world-view.mjs](./build-world-view.mjs) | Monta a WorldView somente-leitura do bot a partir da Match |
+| [baseline-policy.mjs](./baseline-policy.mjs) | Política baseline: decide intenções a partir da WorldView |
+| [package-baseline-bot.mjs](./package-baseline-bot.mjs) | Empacota a política em `game/load-baseline-bot.js` (gerado, não versionado) |
+| [perception.md](./perception.md) | Como o bot enxerga o mundo — inputs, WorldView, sequência no frame |
+| [intents.md](./intents.md) | Contrato de intenções (mover, bomba, skill) |
 | [requirements.md](./requirements.md) | O que o sistema de bots precisa entregar |
 | [planning.md](./planning.md) | Fases, arquitetura proposta e ordem de trabalho |
-| [status-quo.md](./status-quo.md) | O que o CPU faz hoje no código da partida |
+| [status-quo.md](./status-quo.md) | Registro histórico do CPU embutido (antes da extração) |
 | [decisions.md](./decisions.md) | Decisões fechadas e hipóteses ainda abertas |
-
-## Como estamos construindo (ritmo)
-
-Um detalhe por vez: conversar → implementar o mínimo → teste → só então o próximo.  
-Sem fechar o contrato inteiro de cabeça. Tabela do que já entrou: topo de `perception.md`.
 
 ## Fronteira do módulo
 
@@ -28,12 +28,15 @@ Sem fechar o contrato inteiro de cabeça. Tabela do que já entrou: topo de `per
 
 ## Estado atual (produto)
 
-- Match solo começa com P2 em CPU.
-- P2 vira humano local se alguém pressionar setas ou Enter.
-- O CPU de hoje só **anda** e **planta bomba**. Não usa Q / W / E / R.
-- Lógica embutida em `game/run-champion-bomb-duel.js` (`updateBot`).
-- Percepção ainda **não** está extraída: o CPU lê o `Game` por dentro.
+- Match solo começa com P2 em CPU; P2 vira humano local ao pressionar setas ou Enter.
+- O CPU solo entra pela política deste módulo — não há heurística de bot duplicada
+  nas regras da Match (`game/run-champion-bomb-duel.js`).
+- A política baseline **anda** e **planta bomba**; nunca emite `skill`, então
+  Q / W / E / R ficam sem uso pelo CPU.
+- Percepção e política são cobertas por `verify-perception.test.mjs`,
+  `verify-world-view.test.mjs` e `verify-baseline-policy.test.mjs`.
 
 ## Próximo passo
 
-Fechar e, se necessário, refinar `perception.md` → documentar **intents** → só então baseline de política consumindo WorldView.
+Ensinar skills ao baseline: o contrato de intenções já aceita `skill`
+(veja `intents.md`); falta a política decidir quando pedir cada habilidade.

@@ -16,9 +16,9 @@
           wallTop: "wallTopLattice",
           clear: "#07090b",
           base: "#171b1e",
-          floorA: "#2c302f",
-          floorB: "#202524",
-          lane: "#aaa497",
+          floorA: "#8a5a3a",
+          floorB: "#6e452c",
+          lane: "#a87850",
           river: "#176c70",
           riverLight: "#3ed6c5",
           stone: "#252a2d",
@@ -134,11 +134,11 @@
           floor: "floorForts",
           wall: "wallForts",
           wallTop: "wallTopForts",
-          clear: "#07101d",
-          base: "#0f2340",
-          floorA: "#203858",
-          floorB: "#142a46",
-          lane: "#9d9b91",
+          clear: "#07140c",
+          base: "#122418",
+          floorA: "#3a7a36",
+          floorB: "#2a5a28",
+          lane: "#8a9a5a",
           river: "#2c788c",
           riverLight: "#5ad0e6",
           stone: "#b8b5aa",
@@ -148,7 +148,7 @@
           fx: Object.freeze({
             motif: 3,
             primary: "#5ad0e6",
-            secondary: "#c44972",
+            secondary: "#7ec85a",
             intensity: 0.72,
             speed: 0.56,
             density: 0.92
@@ -179,10 +179,10 @@
           floor: "floorPit",
           wall: "wallPit",
           wallTop: "wallTopPit",
-          clear: "#050a13",
-          base: "#101b2f",
-          floorA: "#1b2c45",
-          floorB: "#111f35",
+          clear: "#050810",
+          base: "#0c1424",
+          floorA: "#1a2848",
+          floorB: "#121c36",
           lane: "#6d7480",
           river: "#183d59",
           riverLight: "#5ad0e6",
@@ -229,7 +229,6 @@
         this.rows = 11;
         this.tile = 1.32;
         this.mode = "intro";
-        this.paused = false;
         this.grid = [];
         this.powerupPlan = new Map();
         this.bombs = [];
@@ -500,7 +499,6 @@
 
       start() {
         this.mode = "playing";
-        this.paused = false;
         this.seed = (Date.now() ^ 0xA57A2026) >>> 0;
         this.round = 0;
         this.wave = 1;
@@ -574,11 +572,38 @@
         return false;
       }
 
-      moveEntity(entity, dx, dz, speed, dt, radius, ignoreBomb = null) {
+      moveEntity(entity, dx, dz, speed, dt, radius, ignoreBomb = null, assist = false) {
         const nx = entity.x + dx * speed * dt;
-        if (!this.isBlocked(nx, entity.z, radius, ignoreBomb)) entity.x = nx;
+        if (!this.isBlocked(nx, entity.z, radius, ignoreBomb)) {
+          entity.x = nx;
+        } else if (assist && dx !== 0) {
+          this.nudgeAroundCorner(entity, nx, "x", speed * dt, dz, radius, ignoreBomb);
+        }
         const nz = entity.z + dz * speed * dt;
-        if (!this.isBlocked(entity.x, nz, radius, ignoreBomb)) entity.z = nz;
+        if (!this.isBlocked(entity.x, nz, radius, ignoreBomb)) {
+          entity.z = nz;
+        } else if (assist && dz !== 0) {
+          this.nudgeAroundCorner(entity, nz, "z", speed * dt, dx, radius, ignoreBomb);
+        }
+      }
+
+      // Analog-stick corner assist: when the move along one axis is blocked near
+      // a corner, slide the entity sideways (at most one frame of travel) until
+      // the blocked axis opens. Deterministic: pure function of position, grid
+      // and input; the preferred side follows the perpendicular stick component.
+      nudgeAroundCorner(entity, target, axis, maxShift, perpendicular, radius, ignoreBomb) {
+        const signs = perpendicular < 0 ? [-1, 1] : [1, -1];
+        for (let i = 1; i <= 2; i += 1) {
+          const shift = (maxShift * i) / 2;
+          for (const sign of signs) {
+            const px = axis === "x" ? target : entity.x + sign * shift;
+            const pz = axis === "x" ? entity.z + sign * shift : target;
+            if (this.isBlocked(px, pz, radius, ignoreBomb)) continue;
+            entity.x = px;
+            entity.z = pz;
+            return;
+          }
+        }
       }
 
       activeBombsFor(player) {
@@ -586,7 +611,7 @@
       }
 
       placeBomb(player = this.player) {
-        if (this.mode !== "playing" || this.paused || this.roundLocked || !player?.alive ||
+        if (this.mode !== "playing" || this.roundLocked || !player?.alive ||
             player.ultChannel > 0 || player.vladimirPool > 0) return false;
         this.dropOwnerId = player.id;
         if (this.activeBombsFor(player) >= player.maxBombs) return false;
@@ -649,7 +674,7 @@
       }
 
       castAbility(slot, player = this.player) {
-        if (!player?.alive || this.mode !== "playing" || this.paused || this.roundLocked) return false;
+        if (!player?.alive || this.mode !== "playing" || this.roundLocked) return false;
         if (player.vladimirPool > 0) return false;
         this.dropOwnerId = player.id;
         if (!this.isSkillUnlocked(player, slot)) {
@@ -1595,13 +1620,19 @@
       movementFor(player) {
         let dx = 0;
         let dz = 0;
+        let analog = false;
         if (player.id === 1) {
           const stickX = this.touchStick?.x || 0;
           const stickZ = this.touchStick?.z || 0;
           const stickMag = Math.hypot(stickX, stickZ);
           if (stickMag > 0.18) {
-            dx = stickX;
-            dz = stickZ;
+            // Analog-only cardinal snap: inside ~13° of an axis (minor component
+            // below sin(13°) of the magnitude) the stick reads as a straight lane
+            // walk, so the minor component is zeroed to stop wall scraping.
+            const snapLimit = 0.225 * stickMag;
+            dx = Math.abs(stickX) <= snapLimit ? 0 : stickX;
+            dz = Math.abs(stickZ) <= snapLimit ? 0 : stickZ;
+            analog = true;
           } else {
             if (this.keys.has("KeyA") || this.touchDirs.has("left")) dx -= 1;
             if (this.keys.has("KeyD") || this.touchDirs.has("right")) dx += 1;
@@ -1617,7 +1648,7 @@
           dx = player.aiDx;
           dz = player.aiDz;
         }
-        return { dx, dz };
+        return { dx, dz, analog };
       }
 
       updateContestant(player, dt) {
@@ -1657,7 +1688,7 @@
           return;
         }
 
-        let { dx, dz } = this.movementFor(player);
+        let { dx, dz, analog } = this.movementFor(player);
         const moving = dx !== 0 || dz !== 0;
         player.moving = moving;
         if (moving) {
@@ -1682,7 +1713,7 @@
           !bomb.exploded && bomb.passOwners?.has(player.id)
         );
         const preparation = player.speedBoost > 0 ? 1.3 : 1;
-        this.moveEntity(player, dx, dz, player.speed * preparation * (player.dashing > 0 ? 2.7 : 1), dt, 0.3, passableBombs);
+        this.moveEntity(player, dx, dz, player.speed * preparation * (player.dashing > 0 ? 2.7 : 1), dt, 0.3, passableBombs, analog);
         for (const bomb of passableBombs) {
           const fullyClear = Math.abs(player.x - bomb.x) > this.tile * 0.82 ||
             Math.abs(player.z - bomb.z) > this.tile * 0.82;
@@ -2320,7 +2351,7 @@
       }
 
       update(dt) {
-        if (this.mode !== "playing" || this.paused) {
+        if (this.mode !== "playing") {
           this.updateParticles(dt * 0.35);
           return;
         }
@@ -2372,17 +2403,7 @@
       finishMatch(winner) {
         if (this.mode !== "playing") return;
         this.mode = "matchover";
-        this.paused = false;
         this.presentation.finish(winner, this.roundWins, this.elapsed);
         this.presentation.announce(`${winner.name} wins the Rift Bomber match`);
-      }
-
-      togglePause(force) {
-        if (this.mode !== "playing") return false;
-        this.paused = typeof force === "boolean" ? force : !this.paused;
-        this.presentation.setPaused(this.paused);
-        this.sfx.togglePause(this.paused);
-        this.presentation.announce(this.paused ? "Game paused" : "Game resumed");
-        return this.paused;
       }
     }
