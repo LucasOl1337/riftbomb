@@ -70,9 +70,9 @@ The champion-selection screen also presents the four governing rules: 100 HP per
 
 The compatibility and presentation layer lives in:
 
-- `game/load-arena-textures.js`
+- `game/apply-readable-combat.js`
 
-That file was previously an intentionally empty script slot and is loaded before the game runtime. It installs the combat rules immediately after the `Game` instance is created and before the first rendered frame.
+That file is loaded before the game runtime. It installs the combat rules immediately after the `Game` instance is created and before the first rendered frame.
 
 The layer wraps these runtime boundaries:
 

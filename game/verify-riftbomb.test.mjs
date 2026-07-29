@@ -27,6 +27,17 @@ test("the editable page enters every game module through one named path", async 
   }
 });
 
+test("the readable combat layer preserves the canonical 100 HP rules", async () => {
+  const document = await readFile(sourcePath, "utf8");
+  const combat = await readFile(path.join(gameDirectory, "apply-readable-combat.js"), "utf8");
+
+  assert.match(document, /script src="\.\/apply-readable-combat\.js"/);
+  assert.match(combat, /maxHealth: 100/);
+  assert.match(combat, /arenaBombDamage: 35/);
+  assert.match(combat, /globalThis\.RIFTBOMB_COMBAT = RIFTBOMB_COMBAT/);
+  assert.match(combat, /match\.hitContestant = function hitContestantWithDamage/);
+});
+
 test("the built game is one offline HTML artifact", async () => {
   const sourceDocument = await readFile(sourcePath, "utf8");
   const document = await readFile(releasePath, "utf8");
