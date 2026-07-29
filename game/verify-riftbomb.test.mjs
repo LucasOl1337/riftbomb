@@ -185,9 +185,14 @@ test("mobile controls remain match-only, multitouch-safe, with a floating stick"
   // buttons stay outside it, so skill taps can never start movement.
   assert.match(document, /touch-move-zone[\s\S]*?id="touch-stick"[\s\S]*?class="touch-actions"/);
   assert.match(styles, /\.touch-move-zone \{[\s\S]*?pointer-events: auto/);
+  assert.match(styles, /\.touch-move-zone \{[\s\S]*?width: 48%/);
   assert.match(styles, /\.touch-stick \{[\s\S]*?pointer-events: none/);
-  assert.match(styles, /\.touch-stick\.is-floating \{[\s\S]*?position: fixed/);
+  assert.match(styles, /\.touch-stick \{[\s\S]*?left: max\(/);
+  assert.match(styles, /\.touch-stick\.is-floating \{[\s\S]*?will-change: transform/);
   assert.match(styles, /\.touch-stick:not\(\.is-active\) \.touch-stick__knob \{[\s\S]*?transition: transform 90ms/);
+  // Skills stay bottom-right — never dragged left with the stick.
+  assert.match(styles, /\.touch-actions \{[\s\S]*?position: fixed[\s\S]*?right: max\(/);
+  assert.match(styles, /\.touch-actions \{[\s\S]*?left: auto/);
 
   // A pointerdown on the zone anchors the stick at the touch point and the
   // direction offset is measured from that anchor, not the element center.
