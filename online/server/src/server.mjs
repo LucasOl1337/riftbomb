@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { applyPlayerAction } from "../../../game/create-authoritative-duel.mjs";
 import { AuthoritativeRooms, isChampion, validPreset } from "./authoritative-rooms.mjs";
+import { createJsonTransport } from "./json-transport.mjs";
 
 const PORT = Number(process.env.PORT || 8788);
 const HOST = process.env.HOST || "127.0.0.1";
@@ -15,16 +16,17 @@ const ROOM_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/;
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const rooms = new Map();
 const quickMatchQueue = [];
+const jsonTransport = createJsonTransport({ openState: WebSocket.OPEN });
 
 function send(socket, message) {
-  if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 256_000) {
-    socket.send(JSON.stringify(message));
-  }
+  return jsonTransport.send(socket, message);
 }
 
 function broadcast(room, message) {
-  send(room.players[0]?.socket, message);
-  send(room.players[1]?.socket, message);
+  return jsonTransport.broadcast(
+    [room.players[0]?.socket, room.players[1]?.socket],
+    message
+  );
 }
 const authoritativeRooms = new AuthoritativeRooms({ rooms, broadcast });
 
