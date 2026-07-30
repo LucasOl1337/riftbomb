@@ -22,6 +22,8 @@ test("one deep bake module owns every playable champion", async () => {
 test("the packaged catalog comes from each champion playable model", async () => {
   const catalog = await packagePlayableChampions(repositoryRoot);
 
+  assert.match(catalog, /katarina.*"dagger":"[A-Za-z0-9+/=]+"/s);
+
   for (const champion of playableChampions) {
     const modelDirectory = path.join(repositoryRoot, "champions", champion, "playable-model");
     for (const artifact of ["vertices.bin", "indices.bin", "texture.webp"]) {

@@ -538,6 +538,15 @@
           skillDisc: this.createMesh(buildSkillDisc(this.mobilePerf ? 24 : 56)),
           skillCoin: this.createMesh(buildSkillCoin(this.mobilePerf ? 20 : 48))
         };
+        const katarinaDaggerSource = PLAYABLE_CHAMPIONS?.katarina?.dagger;
+        if (katarinaDaggerSource) {
+          const binary = atob(katarinaDaggerSource);
+          const bytes = new Uint8Array(binary.length);
+          for (let index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index);
+          }
+          this.meshes.katarinaDagger = this.createMesh(new Float32Array(bytes.buffer));
+        }
         this.championModelInitialised = new Set();
         this.championModelLoadPromises = {};
         this.championAnimationStates = new Map();
@@ -3307,15 +3316,22 @@ drawKatarinaFallback(player, t, beat) {
         for (const dagger of game.daggers || []) {
           const ready = dagger.age >= dagger.readyAt;
           const fall = ready ? 0 : clamp(1 - dagger.age / Math.max(0.01, dagger.readyAt), 0, 1);
-          const y = ready ? 0.3 : 0.45 + Math.sin((1 - fall) * Math.PI) * 1.5;
+          const y = ready ? 0.12 : 0.45 + Math.sin((1 - fall) * Math.PI) * 1.5;
           const pulse = 0.9 + Math.sin(t * 7 + dagger.id) * 0.08;
+          const spin = t * 4 + dagger.id;
           this.draw("torus", [dagger.x, 0.07, dagger.z], [0.48 * pulse, 0.055, 0.48 * pulse],
             C.katCrimson, 4, ready ? 2.2 + beat : 0.6, t * 1.4,
             ready ? 0.64 : 0.22, 0, Math.PI * 0.5);
-          this.draw("crystal", [dagger.x, y, dagger.z], [0.085, 0.42, 0.06],
-            ready ? C.katBlade : C.katCrimson, 3, ready ? 2 + beat : 1, t * 4 + dagger.id, 1, 1.08);
-          this.draw("cylinder", [dagger.x, y + 0.29, dagger.z], [0.055, 0.13, 0.055],
-            C.katHilt, 0, 0.2, t * 4 + dagger.id);
+          if (this.meshes.katarinaDagger) {
+            this.drawMesh(this.meshes.katarinaDagger, [dagger.x, y, dagger.z],
+              [0.82, 0.82, 0.82], ready ? C.katBlade : C.katCrimson,
+              3, ready ? 1.35 + beat : 0.7, spin, 1, 0, ready ? Math.PI * 0.42 : 0.18);
+          } else {
+            this.draw("crystal", [dagger.x, y, dagger.z], [0.085, 0.42, 0.06],
+              ready ? C.katBlade : C.katCrimson, 3, ready ? 2 + beat : 1, spin, 1, 1.08);
+            this.draw("cylinder", [dagger.x, y + 0.29, dagger.z], [0.055, 0.13, 0.055],
+              C.katHilt, 0, 0.2, spin);
+          }
         }
 
         for (const projectile of game.projectiles || []) {
@@ -3337,8 +3353,15 @@ drawKatarinaFallback(player, t, beat) {
             this.draw("crystal", [projectile.x, projectile.y, projectile.z], [0.06, 0.22, 0.06],
               C.gangplankOrange, 3, 2.8 + beat, angle, 0.9, 0, Math.PI * 0.5);
           } else {
-            this.draw("crystal", [projectile.x, projectile.y, projectile.z], [0.075, 0.38, 0.055],
-              C.katBladeEdge, 3, 3.2 + beat, t * 11, 1, 1.12);
+            const angle = Math.atan2(projectile.dx, projectile.dz);
+            if (this.meshes.katarinaDagger) {
+              this.drawMesh(this.meshes.katarinaDagger,
+                [projectile.x, projectile.y, projectile.z], [0.72, 0.72, 0.72],
+                C.katBladeEdge, 3, 2.8 + beat, angle, 1, t * 11, Math.PI * 0.5);
+            } else {
+              this.draw("crystal", [projectile.x, projectile.y, projectile.z], [0.075, 0.38, 0.055],
+                C.katBladeEdge, 3, 3.2 + beat, t * 11, 1, 1.12);
+            }
             this.draw("sphere", [projectile.x, projectile.y, projectile.z], [0.18, 0.18, 0.18],
               C.katCrimson, 4, 1.6 + beat, t, 0.22);
           }
