@@ -502,7 +502,8 @@
         this.postProgram = this.createProgram(Renderer.postVertex, Renderer.postFragment);
         this.mainUniforms = this.uniforms(this.mainProgram, [
           "uModel", "uViewProjection", "uColor", "uCamera", "uTime", "uBeat",
-          "uEmissive", "uMaterial", "uAlpha", "uAlbedo", "uAlbedoTop", "uMapId"
+          "uEmissive", "uMaterial", "uAlpha", "uAlbedo", "uAlbedoTop", "uMapId",
+          "uFloorProfile"
         ]);
         this.arenaFxUniforms = this.uniforms(this.arenaFxProgram, [
           "uModel", "uViewProjection", "uTime", "uBeat", "uPrimary", "uSecondary",
@@ -1483,7 +1484,8 @@
       /** Bind floor/wall albedos for the active arena theme (layout + look). */
       bindArenaTheme(theme) {
         if (!theme || !this.arenaTextures) return;
-        const floor = this.arenaTextures[theme.floor] || this.arenaTextures.floorLattice;
+        const floorKey = this.arenaTextures[theme.floor] ? theme.floor : "floorLattice";
+        const floor = this.arenaTextures[floorKey];
         const wall = this.arenaTextures[theme.wall] || this.arenaTextures.wallLattice;
         const wallTop = this.arenaTextures[theme.wallTop]
           || this.arenaTextures.wallTopLattice
@@ -1492,6 +1494,9 @@
         this.arenaMapTextures[3] = wall;
         this.arenaTextures.wall = wall;
         this.arenaTextures.wallTop = wallTop;
+        this.arenaFloorProfile = floorKey === "floorLattice" || floorKey === "floorPit"
+          ? 1
+          : 0;
       }
 
       themeColor(theme, key, fallback) {
@@ -1696,6 +1701,10 @@
           ? 4
           : (mapId > 0 && this.arenaMapTextures?.[mapId] ? mapId : 0);
         gl.uniform1f(this.mainUniforms.uMapId, useMap);
+        gl.uniform1f(
+          this.mainUniforms.uFloorProfile,
+          useMap === 1 ? (this.arenaFloorProfile || 0) : 0
+        );
         const white = this.arenaWhiteTexture;
         let side = white;
         let top = white;
@@ -1731,6 +1740,10 @@
           ? 4
           : (mapId > 0 && this.arenaMapTextures?.[mapId] ? mapId : 0);
         gl.uniform1f(this.mainUniforms.uMapId, useMap);
+        gl.uniform1f(
+          this.mainUniforms.uFloorProfile,
+          useMap === 1 ? (this.arenaFloorProfile || 0) : 0
+        );
         const white = this.arenaWhiteTexture;
         let side = white;
         let top = white;
@@ -2125,18 +2138,24 @@ drawKatarinaFallback(player, t, beat) {
 
       drawZed(player, t, beat, shadow = false) {
         const C = Renderer.colors;
+        const deathMarkCommitment = !shadow ? player.zedDeathMarkCommitment : null;
+        const deathMarkAlpha = deathMarkCommitment?.phase === "windup" ? 0.28 : 0.55;
         if (!this.zedReady) {
           this.draw("sphere", [player.x, 0.72, player.z], [0.34, 0.72, 0.3],
-            shadow ? C.zedShadow : C.zedSteel, 2, shadow ? 1.4 : 0.18, player.facing, shadow ? 0.48 : 1);
+            shadow ? C.zedShadow : C.zedSteel, 2, shadow ? 1.4 : 0.18, player.facing,
+            shadow ? 0.48 : deathMarkCommitment ? deathMarkAlpha : 1);
           this.draw("crystal", [player.x, 1.38, player.z], [0.3, 0.38, 0.28],
-            C.zedCrimson, 3, 1.8 + beat, player.facing, shadow ? 0.5 : 1);
+            C.zedCrimson, 3, 1.8 + beat, player.facing,
+            shadow ? 0.5 : deathMarkCommitment ? deathMarkAlpha : 1);
           return;
         }
         if (this.zedCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "zed")) {
           this.draw("sphere", [player.x, 0.72, player.z], [0.34, 0.72, 0.3],
-            shadow ? C.zedShadow : C.zedSteel, 2, shadow ? 1.4 : 0.18, player.facing, shadow ? 0.48 : 1);
+            shadow ? C.zedShadow : C.zedSteel, 2, shadow ? 1.4 : 0.18, player.facing,
+            shadow ? 0.48 : deathMarkCommitment ? deathMarkAlpha : 1);
           this.draw("crystal", [player.x, 1.38, player.z], [0.3, 0.38, 0.28],
-            C.zedCrimson, 3, 1.8 + beat, player.facing, shadow ? 0.5 : 1);
+            C.zedCrimson, 3, 1.8 + beat, player.facing,
+            shadow ? 0.5 : deathMarkCommitment ? deathMarkAlpha : 1);
           return;
         }
 
@@ -2144,7 +2163,7 @@ drawKatarinaFallback(player, t, beat) {
         const teleport = player.zedUltAnim > 0 ? 1 : 0;
         const slash = player.zedSlashAnim > 0 ? 1 : 0;
         const hurt = player.hurt > 0 ? 1 : 0;
-        const invulnerable = player.invulnerable > 0 ? 1 : 0;
+        const invulnerable = player.invulnerable > 0 || deathMarkCommitment ? 1 : 0;
         const moving = player.moving ? 1 : 0;
         const castDuration = player.castDuration || 0.48;
         const castProgress = player.castAnim > 0
@@ -2152,7 +2171,7 @@ drawKatarinaFallback(player, t, beat) {
           : 0;
         const cast = player.castAnim > 0 ? Math.sin(castProgress * Math.PI) : 0;
         const ultProgress = player.zedUltAnim > 0
-          ? clamp(1 - player.zedUltAnim / 0.68, 0, 1)
+          ? clamp(1 - player.zedUltAnim / 0.95, 0, 1)
           : 0;
         const ultPose = player.zedUltAnim > 0 ? Math.sin(ultProgress * Math.PI) : 0;
         const idleMix = prefersReducedMotion ? 0.5 : 0.5 + Math.sin(t * 2.25 + (player.id || 0)) * 0.5;
@@ -2187,7 +2206,7 @@ drawKatarinaFallback(player, t, beat) {
             voracity: slash,
             dash: teleport * 0.35,
             skill: Math.max(ultPose, slash * 0.72, cast * 0.5, teleport * 0.35 * 0.32),
-            alpha: shadow ? 0.8 :
+            alpha: shadow ? 0.8 : deathMarkCommitment ? deathMarkAlpha :
               (invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1)
           });
         } else {
@@ -2213,7 +2232,8 @@ drawKatarinaFallback(player, t, beat) {
           gl.uniform1f(this.katarinaUniforms.uShadow, shadow ? 1 : 0);
           gl.uniform1f(this.katarinaUniforms.uStyle, 1);
           gl.uniform1f(this.katarinaUniforms.uAlpha, shadow ? 0.8 :
-            (invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1));
+            deathMarkCommitment ? deathMarkAlpha :
+              (invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1));
           gl.activeTexture(gl.TEXTURE0);
           gl.bindTexture(gl.TEXTURE_2D, this.zedTexture);
           gl.uniform1i(this.katarinaUniforms.uChampion, 0);
@@ -2280,6 +2300,15 @@ drawKatarinaFallback(player, t, beat) {
         }
         const poolRemaining = player.vladimirPool || 0;
         let desired;
+        const usesSemanticAbilityAnimations = !modelReviewMode &&
+          Object.prototype.hasOwnProperty.call(player, "abilityAnimRemaining");
+        const abilityAnimRemaining = Math.max(0, Number(player.abilityAnimRemaining) || 0);
+        const abilityAnimDuration = Math.max(0, Number(player.abilityAnimDuration) || 0);
+        const abilityAnimAction = abilityAnimRemaining > 0 && abilityAnimDuration > 0 &&
+          ["q", "w", "e", "r", "rStrike"].includes(player.abilityAnimAction) &&
+          animation.actions[player.abilityAnimAction]
+          ? player.abilityAnimAction
+          : "";
         const action = (name, remaining, duration) => this.sampleChampionAction(
           animation,
           name,
@@ -2318,37 +2347,43 @@ drawKatarinaFallback(player, t, beat) {
             this.championAnimationStates.delete(`${key}:${player.id}`);
             return { hidden: true, key: "pool" };
           }
-        } else if (key === "vladimir" && player.vladimirQAnim > 0) {
+        } else if (abilityAnimAction) {
+          // The authoritative game publishes the exact authored Q/W/E/R action
+          // (plus Zed's separate R strike phase)
+          // and its own visual lifetime. This outranks overlapping legacy VFX
+          // timers, so one ability cannot briefly borrow another ability's clip.
+          desired = action(abilityAnimAction, abilityAnimRemaining, abilityAnimDuration);
+        } else if (!usesSemanticAbilityAnimations && key === "vladimir" && player.vladimirQAnim > 0) {
           desired = action("q", player.vladimirQAnim, 0.56);
-        } else if (key === "vladimir" && player.vladimirEAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "vladimir" && player.vladimirEAnim > 0) {
           desired = action("e", player.vladimirEAnim, 0.62);
-        } else if (key === "vladimir" && player.vladimirUltAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "vladimir" && player.vladimirUltAnim > 0) {
           desired = action("r", player.vladimirUltAnim, 0.66);
         } else if (key === "vladimir" && player.vladimirAttackAnim > 0) {
           desired = action("attack", player.vladimirAttackAnim, 0.42);
-        } else if (key === "katarina" && player.ultChannel > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "katarina" && player.ultChannel > 0) {
           desired = action("r", player.ultChannel, 1.65);
         } else if (key === "katarina" && player.spin > 0) {
           desired = action("w", player.spin, 0.58);
         } else if (key === "katarina" && player.dashing > 0) {
           desired = action("e", player.dashing, 0.18);
-        } else if (key === "zed" && player.zedUltAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "zed" && player.zedUltAnim > 0) {
           desired = action("r", player.zedUltAnim, 0.68);
-        } else if (key === "zed" && player.zedSlashAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "zed" && player.zedSlashAnim > 0) {
           desired = action("e", player.zedSlashAnim, 0.52);
-        } else if (key === "renekton" && player.renektonUltAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "renekton" && player.renektonUltAnim > 0) {
           desired = action("r", player.renektonUltAnim, 0.72);
-        } else if (key === "renekton" && player.renektonDashAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "renekton" && player.renektonDashAnim > 0) {
           desired = action("e", player.renektonDashAnim, 0.46);
-        } else if (key === "renekton" && player.renektonSlashAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "renekton" && player.renektonSlashAnim > 0) {
           desired = action("q", player.renektonSlashAnim, 0.58);
-        } else if (key === "gangplank" && player.gangplankUltAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "gangplank" && player.gangplankUltAnim > 0) {
           desired = action("r", player.gangplankUltAnim, 0.7);
-        } else if (key === "gangplank" && player.gangplankKegAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "gangplank" && player.gangplankKegAnim > 0) {
           desired = action("e", player.gangplankKegAnim, 0.42);
-        } else if (key === "gangplank" && player.gangplankShotAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "gangplank" && player.gangplankShotAnim > 0) {
           desired = action("q", player.gangplankShotAnim, 0.48);
-        } else if (player.castAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && player.castAnim > 0) {
           desired = action("q", player.castAnim, player.castDuration || 0.5);
         } else {
           desired = locomotion();
@@ -3729,6 +3764,7 @@ drawKatarinaFallback(player, t, beat) {
       uniform sampler2D uAlbedo;
       uniform sampler2D uAlbedoTop;
       uniform float uMapId;
+      uniform float uFloorProfile;
       out vec4 outColor;
 
       float hash21(vec2 p) {
@@ -3748,10 +3784,28 @@ drawKatarinaFallback(player, t, beat) {
         return local.xy * 0.5 + 0.5;
       }
 
-      // Multi-scale albedo: base map + high-freq self-detail (breaks 512/1024 "sticker" look).
+      vec2 mirroredTile(vec2 uv) {
+        vec2 doubled = fract(uv * 0.5) * 2.0;
+        vec2 mirrored = 1.0 - abs(doubled - 1.0);
+        vec2 halfTexel = vec2(0.5 / 1024.0);
+        return mix(halfTexel, vec2(1.0) - halfTexel, mirrored);
+      }
+
+      // Legacy multi-scale path retained byte-for-byte in behavior for the other arenas.
       vec3 sampleAlbedoDetail(sampler2D map, vec2 uv, float detailScale, float detailMix) {
         vec3 base = texture(map, uv).rgb;
         vec3 detail = texture(map, uv * detailScale).rgb;
+        vec3 over = mix(2.0 * base * detail, 1.0 - 2.0 * (1.0 - base) * (1.0 - detail), step(0.5, lum(base)));
+        return mix(base, over, detailMix);
+      }
+
+      // Low-noise floor profile: preserve authored macro values while rotating and
+      // mirroring the quiet micro layer so repeated stones never align as a grid.
+      vec3 sampleCombatBandDetail(sampler2D map, vec2 uv, float detailScale, float detailMix) {
+        vec3 base = texture(map, uv).rgb;
+        mat2 detailRotation = mat2(0.8, -0.6, 0.6, 0.8);
+        vec2 detailCoord = detailRotation * ((uv - 0.5) * detailScale) + vec2(0.37, 0.61);
+        vec3 detail = texture(map, mirroredTile(detailCoord)).rgb;
         // Overlay blend keeps grain without washing midtones
         vec3 over = mix(2.0 * base * detail, 1.0 - 2.0 * (1.0 - base) * (1.0 - detail), step(0.5, lum(base)));
         return mix(base, over, detailMix);
@@ -3828,13 +3882,22 @@ drawKatarinaFallback(player, t, beat) {
             vec3 Nb = mix(NbSide, NbTop, topFace);
             N = normalize(mix(N, Nb, 0.3));
           } else {
-            // FLOOR: continuous board field + multi-scale detail so 1024 albedo
-            // reads at crate/wall clarity from gameplay distance.
-            uv = clamp(vWorld.xz * 0.072 + 0.5, 0.0, 1.0);
-            mapUv = uv;
-            albedo = sampleAlbedoDetail(uAlbedo, uv, 5.5, 0.28);
-            vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 1.15);
-            N = normalize(mix(N, Nb, 0.32));
+            if (uFloorProfile > 0.5) {
+              // Authored low-noise floors use one arena-scale material with restrained
+              // microdetail. UVs remain independent from the 99 floor cells.
+              uv = fract(vWorld.xz * 0.066 + 0.5);
+              mapUv = uv;
+              albedo = sampleCombatBandDetail(uAlbedo, uv, 5.25, 0.16);
+              vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 0.8);
+              N = normalize(mix(N, Nb, 0.22));
+            } else {
+              // Preserve the established material response of the other four arenas.
+              uv = clamp(vWorld.xz * 0.072 + 0.5, 0.0, 1.0);
+              mapUv = uv;
+              albedo = sampleAlbedoDetail(uAlbedo, uv, 5.5, 0.28);
+              vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 1.15);
+              N = normalize(mix(N, Nb, 0.32));
+            }
           }
           mapped = 1.0;
           // Recompute lighting terms after bump

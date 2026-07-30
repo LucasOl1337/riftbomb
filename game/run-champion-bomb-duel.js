@@ -223,6 +223,20 @@
     // Bot skill intents ("q" | "w" | "e" | "r") map to the same slots the
     // human input uses; unknown values never reach castAbility.
     const BOT_SKILL_SLOTS = Object.freeze({ q: 0, w: 1, e: 2, r: 3 });
+    const ABILITY_ANIMATION_ACTIONS = Object.freeze(["q", "w", "e", "r", "rStrike"]);
+    const ZED_DEATH_MARK_WINDUP_SECONDS = 0.6;
+    const ZED_DEATH_MARK_DASH_SECONDS = 0.35;
+    const ZED_DEATH_MARK_COMMITMENT_SECONDS =
+      ZED_DEATH_MARK_WINDUP_SECONDS + ZED_DEATH_MARK_DASH_SECONDS;
+    const ZED_DEATH_MARK_FUSE_SECONDS = 3;
+    const ZED_DEATH_MARK_SHADOW_SECONDS = 9;
+    const ABILITY_ANIMATION_DURATIONS = Object.freeze({
+      katarina: Object.freeze([0.42, 0.42, 0.42, 1.65]),
+      zed: Object.freeze([0.48, 0.48, 0.52, ZED_DEATH_MARK_WINDUP_SECONDS]),
+      renekton: Object.freeze([0.58, 0.56, 0.46, 0.72]),
+      vladimir: Object.freeze([0.56, 1.45, 0.62, 0.66]),
+      gangplank: Object.freeze([0.48, 0.4, 0.42, 0.7])
+    });
     const ABILITY_BUFFER_SECONDS = 0.15;
     const ABILITY_TIME_EPSILON = 0.000001;
 
@@ -524,11 +538,15 @@
           spin: 0,
           moving: false,
           castAnim: 0,
+          abilityAnimAction: "",
+          abilityAnimRemaining: 0,
+          abilityAnimDuration: 0,
           ultChannel: 0,
           ultTick: 0,
           zedUltAnim: 0,
           zedSlashAnim: 0,
           zedSwapWindow: 0,
+          zedDeathMarkCommitment: null,
           stunned: 0,
           fury: 0,
           renektonDominus: 0,
@@ -717,7 +735,8 @@
 
       placeBomb(player = this.player) {
         if (this.mode !== "playing" || this.roundLocked || !player?.alive ||
-            player.ultChannel > 0 || player.vladimirPool > 0) return false;
+            player.ultChannel > 0 || player.vladimirPool > 0 ||
+            this.isZedDeathMarkCommitted(player)) return false;
         this.dropOwnerId = player.id;
         if (this.activeBombsFor(player) >= player.maxBombs) return false;
         const { r, c } = this.cellFromWorld(player.x, player.z);
@@ -787,6 +806,30 @@
         return cooldown > ABILITY_TIME_EPSILON ? cooldown : 0;
       }
 
+      zedDeathMarkCommitmentRemaining(player) {
+        const commitment = player?.zedDeathMarkCommitment;
+        if (!commitment || !["windup", "dash"].includes(commitment.phase)) return 0;
+        const phaseRemaining = Math.max(0, Number(commitment.phaseRemaining) || 0);
+        return commitment.phase === "windup"
+          ? phaseRemaining + ZED_DEATH_MARK_DASH_SECONDS
+          : phaseRemaining;
+      }
+
+      isZedDeathMarkCommitted(player) {
+        return player?.champion === "zed" &&
+          this.zedDeathMarkCommitmentRemaining(player) > ABILITY_TIME_EPSILON;
+      }
+
+      isContestantTargetable(player) {
+        return Boolean(player?.alive) && !this.isZedDeathMarkCommitted(player) &&
+          (Number(player.vladimirPool) || 0) <= ABILITY_TIME_EPSILON;
+      }
+
+      canMoveContestant(player) {
+        return Boolean(player?.alive) && player.stunned <= ABILITY_TIME_EPSILON &&
+          !this.isZedDeathMarkCommitted(player);
+      }
+
       abilityBufferBlock(player, slot) {
         const blockers = [];
         // Remove Scurvy is the one explicit cleanse: it remains castable while
@@ -798,6 +841,10 @@
         if (player.vladimirPool > ABILITY_TIME_EPSILON) {
           blockers.push({ kind: "pool", remaining: player.vladimirPool });
         }
+        const deathMarkCommitment = this.zedDeathMarkCommitmentRemaining(player);
+        if (deathMarkCommitment > ABILITY_TIME_EPSILON) {
+          blockers.push({ kind: "death-mark", remaining: deathMarkCommitment });
+        }
         const cooldown = this.abilityCooldown(player, slot);
         if (cooldown > 0) blockers.push({ kind: "cooldown", remaining: cooldown });
         return blockers.length ? {
@@ -807,7 +854,8 @@
       }
 
       rivalInRange(player, range) {
-        return this.players.find((candidate) => candidate.id !== player.id && candidate.alive &&
+        return this.players.find((candidate) => candidate.id !== player.id &&
+          this.isContestantTargetable(candidate) &&
           Math.hypot(candidate.x - player.x, candidate.z - player.z) <= range);
       }
 
@@ -916,6 +964,7 @@
         if (player?.champion !== "katarina" || player.ultChannel <= 0) return false;
         player.ultChannel = 0;
         player.ultTick = 0;
+        if (player.abilityAnimAction === "r") this.clearAbilityAnimation(player);
         this.slashes = this.slashes.filter((slash) =>
           !slash.lotus || slash.ownerId !== player.id
         );
@@ -960,40 +1009,75 @@
         return executed;
       }
 
+      clearAbilityAnimation(actor) {
+        if (!actor) return;
+        actor.abilityAnimAction = "";
+        actor.abilityAnimRemaining = 0;
+        actor.abilityAnimDuration = 0;
+      }
+
+      startAbilityAnimation(actor, action, duration) {
+        if (!actor || !ABILITY_ANIMATION_ACTIONS.includes(action) ||
+            !Number.isFinite(duration) || duration <= ABILITY_TIME_EPSILON) {
+          this.clearAbilityAnimation(actor);
+          return false;
+        }
+        actor.abilityAnimAction = action;
+        actor.abilityAnimRemaining = duration;
+        actor.abilityAnimDuration = duration;
+        return true;
+      }
+
+      abilityAnimationDuration(player, slot) {
+        return Number(ABILITY_ANIMATION_DURATIONS[player?.champion]?.[slot]) || 0;
+      }
+
+      updateAbilityAnimation(actor, dt) {
+        if (!actor) return;
+        const remaining = Math.max(0, (Number(actor.abilityAnimRemaining) || 0) - dt);
+        if (remaining <= ABILITY_TIME_EPSILON) {
+          this.clearAbilityAnimation(actor);
+          return;
+        }
+        actor.abilityAnimRemaining = remaining;
+      }
+
       executeAbility(slot, player) {
+        let executed = false;
         if (player.champion === "zed") {
-          if (slot === 0) return this.castZedQ(player);
-          if (slot === 1) return this.castZedW(player);
-          if (slot === 2) return this.castZedE(player);
-          if (slot === 3) return this.castZedR(player);
-          return false;
+          if (slot === 0) executed = this.castZedQ(player);
+          else if (slot === 1) executed = this.castZedW(player);
+          else if (slot === 2) executed = this.castZedE(player);
+          else if (slot === 3) executed = this.castZedR(player);
+        } else if (player.champion === "renekton") {
+          if (slot === 0) executed = this.castRenektonQ(player);
+          else if (slot === 1) executed = this.castRenektonW(player);
+          else if (slot === 2) executed = this.castRenektonE(player);
+          else if (slot === 3) executed = this.castRenektonR(player);
+        } else if (player.champion === "vladimir") {
+          if (slot === 0) executed = this.castVladimirQ(player);
+          else if (slot === 1) executed = this.castVladimirW(player);
+          else if (slot === 2) executed = this.castVladimirE(player);
+          else if (slot === 3) executed = this.castVladimirR(player);
+        } else if (player.champion === "gangplank") {
+          if (slot === 0) executed = this.castGangplankQ(player);
+          else if (slot === 1) executed = this.castGangplankW(player);
+          else if (slot === 2) executed = this.castGangplankE(player);
+          else if (slot === 3) executed = this.castGangplankR(player);
+        } else {
+          if (slot === 0) executed = this.castKatarinaQ(player);
+          else if (slot === 1) executed = this.castKatarinaW(player);
+          else if (slot === 2) executed = this.castKatarinaE(player);
+          else if (slot === 3) executed = this.castKatarinaR(player);
         }
-        if (player.champion === "renekton") {
-          if (slot === 0) return this.castRenektonQ(player);
-          if (slot === 1) return this.castRenektonW(player);
-          if (slot === 2) return this.castRenektonE(player);
-          if (slot === 3) return this.castRenektonR(player);
-          return false;
+        if (executed) {
+          this.startAbilityAnimation(
+            player,
+            ABILITY_ANIMATION_ACTIONS[slot],
+            this.abilityAnimationDuration(player, slot)
+          );
         }
-        if (player.champion === "vladimir") {
-          if (slot === 0) return this.castVladimirQ(player);
-          if (slot === 1) return this.castVladimirW(player);
-          if (slot === 2) return this.castVladimirE(player);
-          if (slot === 3) return this.castVladimirR(player);
-          return false;
-        }
-        if (player.champion === "gangplank") {
-          if (slot === 0) return this.castGangplankQ(player);
-          if (slot === 1) return this.castGangplankW(player);
-          if (slot === 2) return this.castGangplankE(player);
-          if (slot === 3) return this.castGangplankR(player);
-          return false;
-        }
-        if (slot === 0) return this.castKatarinaQ(player);
-        if (slot === 1) return this.castKatarinaW(player);
-        if (slot === 2) return this.castKatarinaE(player);
-        if (slot === 3) return this.castKatarinaR(player);
-        return false;
+        return executed;
       }
 
       processAbilityBuffer(dt) {
@@ -1027,7 +1111,8 @@
       }
 
       katTargetInFront(player, maxDistance) {
-        const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
+        const rival = this.players.find((candidate) => candidate.id !== player.id &&
+          this.isContestantTargetable(candidate));
         const facingX = player.lastDx;
         const facingZ = player.lastDz;
         if (rival) {
@@ -1164,6 +1249,7 @@
       }
 
       createZedShadow(player, x, z, kind = "living", life = 5.2) {
+        const deathMarkDuration = kind === "death" ? ZED_DEATH_MARK_WINDUP_SECONDS : 0;
         const shadow = {
           id: 10000 + ++this.shadowId,
           ownerId: player.id,
@@ -1178,13 +1264,18 @@
           moving: false,
           castAnim: 0.46,
           castDuration: 0.48,
-          zedUltAnim: kind === "death" ? 0.68 : 0,
+          abilityAnimAction: "",
+          abilityAnimRemaining: 0,
+          abilityAnimDuration: 0,
+          zedUltAnim: deathMarkDuration,
           zedSlashAnim: 0,
           hurt: 0,
           invulnerable: 0,
           shield: 0,
           swapAvailable: kind === "living"
         };
+        this.startAbilityAnimation(shadow, kind === "death" ? "r" : "w",
+          kind === "death" ? deathMarkDuration : 0.48);
         this.zedShadows.push(shadow);
         return shadow;
       }
@@ -1203,6 +1294,7 @@
         for (const [index, origin] of origins.entries()) {
           origin.castAnim = 0.48;
           origin.castDuration = 0.48;
+          this.startAbilityAnimation(origin, "q", 0.48);
           origin.facing = player.facing;
           this.projectiles.push({
             id: ++this.daggerId,
@@ -1239,6 +1331,7 @@
           living.swapAvailable = false;
           player.zedSwapWindow = 0;
           player.zedUltAnim = 0.42;
+          this.startAbilityAnimation(living, "w", 0.48);
           player.invulnerable = Math.max(player.invulnerable, 0.2);
           this.skillTrails.push({
             x1: fromX, z1: fromZ, x2: player.x, z2: player.z,
@@ -1287,11 +1380,13 @@
         player.castAnim = 0.4;
         player.castDuration = 0.4;
         let hitRival = false;
-        const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
+        const rival = this.players.find((candidate) => candidate.id !== player.id &&
+          this.isContestantTargetable(candidate));
         for (const origin of origins) {
           origin.zedSlashAnim = 0.52;
           origin.castAnim = 0.4;
           origin.castDuration = 0.4;
+          this.startAbilityAnimation(origin, "e", 0.52);
           this.slashes.push({ x: origin.x, z: origin.z, radius, age: 0, life: 0.52, zed: true });
           this.spawnParticles(origin.x, 0.48, origin.z, Renderer.colors.zedCrimson, 18, 0.62, 0.1);
           for (let r = 1; r < this.rows - 1; r++) {
@@ -1316,7 +1411,7 @@
       }
 
       castZedR(player) {
-        if (player.rCooldown > 0) return false;
+        if (player.rCooldown > 0 || this.isZedDeathMarkCommitted(player)) return false;
         const rival = this.rivalInRange(player, this.tile * 4.5);
         if (!rival) {
           this.presentation.announce("Death Mark needs the rival in range");
@@ -1324,44 +1419,209 @@
         }
         const fromX = player.x;
         const fromZ = player.z;
-        const vx = rival.x - player.x;
-        const vz = rival.z - player.z;
-        const distance = Math.max(0.001, Math.hypot(vx, vz));
-        const landing = this.findOpenLanding(
-          rival.x + vx / distance * this.tile * 0.82,
-          rival.z + vz / distance * this.tile * 0.82,
-          player
+        const shadow = this.createZedShadow(
+          player, fromX, fromZ, "death", ZED_DEATH_MARK_SHADOW_SECONDS
         );
-        this.createZedShadow(player, fromX, fromZ, "death", 4.1);
-        player.x = landing.x;
-        player.z = landing.z;
-        player.facing = Math.atan2(rival.x - player.x, rival.z - player.z);
-        player.lastDx = Math.sin(player.facing);
-        player.lastDz = Math.cos(player.facing);
         player.rCooldown = 30;
-        player.zedUltAnim = 0.68;
-        player.invulnerable = Math.max(player.invulnerable, 0.38);
-        this.zedMarks = this.zedMarks.filter((mark) => mark.ownerId !== player.id || mark.targetId !== rival.id);
-        this.zedMarks.push({
-          ownerId: player.id,
+        player.castAnim = ZED_DEATH_MARK_COMMITMENT_SECONDS;
+        player.castDuration = ZED_DEATH_MARK_COMMITMENT_SECONDS;
+        player.zedUltAnim = ZED_DEATH_MARK_COMMITMENT_SECONDS;
+        player.zedDeathMarkCommitment = {
+          phase: "windup",
+          phaseRemaining: ZED_DEATH_MARK_WINDUP_SECONDS,
           targetId: rival.id,
-          age: 0,
-          fuse: 1.85,
-          stored: 0,
-          detonated: false
-        });
-        this.skillTrails.push({
-          x1: fromX, z1: fromZ, x2: player.x, z2: player.z,
-          angle: Math.atan2(player.x - fromX, player.z - fromZ), age: 0, life: 0.48, zed: true
-        });
+          originX: fromX,
+          originZ: fromZ,
+          dashStartX: fromX,
+          dashStartZ: fromZ,
+          dashEndX: fromX,
+          dashEndZ: fromZ,
+          shadowId: shadow.id
+        };
         this.renderer.addShock(fromX, fromZ, 0.72);
-        this.renderer.addShock(player.x, player.z, 0.76);
         this.spawnParticles(fromX, 0.58, fromZ, Renderer.colors.zedShadow, 34, 0.86, 0.13);
-        this.spawnParticles(player.x, 0.58, player.z, Renderer.colors.zedCrimson, 34, 0.86, 0.13);
-        this.playSfxAt("deathMark", rival);
-        this.presentation.announce("Zed · Death Mark");
+        this.presentation.announce("Zed · Death Mark · vanishing");
         this.presentation.update(this);
         return true;
+      }
+
+      cancelZedDeathMarkCommitment(player, { targetLost = false } = {}) {
+        const commitment = player?.zedDeathMarkCommitment;
+        if (!commitment) return false;
+        player.zedDeathMarkCommitment = null;
+        player.zedUltAnim = 0;
+        player.castAnim = 0;
+        if (["r", "rStrike"].includes(player.abilityAnimAction)) {
+          this.clearAbilityAnimation(player);
+        }
+        this.zedShadows = this.zedShadows.filter((shadow) => shadow.id !== commitment.shadowId);
+        if (targetLost) player.rCooldown = Math.min(player.rCooldown, 0.5);
+        return true;
+      }
+
+      beginZedDeathMarkDash(player, commitment, target) {
+        if (!this.isContestantTargetable(target)) {
+          this.cancelZedDeathMarkCommitment(player, { targetLost: true });
+          return false;
+        }
+        const vx = target.x - player.x;
+        const vz = target.z - player.z;
+        const distance = Math.max(0.001, Math.hypot(vx, vz));
+        const landing = this.findOpenLanding(
+          target.x + vx / distance * this.tile * 0.82,
+          target.z + vz / distance * this.tile * 0.82,
+          player
+        );
+        commitment.phase = "dash";
+        commitment.phaseRemaining = ZED_DEATH_MARK_DASH_SECONDS;
+        commitment.dashStartX = player.x;
+        commitment.dashStartZ = player.z;
+        commitment.dashEndX = landing.x;
+        commitment.dashEndZ = landing.z;
+        this.startAbilityAnimation(player, "rStrike", ZED_DEATH_MARK_DASH_SECONDS);
+        return true;
+      }
+
+      trackZedDeathMarkDashTarget(player, commitment, target) {
+        if (!this.isContestantTargetable(target)) return false;
+        const vx = target.x - commitment.dashStartX;
+        const vz = target.z - commitment.dashStartZ;
+        const distance = Math.max(0.001, Math.hypot(vx, vz));
+        if (distance >= this.tile * 14.05) return false;
+        const landing = this.findOpenLanding(
+          target.x + vx / distance * this.tile * 0.82,
+          target.z + vz / distance * this.tile * 0.82,
+          player
+        );
+        commitment.dashEndX = landing.x;
+        commitment.dashEndZ = landing.z;
+        return true;
+      }
+
+      finishZedDeathMarkDash(player, commitment) {
+        player.x = commitment.dashEndX;
+        player.z = commitment.dashEndZ;
+        const target = this.players.find((candidate) => candidate.id === commitment.targetId);
+        const targetX = target?.x ?? commitment.dashEndX;
+        const targetZ = target?.z ?? commitment.dashEndZ;
+        player.facing = Math.atan2(targetX - player.x, targetZ - player.z);
+        player.lastDx = Math.sin(player.facing);
+        player.lastDz = Math.cos(player.facing);
+        player.zedDeathMarkCommitment = null;
+        if (["r", "rStrike"].includes(player.abilityAnimAction)) {
+          this.clearAbilityAnimation(player);
+        }
+        this.skillTrails.push({
+          x1: commitment.dashStartX,
+          z1: commitment.dashStartZ,
+          x2: player.x,
+          z2: player.z,
+          angle: Math.atan2(player.x - commitment.dashStartX, player.z - commitment.dashStartZ),
+          age: 0,
+          life: ZED_DEATH_MARK_DASH_SECONDS,
+          zed: true
+        });
+        this.renderer.addShock(player.x, player.z, 0.76);
+        this.spawnParticles(player.x, 0.58, player.z, Renderer.colors.zedCrimson, 34, 0.86, 0.13);
+        let mark = null;
+        const targetable = this.isContestantTargetable(target);
+        const shieldBlocked = targetable && this.consumeSpellShield(target, "Death Mark");
+        if (targetable && !shieldBlocked) {
+          this.zedMarks = this.zedMarks.filter((mark) =>
+            mark.ownerId !== player.id || mark.targetId !== target.id
+          );
+          mark = {
+            ownerId: player.id,
+            targetId: target.id,
+            age: 0,
+            fuse: ZED_DEATH_MARK_FUSE_SECONDS,
+            stored: 0,
+            detonated: false
+          };
+          this.zedMarks.push(mark);
+          this.playSfxAt("deathMark", target);
+          this.presentation.announce("Zed · Death Mark · target marked");
+        } else if (!targetable) {
+          this.presentation.announce("Zed · Death Mark · target lost");
+        }
+        this.presentation.update(this);
+        return mark;
+      }
+
+      advanceZedMark(mark, dt) {
+        if (!mark || mark.detonated) return false;
+        mark.age += Math.max(0, Number(dt) || 0);
+        const owner = this.players.find((player) => player.id === mark.ownerId);
+        const target = this.players.find((player) => player.id === mark.targetId && player.alive);
+        if (!owner || !target) {
+          mark.detonated = true;
+          return false;
+        }
+        if (mark.age + ABILITY_TIME_EPSILON < mark.fuse) return false;
+        mark.detonated = true;
+        const damage = clamp(0.32 + mark.stored, 0.32, 0.62);
+        this.renderer.addShock(target.x, target.z, 0.92);
+        this.slashes.push({ x: target.x, z: target.z, radius: this.tile * 1.08,
+          age: 0, life: 0.68, zed: true });
+        this.spawnParticles(target.x, 0.68, target.z, Renderer.colors.zedCrimson, 46, 0.94, 0.14);
+        this.playSfxAt("markPop", target, 1, {
+          sourceId: `${mark.ownerId}:${mark.targetId}`
+        });
+        // The mark is already attached. Later untargetability or short hit
+        // invulnerability can stop new attacks, but cannot erase its pop.
+        this.hitSkill(target, damage, owner, "Death Mark", false, 0.48, {
+          requiresTargetable: false,
+          respectsHitLocks: false,
+          respectsShield: false
+        });
+        return true;
+      }
+
+      advanceZedDeathMarkCommitment(player, dt) {
+        let remainingDt = Math.max(0, Number(dt) || 0);
+        while (remainingDt > ABILITY_TIME_EPSILON && player?.zedDeathMarkCommitment) {
+          const commitment = player.zedDeathMarkCommitment;
+          if (!player.alive) {
+            this.cancelZedDeathMarkCommitment(player);
+            return;
+          }
+          const target = this.players.find((candidate) => candidate.id === commitment.targetId);
+          const targetBeyondCancelRange = target && Math.hypot(
+            target.x - player.x, target.z - player.z
+          ) >= this.tile * 14.05;
+          if (commitment.phase === "windup" &&
+              (!this.isContestantTargetable(target) || targetBeyondCancelRange)) {
+            this.cancelZedDeathMarkCommitment(player, { targetLost: true });
+            return;
+          }
+          const step = Math.min(remainingDt, Math.max(0, commitment.phaseRemaining));
+          commitment.phaseRemaining = Math.max(0, commitment.phaseRemaining - step);
+          remainingDt -= step;
+
+          if (player.abilityAnimAction === (commitment.phase === "windup" ? "r" : "rStrike")) {
+            player.abilityAnimRemaining = commitment.phaseRemaining;
+          }
+
+          if (commitment.phase === "dash") {
+            this.trackZedDeathMarkDashTarget(player, commitment, target);
+            const progress = clamp(
+              1 - commitment.phaseRemaining / ZED_DEATH_MARK_DASH_SECONDS, 0, 1
+            );
+            const eased = progress * progress * (3 - 2 * progress);
+            player.x = lerp(commitment.dashStartX, commitment.dashEndX, eased);
+            player.z = lerp(commitment.dashStartZ, commitment.dashEndZ, eased);
+          }
+
+          if (commitment.phaseRemaining > ABILITY_TIME_EPSILON) return;
+          if (commitment.phase === "windup") {
+            if (!this.beginZedDeathMarkDash(player, commitment, target)) return;
+          } else {
+            const mark = this.finishZedDeathMarkDash(player, commitment);
+            if (mark && remainingDt > ABILITY_TIME_EPSILON) {
+              this.advanceZedMark(mark, remainingDt);
+            }
+          }
+        }
       }
 
       healChampion(player, amount) {
@@ -1409,7 +1669,8 @@
                 this.destroyBreakable(r, c, Renderer.colors.renektonGold)) destroyed++;
           }
         }
-        const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
+        const rival = this.players.find((candidate) => candidate.id !== player.id &&
+          this.isContestantTargetable(candidate));
         const hitRival = rival && Math.hypot(rival.x - player.x, rival.z - player.z) <= radius
           ? this.hitSkill(rival, empowered ? 0.36 : 0.24, player, "Cull the Meek")
           : false;
@@ -1504,7 +1765,8 @@
           landingX = x;
           landingZ = z;
         }
-        const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
+        const rival = this.players.find((candidate) => candidate.id !== player.id &&
+          this.isContestantTargetable(candidate));
         const empowered = recast && player.fury >= 50;
         if (rival && this.distanceToSegment(rival.x, rival.z, fromX, fromZ, landingX, landingZ) <= 0.74) {
           hitUnit = this.hitSkill(rival, empowered ? 0.25 : recast ? 0.18 : 0.14,
@@ -1621,7 +1883,8 @@
                 this.destroyBreakable(r, c, Renderer.colors.vladimirBlood)) destroyed++;
           }
         }
-        const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
+        const rival = this.players.find((candidate) => candidate.id !== player.id &&
+          this.isContestantTargetable(candidate));
         if (rival && Math.hypot(rival.x - player.x, rival.z - player.z) <= radius) {
           this.hitSkill(rival, 0.29, player, "Tides of Blood");
         }
@@ -1778,7 +2041,8 @@
                 this.destroyBreakable(r, c, Renderer.colors.gangplankOrange)) destroyed++;
           }
         }
-        const rival = this.players.find((p) => p.id !== barrel.ownerId && p.alive);
+        const rival = this.players.find((p) => p.id !== barrel.ownerId &&
+          this.isContestantTargetable(p));
         if (rival && Math.hypot(rival.x - barrel.x, rival.z - barrel.z) <= radius) {
           this.hitSkill(rival, 0.3 + chainDepth * 0.04, owner, "Powder Keg");
         }
@@ -1821,7 +2085,8 @@
           const cell = this.cellFromWorld(projectile.x, projectile.z);
           const tile = this.grid[cell.r]?.[cell.c];
           const owner = this.players.find((p) => p.id === projectile.ownerId && p.alive);
-          const rival = this.players.find((p) => p.id !== projectile.ownerId && p.alive);
+          const rival = this.players.find((p) => p.id !== projectile.ownerId &&
+            this.isContestantTargetable(p));
           const hitBarrel = this.gangplankBarrels.find((b) =>
             !b.exploded && Math.hypot(b.x - projectile.x, b.z - projectile.z) <= 0.62
           );
@@ -1868,7 +2133,8 @@
               playedCannonImpact = true;
             }
             const owner = this.players.find((p) => p.id === barrage.ownerId);
-            const rival = this.players.find((p) => p.id !== barrage.ownerId && p.alive);
+            const rival = this.players.find((p) => p.id !== barrage.ownerId &&
+              this.isContestantTargetable(p));
             if (rival && Math.hypot(rival.x - barrage.x, rival.z - barrage.z) <= barrage.radius) {
               this.hitSkill(rival, 0.07, owner, "Cannon Barrage", true);
             }
@@ -1970,6 +2236,7 @@
         player.speedBoost = Math.max(0, player.speedBoost - dt);
         player.spin = Math.max(0, player.spin - dt);
         player.castAnim = Math.max(0, player.castAnim - dt);
+        if (!this.isZedDeathMarkCommitted(player)) this.updateAbilityAnimation(player, dt);
         player.zedUltAnim = Math.max(0, player.zedUltAnim - dt);
         player.zedSlashAnim = Math.max(0, player.zedSlashAnim - dt);
         player.zedSwapWindow = Math.max(0, player.zedSwapWindow - dt);
@@ -1999,6 +2266,11 @@
         }
 
         if (player.stunned > 0) {
+          player.dashRequested = false;
+          return;
+        }
+
+        if (this.isZedDeathMarkCommitted(player)) {
           player.dashRequested = false;
           return;
         }
@@ -2089,7 +2361,8 @@
       resolveKatarinaProjectile(projectile) {
         const owner = this.players.find((player) => player.id === projectile.ownerId);
         if (!owner) return;
-        const target = this.players.find((player) => player.id === projectile.targetPlayerId && player.alive);
+        const target = this.players.find((player) => player.id === projectile.targetPlayerId &&
+          this.isContestantTargetable(player));
         const hitX = target?.x ?? projectile.targetX;
         const hitZ = target?.z ?? projectile.targetZ;
         if (target && Math.hypot(target.x - hitX, target.z - hitZ) <= this.tile * 0.9) {
@@ -2141,7 +2414,8 @@
         this.playSfxAt("voracity", dagger);
         this.spawnParticles(dagger.x, 0.48, dagger.z, Renderer.colors.katCrimson, 34, 0.82, 0.12);
 
-        const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
+        const rival = this.players.find((candidate) => candidate.id !== player.id &&
+          this.isContestantTargetable(candidate));
         if (rival && Math.hypot(rival.x - dagger.x, rival.z - dagger.z) <= radius) {
           this.hitSkill(rival, 0.4, player, "Voracity");
         }
@@ -2193,7 +2467,8 @@
           player.ultTick -= dt;
           while (player.ultTick <= 0 && player.ultChannel > 0) {
             player.ultTick += 0.13;
-            const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
+            const rival = this.players.find((candidate) => candidate.id !== player.id &&
+              this.isContestantTargetable(candidate));
             if (rival && Math.hypot(rival.x - player.x, rival.z - player.z) <= this.tile * 3.35) {
               this.hitSkill(rival, 0.082, player, "Death Lotus", true);
             }
@@ -2220,6 +2495,7 @@
         for (const shadow of this.zedShadows) {
           shadow.age += dt;
           shadow.castAnim = Math.max(0, shadow.castAnim - dt);
+          this.updateAbilityAnimation(shadow, dt);
           shadow.zedUltAnim = Math.max(0, shadow.zedUltAnim - dt);
           shadow.zedSlashAnim = Math.max(0, shadow.zedSlashAnim - dt);
         }
@@ -2237,7 +2513,8 @@
           const cell = this.cellFromWorld(projectile.x, projectile.z);
           const tile = this.grid[cell.r]?.[cell.c];
           const owner = this.players.find((player) => player.id === projectile.ownerId && player.alive);
-          const rival = this.players.find((player) => player.id !== projectile.ownerId && player.alive);
+          const rival = this.players.find((player) => player.id !== projectile.ownerId &&
+            this.isContestantTargetable(player));
 
           if (tile === 1) {
             projectile.resolved = true;
@@ -2259,24 +2536,11 @@
         }
         this.projectiles = this.projectiles.filter((projectile) => !projectile.resolved);
 
-        for (const mark of this.zedMarks) {
-          mark.age += dt;
-          const owner = this.players.find((player) => player.id === mark.ownerId && player.alive);
-          const target = this.players.find((player) => player.id === mark.targetId && player.alive);
-          if (!owner || !target) {
-            mark.detonated = true;
-            continue;
-          }
-          if (mark.age >= mark.fuse && !mark.detonated) {
-            mark.detonated = true;
-            const damage = clamp(0.32 + mark.stored, 0.32, 0.62);
-            this.renderer.addShock(target.x, target.z, 0.92);
-            this.slashes.push({ x: target.x, z: target.z, radius: this.tile * 1.08, age: 0, life: 0.68, zed: true });
-            this.spawnParticles(target.x, 0.68, target.z, Renderer.colors.zedCrimson, 46, 0.94, 0.14);
-            this.playSfxAt("markPop", target, 1, {
-              sourceId: `${mark.ownerId}:${mark.targetId}`
-            });
-            this.hitSkill(target, damage, owner, "Death Mark");
+        for (const mark of this.zedMarks) this.advanceZedMark(mark, dt);
+        this.zedMarks = this.zedMarks.filter((mark) => !mark.detonated);
+        for (const player of this.players) {
+          if (player.champion === "zed" && player.zedDeathMarkCommitment) {
+            this.advanceZedDeathMarkCommitment(player, dt);
           }
         }
         this.zedMarks = this.zedMarks.filter((mark) => !mark.detonated);
@@ -2291,7 +2555,8 @@
           while (player.renektonUltTick <= 0 && player.renektonDominus > 0) {
             player.renektonUltTick += 0.42;
             const radius = this.tile * 1.72;
-            const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
+            const rival = this.players.find((candidate) => candidate.id !== player.id &&
+              this.isContestantTargetable(candidate));
             if (rival && Math.hypot(rival.x - player.x, rival.z - player.z) <= radius) {
               this.hitSkill(rival, 0.045, player, "Dominus", true);
               this.gainRenektonFury(player, 3);
@@ -2320,7 +2585,8 @@
           player.vladimirPoolTick -= dt;
           while (player.vladimirPoolTick <= 0 && player.vladimirPool > 0) {
             player.vladimirPoolTick += 0.28;
-            const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
+            const rival = this.players.find((candidate) => candidate.id !== player.id &&
+              this.isContestantTargetable(candidate));
             if (rival && Math.hypot(rival.x - player.x, rival.z - player.z) <= this.tile * 1.38) {
               const hit = this.hitSkill(rival, 0.038, player, "Sanguine Pool", true);
               if (hit) this.healChampion(player, 0.022);
@@ -2351,7 +2617,8 @@
                   this.destroyBreakable(r, c, Renderer.colors.vladimirCrimson)) destroyed++;
             }
           }
-          const rival = this.players.find((candidate) => candidate.id !== owner.id && candidate.alive);
+          const rival = this.players.find((candidate) => candidate.id !== owner.id &&
+            this.isContestantTargetable(candidate));
           const hitRival = rival && Math.hypot(rival.x - mark.x, rival.z - mark.z) <= mark.radius
             ? this.hitSkill(rival, 0.44, owner, "Hemoplague")
             : false;
@@ -2462,6 +2729,47 @@
         this.damageAtCells(cells, bomb);
       }
 
+      pendingRoundDecisionHold() {
+        let active = false;
+        let delay = 0;
+        for (const player of this.players) {
+          const commitmentDelay = this.zedDeathMarkCommitmentRemaining(player);
+          if (commitmentDelay <= ABILITY_TIME_EPSILON) continue;
+          active = true;
+          delay = Math.max(delay, commitmentDelay);
+        }
+        for (const mark of this.zedMarks) {
+          if (mark.detonated) continue;
+          const owner = this.players.find((player) => player.id === mark.ownerId);
+          const target = this.players.find((player) => player.id === mark.targetId);
+          if (!owner || owner.alive || !target?.alive) continue;
+          active = true;
+          delay = Math.max(delay, Math.max(0, mark.fuse - mark.age));
+        }
+        return { active, delay };
+      }
+
+      pendingPostMortemDeathMarkDelay() {
+        const pending = this.pendingRoundDecisionHold();
+        return pending.active ? pending.delay : 0;
+      }
+
+      scheduleRoundDecision() {
+        if (this.players.filter((player) => player.alive).length > 1) return false;
+        const pending = this.pendingRoundDecisionHold();
+        const delay = Math.max(0.16, pending.delay);
+        if (this.roundDecisionTimer < 0) {
+          this.roundDecisionTimer = delay;
+        } else if (pending.active) {
+          this.roundDecisionTimer = Math.max(this.roundDecisionTimer, delay);
+        } else {
+          // A new terminal event gets a short readable beat. This also clamps
+          // an invalidated post-mortem fuse instead of preserving its old wait.
+          this.roundDecisionTimer = 0.16;
+        }
+        return true;
+      }
+
       damageAtCells(cells, bomb) {
         const includes = (player) => {
           const cell = this.cellFromWorld(player.x, player.z);
@@ -2470,13 +2778,12 @@
         for (const player of this.players) {
           if (player.alive && includes(player)) this.hitContestant(player, bomb);
         }
-        if (this.players.filter((player) => player.alive).length <= 1 && this.roundDecisionTimer < 0) {
-          this.roundDecisionTimer = 0.16;
-        }
+        this.scheduleRoundDecision();
       }
 
       hitContestant(player, bomb) {
-        if (!player.alive || player.invulnerable > 0 || player.dashing > 0 || this.mode !== "playing") return;
+        if (!this.isContestantTargetable(player) || player.invulnerable > 0 ||
+            player.dashing > 0 || this.mode !== "playing") return;
         if (player.shield > 0) {
           player.shield -= 1;
           player.invulnerable = 0.72;
@@ -2490,6 +2797,7 @@
         player.health = 0;
         this.clearAbilityBuffer(player.id);
         this.cancelKatarinaChannel(player);
+        this.cancelZedDeathMarkCommitment(player);
         this.renderer.hitPulse = player.id === 1 ? 1.25 : 0.75;
         this.renderer.cameraShake = 0.82;
         this.playSfxAt("hit", player);
@@ -2499,22 +2807,32 @@
         const cause = owner?.id === player.id ? "self-destructed" : "was caught in the blast";
         this.presentation.announce(`${player.name} ${cause}`);
         this.presentation.update(this);
+        this.scheduleRoundDecision();
       }
 
-      hitSkill(player, damage, source, label, quiet = false, shieldInvulnerability = 0.48) {
-        if (!player.alive || player.invulnerable > 0 || player.dashing > 0 || this.mode !== "playing") return false;
+      consumeSpellShield(player, label, shieldInvulnerability = 0.48) {
+        if (!player || player.shield <= 0) return false;
+        player.shield -= 1;
+        player.invulnerable = shieldInvulnerability;
+        this.playSfxAt("shield", player);
+        this.presentation.announce(`${player.name} blocked ${label}`);
+        this.spawnParticles(player.x, 0.55, player.z, Renderer.colors.ice, 26, 0.75, 0.12);
+        this.renderer.addShock(player.x, player.z, 0.4);
+        return true;
+      }
+
+      hitSkill(player, damage, source, label, quiet = false, shieldInvulnerability = 0.48,
+        rules = {}) {
+        const requiresTargetable = rules.requiresTargetable !== false;
+        const respectsHitLocks = rules.respectsHitLocks !== false;
+        const respectsShield = rules.respectsShield !== false;
+        if (!player?.alive || this.mode !== "playing") return false;
+        if (requiresTargetable && !this.isContestantTargetable(player)) return false;
+        if (respectsHitLocks && (player.invulnerable > 0 || player.dashing > 0)) return false;
         if (source?.champion === "vladimir" && this.vladimirMarks.some((mark) =>
           mark.ownerId === source.id && Math.hypot(player.x - mark.x, player.z - mark.z) <= mark.radius
         )) damage *= 1.12;
-        if (player.shield > 0) {
-          player.shield -= 1;
-          player.invulnerable = shieldInvulnerability;
-          this.playSfxAt("shield", player);
-          this.presentation.announce(`${player.name} blocked ${label}`);
-          this.spawnParticles(player.x, 0.55, player.z, Renderer.colors.ice, 26, 0.75, 0.12);
-          this.renderer.addShock(player.x, player.z, 0.4);
-          return false;
-        }
+        if (respectsShield && this.consumeSpellShield(player, label, shieldInvulnerability)) return false;
         player.health = Math.max(0, player.health - damage);
         if (source?.champion === "zed" && label !== "Death Mark") {
           const mark = this.zedMarks.find((candidate) =>
@@ -2537,6 +2855,7 @@
           player.alive = false;
           this.clearAbilityBuffer(player.id);
           this.cancelKatarinaChannel(player);
+          this.cancelZedDeathMarkCommitment(player);
           this.renderer.hitPulse = player.id === 1 ? 1.25 : 0.82;
           this.renderer.cameraShake = 0.86;
           this.playSfxAt("kill", player, 1, {
@@ -2571,7 +2890,7 @@
             source.rCooldown = Math.max(0, source.rCooldown - 12);
             this.healChampion(source, 0.22);
           }
-          if (this.roundDecisionTimer < 0) this.roundDecisionTimer = 0.16;
+          this.scheduleRoundDecision();
         } else if (!quiet) {
           const healthPercent = player.maxHealth > 0
             ? Math.ceil(player.health / player.maxHealth * 100)
@@ -2584,6 +2903,7 @@
 
       finalizeRound(forcedWinner = null) {
         if (this.roundLocked) return;
+        for (const player of this.players) this.cancelZedDeathMarkCommitment(player);
         this.roundLocked = true;
         this.roundTransition = 2.15;
         const survivors = this.players.filter((player) => player.alive);
@@ -2732,8 +3052,22 @@
         this.collectPickups();
 
         if (this.roundDecisionTimer >= 0) {
+          const pendingBeforeTick = this.pendingRoundDecisionHold();
+          if (!pendingBeforeTick.active && this.roundDecisionTimer > 0.16) {
+            this.roundDecisionTimer = 0.16;
+          }
           this.roundDecisionTimer -= dt;
-          if (this.roundDecisionTimer <= 0) this.finalizeRound();
+          if (this.roundDecisionTimer <= 0) {
+            const pending = this.pendingRoundDecisionHold();
+            if (pending.active) {
+              // Mechanics are advanced before settlement in every frame. A
+              // pending attached mark or dash therefore always gets one more
+              // authoritative tick instead of being frozen by roundLocked.
+              this.roundDecisionTimer = Math.max(ABILITY_TIME_EPSILON, pending.delay);
+            } else {
+              this.finalizeRound();
+            }
+          }
         } else if (this.roundTime <= 0) {
           this.resolveTimeout();
         }

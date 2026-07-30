@@ -55,6 +55,21 @@ test("loads the online duel layer into the reconstructed game", async () => {
   assert.doesNotMatch(page, /<script>[\s\S]*<\/script>/);
 });
 
+test("online movement prediction honors the canonical contestant lock", async () => {
+  const source = await readFile(new URL("public/online-duel.js", root), "utf8");
+  const prediction = extractFunctionDeclaration(
+    source,
+    "predictLocalMovement",
+    "  function interpolateRemoteHost"
+  );
+  assert.match(prediction, /game\.canMoveContestant\(player\)/);
+  assert.match(prediction, /player\.moving = false;\s+return;/);
+  assert.ok(
+    prediction.indexOf("game.canMoveContestant(player)") < prediction.indexOf("game.moveEntity(player"),
+    "a committed Zed must be stopped before optimistic position mutation"
+  );
+});
+
 test("embeds the packaged manifest to remove its serial boot request", async () => {
   const page = await readFile(new URL("public/riftbomb.html", root), "utf8");
   const loader = await readFile(new URL("public/riftbomb-loader.js", root), "utf8");
@@ -147,6 +162,83 @@ test("uses one authoritative WebSocket transport", async () => {
   assert.doesNotMatch(duel, /RTCPeerConnection|iceGatheringState|state\.inputChannel|state\.snapshots/);
 });
 
+test("movement and actions use independent bounded streams with causal ACK and replay", async () => {
+  const [client, server, rooms, clientCss] = await Promise.all([
+    readFile(new URL("public/online-duel.js", root), "utf8"),
+    readFile(new URL("server/src/server.mjs", root), "utf8"),
+    readFile(new URL("server/src/authoritative-rooms.mjs", root), "utf8"),
+    readFile(new URL("public/online-duel.css", root), "utf8")
+  ]);
+
+  assert.match(client, /function createReliableInputStream/);
+  assert.match(client, /INPUT_OUTBOX_LIMIT = 64/);
+  assert.match(client, /inputProtocol: INPUT_PROTOCOL_VERSION/);
+  assert.match(client, /setInterval\(\(\) => \{\s*if \(!state\.connected\) return;\s*reliableInput\.replay\(\);\s*reliableAction\.replay\(\)/);
+  assert.match(client, /function sendMovementInput/);
+  assert.match(client, /reliableInput\.currentEpoch\(\) <= 0/);
+  assert.match(client, /inputEpoch: epoch/);
+  assert.match(client, /inputSeq: nextSequence\+\+/);
+  assert.match(client, /if \(cursor\.epoch < epoch\) return false/);
+  assert.match(client, /transmit\(outbox\[0\], true\)/);
+  assert.match(client, /reliableInput\.synchronize\(data\.input/);
+  const matchControl = client.slice(
+    client.indexOf("function handleControl"),
+    client.indexOf("function sendControl")
+  );
+  assert.match(matchControl,
+    /reliableInput\.currentEpoch\(\) <= 0\) state\.lastLegacyInput = -1/,
+    "legacy movement dedupe must re-arm at every old-server match boundary");
+  assert.match(client, /if \(!reliableInput\.queue\(mask\)\) reliableInput\.replay\(\)/);
+  const keyup = client.slice(
+    client.indexOf('addEventListener("keyup"'),
+    client.indexOf('addEventListener("blur"')
+  );
+  assert.ok(keyup.indexOf("state.localInput[direction] = false") <
+    keyup.indexOf('game.mode !== "playing"'),
+  "guest key release must clear local state even between matches");
+  assert.match(client, /function createReliableActionStream/);
+  assert.match(client, /ACTION_OUTBOX_LIMIT = 16/);
+  assert.match(client, /actionProtocol: ACTION_PROTOCOL_VERSION/);
+  assert.match(client, /actionEpoch: epoch/);
+  assert.match(client, /actionSeq: nextSequence\+\+/);
+  assert.match(client, /actionRound: round/);
+  assert.match(client, /reliableAction\.negotiate\(message\.action/);
+  assert.match(client, /reliableAction\.synchronize\(data\.action/);
+  assert.match(client, /function sendOnlineAction/);
+  assert.match(client, /actionAlert\.setAttribute\("role", "alert"\)/);
+  assert.match(client, /showActionDeliveryError\(message\)/,
+    "a fail-closed action must remain visibly actionable during the match");
+  assert.match(clientCss, /\.online-action-alert \{[\s\S]*position: fixed;[\s\S]*z-index: 15;/);
+  assert.doesNotMatch(clientCss, /is-match-active[^\n]*online-action-alert/,
+    "match mode must not hide its critical action-delivery alert");
+  assert.match(client, /if \(!sendOnlineAction\("bomb"\)\) return false/);
+  assert.match(client, /if \(!sendOnlineAction\("ability", slot\)\) return false/);
+  assert.match(client,
+    /if \(!persistNow\(\)\) \{\s*outbox\.pop\(\);\s*nextSequence -= 1;\s*failure = "storage";\s*return false;\s*\}\s*if \(outbox\.length === 1\) transmit\(entry\)/,
+    "an action envelope must durably persist or roll back before transmission");
+  assert.doesNotMatch(client, /pagehide[^\n]*clearInterval/,
+    "BFCache restore must keep the delivery timer available");
+  assert.doesNotMatch(client, /sendControl\(\{ type: "action"/,
+    "gameplay actions must route through negotiated delivery");
+  assert.doesNotMatch(client, /reliableInput\.queue\([^)]*(?:bomb|ability)/);
+
+  assert.match(server, /room\.players\[index\]\?\.socket !== socket/);
+  assert.match(server, /inputProtocol: message\.inputProtocol === 1 \? 1 : 0/);
+  assert.match(server, /actionProtocol: message\.actionProtocol === 1 \? 1 : 0/);
+  assert.match(server, /authoritativeRooms\.acceptInput\(room, index, message\)/);
+  assert.match(server, /authoritativeRooms\.processPlayerAction\(room, index, message\)/);
+  assert.match(server, /room\.game\?\.mode === "matchover"/);
+  assert.match(server, /message\.inputEpoch === room\.inputEpoch/);
+  assert.match(rooms, /message\.inputSeq !== room\.inputAccepted\[playerIndex\] \+ 1/);
+  assert.match(rooms, /room\.game\.update\(dt\);\s*room\.inputApplied\[0\] =/);
+  assert.match(rooms, /snapshot\.input = this\.inputProtocol\(room\)/);
+  assert.match(rooms, /snapshot\.action = this\.actionProtocol\(room\)/);
+  assert.match(rooms, /message\.actionSeq !== room\.actionAck\[playerIndex\] \+ 1/);
+  assert.match(rooms, /message\.actionRound === room\.game\.round/);
+  assert.match(rooms, /room\.actionAck\[playerIndex\] = message\.actionSeq/);
+  assert.match(rooms, /inputEpoch: 0/);
+});
+
 test("superseded sockets cannot mutate the active room or audio cursor", async () => {
   const source = await readFile(new URL("public/online-duel.js", root), "utf8");
   const declaration = extractFunctionDeclaration(
@@ -188,32 +280,57 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
     lastPlayedSoundEventId: 0
   };
   const applied = [];
+  const controls = [];
   let connectedCalls = 0;
   const connectAuthoritative = new Function(
     "WebSocket",
     "AUTHORITATIVE_SERVER_URL",
+    "INPUT_PROTOCOL_VERSION",
+    "ACTION_PROTOCOL_VERSION",
+    "RESUME_PROTOCOL_VERSION",
     "state",
+    "pendingConnectCancel",
     "setTimeout",
     "clearTimeout",
     "lobbyPayload",
+    "ensureResumeToken",
     "onConnected",
-    "applySnapshot",
+    "receiveSnapshot",
+    "handleControl",
+    "saveSession",
+    "clearPendingResume",
+    "reliableInput",
+    "reliableAction",
+    "localOnlinePlayerId",
     `"use strict"; ${declaration}; return connectAuthoritative;`
   )(
     FakeWebSocket,
     "ws://test.invalid/game-ws",
+    1,
+    1,
+    1,
     state,
+    null,
     () => 1,
     () => {},
     () => ({}),
+    () => "11".repeat(32),
     () => { connectedCalls += 1; },
-    (snapshot) => applied.push(snapshot)
+    (snapshot) => applied.push(snapshot),
+    (message) => controls.push(message),
+    () => {},
+    () => {},
+    { synchronize() { return true; } },
+    { negotiate() { return true; } },
+    () => 1
   );
 
-  void connectAuthoritative("host");
+  const superseded = connectAuthoritative("host");
   const oldSocket = sockets[0];
   const activePromise = connectAuthoritative("host");
   const activeSocket = sockets[1];
+  await assert.rejects(superseded, /resume_cancelled/,
+    "superseding a pending connect must settle its promise");
 
   oldSocket.emit("open");
   oldSocket.emit("message", { type: "connected", soundCursor: 99 });
@@ -234,9 +351,75 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
   await activePromise;
 
   assert.equal(activeSocket.sent.length, 1);
+  assert.equal(activeSocket.sent[0].resumeProtocol, 1);
+  assert.equal(activeSocket.sent[0].resumeToken, "11".repeat(32));
   assert.equal(state.lastPlayedSoundEventId, 2);
   assert.deepEqual(applied, [{ s: 1, room: "new" }]);
   assert.equal(connectedCalls, 1);
+
+  let resumeResolved = false;
+  const resumed = connectAuthoritative("guest", { resume: true, resumePhase: "match" })
+    .then(() => { resumeResolved = true; });
+  const resumedSocket = sockets[2];
+  resumedSocket.emit("open");
+  resumedSocket.emit("message", {
+    type: "connected",
+    resume: { v: 1, protected: true, resumed: true },
+    input: { v: 1, epoch: 4, accepted: [0, 7], ack: [0, 7] }
+  });
+  await Promise.resolve();
+  assert.equal(resumeResolved, false, "authenticated resume waits for its explicit control frame");
+  resumedSocket.emit("message", { type: "resume", activeMatch: true });
+  await resumed;
+  assert.equal(resumeResolved, true);
+  assert.equal(controls.at(-1).type, "resume");
+
+  const rejected = connectAuthoritative("guest");
+  const rejectedSocket = sockets[3];
+  rejectedSocket.emit("open");
+  rejectedSocket.emit("message", { type: "error", error: "role_taken" });
+  await assert.rejects(rejected, /role_taken/);
+  assert.equal(rejectedSocket.readyState, 3, "pre-connected errors must close their socket");
+
+  state.sessionConfirmed = false;
+  const freshLobby = connectAuthoritative("guest", { resume: true, resumePhase: "lobby" });
+  const freshLobbySocket = sockets[4];
+  freshLobbySocket.emit("open");
+  assert.equal(freshLobbySocket.sent[0].resumeOnly, false);
+  freshLobbySocket.emit("message", {
+    type: "connected",
+    resume: { v: 1, protected: true, resumed: false },
+    input: { v: 1, epoch: 0, accepted: [0, 0], ack: [0, 0] }
+  });
+  await freshLobby;
+  assert.equal(controls.at(-1).type, "resume");
+  assert.equal(controls.at(-1).activeMatch, false,
+    "a persisted pre-hello lobby claim must complete instead of orphaning its bearer");
+  assert.equal(state.sessionConfirmed, true);
+
+  const confirmedLobby = connectAuthoritative("guest", { resume: true, resumePhase: "lobby" });
+  const confirmedLobbySocket = sockets[5];
+  confirmedLobbySocket.emit("open");
+  assert.equal(confirmedLobbySocket.sent[0].resumeOnly, true,
+    "an established lobby may only recover its existing protected seat");
+  confirmedLobbySocket.emit("message", {
+    type: "connected",
+    resume: { v: 1, protected: true, resumed: true },
+    input: { v: 1, epoch: 0, accepted: [0, 0], ack: [0, 0] }
+  });
+  confirmedLobbySocket.emit("message", { type: "resume", activeMatch: false });
+  await confirmedLobby;
+
+  const missingMatch = connectAuthoritative("guest", { resume: true, resumePhase: "match" });
+  const missingMatchSocket = sockets[6];
+  missingMatchSocket.emit("open");
+  assert.equal(missingMatchSocket.sent[0].resumeOnly, true);
+  missingMatchSocket.emit("message", {
+    type: "connected",
+    resume: { v: 1, protected: true, resumed: false }
+  });
+  await assert.rejects(missingMatch, /resume_denied/);
+  assert.equal(missingMatchSocket.readyState, 3);
 });
 
 test("online one-shot audio is authoritative, ordered and locally panned", async () => {
@@ -313,7 +496,7 @@ test("packages every web part behind a self-consistent dynamic manifest", async 
   );
 });
 
-test("caches only fingerprinted game parts as immutable", async () => {
+test("caches only fingerprinted game artifacts as immutable", async () => {
   const headers = await readFile(new URL("public/_headers", root), "utf8");
   const loader = await readFile(new URL("public/riftbomb-loader.js", root), "utf8");
 
@@ -324,6 +507,14 @@ test("caches only fingerprinted game parts as immutable", async () => {
   assert.match(
     headers,
     /\/riftbomb-parts\/manifest\.json\s+Cache-Control: no-store/,
+  );
+  assert.match(
+    headers,
+    /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp\s+Cache-Control: public, max-age=31556952, immutable/,
+  );
+  assert.match(
+    headers,
+    /\/arena-textures\/floor-storm-eye-combat-field-99509f91\.webp\s+Cache-Control: public, max-age=31556952, immutable/,
   );
   assert.match(loader, /manifest\.partsPath !== `\/riftbomb-parts\/\$\{manifest\.sha256\}`/);
   assert.match(loader, /fetch\(`\$\{manifest\.partsPath\}\/part-\$\{name\}/);
@@ -342,15 +533,25 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     /ARENA_TEXTURE_SOURCE\s*=\s*Object\.freeze\(\{"crateSide":"data:image\/webp;base64/,
   );
   assert.match(game, /\/arena-textures\/crate\.webp/);
+  assert.match(game, /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp/);
+  assert.match(game, /\/arena-textures\/floor-storm-eye-combat-field-99509f91\.webp/);
+  assert.doesNotMatch(game, /\/arena-textures\/floor-lattice\.webp/);
+  assert.doesNotMatch(game, /\/arena-textures\/floor-pit\.webp/);
 
   const textures = [
     ["game/arena-appearance/textures/crates/crate-albedo.webp", "crate.webp"],
     ["game/arena-appearance/textures/crates/crate-top-albedo.webp", "crate-top.webp"],
-    ["game/arena-appearance/textures/ground/floor-lattice.webp", "floor-lattice.webp"],
+    [
+      "game/arena-appearance/textures/ground/floor-salt-lens-combat-band-6ffb0854.webp",
+      "floor-salt-lens-combat-band-6ffb0854.webp",
+    ],
     ["game/arena-appearance/textures/ground/floor-clearing.webp", "floor-clearing.webp"],
     ["game/arena-appearance/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
     ["game/arena-appearance/textures/ground/floor-forts.webp", "floor-forts.webp"],
-    ["game/arena-appearance/textures/ground/floor-pit.webp", "floor-pit.webp"],
+    [
+      "game/arena-appearance/textures/ground/floor-storm-eye-combat-field-99509f91.webp",
+      "floor-storm-eye-combat-field-99509f91.webp",
+    ],
     ["game/arena-appearance/textures/walls/wall-lattice.webp", "wall-lattice.webp"],
     ["game/arena-appearance/textures/walls/wall-clearing.webp", "wall-clearing.webp"],
     ["game/arena-appearance/textures/walls/wall-labyrinth.webp", "wall-labyrinth.webp"],
@@ -362,10 +563,9 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     ["game/arena-appearance/textures/walls/wall-top-forts.webp", "wall-top-forts.webp"],
     ["game/arena-appearance/textures/walls/wall-top-pit.webp", "wall-top-pit.webp"],
   ];
-  assert.equal(
-    (game.match(/\/arena-textures\/[^"]+\.webp/g) || []).length,
-    textures.length,
-  );
+  const arenaUrls = game.match(/\/arena-textures\/[^"]+\.webp/g) || [];
+  assert.equal(arenaUrls.length, textures.length);
+  assert.equal(new Set(arenaUrls).size, textures.length, "every arena slot must own one URL");
   for (const [sourceName, outputName] of textures) {
     const source = await readFile(new URL(`../${sourceName}`, root));
     const output = await readFile(

@@ -31,7 +31,22 @@
   const CLIENT_SOURCE = "riftbomb-client";
   const RUNTIME_SOURCE = "riftbomb-runtime";
   const SESSION_KEY = "riftbomb-online-session-v1";
-  const SESSION_MAX_AGE_MS = 25 * 60_000;
+  const PENDING_RESUME_KEY = "riftbomb-online-resume-pending-v1";
+  const RESUME_PROTOCOL_VERSION = 1;
+  const RESUME_TOKEN_BYTES = 32;
+  // Covers the legacy server's worst-case 45 s dead-socket heartbeat during a
+  // rolling deploy. Authenticated v1 replacement still completes immediately.
+  const RESUME_ROLE_RETRY_DELAYS_MS = Object.freeze([
+    100, 250, 500, 1_000, 2_000, 4_000, 8_000, 12_000, 16_000, 16_000
+  ]);
+  const INPUT_PROTOCOL_VERSION = 1;
+  const INPUT_RETRY_MS = 120;
+  const INPUT_OUTBOX_LIMIT = 64;
+  const MAX_INPUT_SEQUENCE = 0x7fffffff;
+  const ACTION_PROTOCOL_VERSION = 1;
+  const ACTION_RETRY_MS = 120;
+  const ACTION_OUTBOX_LIMIT = 16;
+  const MAX_ACTION_SEQUENCE = 0x7fffffff;
   const authoritativeAudio = globalThis.RIFTBOMB_AUTHORITATIVE_AUDIO;
   const browserGameplaySfx = game.sfx;
   const authoritativePredictionSink = Object.freeze({
@@ -55,10 +70,375 @@
     return CHAMPION_NAMES[value] || "Katarina";
   }
 
+  function createResumeToken(fillRandom = (bytes) => globalThis.crypto.getRandomValues(bytes)) {
+    const bytes = new Uint8Array(RESUME_TOKEN_BYTES);
+    fillRandom(bytes);
+    return [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+  }
+
+  function validResumeToken(value) {
+    return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+  }
+
+  function definitiveResumeFailure(error) {
+    return new Set([
+      "resume_denied", "resume_expired", "room_not_found", "invalid_resume", "invalid_hello"
+    ]).has(error?.message);
+  }
+
+  function definitiveInitialConnectionFailure(error) {
+    return definitiveResumeFailure(error) ||
+      ["role_taken", "room_full"].includes(error?.message);
+  }
+
+  async function retryRoleTaken(
+    connect,
+    {
+      delays = RESUME_ROLE_RETRY_DELAYS_MS,
+      wait = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
+      active = () => true
+    } = {}
+  ) {
+    for (let attempt = 0; ; attempt += 1) {
+      if (!active()) throw new Error("resume_cancelled");
+      try {
+        return await connect();
+      } catch (error) {
+        if (error?.message !== "role_taken" || attempt >= delays.length || !active()) throw error;
+        await wait(delays[attempt]);
+      }
+    }
+  }
+
+  function createLatestSnapshotBuffer() {
+    let latest = null;
+    const push = (snapshot) => {
+      if (!snapshot || !Number.isFinite(snapshot.s) || snapshot.s <= 0 ||
+          (latest && snapshot.s <= latest.s)) return false;
+      // The server deliberately sends a full grid first after reattach. Preserve
+      // it while coalescing later state-only snapshots during asynchronous boot.
+      latest = !Array.isArray(snapshot.grid) && Array.isArray(latest?.grid)
+        ? { ...snapshot, grid: latest.grid }
+        : snapshot;
+      return true;
+    };
+    const take = () => {
+      const snapshot = latest;
+      latest = null;
+      return snapshot;
+    };
+    const reset = () => { latest = null; };
+    const peek = () => latest;
+    return Object.freeze({ peek, push, reset, take });
+  }
+
+  function createReliableInputStream({
+    send,
+    now = () => performance.now(),
+    retryMs = INPUT_RETRY_MS,
+    outboxLimit = INPUT_OUTBOX_LIMIT
+  } = {}) {
+    if (typeof send !== "function") throw new TypeError("reliable input requires send");
+    let epoch = 0;
+    let nextSequence = 1;
+    let acceptedSequence = 0;
+    let acknowledgedSequence = 0;
+    let lastMask = -1;
+    let replayCount = 0;
+    let outbox = [];
+
+    const seatCursor = (protocol, seatIndex) => {
+      if (!protocol || protocol.v !== INPUT_PROTOCOL_VERSION ||
+          !Number.isSafeInteger(protocol.epoch) || protocol.epoch < 0 ||
+          !Array.isArray(protocol.accepted) || !Array.isArray(protocol.ack) ||
+          !Number.isInteger(seatIndex) || seatIndex < 0) return null;
+      const accepted = protocol.accepted[seatIndex];
+      const ack = protocol.ack[seatIndex];
+      if (!Number.isSafeInteger(accepted) || accepted < 0 ||
+          accepted > MAX_INPUT_SEQUENCE || !Number.isSafeInteger(ack) || ack < 0 ||
+          ack > accepted || ack > MAX_INPUT_SEQUENCE) return null;
+      return { epoch: protocol.epoch, accepted, ack };
+    };
+
+    const transmit = (entry, replay = false) => {
+      entry.sentAt = now();
+      const delivered = send(entry.message) === true;
+      if (delivered && replay) replayCount += 1;
+      return delivered;
+    };
+
+    const synchronize = (protocol, seatIndex) => {
+      const cursor = seatCursor(protocol, seatIndex);
+      if (!cursor) return false;
+      if (cursor.epoch < epoch) return false;
+      if (cursor.epoch > epoch) {
+        epoch = cursor.epoch;
+        nextSequence = Math.min(MAX_INPUT_SEQUENCE + 1, cursor.accepted + 1);
+        acceptedSequence = cursor.accepted;
+        acknowledgedSequence = cursor.ack;
+        lastMask = -1;
+        outbox = [];
+        return true;
+      }
+      if (cursor.accepted < acceptedSequence || cursor.ack < acknowledgedSequence ||
+          cursor.accepted >= nextSequence) return false;
+      acceptedSequence = cursor.accepted;
+      acknowledgedSequence = cursor.ack;
+      nextSequence = Math.max(nextSequence, Math.min(MAX_INPUT_SEQUENCE + 1, cursor.accepted + 1));
+      outbox = outbox.filter(({ message }) => message.inputSeq > acknowledgedSequence);
+      return true;
+    };
+
+    const queue = (mask) => {
+      if (!Number.isInteger(mask) || mask < 0 || mask > 15 || epoch <= 0 ||
+          mask === lastMask || outbox.length >= outboxLimit ||
+          nextSequence > MAX_INPUT_SEQUENCE) return false;
+      const message = {
+        type: "input",
+        mask,
+        inputEpoch: epoch,
+        inputSeq: nextSequence++
+      };
+      const entry = { message, sentAt: Number.NEGATIVE_INFINITY };
+      outbox.push(entry);
+      lastMask = mask;
+      transmit(entry);
+      return true;
+    };
+
+    const replay = () => {
+      if (!outbox.length || now() - outbox[0].sentAt < retryMs) return false;
+      transmit(outbox[0], true);
+      return true;
+    };
+
+    const reset = () => {
+      epoch = 0;
+      nextSequence = 1;
+      acceptedSequence = 0;
+      acknowledgedSequence = 0;
+      lastMask = -1;
+      replayCount = 0;
+      outbox = [];
+    };
+
+    const snapshot = () => ({
+      version: INPUT_PROTOCOL_VERSION,
+      epoch,
+      nextSequence,
+      acceptedSequence,
+      acknowledgedSequence,
+      pendingSequences: outbox.map(({ message }) => message.inputSeq),
+      pendingMasks: outbox.map(({ message }) => message.mask),
+      replayCount
+    });
+    const currentEpoch = () => epoch;
+
+    return Object.freeze({ currentEpoch, queue, replay, reset, snapshot, synchronize });
+  }
+
+  function createReliableActionStream({
+    send,
+    persist = () => {},
+    now = () => performance.now(),
+    retryMs = ACTION_RETRY_MS,
+    outboxLimit = ACTION_OUTBOX_LIMIT
+  } = {}) {
+    if (typeof send !== "function") throw new TypeError("reliable action requires send");
+    if (typeof persist !== "function") throw new TypeError("reliable action requires persistence");
+    let mode = "unknown";
+    let epoch = 0;
+    let nextSequence = 1;
+    let acknowledgedSequence = 0;
+    let replayCount = 0;
+    let outbox = [];
+    let failure = "";
+
+    const validAction = (kind, slot) => kind === "bomb" ||
+      (kind === "ability" && Number.isInteger(slot) && slot >= 0 && slot <= 3);
+    const validRound = (round) => Number.isSafeInteger(round) && round >= 0;
+    const seatCursor = (protocol, seatIndex) => {
+      if (!protocol || protocol.v !== ACTION_PROTOCOL_VERSION ||
+          !Number.isSafeInteger(protocol.epoch) || protocol.epoch < 0 ||
+          !Array.isArray(protocol.ack) || !Number.isInteger(seatIndex) || seatIndex < 0) return null;
+      const ack = protocol.ack[seatIndex];
+      if (!Number.isSafeInteger(ack) || ack < 0 || ack > MAX_ACTION_SEQUENCE) return null;
+      return { epoch: protocol.epoch, ack };
+    };
+    const persistedState = () => ({
+      v: ACTION_PROTOCOL_VERSION,
+      epoch,
+      nextSequence,
+      acknowledgedSequence,
+      outbox: outbox.map(({ message }) => ({ ...message }))
+    });
+    const persistNow = () => {
+      try { return persist(persistedState()) !== false; } catch { return false; }
+    };
+    const transmit = (entry, replay = false) => {
+      entry.sentAt = now();
+      const delivered = send(entry.message) === true;
+      if (delivered && replay) replayCount += 1;
+      return delivered;
+    };
+    const clear = (nextMode = "unknown") => {
+      mode = nextMode;
+      epoch = 0;
+      nextSequence = 1;
+      acknowledgedSequence = 0;
+      replayCount = 0;
+      outbox = [];
+      failure = "";
+    };
+
+    const synchronize = (protocol, seatIndex) => {
+      const cursor = seatCursor(protocol, seatIndex);
+      if (!cursor || cursor.epoch < epoch) return false;
+      if (cursor.epoch > epoch) {
+        mode = "reliable";
+        epoch = cursor.epoch;
+        nextSequence = Math.min(MAX_ACTION_SEQUENCE + 1, cursor.ack + 1);
+        acknowledgedSequence = cursor.ack;
+        outbox = [];
+        persistNow();
+        return true;
+      }
+      if (cursor.ack < acknowledgedSequence) return false;
+      const changed = mode !== "reliable" || cursor.ack !== acknowledgedSequence ||
+        cursor.ack >= nextSequence ||
+        outbox.some(({ message }) => message.actionSeq <= cursor.ack);
+      const previousHead = outbox[0];
+      mode = "reliable";
+      acknowledgedSequence = cursor.ack;
+      nextSequence = Math.max(
+        nextSequence,
+        Math.min(MAX_ACTION_SEQUENCE + 1, cursor.ack + 1)
+      );
+      outbox = outbox.filter(({ message }) => message.actionSeq > cursor.ack);
+      if (changed) persistNow();
+      if (outbox.length && outbox[0] !== previousHead) transmit(outbox[0]);
+      return true;
+    };
+
+    const negotiate = (protocol, seatIndex) => {
+      if (seatCursor(protocol, seatIndex)) return synchronize(protocol, seatIndex);
+      const nextMode = protocol === undefined ? "legacy" : "disabled";
+      const changed = mode !== nextMode || epoch !== 0 || outbox.length > 0;
+      clear(nextMode);
+      if (changed) persistNow();
+      return false;
+    };
+
+    const hydrate = (saved) => {
+      clear();
+      if (!saved || saved.v !== ACTION_PROTOCOL_VERSION ||
+          !Number.isSafeInteger(saved.epoch) || saved.epoch <= 0 ||
+          !Number.isSafeInteger(saved.nextSequence) || saved.nextSequence <= 0 ||
+          saved.nextSequence > MAX_ACTION_SEQUENCE + 1 ||
+          !Number.isSafeInteger(saved.acknowledgedSequence) ||
+          saved.acknowledgedSequence < 0 ||
+          saved.acknowledgedSequence >= saved.nextSequence ||
+          !Array.isArray(saved.outbox) || saved.outbox.length > outboxLimit ||
+          saved.nextSequence !== saved.acknowledgedSequence + saved.outbox.length + 1) return false;
+      const restored = [];
+      for (let index = 0; index < saved.outbox.length; index += 1) {
+        const message = saved.outbox[index];
+        const expectedSequence = saved.acknowledgedSequence + index + 1;
+        if (!message || message.type !== "action" ||
+            !validAction(message.kind, message.slot) || !validRound(message.actionRound) ||
+            message.actionEpoch !== saved.epoch ||
+            message.actionSeq !== expectedSequence) return false;
+        const restoredMessage = {
+          type: "action",
+          kind: message.kind,
+          actionEpoch: message.actionEpoch,
+          actionSeq: message.actionSeq,
+          actionRound: message.actionRound
+        };
+        if (message.kind === "ability") restoredMessage.slot = message.slot;
+        restored.push({ message: restoredMessage, sentAt: Number.NEGATIVE_INFINITY });
+      }
+      epoch = saved.epoch;
+      nextSequence = saved.nextSequence;
+      acknowledgedSequence = saved.acknowledgedSequence;
+      outbox = restored;
+      return true;
+    };
+
+    const queue = (kind, slot, round) => {
+      failure = "";
+      if (mode !== "reliable" || epoch <= 0) {
+        failure = "protocol";
+        return false;
+      }
+      if (!validAction(kind, slot) || !validRound(round)) {
+        failure = "invalid";
+        return false;
+      }
+      if (outbox.length >= outboxLimit) {
+        failure = "capacity";
+        return false;
+      }
+      if (nextSequence > MAX_ACTION_SEQUENCE) {
+        failure = "sequence";
+        return false;
+      }
+      const message = {
+        type: "action",
+        kind,
+        actionEpoch: epoch,
+        actionSeq: nextSequence++,
+        actionRound: round
+      };
+      if (kind === "ability") message.slot = slot;
+      const entry = { message, sentAt: Number.NEGATIVE_INFINITY };
+      outbox.push(entry);
+      // The durable tab session must contain the envelope before its first
+      // transmission so an F5 between send and ACK can replay the same action.
+      if (!persistNow()) {
+        outbox.pop();
+        nextSequence -= 1;
+        failure = "storage";
+        return false;
+      }
+      if (outbox.length === 1) transmit(entry);
+      return true;
+    };
+
+    const replay = () => {
+      if (mode !== "reliable" || !outbox.length ||
+          now() - outbox[0].sentAt < retryMs) return false;
+      transmit(outbox[0], true);
+      return true;
+    };
+    const reset = () => clear();
+    const snapshot = () => ({
+      version: ACTION_PROTOCOL_VERSION,
+      mode,
+      epoch,
+      nextSequence,
+      acknowledgedSequence,
+      pendingSequences: outbox.map(({ message }) => message.actionSeq),
+      pendingKinds: outbox.map(({ message }) => message.kind),
+      replayCount
+    });
+    const currentMode = () => mode;
+    const currentFailure = () => failure;
+
+    return Object.freeze({
+      currentFailure, currentMode, hydrate, negotiate, persistedState, queue, replay, reset,
+      snapshot, synchronize
+    });
+  }
+
   const state = {
     role: "offline",
     roomCode: "",
     hostToken: "",
+    resumeToken: "",
+    resuming: false,
+    resumePhase: "",
+    sessionConfirmed: false,
     socket: null,
     connected: false,
     matchmaking: false,
@@ -82,8 +462,28 @@
     matchTarget: 3,
     guestRound: 0,
     guestMode: "intro",
-    lastSentInput: -1
+    lastLegacyInput: -1
   };
+
+  const bufferedSnapshots = createLatestSnapshotBuffer();
+  let lifecycleGeneration = 0;
+  let matchRuntimeEpoch = 0;
+  let runtimeBootRecord = null;
+  let runtimeBootTail = Promise.resolve();
+  let pendingConnectCancel = null;
+
+  const reliableInput = createReliableInputStream({ send: sendControl });
+  const reliableAction = createReliableActionStream({
+    send: sendControl,
+    persist: () => saveSession()
+  });
+  setInterval(() => {
+    if (!state.connected) return;
+    reliableInput.replay();
+    reliableAction.replay();
+  }, INPUT_RETRY_MS);
+  // Timers are suspended automatically while a page is in BFCache. Clearing
+  // this interval on pagehide would make a restored match lose replay forever.
 
   const panel = document.createElement("section");
   panel.className = "online-panel";
@@ -196,6 +596,15 @@
   connection.textContent = "Online link";
   document.body.appendChild(connection);
 
+  const actionAlert = document.createElement("div");
+  actionAlert.className = "online-action-alert";
+  actionAlert.hidden = true;
+  actionAlert.setAttribute("role", "alert");
+  actionAlert.setAttribute("aria-live", "assertive");
+  actionAlert.setAttribute("aria-atomic", "true");
+  document.body.appendChild(actionAlert);
+  let actionAlertTimer = 0;
+
   const $p = (selector) => panel.querySelector(selector);
   const createButton = $p("#online-create");
   const showInviteButton = $p("#online-show-invite");
@@ -226,6 +635,7 @@
   const championName = championNameSafe;
 
   function clientPhase() {
+    if (state.resuming || runtimeBootRecord) return "boot";
     if (game.mode === "playing" || game.mode === "matchover") return "match";
     return state.role === "offline" ? "setup" : "lobby";
   }
@@ -251,6 +661,8 @@
       guestChampion: state.guestChampion,
       arena: state.arena,
       matchTarget: state.matchTarget,
+      inputDelivery: reliableInput.snapshot(),
+      actionDelivery: reliableAction.snapshot(),
       status: status.textContent || "",
       tone: status.dataset.tone || ""
     };
@@ -265,23 +677,38 @@
       reason,
       state: clientStateSnapshot()
     }, window.location.origin);
-    saveSession();
+    // During iframe boot the saved session is the only source for the automatic
+    // F5 resume scheduled below. Do not erase it while the runtime still has its
+    // initial offline role; explicit offline/leave flows already clear it.
+    if (reason !== "ready") saveSession();
   }
 
   function clearSession() {
+    clearSavedSession();
+    clearPendingResume();
+  }
+
+  function clearSavedSession() {
     try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+  }
+
+  function clearPendingResume() {
+    try { sessionStorage.removeItem(PENDING_RESUME_KEY); } catch {}
   }
 
   function saveSession() {
     try {
       if (state.role === "offline" || !state.roomCode) {
-        clearSession();
-        return;
+        // Startup status publications happen before auto-resume while the
+        // iframe still reports its initial offline role. Only explicit
+        // cancel/leave/failure flows are allowed to erase a saved credential.
+        return false;
       }
       // Persist even while briefly disconnected so F5 can reattach.
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({
         role: state.role,
         roomCode: state.roomCode,
+        resumeToken: state.resumeToken,
         hostChampion: state.hostChampion,
         guestChampion: state.guestChampion,
         arena: state.arena,
@@ -289,10 +716,17 @@
         quickMatch: state.quickMatch,
         guestReady: state.guestReady,
         matchTarget: state.matchTarget,
-        phase: clientPhase(),
+        phase: ["lobby", "match"].includes(state.resumePhase)
+          ? state.resumePhase
+          : clientPhase(),
+        confirmed: Boolean(state.sessionConfirmed),
+        actionDelivery: reliableAction.persistedState(),
         savedAt: Date.now()
       }));
-    } catch {}
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function readSession() {
@@ -301,16 +735,57 @@
       if (!raw) return null;
       const data = JSON.parse(raw);
       if (!data?.roomCode || !data?.role) return null;
-      if (Date.now() - Number(data.savedAt || 0) > SESSION_MAX_AGE_MS) {
-        clearSession();
-        return null;
-      }
       if (!/^[A-HJ-NP-Z2-9]{6}$/.test(String(data.roomCode))) return null;
       if (data.role !== "host" && data.role !== "guest") return null;
+      if (data.resumeToken !== undefined && data.resumeToken !== "" &&
+          !validResumeToken(data.resumeToken)) return null;
       return data;
     } catch {
       return null;
     }
+  }
+
+  function sessionMatchesRoom(session, room) {
+    return Boolean(session && typeof room === "string" &&
+      session.roomCode === room.toUpperCase());
+  }
+
+  function savePendingResume() {
+    if (!validResumeToken(state.resumeToken) || !state.quickMatch || state.roomCode) return;
+    try {
+      sessionStorage.setItem(PENDING_RESUME_KEY, JSON.stringify({
+        resumeToken: state.resumeToken,
+        quickMatch: true,
+        hostChampion: state.hostChampion,
+        arena: state.arena,
+        savedAt: Date.now()
+      }));
+    } catch {}
+  }
+
+  function readPendingResume() {
+    try {
+      const data = JSON.parse(sessionStorage.getItem(PENDING_RESUME_KEY) || "null");
+      if (!data?.quickMatch || !validResumeToken(data.resumeToken)) {
+        clearPendingResume();
+        return null;
+      }
+      return data;
+    } catch {
+      clearPendingResume();
+      return null;
+    }
+  }
+
+  function ensureResumeToken() {
+    if (!validResumeToken(state.resumeToken)) {
+      state.resumeToken = readPendingResume()?.resumeToken || createResumeToken();
+    }
+    // Persist before opening the socket. A lost `connected` frame must not lock
+    // this browser out of the seat it just protected.
+    if (state.roomCode) saveSession();
+    else savePendingResume();
+    return state.resumeToken;
   }
 
   function returnToIntroUi() {
@@ -336,6 +811,7 @@
 
   function leaveOnlineSession({ fromMatch = false } = {}) {
     const wasPlaying = game.mode === "playing" || game.mode === "matchover";
+    releaseCurrentSeat();
     try { state.socket?.close(); } catch {}
     resetConnection();
     setOnlineRole("offline");
@@ -362,10 +838,13 @@
   }
 
   function cancelQuickMatch() {
+    pendingConnectCancel?.();
+    pendingConnectCancel = null;
     const socket = state.socket;
     state.socket = null;
     state.matchmaking = false;
     state.quickMatch = false;
+    clearSession();
     try {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "cancel-quick-match" }));
@@ -384,6 +863,22 @@
     status.dataset.tone = tone;
     UI.live.textContent = message;
     publishClientState("status");
+  }
+
+  function showActionDeliveryError(message) {
+    clearTimeout(actionAlertTimer);
+    actionAlert.textContent = message;
+    actionAlert.hidden = false;
+    actionAlertTimer = setTimeout(() => {
+      actionAlert.hidden = true;
+      actionAlert.textContent = "";
+    }, 8000);
+  }
+
+  function clearActionDeliveryError() {
+    clearTimeout(actionAlertTimer);
+    actionAlert.hidden = true;
+    actionAlert.textContent = "";
   }
 
   function updateConnection(kind, message) {
@@ -497,6 +992,42 @@
     bindLocalOnlineView();
   }
 
+  function messageInputEpoch(message) {
+    const epoch = message?.input?.epoch;
+    if (Number.isSafeInteger(epoch) && epoch > 0) return epoch;
+    if (message?.type === "rematch") {
+      if (game.mode !== "matchover" && matchRuntimeEpoch > 0) return matchRuntimeEpoch;
+      return Math.max(1, matchRuntimeEpoch + 1);
+    }
+    return Math.max(1, matchRuntimeEpoch);
+  }
+
+  async function ensureOnlineMatchRuntime(message, generation) {
+    const epoch = messageInputEpoch(message);
+    if (matchRuntimeEpoch === epoch && game.mode !== "intro") return true;
+    if (runtimeBootRecord?.generation === generation && runtimeBootRecord.epoch === epoch) {
+      return runtimeBootRecord.promise;
+    }
+
+    const promise = runtimeBootTail.catch(() => undefined).then(async () => {
+      if (generation !== lifecycleGeneration || state.role === "offline") return false;
+      await beginConfiguredGame();
+      if (generation !== lifecycleGeneration || state.role === "offline") {
+        returnToIntroUi();
+        return false;
+      }
+      matchRuntimeEpoch = epoch;
+      return true;
+    });
+    runtimeBootRecord = { epoch, generation, promise };
+    runtimeBootTail = promise.catch(() => undefined);
+    try {
+      return await promise;
+    } finally {
+      if (runtimeBootRecord?.promise === promise) runtimeBootRecord = null;
+    }
+  }
+
   async function signaling(method, data, query = "") {
     const response = await fetch(`${SIGNALING_URL}${query}`, {
       method,
@@ -513,22 +1044,66 @@
     return body;
   }
 
-  function connectAuthoritative(role, { quickMatch = false } = {}) {
+  function connectAuthoritative(role, {
+    quickMatch = false,
+    resume = false,
+    resumePhase = ""
+  } = {}) {
+    pendingConnectCancel?.();
+    pendingConnectCancel = null;
+    const resumeToken = ensureResumeToken();
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(AUTHORITATIVE_SERVER_URL);
       state.socket = socket;
       let settled = false;
-      const timeout = setTimeout(() => {
+      let connectedReceived = false;
+      let timeout = 0;
+      let cancelPending = null;
+      const clearPendingCancel = () => {
+        if (pendingConnectCancel === cancelPending) pendingConnectCancel = null;
+      };
+      const failBeforeSettled = (reason) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        clearPendingCancel();
+        if (connectedReceived) state.connected = false;
+        try { socket.close(); } catch {}
+        reject(new Error(reason));
+      };
+      const succeed = (message) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        clearPendingCancel();
+        resolve(message);
+      };
+      cancelPending = () => failBeforeSettled("resume_cancelled");
+      pendingConnectCancel = cancelPending;
+      timeout = setTimeout(() => {
         if (state.socket !== socket) return;
-        if (!settled) reject(new Error("authoritative_server_timeout"));
-        socket.close();
+        failBeforeSettled("authoritative_server_timeout");
       }, 12_000);
       socket.addEventListener("open", () => {
         if (state.socket !== socket) return;
         socket.send(JSON.stringify(quickMatch
-          ? { type: "quick-match", preset: lobbyPayload() }
+          ? {
+              type: "quick-match",
+              inputProtocol: INPUT_PROTOCOL_VERSION,
+              actionProtocol: ACTION_PROTOCOL_VERSION,
+              resumeProtocol: RESUME_PROTOCOL_VERSION,
+              resumeToken,
+              preset: lobbyPayload()
+            }
           : {
               type: "hello",
+              inputProtocol: INPUT_PROTOCOL_VERSION,
+              actionProtocol: ACTION_PROTOCOL_VERSION,
+              resumeProtocol: RESUME_PROTOCOL_VERSION,
+              resumeToken,
+              resumeOnly: resume && (
+                resumePhase === "match" || state.sessionConfirmed
+              ),
               room: state.roomCode,
               role,
               ready: role === "guest" && state.guestReady,
@@ -540,7 +1115,7 @@
         let message;
         try { message = JSON.parse(event.data); } catch { return; }
         if (message.type === "error") {
-          if (!settled) reject(new Error(message.error));
+          failBeforeSettled(message.error || "authoritative_server_error");
           return;
         }
         if (message.type === "quick-queued") {
@@ -556,6 +1131,8 @@
           return;
         }
         if (message.type === "connected") {
+          const wasConfirmed = state.sessionConfirmed;
+          state.sessionConfirmed = true;
           if (message.quickMatch) {
             state.matchmaking = false;
             state.quickMatch = true;
@@ -563,21 +1140,58 @@
             state.guestReady = true;
             state.rivalConnected = true;
             setOnlineRole(message.role);
+            saveSession();
+            clearPendingResume();
           }
-          settled = true;
+          const seatIndex = localOnlinePlayerId() - 1;
+          reliableInput.synchronize(message.input, seatIndex);
+          reliableAction.negotiate(message.action, seatIndex);
+          connectedReceived = true;
+          const freshLobbyClaim = resume && resumePhase === "lobby" && !wasConfirmed &&
+            message.resume?.v === RESUME_PROTOCOL_VERSION &&
+            message.resume.resumed === false;
+          if (resume && message.resume?.v === RESUME_PROTOCOL_VERSION &&
+              message.resume.resumed !== true && !freshLobbyClaim) {
+            failBeforeSettled("resume_denied");
+            return;
+          }
           if (Number.isSafeInteger(message.soundCursor) && message.soundCursor >= 0) {
             state.lastPlayedSoundEventId = Math.max(
               state.lastPlayedSoundEventId,
               message.soundCursor
             );
           }
-          clearTimeout(timeout);
-          void onConnected();
-          resolve();
+          void onConnected({ resuming: resume });
+          if (freshLobbyClaim) {
+            // The page may have reloaded after persisting its bearer but before
+            // the first hello reached the server. The protected lobby claim is
+            // valid even though there was no prior seat to replace.
+            handleControl({
+              ...lobbyPayload(),
+              type: "resume",
+              activeMatch: false,
+              input: message.input
+            });
+            succeed(message);
+            return;
+          }
+          if (resume && message.resume?.v !== RESUME_PROTOCOL_VERSION) {
+            // Rolling compatibility with an older authoritative server. New
+            // servers always follow with an explicit authenticated `resume`.
+            handleControl({
+              ...lobbyPayload(),
+              type: "resume",
+              activeMatch: resumePhase === "match",
+              input: message.input
+            });
+          }
+          if (!resume || message.resume?.v !== RESUME_PROTOCOL_VERSION) {
+            succeed(message);
+          }
           return;
         }
         if (message.type === "snapshot") {
-          try { applySnapshot(message.data); }
+          try { receiveSnapshot(message.data); }
           catch (error) { console.warn("Ignored invalid authoritative snapshot", error); }
           return;
         }
@@ -587,32 +1201,47 @@
           }
           return;
         }
-        if (message.type === "presence" && message.connected === false) {
-          state.rivalConnected = false;
-          setStatus(`Player ${message.playerId} disconnected. Waiting briefly for reconnection.`, "error");
-          updateConnection("waiting", `ONLINE · LOBBY ${state.roomCode} · RECONNECTING PLAYER ${message.playerId}`);
+        if (message.type === "presence") {
+          if (message.playerId === localOnlinePlayerId()) return;
+          state.rivalConnected = message.connected === true;
+          if (state.rivalConnected) {
+            setStatus(`Player ${message.playerId} reconnected. Match continues.`, "ok");
+            updateConnection("connected", `ONLINE · LOBBY ${state.roomCode} · PLAYER ${message.playerId} RECONNECTED`);
+          } else {
+            setStatus(`Player ${message.playerId} disconnected. Waiting briefly for reconnection.`, "error");
+            updateConnection("waiting", `ONLINE · LOBBY ${state.roomCode} · RECONNECTING PLAYER ${message.playerId}`);
+          }
           updateLobbyDisplay();
           return;
         }
         handleControl(message);
+        if (resume && message.type === "resume" && !settled) {
+          succeed(message);
+        }
       });
       socket.addEventListener("close", () => {
         clearTimeout(timeout);
         if (state.socket !== socket) return;
-        if (!settled) reject(new Error("authoritative_server_unavailable"));
+        if (!settled) failBeforeSettled("authoritative_server_unavailable");
         else handleDisconnect();
       });
       socket.addEventListener("error", () => {
         if (state.socket !== socket) return;
-        if (!settled) reject(new Error("authoritative_server_unavailable"));
+        if (!settled) failBeforeSettled("authoritative_server_unavailable");
       });
     });
   }
 
-  async function onConnected() {
+  async function onConnected({ resuming = false } = {}) {
     const transportOpen = state.socket?.readyState === WebSocket.OPEN;
     if (state.connected || !transportOpen) return;
     state.connected = true;
+    if (resuming) {
+      setBusy(true);
+      setStatus(`Restoring ${state.resumePhase === "match" ? "match" : "lobby"} ${state.roomCode}…`, "ok");
+      updateConnection("waiting", `ONLINE · LOBBY ${state.roomCode} · RESTORING SESSION`);
+      return;
+    }
     if (state.quickMatch) {
       state.rivalConnected = true;
       state.guestReady = true;
@@ -664,7 +1293,21 @@
 
   function handleControl(message) {
     if (!message || typeof message !== "object") return;
-    if (message.type === "start" || message.type === "rematch") {
+    if (message.type === "room-closed") {
+      const wasPlaying = game.mode === "playing" || game.mode === "matchover";
+      resetConnection();
+      clearSession();
+      setBusy(false);
+      setOnlineRole("offline");
+      if (wasPlaying) returnToIntroUi();
+      setStatus("The host closed this lobby. Create or join another one.", "error");
+      return;
+    }
+    if (message.type === "start" || message.type === "rematch" || message.type === "resume") {
+      const seatIndex = localOnlinePlayerId() - 1;
+      reliableInput.synchronize(message.input, seatIndex);
+      reliableAction.synchronize(message.action, seatIndex);
+      if (reliableInput.currentEpoch() <= 0) state.lastLegacyInput = -1;
       void startOnlineMatch(message);
       return;
     }
@@ -688,7 +1331,13 @@
   }
 
   function sendControl(message) {
-    if (state.socket?.readyState === WebSocket.OPEN) state.socket.send(JSON.stringify(message));
+    if (state.socket?.readyState !== WebSocket.OPEN) return false;
+    try {
+      state.socket.send(JSON.stringify(message));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function lobbyPayload(type = "lobby") {
@@ -715,7 +1364,11 @@
     state.inviteMode = Boolean(message.inviteMode);
     state.matchTarget = message.matchTarget === INVITE_MATCH_TARGET ? INVITE_MATCH_TARGET : 3;
     state.guestReady = Boolean(message.guestReady);
-    state.rivalConnected = state.role === "guest" || Boolean(message.guestConnected);
+    state.rivalConnected = state.role === "guest"
+      ? Object.prototype.hasOwnProperty.call(message, "hostConnected")
+        ? Boolean(message.hostConnected)
+        : true
+      : Boolean(message.guestConnected);
     void renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
     if (game.mode === "intro") {
       game.selectedChampion = state.hostChampion;
@@ -730,23 +1383,59 @@
   }
 
   async function startOnlineMatch(message) {
+    const isResume = message.type === "resume";
+    const activeMatch = !isResume || message.activeMatch === true;
+    if (activeMatch) state.resuming = true;
     applyLobby(message);
-    const isRematch = message.type === "rematch" || game.mode === "matchover";
+    if (isResume && message.activeMatch !== true) {
+      state.resuming = false;
+      state.resumePhase = "lobby";
+      setBusy(false);
+      setStatus(`Lobby ${state.roomCode} restored.`, "ok");
+      updateConnection(
+        state.rivalConnected ? "connected" : "waiting",
+        `ONLINE · LOBBY ${state.roomCode} · ${state.rivalConnected ? "SESSION RESTORED" : "WAITING FOR RIVAL"}`
+      );
+      updateLobbyDisplay();
+      return;
+    }
+
+    const generation = lifecycleGeneration;
+    const isRematch = message.type === "rematch";
     if (isRematch) {
+      if (state.role === "guest") {
+        state.localInput = { up: false, down: false, left: false, right: false };
+      }
       UI.end.hidden = true;
       UI.chrome.classList.remove("is-hidden");
       UI.chrome.setAttribute("aria-hidden", "false");
       UI.chrome.removeAttribute("inert");
       state.startInitiated = false;
     }
-    // Authoritative matches begin only on server start/rematch — never local-only.
-    if (game.mode !== "playing" || isRematch) {
-      state.startInitiated = true;
-      await beginConfiguredGame();
+    if (isResume && state.role === "guest") {
+      state.localInput = { up: false, down: false, left: false, right: false };
+    }
+    // A start/resume may be repeated while champion assets are still loading.
+    // Serialize boot and make it idempotent for the authoritative input epoch.
+    state.startInitiated = true;
+    try {
+      if (!await ensureOnlineMatchRuntime(message, generation)) return;
+    } catch (error) {
+      if (generation !== lifecycleGeneration) return;
+      console.warn("Could not initialize authoritative match runtime", error);
+      state.resuming = false;
+      setBusy(false);
+      setStatus("Could not restore the online match runtime.", "error");
+      return;
     }
     game.p2Human = true;
     // Always re-bind seat/camera after start — beginGame may reset presentation to P1.
     bindLocalOnlineView();
+    const bufferedSnapshot = bufferedSnapshots.take();
+    if (bufferedSnapshot) applySnapshot(bufferedSnapshot);
+    state.resuming = false;
+    state.resumePhase = "match";
+    setBusy(false);
     UI.start.disabled = true;
     UI.start.textContent = "ONLINE MATCH IN PROGRESS";
     const side = state.role === "host"
@@ -755,14 +1444,42 @@
     updateConnection("connected",
       `ONLINE · LOBBY ${state.roomCode} · YOU ARE ${side} · FIRST TO ${state.matchTarget}`);
     setStatus(
-      isRematch ? "Rematch started on the São Paulo server." : "Match started on the São Paulo server.",
+      isResume
+        ? "Online match restored from the São Paulo server."
+        : isRematch
+          ? "Rematch started on the São Paulo server."
+          : "Match started on the São Paulo server.",
       "ok"
     );
+  }
+
+  function releaseCurrentSeat() {
+    if (state.role === "offline") return false;
+    return sendControl({ type: "leave" });
+  }
+
+  function receiveSnapshot(data) {
+    if (!data || ![2, 3].includes(data.v) || !Array.isArray(data.players)) return;
+    if (Number.isFinite(data.s) && data.s <= state.receivedSequence) return;
+    // ACK/outbox state is current even while rendering waits for model/runtime boot.
+    const seatIndex = localOnlinePlayerId() - 1;
+    reliableInput.synchronize(data.input, seatIndex);
+    reliableAction.synchronize(data.action, seatIndex);
+    const runtimeUnavailable = state.resuming || runtimeBootRecord ||
+      (state.role !== "offline" && game.mode === "intro" && reliableInput.currentEpoch() > 0);
+    if (runtimeUnavailable) {
+      bufferedSnapshots.push(data);
+      return;
+    }
+    applySnapshot(data);
   }
 
   function applySnapshot(data) {
     if (!data || ![2, 3].includes(data.v) || !Array.isArray(data.players)) return;
     if (Number.isFinite(data.s) && data.s <= state.receivedSequence) return;
+    const seatIndex = localOnlinePlayerId() - 1;
+    reliableInput.synchronize(data.input, seatIndex);
+    reliableAction.synchronize(data.action, seatIndex);
     state.receivedSequence = Number(data.s) || state.receivedSequence + 1;
     const previousRound = state.guestRound;
     const previousMode = state.guestMode;
@@ -801,16 +1518,23 @@
         authoritativeLocal.x - previousLocal.x,
         authoritativeLocal.z - previousLocal.z
       );
-      state.localPlayerTarget = {
-        playerId: authoritativeLocal.id,
-        x: authoritativeLocal.x,
-        z: authoritativeLocal.z
-      };
-      if (distance < game.tile) {
-        authoritativeLocal.x = previousLocal.x;
-        authoritativeLocal.z = previousLocal.z;
-      } else {
+      if (typeof game.canMoveContestant === "function" &&
+          !game.canMoveContestant(authoritativeLocal)) {
+        // A commitment snapshot is already the visual authority. Never blend
+        // toward a stale pre-cast prediction while Zed vanishes or dashes.
         state.localPlayerTarget = null;
+      } else {
+        state.localPlayerTarget = {
+          playerId: authoritativeLocal.id,
+          x: authoritativeLocal.x,
+          z: authoritativeLocal.z
+        };
+        if (distance < game.tile) {
+          authoritativeLocal.x = previousLocal.x;
+          authoritativeLocal.z = previousLocal.z;
+        } else {
+          state.localPlayerTarget = null;
+        }
       }
     }
     if (previousRemote && authoritativeRemote && data.round === previousRound) {
@@ -879,6 +1603,10 @@
   function predictLocalMovement(dt) {
     const player = localOnlinePlayer();
     if (!player?.alive || game.mode !== "playing" || game.roundLocked) return;
+    if (typeof game.canMoveContestant === "function" && !game.canMoveContestant(player)) {
+      player.moving = false;
+      return;
+    }
     const input = state.role === "guest" ? state.localInput : hostLocalInput();
     let dx = Number(input.right) - Number(input.left);
     let dz = Number(input.down) - Number(input.up);
@@ -911,6 +1639,10 @@
     const target = state.localPlayerTarget;
     const local = game.players.find((player) => player.id === target?.playerId);
     if (!local || !target || game.mode !== "playing") return;
+    if (typeof game.canMoveContestant === "function" && !game.canMoveContestant(local)) {
+      state.localPlayerTarget = null;
+      return;
+    }
     const blend = 1 - Math.exp(-10 * dt);
     local.x += (target.x - local.x) * blend;
     local.z += (target.z - local.z) * blend;
@@ -931,12 +1663,21 @@
     };
   }
 
+  function sendMovementInput(mask) {
+    if (reliableInput.currentEpoch() <= 0) {
+      if (mask === state.lastLegacyInput) return false;
+      const sent = sendControl({ type: "input", mask });
+      if (sent) state.lastLegacyInput = mask;
+      return sent;
+    }
+    state.lastLegacyInput = -1;
+    if (!reliableInput.queue(mask)) reliableInput.replay();
+    return true;
+  }
+
   function sendCurrentInput() {
     if (state.role === "host") state.localInput = hostLocalInput();
-    const mask = inputMask();
-    if (mask === state.lastSentInput) return;
-    state.lastSentInput = mask;
-    sendControl({ type: "input", mask });
+    sendMovementInput(inputMask());
   }
 
   const originalUpdate = game.update.bind(game);
@@ -1017,7 +1758,14 @@
   }
 
   async function startQuickMatch(options = {}) {
+    const pendingToken = validResumeToken(options.resumeToken) ? options.resumeToken : "";
+    releaseCurrentSeat();
     resetConnection();
+    // A new Quick Match is an explicit replacement for any older saved room.
+    // Keep the pending key separate so a stale session can never win on reload.
+    clearSavedSession();
+    clearPendingResume();
+    state.resumeToken = pendingToken;
     state.hostChampion = validChampion(options.champion) ? options.champion : "katarina";
     state.guestChampion = "zed";
     state.arena = validArena(options.arena) ? options.arena : ARENAS[0];
@@ -1039,7 +1787,9 @@
   }
 
   async function createRoom(options = {}) {
+    releaseCurrentSeat();
     resetConnection();
+    clearPendingResume();
     if (options.inviteMode) applyInvitePreset(options);
     setOnlineRole("host");
     if (!state.inviteMode) {
@@ -1078,7 +1828,9 @@
   }
 
   async function joinRoom(code, options = {}) {
+    releaseCurrentSeat();
     resetConnection();
+    clearPendingResume();
     if (options.inviteMode) applyInvitePreset(options);
     setOnlineRole("guest");
     state.roomCode = code;
@@ -1104,6 +1856,10 @@
 
   function failConnection(error) {
     console.warn("Online PvP connection failed", error);
+    // A timeout can happen after the server protected the seat but before this
+    // browser received `connected`. Keep the pre-persisted bearer unless the
+    // server definitively rejected the claim.
+    if (definitiveInitialConnectionFailure(error)) clearSession();
     setBusy(false);
     setOnlineRole("offline");
     const message = error?.message === "room_not_found"
@@ -1120,10 +1876,17 @@
   }
 
   function resetConnection() {
+    pendingConnectCancel?.();
+    pendingConnectCancel = null;
     try { state.socket?.close(); } catch {}
+    lifecycleGeneration += 1;
+    matchRuntimeEpoch = 0;
+    runtimeBootRecord = null;
+    bufferedSnapshots.reset();
     Object.assign(state, {
       socket: null,
-      connected: false, rivalConnected: false, guestReady: false, hostToken: "", roomCode: "",
+      connected: false, rivalConnected: false, guestReady: false, hostToken: "", resumeToken: "",
+      resuming: false, resumePhase: "", sessionConfirmed: false, roomCode: "",
       matchmaking: false, quickMatch: false,
       inviteMode: false, inviteUrl: "", startInitiated: false, inviteAssetsReady: null, matchTarget: 3,
       receivedSequence: 0,
@@ -1131,11 +1894,14 @@
       droppedSoundEventCount: 0,
       localInput: { up: false, down: false, left: false, right: false },
       remoteHostTarget: null, localPlayerTarget: null,
-      pendingGuestBombs: [], lastSentInput: -1
+      pendingGuestBombs: [], lastLegacyInput: -1
     });
+    reliableInput.reset();
+    reliableAction.reset();
   }
 
   function chooseOffline() {
+    releaseCurrentSeat();
     try { state.socket?.close(); } catch {}
     resetConnection();
     setOnlineRole("offline");
@@ -1158,72 +1924,75 @@
 
   async function tryResumeSession() {
     const saved = readSession();
-    if (!saved || state.role !== "offline") return false;
-    setStatus(`Reconnecting to lobby ${saved.roomCode}…`, "ok");
-    try {
-      if (saved.role === "host") {
-        resetConnection();
-        setOnlineRole("host");
-        state.roomCode = saved.roomCode;
-        state.hostChampion = validChampion(saved.hostChampion) ? saved.hostChampion : "katarina";
-        state.guestChampion = validChampion(saved.guestChampion) ? saved.guestChampion : "zed";
-        state.arena = validArena(saved.arena) ? saved.arena : ARENAS[0];
-        state.inviteMode = Boolean(saved.inviteMode);
-        state.quickMatch = Boolean(saved.quickMatch);
-        state.matchTarget = saved.matchTarget === INVITE_MATCH_TARGET ? INVITE_MATCH_TARGET : 3;
-        game.selectedChampion = state.hostChampion;
-        game.selectedChampion2 = state.guestChampion;
-        game.matchTarget = state.matchTarget;
-        if (game.mode === "intro") {
-          game.selectArena(state.arena);
-          game.resetPlayers();
-        }
-        setChampionButtons(state.hostChampion);
-        setArenaButtons(state.arena);
-        roomLabel.textContent = state.inviteMode ? "CHALLENGE LINK · RESUME" : "LOBBY CODE · RESUME";
-        roomCode.textContent = state.roomCode;
-        setBusy(true);
-        updateLobbyDisplay();
-        await connectAuthoritative("host");
-        roomCode.textContent = state.roomCode;
-        if (state.inviteMode) state.inviteUrl = challengeUrl(state.roomCode);
-        setStatus(`Reconnected as host to lobby ${state.roomCode}.`, "ok");
-        updateConnection("connected", `ONLINE · LOBBY ${state.roomCode} · RECONNECTED`);
-        updateLobbyDisplay();
-        saveSession();
-        return true;
-      }
-      if (saved.quickMatch) {
-        resetConnection();
-        setOnlineRole("guest");
-        state.roomCode = saved.roomCode;
-        state.hostChampion = validChampion(saved.hostChampion) ? saved.hostChampion : "katarina";
-        state.guestChampion = validChampion(saved.guestChampion) ? saved.guestChampion : "zed";
-        state.arena = validArena(saved.arena) ? saved.arena : ARENAS[0];
-        state.matchTarget = 3;
-        state.quickMatch = true;
-        state.guestReady = true;
-        setBusy(true);
-        await connectAuthoritative("guest");
-        saveSession();
-        return true;
-      }
-      await joinRoom(saved.roomCode, {
-        guestChampion: validChampion(saved.guestChampion) ? saved.guestChampion : "zed",
-        inviteMode: Boolean(saved.inviteMode)
+    if (state.role !== "offline") return false;
+    if (!saved) {
+      const pending = readPendingResume();
+      if (!pending) return false;
+      await startQuickMatch({
+        champion: validChampion(pending.hostChampion) ? pending.hostChampion : "katarina",
+        arena: validArena(pending.arena) ? pending.arena : ARENAS[0],
+        resumeToken: pending.resumeToken
       });
-      if (saved.guestReady && !state.inviteMode) {
-        state.guestReady = true;
-        sendGuestConfig();
-      }
-      saveSession();
+      return true;
+    }
+
+    resetConnection();
+    state.roomCode = saved.roomCode;
+    state.resumeToken = validResumeToken(saved.resumeToken) ? saved.resumeToken : createResumeToken();
+    state.resuming = true;
+    state.resumePhase = saved.phase === "match" ? "match" : "lobby";
+    state.sessionConfirmed = saved.confirmed === true;
+    state.hostChampion = validChampion(saved.hostChampion) ? saved.hostChampion : "katarina";
+    state.guestChampion = validChampion(saved.guestChampion) ? saved.guestChampion : "zed";
+    state.arena = validArena(saved.arena) ? saved.arena : ARENAS[0];
+    state.inviteMode = Boolean(saved.inviteMode);
+    state.quickMatch = Boolean(saved.quickMatch);
+    state.guestReady = Boolean(saved.guestReady) || state.quickMatch;
+    state.matchTarget = saved.matchTarget === INVITE_MATCH_TARGET ? INVITE_MATCH_TARGET : 3;
+    game.selectedChampion = state.hostChampion;
+    game.selectedChampion2 = state.guestChampion;
+    game.matchTarget = state.matchTarget;
+    if (game.mode === "intro") {
+      game.selectArena(state.arena);
+      game.resetPlayers();
+    }
+    reliableAction.hydrate(saved.actionDelivery);
+    setOnlineRole(saved.role);
+    setChampionButtons(saved.role === "guest" ? state.guestChampion : state.hostChampion);
+    setArenaButtons(state.arena);
+    roomLabel.textContent = state.inviteMode ? "CHALLENGE LINK · RESUME" : "LOBBY CODE · RESUME";
+    roomCode.textContent = state.roomCode;
+    if (saved.role === "host" && state.inviteMode) state.inviteUrl = challengeUrl(state.roomCode);
+    setBusy(true);
+    setStatus(`Reconnecting to ${state.resumePhase} ${saved.roomCode}…`, "ok");
+    updateLobbyDisplay();
+    saveSession();
+    const resumeGeneration = lifecycleGeneration;
+    try {
+      await retryRoleTaken(() => connectAuthoritative(saved.role, {
+        resume: true,
+        resumePhase: state.resumePhase
+      }), {
+        active: () => lifecycleGeneration === resumeGeneration &&
+          state.resuming && state.role === saved.role
+      });
       return true;
     } catch (error) {
+      if (error?.message === "resume_cancelled" || lifecycleGeneration !== resumeGeneration) {
+        return false;
+      }
       console.warn("Session resume failed", error);
-      clearSession();
+      const credentialRejected = definitiveResumeFailure(error);
+      resetConnection();
+      if (credentialRejected) clearSession();
       setBusy(false);
       setOnlineRole("offline");
-      setStatus("Could not resume the previous lobby. Create or join again.", "error");
+      setStatus(
+        credentialRejected
+          ? "The previous lobby no longer accepts this session. Create or join again."
+          : "The server is temporarily unavailable. Your session was kept for another retry.",
+        "error"
+      );
       return false;
     }
   }
@@ -1236,8 +2005,7 @@
   }
 
   function sendInput() {
-    const mask = inputMask();
-    sendControl({ type: "input", mask });
+    sendMovementInput(inputMask());
   }
 
   function setGuestDirection(direction, active) {
@@ -1270,6 +2038,23 @@
     globalThis.configurePlayerView?.(id, { shared: false, localMultiplayer: false });
   }
 
+  function sendOnlineAction(kind, slot) {
+    if (reliableAction.currentMode() === "reliable") {
+      const queued = reliableAction.queue(kind, slot, game.round);
+      if (!queued && reliableAction.currentFailure() === "storage") {
+        const message = "Action blocked: browser storage is unavailable. Reload after enabling site data.";
+        setStatus(message, "error");
+        showActionDeliveryError(message);
+      }
+      if (queued) clearActionDeliveryError();
+      return queued;
+    }
+    if (reliableAction.currentMode() !== "legacy") return false;
+    const message = { type: "action", kind };
+    if (kind === "ability") message.slot = slot;
+    return sendControl(message);
+  }
+
   game.placeBomb = (player) => {
     if (state.role === "offline" || !state.connected || !state.socket) {
       return offlinePlaceBomb(player || game.player);
@@ -1278,7 +2063,7 @@
     const actor = player?.id === local?.id ? player : local;
     if (!actor) return false;
     // Always tell the server; optimistic predict may fail client-side.
-    sendControl({ type: "action", kind: "bomb" });
+    if (!sendOnlineAction("bomb")) return false;
     const bombIds = new Set(game.bombs.map((bomb) => bomb.id));
     const placed = offlinePlaceBomb(actor);
     if (!placed) return false;
@@ -1302,7 +2087,7 @@
     const local = localOnlinePlayer();
     const actor = player?.id === local?.id ? player : local;
     if (!actor) return false;
-    sendControl({ type: "action", kind: "ability", slot });
+    if (!sendOnlineAction("ability", slot)) return false;
     // The server owns postponed-spell buffering. Keep immediate local
     // prediction for legal casts, but never leave a client-only buffered cast
     // that could survive a snapshot or execute twice.
@@ -1366,12 +2151,15 @@
   }, true);
 
   addEventListener("keyup", (event) => {
-    if (state.role !== "guest" || game.mode !== "playing") return;
+    if (state.role !== "guest") return;
     const direction = keyDirections[event.code];
     if (!direction) return;
+    const wasActive = state.localInput[direction];
+    state.localInput[direction] = false;
+    if (game.mode !== "playing" || !state.connected || !wasActive) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    setGuestDirection(direction, false);
+    sendInput();
   }, true);
 
   addEventListener("blur", () => {
@@ -1435,6 +2223,7 @@
       // Server rebuilds the duel and broadcasts type "rematch".
       sendControl({
         type: "rematch",
+        inputEpoch: reliableInput.snapshot().epoch,
         hostChampion: state.hostChampion,
         guestChampion: state.guestChampion,
         arena: state.arena,
@@ -1747,9 +2536,13 @@
   const directInvite = parentParams.get("invite") === "1" &&
     validChampion(parentParams.get("p1")) && validChampion(parentParams.get("p2")) &&
     validArena(parentParams.get("arena")) && Number(parentParams.get("target")) === INVITE_MATCH_TARGET;
+  const startupSession = readSession();
+  const resumeParentSession = sessionMatchesRoom(startupSession, parentRoom);
   if (parentRoom && /^[A-HJ-NP-Z2-9]{6}$/i.test(parentRoom)) {
     codeInput.value = parentRoom.toUpperCase();
-    if (directInvite) {
+    if (resumeParentSession) {
+      setStatus("Previous session detected. Restoring this lobby…", "ok");
+    } else if (directInvite) {
       setStatus("Direct challenge detected. Connecting automatically…", "ok");
       setTimeout(() => joinRoom(parentRoom.toUpperCase(), {
         inviteMode: true,
@@ -1774,7 +2567,7 @@
   publishClientState("ready");
   // F5 / reload: try to reattach to the last live lobby on this browser tab.
   setTimeout(() => {
-    if (parentRoom) return;
+    if (parentRoom && !resumeParentSession) return;
     void tryResumeSession().catch((error) => {
       console.warn("Auto resume failed", error);
     });

@@ -14,14 +14,15 @@
     "start": "node src/server.mjs",
     "benchmark:boot": "node scripts/benchmark-server-boot.mjs",
     "benchmark:serialization": "node scripts/benchmark-json-transport.mjs",
-    "test": "npm run test:core && npm run test:runtime-loading && npm run test:serialization && npm run test:rate-limit && npm run test:transport && npm run test:rematch && npm run test:matchmaking",
+    "test": "npm run test:core && npm run test:runtime-loading && npm run test:serialization && npm run test:rate-limit && npm run test:transport && npm run test:rematch && npm run test:matchmaking && npm run test:resume",
     "test:core": "node --test tests/authoritative-core.test.mjs",
     "test:runtime-loading": "node --test tests/authoritative-runtime-loading.test.mjs",
     "test:serialization": "node --test tests/json-transport.test.mjs",
     "test:rate-limit": "node --test tests/message-rate-limit.test.mjs",
     "test:transport": "node --test --test-name-pattern=websocket tests/authoritative-server.test.mjs",
     "test:rematch": "node --test --test-name-pattern=rematch tests/authoritative-server.test.mjs",
-    "test:matchmaking": "node --test --test-name-pattern=\"quick match\" tests/authoritative-server.test.mjs"
+    "test:matchmaking": "node --test --test-name-pattern=\"quick match\" tests/authoritative-server.test.mjs",
+    "test:resume": "node --test --test-name-pattern=\"quick-match|resume|legacy|leave|expires after reconnect grace\" tests/authoritative-server.test.mjs"
   },
   "dependencies": {
     "ws": "8.21.1"

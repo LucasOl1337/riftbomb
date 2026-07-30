@@ -1,14 +1,66 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { createAuthoritativeDuel } from "./create-authoritative-duel.mjs";
 
 const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.dirname(gameDirectory);
 const sourcePath = path.join(gameDirectory, "play-riftbomb.html");
 const releasePath = path.join(repositoryRoot, "riftbomb.html");
+
+const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
+
+function webpInfo(buffer) {
+  assert.equal(buffer.subarray(0, 4).toString("ascii"), "RIFF");
+  assert.equal(buffer.subarray(8, 12).toString("ascii"), "WEBP");
+  const uint24 = (offset) => (
+    buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16)
+  );
+  let width = 0;
+  let height = 0;
+  let hasAlpha = false;
+  for (let offset = 12; offset + 8 <= buffer.length;) {
+    const chunk = buffer.subarray(offset, offset + 4).toString("ascii");
+    const size = buffer.readUInt32LE(offset + 4);
+    const data = offset + 8;
+    assert.ok(data + size <= buffer.length, `${chunk} exceeds its WebP container`);
+    if (chunk === "VP8 ") {
+      assert.equal(buffer.subarray(data + 3, data + 6).toString("hex"), "9d012a");
+      width ||= buffer.readUInt16LE(data + 6) & 0x3fff;
+      height ||= buffer.readUInt16LE(data + 8) & 0x3fff;
+    } else if (chunk === "VP8L") {
+      assert.equal(buffer[data], 0x2f);
+      const bits = buffer.readUInt32LE(data + 1);
+      width ||= (bits & 0x3fff) + 1;
+      height ||= ((bits >>> 14) & 0x3fff) + 1;
+      hasAlpha ||= Boolean(bits & 0x10000000);
+    } else if (chunk === "VP8X") {
+      hasAlpha ||= Boolean(buffer[data] & 0x10);
+      width = uint24(data + 4) + 1;
+      height = uint24(data + 7) + 1;
+    } else if (chunk === "ALPH") {
+      hasAlpha = true;
+    }
+    offset = data + size + (size & 1);
+  }
+  assert.ok(width > 0 && height > 0, "WebP must contain a VP8, VP8L or VP8X size");
+  return { width, height, hasAlpha };
+}
+
+function webpDimensions(buffer) {
+  const { width, height } = webpInfo(buffer);
+  return { width, height };
+}
+
+function pngDimensions(buffer) {
+  assert.equal(buffer.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(buffer.subarray(12, 16).toString("ascii"), "IHDR");
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
 
 const localEntrypoints = (document) => [
   ...document.matchAll(/<(?:link rel="stylesheet" href|script src)="\.\/([^"]+)"(?:><\/script>)?/g)
@@ -132,6 +184,12 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   const texturePathForKey = (key) => {
     if (key === "crate") return path.join("crates", "crate-albedo.webp");
     if (key === "crateTop") return path.join("crates", "crate-top-albedo.webp");
+    if (key === "floorLattice") {
+      return path.join("ground", "floor-salt-lens-combat-band-6ffb0854.webp");
+    }
+    if (key === "floorPit") {
+      return path.join("ground", "floor-storm-eye-combat-field-99509f91.webp");
+    }
     const directory = key.startsWith("floor") ? "ground" : "walls";
     const fileName = key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
     return path.join(directory, `${fileName}.webp`);
@@ -139,7 +197,7 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   const texturesDirectory = path.join(gameDirectory, "arena-appearance", "textures");
   const measuredThemes = await Promise.all(themes.map(async (arenaTheme) => {
     const keys = [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(arenaTheme)];
-    assert.ok(keys.length <= 5, `arena boot requests ${keys.length} textures; budget is 5`);
+    assert.equal(keys.length, 5, `arena boot must request exactly 5 textures, received ${keys.length}`);
     const sizes = await Promise.all(keys.map(async (key) => (
       await stat(path.join(texturesDirectory, texturePathForKey(key)))
     ).size));
@@ -155,6 +213,153 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   t.diagnostic(
     `arena texture budget: ${themes.length} themes, max ${largestTheme.keys.length} requests / ${largestTheme.bytes} B`
   );
+});
+
+test("Salt Lens floor preserves original provenance, budget, scale and packed bytes", async () => {
+  const appearanceDirectory = path.join(gameDirectory, "arena-appearance");
+  const metadata = JSON.parse(await readFile(
+    path.join(appearanceDirectory, "materials", "ground.json"),
+    "utf8"
+  ));
+  const floorPath = path.join(appearanceDirectory, metadata.maps.saltLens);
+  const sourceFile = path.join(appearanceDirectory, metadata.source);
+  const [floor, source, packedTextures, renderer] = await Promise.all([
+    readFile(floorPath),
+    readFile(sourceFile),
+    readFile(path.join(appearanceDirectory, "load-arena-appearance.js"), "utf8"),
+    readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8")
+  ]);
+
+  assert.deepEqual(webpDimensions(floor), { width: 1024, height: 1024 });
+  const sourceSize = pngDimensions(source);
+  assert.ok(sourceSize.width >= 1024 && sourceSize.height >= 1024);
+  assert.ok(floor.length <= 249_056, `Salt Lens floor is ${floor.length} B; ceiling is 249056 B`);
+  assert.equal(floor.length, metadata.assetByteLength);
+  assert.deepEqual(metadata.assetDimensions, [1024, 1024]);
+  assert.equal(sha256(source), metadata.sourceSha256);
+  assert.equal(sha256(floor), metadata.assetSha256);
+  assert.notEqual(
+    metadata.assetSha256,
+    "a1b41d7c797aa9fe473be8116d32655c077b353af05b377bb75e9aa5eb09e0d9",
+    "the homogeneous legacy floor must not be repromoted"
+  );
+
+  const packedFloor = packedTextures.match(
+    /"floorLattice":"data:image\/webp;base64,([^"]+)"/
+  );
+  assert.ok(packedFloor, "offline arena pack must include floorLattice");
+  assert.deepEqual(Buffer.from(packedFloor[1], "base64"), floor);
+
+  assert.match(
+    renderer,
+    /this\.arenaFloorProfile = floorKey === "floorLattice" \|\| floorKey === "floorPit"\s*\? 1\s*: 0/
+  );
+  assert.match(renderer, /useMap === 1 \? \(this\.arenaFloorProfile \|\| 0\) : 0/);
+  assert.match(renderer, /if \(uFloorProfile > 0\.5\)/);
+  assert.match(renderer, /uv = fract\(vWorld\.xz \* 0\.066 \+ 0\.5\)/);
+  assert.match(renderer, /detailRotation \* \(\(uv - 0\.5\) \* detailScale\)/);
+  assert.match(renderer, /texture\(map, mirroredTile\(detailCoord\)\)/);
+  assert.match(renderer, /halfTexel = vec2\(0\.5 \/ 1024\.0\)/);
+  assert.match(renderer, /sampleCombatBandDetail\(uAlbedo, uv, 5\.25, 0\.16\)/);
+  assert.match(renderer, /bumpFromAlbedo\(uAlbedo, uv, N, 0\.8\)/);
+  assert.match(renderer, /sampleAlbedoDetail\(uAlbedo, uv, 5\.5, 0\.28\)/);
+  assert.match(renderer, /bumpFromAlbedo\(uAlbedo, uv, N, 1\.15\)/);
+});
+
+test("Storm-Eye floor preserves original provenance, rollback, budget and packed bytes", async () => {
+  const appearanceDirectory = path.join(gameDirectory, "arena-appearance");
+  const metadata = JSON.parse(await readFile(
+    path.join(appearanceDirectory, "materials", "ground.json"),
+    "utf8"
+  ));
+  const provenance = metadata.provenance.stormEye;
+  const floorPath = path.join(appearanceDirectory, metadata.maps.stormEye);
+  const sourceFile = path.join(appearanceDirectory, provenance.source);
+  const legacyPath = path.join(appearanceDirectory, "textures", "ground", "floor-pit.webp");
+  const [floor, source, legacy, packedTextures, renderer] = await Promise.all([
+    readFile(floorPath),
+    readFile(sourceFile),
+    readFile(legacyPath),
+    readFile(path.join(appearanceDirectory, "load-arena-appearance.js"), "utf8"),
+    readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8")
+  ]);
+
+  assert.equal(
+    path.basename(floorPath),
+    "floor-storm-eye-combat-field-99509f91.webp"
+  );
+  assert.deepEqual(webpDimensions(floor), { width: 1024, height: 1024 });
+  const sourceSize = pngDimensions(source);
+  assert.ok(sourceSize.width >= 1024 && sourceSize.height >= 1024);
+  assert.equal(source[25], 2, "the native PNG must be RGB truecolor without alpha");
+  assert.equal(webpInfo(floor).hasAlpha, false, "the runtime WebP must not carry alpha");
+  assert.ok(floor.length <= 200_000, `Storm-Eye floor is ${floor.length} B; ceiling is 200000 B`);
+  assert.ok(floor.length < legacy.length, "the promoted floor must remain smaller than its rollback");
+  assert.equal(floor.length, provenance.assetByteLength);
+  assert.deepEqual(provenance.assetDimensions, [1024, 1024]);
+  assert.deepEqual(provenance.thirdPartyInputs, []);
+  assert.equal(sha256(source), provenance.sourceSha256);
+  assert.equal(sha256(floor), provenance.assetSha256);
+  assert.equal(provenance.assetSha256.slice(0, 8), "99509f91");
+  assert.equal(
+    sha256(legacy),
+    "031e0e828a198761da3807240615fd87e7f68c6dc769e5ad8c5d77edb1ccc6ce",
+    "the legacy floor must remain byte-identical for rollback"
+  );
+
+  const packedFloor = packedTextures.match(
+    /"floorPit":"data:image\/webp;base64,([^"]+)"/
+  );
+  assert.ok(packedFloor, "offline arena pack must include the promoted floorPit");
+  assert.deepEqual(Buffer.from(packedFloor[1], "base64"), floor);
+  assert.match(
+    renderer,
+    /this\.arenaFloorProfile = floorKey === "floorLattice" \|\| floorKey === "floorPit"\s*\? 1\s*: 0/
+  );
+
+  const bindStart = renderer.indexOf("      bindArenaTheme(theme) {");
+  const bindEnd = renderer.indexOf("\n      themeColor(", bindStart);
+  assert.ok(bindStart >= 0 && bindEnd > bindStart);
+  const bindArenaTheme = new Function(
+    `"use strict"; return ({ ${renderer.slice(bindStart, bindEnd).trim()} }).bindArenaTheme;`
+  )();
+  const textureKeys = [
+    "floorLattice", "floorClearing", "floorLabyrinth", "floorForts", "floorPit",
+    "wallLattice", "wallTopLattice"
+  ];
+  const subject = {
+    arenaTextures: Object.fromEntries(textureKeys.map((key) => [key, { key }])),
+    arenaMapTextures: Object.create(null)
+  };
+  for (const [floorKey, expectedProfile] of [
+    ["floorLattice", 1],
+    ["floorPit", 1],
+    ["floorClearing", 0],
+    ["floorLabyrinth", 0],
+    ["floorForts", 0]
+  ]) {
+    bindArenaTheme.call(subject, {
+      floor: floorKey,
+      wall: "wallLattice",
+      wallTop: "wallTopLattice"
+    });
+    assert.equal(subject.arenaFloorProfile, expectedProfile, `${floorKey} profile`);
+  }
+
+  const detailStart = renderer.indexOf("vec3 sampleCombatBandDetail");
+  const detailEnd = renderer.indexOf("\n      }", detailStart);
+  const bumpStart = renderer.indexOf("vec3 bumpFromAlbedo");
+  const bumpEnd = renderer.indexOf("\n      }", bumpStart);
+  assert.ok(detailStart >= 0 && detailEnd > detailStart);
+  assert.ok(bumpStart >= 0 && bumpEnd > bumpStart);
+  assert.equal((renderer.slice(detailStart, detailEnd).match(/texture\(/g) || []).length, 2);
+  assert.equal((renderer.slice(bumpStart, bumpEnd).match(/texture\(/g) || []).length, 3);
+  const profileStart = renderer.indexOf("if (uFloorProfile > 0.5)");
+  const profileEnd = renderer.indexOf("\n            } else {", profileStart);
+  assert.ok(profileStart >= 0 && profileEnd > profileStart);
+  const profileBranch = renderer.slice(profileStart, profileEnd);
+  assert.equal((profileBranch.match(/sampleCombatBandDetail\(/g) || []).length, 1);
+  assert.equal((profileBranch.match(/bumpFromAlbedo\(/g) || []).length, 1);
 });
 
 test("the readable combat layer preserves the canonical 100 HP rules", async () => {
@@ -629,6 +834,298 @@ test("the full roster samples tiled VAT on the GPU with a bounded CPU fallback",
   assert.match(startup, /\.\.\.game\.players\.map\(\(player\) => player\.champion\),\s*modelReviewTarget/);
   assert.match(startup, /\.filter\(Boolean\)/);
   assert.match(startup, /renderer\.ensureChampionModels\(embeddedModels\)/);
+});
+
+test("real ability casts select their authored VAT actions across the roster", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const resolverStart = renderer.indexOf("      resolveChampionAnimation(player, t, key) {");
+  const resolverEnd = renderer.indexOf("      resolveVladimirAnimation(player, t)", resolverStart);
+  assert.ok(resolverStart >= 0 && resolverEnd > resolverStart);
+
+  const ResolverHarness = new Function(
+    "clamp",
+    "prefersReducedMotion",
+    "modelReviewMode",
+    "modelReviewTarget",
+    "modelReviewAction",
+    "requestedModelReviewFrame",
+    `return class ResolverHarness {
+      constructor() { this.championAnimationStates = new Map(); }
+      sampleChampionAction(animation, action, progress) {
+        const clipKey = animation.actions[action];
+        return clipKey ? { key: action, clipKey, progress } : null;
+      }
+      ${renderer.slice(resolverStart, resolverEnd).trim()}
+    };`
+  )(
+    (value, min, max) => Math.max(min, Math.min(max, value)),
+    true,
+    false,
+    "",
+    "",
+    0
+  );
+
+  const expectedActions = {
+    katarina: ["q", "w", "e", "r"],
+    zed: ["q", "w", "e", "r"],
+    renekton: ["q", "w", "e", "r"],
+    vladimir: ["q", "poolDown", "e", "r"],
+    gangplank: ["q", "w", "e", "r"]
+  };
+  const expectedDurations = {
+    katarina: [0.42, 0.42, 0.42, 1.65],
+    zed: [0.48, 0.48, 0.52, 0.6],
+    renekton: [0.58, 0.56, 0.46, 0.72],
+    vladimir: [0.56, 1.45, 0.62, 0.66],
+    gangplank: [0.48, 0.4, 0.42, 0.7]
+  };
+  const correctedRoutes = new Set([
+    "katarina:w", "katarina:e", "zed:w", "renekton:w", "gangplank:w"
+  ]);
+
+  for (const [champion, actions] of Object.entries(expectedActions)) {
+    const metadata = JSON.parse(await readFile(
+      path.join(repositoryRoot, "champions", champion, "playable-model",
+        `${champion}-model-metadata.json`),
+      "utf8"
+    ));
+    for (let slot = 0; slot < actions.length; slot += 1) {
+      const game = await createAuthoritativeDuel({
+        hostChampion: champion,
+        guestChampion: "katarina",
+        seed: 600 + slot
+      });
+      const player = game.players[0];
+      const rival = game.players[1];
+      player.skillsUnlocked = [true, true, true, true];
+      player.invulnerable = 0;
+      player.stunned = 0;
+      player.lastDx = 0;
+      player.lastDz = 1;
+      player.facing = 0;
+      rival.x = player.x;
+      rival.z = player.z + 0.8;
+      rival.alive = true;
+      rival.invulnerable = 0;
+      game.daggers.push({
+        id: 999,
+        ownerId: player.id,
+        x: rival.x,
+        z: rival.z,
+        age: 1,
+        readyAt: 0,
+        life: 5
+      });
+      if (champion === "zed" && slot === 1) {
+        rival.x = player.x - 8;
+        rival.z = player.z - 8;
+        for (let distance = 1; distance <= 3; distance += 1) {
+          const cell = game.cellFromWorld(player.x, player.z + game.tile * distance);
+          if (game.grid[cell.r]) game.grid[cell.r][cell.c] = 0;
+        }
+        game.bombs = [];
+      }
+      if (champion === "gangplank" && slot === 2) {
+        const cell = game.cellFromWorld(player.x, player.z + game.tile);
+        if (game.grid[cell.r]) game.grid[cell.r][cell.c] = 0;
+        game.bombs = [];
+      }
+
+      assert.equal(game.castAbility(slot, player, { buffer: false }), true,
+        `${champion} ${"QWER"[slot]} cast must execute`);
+      assert.equal(player.abilityAnimAction, "qwer"[slot],
+        `${champion} ${"QWER"[slot]} must publish its semantic action`);
+      assert.equal(player.abilityAnimDuration, expectedDurations[champion][slot]);
+      assert.equal(player.abilityAnimRemaining, expectedDurations[champion][slot]);
+      const resolver = new ResolverHarness();
+      resolver[`${champion}Animation`] = {
+        frameCount: metadata.frameCount,
+        actions: metadata.animationActions,
+        clips: metadata.animationClips
+      };
+      const frame = resolver.resolveChampionAnimation(player, 1, champion);
+      const expectedAction = actions[slot];
+      assert.equal(frame?.key, expectedAction,
+        `${champion} ${"QWER"[slot]} must select ${expectedAction}`);
+      assert.equal(frame?.clipKey, metadata.animationActions[expectedAction],
+        `${champion} ${"QWER"[slot]} must select its authored clip`);
+
+      if (champion === "zed" && slot === 1) {
+        const shadow = game.zedShadows.find((candidate) => candidate.kind === "living");
+        assert.ok(shadow, "Living Shadow must create a rendered shadow actor");
+        assert.equal(shadow.abilityAnimAction, "w");
+        assert.equal(shadow.abilityAnimRemaining, 0.48);
+        assert.equal(resolver.resolveChampionAnimation(shadow, 1, champion)?.key, "w",
+          "Living Shadow must mirror the authored W clip when it appears");
+        assert.equal(game.castAbility(1, player, { buffer: false }), true,
+          "Living Shadow must support its immediate exchange recast");
+        assert.equal(shadow.abilityAnimAction, "w");
+        assert.equal(shadow.abilityAnimRemaining, 0.48,
+          "the exchanged shadow body must restart the W clip");
+        assert.equal(resolver.resolveChampionAnimation(shadow, 1.01, champion)?.key, "w");
+      }
+
+      if (correctedRoutes.has(`${champion}:${expectedAction}`)) {
+        if (champion === "renekton" && slot === 1) {
+          game.updateContestant(player, 0.51);
+          assert.ok(player.abilityAnimRemaining > 0.049 && player.abilityAnimRemaining < 0.051,
+            "Renekton W must retain its semantic clip through the final 50 ms");
+          assert.equal(resolver.resolveChampionAnimation(player, 1.51, champion)?.key, "w",
+            "Renekton W must not flicker to Q near recovery");
+          game.updateContestant(player, 0.06);
+        } else {
+          game.updateContestant(player, 1);
+        }
+        if (champion === "gangplank") game.updateGangplank(1);
+        assert.equal(player.abilityAnimAction, "");
+        assert.equal(player.abilityAnimRemaining, 0);
+        assert.equal(player.abilityAnimDuration, 0);
+        assert.equal(resolver.resolveChampionAnimation(player, 2, champion)?.key, "idle",
+          `${champion} ${expectedAction} must return to locomotion`);
+      }
+    }
+  }
+
+  const stagedZed = await createAuthoritativeDuel({
+    hostChampion: "zed", guestChampion: "katarina", seed: 703
+  });
+  const [stagedPlayer, stagedTarget] = stagedZed.players;
+  stagedZed.p2Human = true;
+  stagedPlayer.skillsUnlocked = [true, true, true, true];
+  stagedPlayer.invulnerable = 0;
+  stagedPlayer.x = 0;
+  stagedPlayer.z = 0;
+  stagedTarget.x = 0;
+  stagedTarget.z = 2;
+  stagedTarget.invulnerable = 0;
+  for (let row = 1; row < stagedZed.rows - 1; row += 1) {
+    for (let column = 1; column < stagedZed.cols - 1; column += 1) {
+      stagedZed.grid[row][column] = 0;
+    }
+  }
+  assert.equal(stagedZed.castAbility(3, stagedPlayer, { buffer: false }), true);
+  stagedZed.update(0.6);
+  assert.equal(stagedPlayer.abilityAnimAction, "rStrike");
+  assert.equal(stagedPlayer.abilityAnimDuration, 0.35);
+  assert.equal(stagedPlayer.abilityAnimRemaining, 0.35);
+  const stagedMetadata = JSON.parse(await readFile(
+    path.join(repositoryRoot, "champions", "zed", "playable-model", "zed-model-metadata.json"),
+    "utf8"
+  ));
+  const stagedResolver = new ResolverHarness();
+  stagedResolver.zedAnimation = {
+    frameCount: stagedMetadata.frameCount,
+    actions: stagedMetadata.animationActions,
+    clips: stagedMetadata.animationClips
+  };
+  const strikeFrame = stagedResolver.resolveChampionAnimation(stagedPlayer, 1.6, "zed");
+  assert.equal(strikeFrame?.key, "rStrike");
+  assert.equal(strikeFrame?.clipKey, stagedMetadata.animationActions.rStrike,
+    "the dash phase must route to Zed's authored Spell4_Strike clip");
+
+  const buffered = await createAuthoritativeDuel({
+    hostChampion: "gangplank",
+    guestChampion: "katarina",
+    seed: 704
+  });
+  const bufferedPlayer = buffered.players[0];
+  bufferedPlayer.skillsUnlocked = [true, true, true, true];
+  bufferedPlayer.invulnerable = 0;
+  bufferedPlayer.wCooldown = 0.1;
+  assert.equal(buffered.castAbility(1, bufferedPlayer), true);
+  assert.equal(bufferedPlayer.abilityAnimAction, "",
+    "a buffered command must not publish an action before execution");
+  buffered.updateContestant(bufferedPlayer, 0.11);
+  buffered.processAbilityBuffer(0.11);
+  assert.equal(bufferedPlayer.abilityAnimAction, "w",
+    "the buffered executeAbility path must publish the authored action");
+  assert.equal(bufferedPlayer.abilityAnimRemaining, 0.4);
+
+  const rejected = await createAuthoritativeDuel({
+    hostChampion: "katarina",
+    guestChampion: "katarina",
+    seed: 705
+  });
+  const rejectedPlayer = rejected.players[0];
+  const rejectedRival = rejected.players[1];
+  rejectedPlayer.skillsUnlocked = [true, true, true, true];
+  rejectedPlayer.invulnerable = 0;
+  rejected.daggers = [];
+  rejected.pickups = [];
+  rejectedRival.x = rejectedPlayer.x + rejected.tile * 8;
+  rejectedRival.z = rejectedPlayer.z + rejected.tile * 8;
+  assert.equal(rejected.castAbility(2, rejectedPlayer, { buffer: false }), false);
+  assert.equal(rejectedPlayer.abilityAnimAction, "",
+    "a rejected spatial cast must not publish an animation action");
+  assert.equal(rejectedPlayer.abilityAnimRemaining, 0);
+
+  const flashbackSequences = [
+    { champion: "renekton", first: 1, second: 2, elapsed: 0.47, staleTimer: "renektonSlashAnim" },
+    { champion: "gangplank", first: 3, second: 0, elapsed: 0.49, staleTimer: "gangplankUltAnim" }
+  ];
+  for (const sequence of flashbackSequences) {
+    const game = await createAuthoritativeDuel({
+      hostChampion: sequence.champion,
+      guestChampion: "katarina",
+      seed: 710 + sequence.first
+    });
+    const player = game.players[0];
+    const rival = game.players[1];
+    player.skillsUnlocked = [true, true, true, true];
+    player.invulnerable = 0;
+    player.stunned = 0;
+    player.lastDx = 0;
+    player.lastDz = 1;
+    player.facing = 0;
+    rival.x = player.x;
+    rival.z = player.z + 0.8;
+    rival.alive = true;
+    rival.invulnerable = 0;
+    assert.equal(game.castAbility(sequence.first, player, { buffer: false }), true);
+    assert.equal(game.castAbility(sequence.second, player, { buffer: false }), true);
+    assert.equal(player.abilityAnimAction, "qwer"[sequence.second]);
+    game.updateContestant(player, sequence.elapsed);
+    if (sequence.champion === "gangplank") game.updateGangplank(sequence.elapsed);
+    assert.ok(player[sequence.staleTimer] > 0,
+      `${sequence.champion} must retain its independent procedural timer for this regression`);
+
+    const metadata = JSON.parse(await readFile(
+      path.join(repositoryRoot, "champions", sequence.champion, "playable-model",
+        `${sequence.champion}-model-metadata.json`),
+      "utf8"
+    ));
+    const resolver = new ResolverHarness();
+    resolver[`${sequence.champion}Animation`] = {
+      frameCount: metadata.frameCount,
+      actions: metadata.animationActions,
+      clips: metadata.animationClips
+    };
+    assert.equal(resolver.resolveChampionAnimation(player, 4, sequence.champion)?.key, "idle",
+      `${sequence.champion} must not flash back to an older ability after a newer cast ends`);
+  }
+
+  const canceled = await createAuthoritativeDuel({
+    hostChampion: "katarina",
+    guestChampion: "katarina",
+    seed: 720
+  });
+  const canceledPlayer = canceled.players[0];
+  const canceledRival = canceled.players[1];
+  canceledPlayer.skillsUnlocked = [true, true, true, true];
+  canceledPlayer.invulnerable = 0;
+  canceledRival.x = canceledPlayer.x;
+  canceledRival.z = canceledPlayer.z + 0.8;
+  canceledRival.invulnerable = 0;
+  assert.equal(canceled.castAbility(3, canceledPlayer, { buffer: false }), true);
+  assert.equal(canceledPlayer.abilityAnimAction, "r");
+  canceled.keys.add("KeyD");
+  canceled.updateContestant(canceledPlayer, 0.01);
+  assert.equal(canceledPlayer.ultChannel, 0, "movement must cancel Death Lotus");
+  assert.equal(canceledPlayer.abilityAnimAction, "",
+    "canceling Death Lotus must also stop its authored VAT action");
+  assert.equal(canceledPlayer.abilityAnimRemaining, 0);
+  assert.equal(canceledPlayer.abilityAnimDuration, 0);
 });
 
 test("real VAT binaries preserve CPU fallback samples after tiled GPU packing", async () => {

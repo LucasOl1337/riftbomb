@@ -21,10 +21,9 @@ must never recolor or obscure gameplay signals.
 | Aeolian Bastions | A storm archive suspended between stone towers. | Pale masonry, oxidized steel and skyglass. | Directional wind bands and charged nodes. |
 | Storm-Eye Basin | A ring-shaped collector around a deceptively calm center. | Dark navy plate, storm glass and magenta charge. | Rotating outer arcs around a quiet eye. |
 
-The first three arenas have dedicated authored floor albedos and production
-keyframes. Aeolian Bastions shares the Cinderfrost macro material, and
-Storm-Eye Basin shares the Salt Lens macro material; both retain unique
-procedural motifs and palettes.
+The first three arenas and Storm-Eye Basin have dedicated authored floor
+albedos. Aeolian Bastions preserves its earlier green macro material; every
+arena retains a unique procedural motif and palette.
 
 ## Rendering architecture
 
@@ -43,7 +42,7 @@ procedural motifs and palettes.
 | Budget | Target |
 | --- | ---: |
 | Environmental ambience | 1 draw call |
-| Authored offline texture sources | 13 WebP embeds (2 crate + 5 floor + 3 wall + 3 wall-top) |
+| Authored offline texture sources | 17 WebP embeds (2 crate + 5 floor + 5 wall + 5 wall-top) |
 | Active shockwaves | 4 maximum |
 | Low-tier arena ambience | Disabled |
 | Motion-reduced animation speed | Zero |
@@ -51,8 +50,8 @@ procedural motifs and palettes.
 ## Asset map
 
 - Proof keyframes: `raw-imagine/proof-01-salt-lens.jpg`, `proof-02-nacre-hollow.jpg`, `proof-03-cinderfrost.jpg`
-- Floors: `textures/ground/floor-{lattice,clearing,labyrinth,forts,pit}.webp`
-- Walls: `textures/walls/wall-{lattice,clearing,labyrinth}.webp` + matching `wall-top-*`
+- Floors: fingerprinted Salt Lens/Storm-Eye files plus `floor-{clearing,labyrinth,forts}.webp`
+- Walls: `textures/walls/wall-{lattice,clearing,labyrinth,forts,pit}.webp` + matching `wall-top-*`
 - See `MODULAR-KIT.md` for piece language and how to compose new places.
 
 ## Originality and commercial boundary
