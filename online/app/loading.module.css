@@ -1,0 +1,277 @@
+.page {
+  position: relative;
+  display: grid;
+  min-height: 100dvh;
+  overflow: hidden;
+  place-items: center;
+  padding: clamp(7rem, 14vh, 10rem) clamp(1.25rem, 5vw, 5rem) clamp(4rem, 9vh, 6rem);
+  color: #effcff;
+  background: #03080d;
+  isolation: isolate;
+}
+
+.arena,
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.arena {
+  z-index: -2;
+  background-image: url("/client/arenas/lattice.webp");
+  background-position: center;
+  background-size: cover;
+  filter: saturate(0.72) contrast(1.12);
+  opacity: 0.36;
+  transform: scale(1.04);
+  animation: arena-drift 12s ease-in-out infinite alternate;
+}
+
+.vignette {
+  z-index: -1;
+  background:
+    radial-gradient(circle at 50% 47%, rgb(3 8 13 / 8%) 0 16%, rgb(3 8 13 / 74%) 67%),
+    linear-gradient(180deg, rgb(3 8 13 / 82%) 0%, transparent 34%, rgb(3 8 13 / 90%) 100%);
+}
+
+.brand {
+  position: absolute;
+  top: clamp(1.5rem, 4vw, 3rem);
+  left: clamp(1.25rem, 5vw, 5rem);
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: inherit;
+}
+
+.brandMark {
+  display: grid;
+  width: 2.45rem;
+  aspect-ratio: 1;
+  place-items: center;
+  color: #031015;
+  background: #69e4f0;
+  border: 1px solid #bffaff;
+  box-shadow: 0 0 1.6rem rgb(66 220 235 / 24%);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 1rem;
+  font-weight: 800;
+  transform: rotate(45deg);
+}
+
+.brandMark b {
+  line-height: 1;
+  transform: rotate(-45deg);
+}
+
+.brand > span:last-child {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.brand strong,
+.brand small {
+  line-height: 1;
+  letter-spacing: 0.15em;
+}
+
+.brand strong {
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.brand small {
+  color: rgb(209 239 242 / 58%);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.58rem;
+}
+
+.status {
+  width: min(100%, 43rem);
+  text-align: center;
+}
+
+.eyebrow,
+.proof,
+.coordinate {
+  font-family: var(--font-geist-mono), monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  margin: 0 0 clamp(1.4rem, 3vh, 2.2rem);
+  color: #82edf5;
+  font-size: clamp(0.62rem, 1.2vw, 0.72rem);
+  font-weight: 650;
+}
+
+.status h1 {
+  max-width: 12ch;
+  margin: 0 auto;
+  font-size: clamp(2.5rem, 7.5vw, 5.6rem);
+  font-weight: 680;
+  letter-spacing: -0.065em;
+  line-height: 0.92;
+  text-wrap: balance;
+}
+
+.copy {
+  max-width: 47ch;
+  margin: clamp(1.25rem, 3vh, 1.8rem) auto 0;
+  color: rgb(221 241 243 / 70%);
+  font-size: clamp(0.94rem, 1.5vw, 1.08rem);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.progress {
+  position: relative;
+  width: min(100%, 24rem);
+  height: 2px;
+  overflow: hidden;
+  margin: clamp(2rem, 5vh, 3rem) auto 0;
+  background: rgb(213 247 249 / 14%);
+}
+
+.progress::before,
+.progress::after {
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  aspect-ratio: 1;
+  background: #f1c56a;
+  content: "";
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.progress::before {
+  left: 0;
+}
+
+.progress::after {
+  right: 0;
+}
+
+.progress span {
+  display: block;
+  width: 42%;
+  height: 100%;
+  background: #75e8f0;
+  box-shadow: 0 0 1.2rem rgb(43 199 212 / 70%);
+  animation: load-arena 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.proof {
+  margin: 1rem 0 0;
+  color: rgb(203 232 235 / 50%);
+  font-size: 0.58rem;
+}
+
+.coordinate {
+  position: absolute;
+  right: clamp(1.25rem, 5vw, 5rem);
+  bottom: clamp(1.35rem, 3vw, 2.5rem);
+  margin: 0;
+  color: rgb(203 232 235 / 36%);
+  font-size: 0.56rem;
+}
+
+@keyframes arena-drift {
+  from {
+    transform: scale(1.04);
+  }
+
+  to {
+    transform: scale(1.09);
+  }
+}
+
+@keyframes load-arena {
+  0% {
+    transform: translateX(-110%);
+  }
+
+  50% {
+    transform: translateX(70%);
+  }
+
+  100% {
+    transform: translateX(240%);
+  }
+}
+
+@media (max-width: 560px) {
+  .page {
+    padding-top: 7rem;
+    padding-bottom: 4.75rem;
+  }
+
+  .arena {
+    background-position: 53% center;
+    opacity: 0.3;
+  }
+
+  .status h1 {
+    font-size: clamp(2.7rem, 14vw, 4.1rem);
+  }
+
+  .copy {
+    max-width: 31ch;
+  }
+
+  .progress {
+    width: min(100%, 19rem);
+  }
+
+  .coordinate {
+    right: auto;
+    left: 50%;
+    width: max-content;
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-height: 620px) and (orientation: landscape) {
+  .page {
+    padding-top: 5rem;
+    padding-bottom: 2rem;
+  }
+
+  .brand {
+    top: 1rem;
+  }
+
+  .eyebrow {
+    margin-bottom: 0.9rem;
+  }
+
+  .status h1 {
+    font-size: min(10vh, 3.5rem);
+  }
+
+  .copy {
+    margin-top: 0.7rem;
+  }
+
+  .progress {
+    margin-top: 1.2rem;
+  }
+
+  .coordinate {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arena,
+  .progress span {
+    animation: none;
+  }
+
+  .progress span {
+    width: 68%;
+  }
+}
