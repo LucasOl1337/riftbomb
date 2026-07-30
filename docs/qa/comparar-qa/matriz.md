@@ -28,8 +28,8 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | Aprovadas | 0 |
 | Mudança necessária | 0 |
 | Corrigidas localmente | 6 |
-| Verificadas ao vivo | 10 |
-| Em andamento | 1 |
+| Verificadas ao vivo | 11 |
+| Em andamento | 0 |
 | Reauditoria necessária | 0 |
 | Bloqueadas | 1 |
 | Não testadas | 0 |
@@ -55,7 +55,7 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | 015 | Qualidade LoL · rodada 10 · ACK causal e replay de movimento | verified_live | Codex `/root` | 2026-07-30T02:09:04-03:00 | Worker `0fa64580` + Oracle anterior | `d114a11` · Oracle `d114a11` · Worker `e0597eb4` | ✅ antes/live, dois clientes e input real, 1936×1048 | — | — | ✅ epoch por partida, sequência exata, ACK pós-tick e replay; rolling deploy nos dois sentidos | ✅ 140/140 + 46/46 + 33/33; console live limpo; 0 ciclos pulados; P0=0, P1=0 no escopo | `artifacts/comparar-qa/2026-07-30/lol-quality-round-10/` | Netcode 60→66. Uma `seq=2` adiantada permaneceu sem ACK; replay `seq=1→2` avançou ACK `0→1→2`. Ações one-shot e retomada autenticada por assento continuam pendentes. |
 | 016 | Qualidade LoL · rodada 11 · retomada autenticada após F5 | verified_live | Codex `/root` | 2026-07-30T02:20:13-03:00 | `c9da842` + Worker `e0597eb4` | `a21c49f` · Oracle `a21c49f` · Worker `be838e1a` | ✅ antes 1936×1048/1440×900 e depois 1280×720, dois clientes visíveis, F5 e teclado real | — | — | ✅ bearer de 256 bits por assento, digest no servidor, substituição atômica, grace exato de 20 s, ACK preservado, boot coalescido e presença false→true | ✅ 140/140 + 63/63 + servidor 54/54; dry-run; P0=0/P1=0 bloqueadores | `artifacts/comparar-qa/2026-07-30/lol-quality-round-11/` | Netcode 66→72. O cliente voltou à mesma rodada após F5 em 3.523 ms, o rival confirmou reconexão em 3.598 ms e novo input `D` foi aceito. Bearer estável sem rotação e ACK de ações one-shot permanecem pendentes. |
 | 017 | Qualidade LoL · rodada 12 · material original do piso da arena | verified_live | Codex `/root` | 2026-07-30T04:08:04-03:00 | `3cb5a11` + Worker `be838e1a` | `80503b1` · Worker `53cabbe1` | ✅ antes 1440×900; depois local/live no mesmo enquadramento | ✅ antes/local/live 844×390 emulado, controles touch visíveis | ✅ bloqueio correto 390×844 e gameplay 844×390 emulados | ✅ colisão e regras intactas; perfil Salt Lens isolado, 5 taps e mesmo draw | ✅ 141/141 + 63/63 + servidor 54/54; WebGL2 visível limpo; P0/P1/P2=0 | `artifacts/comparar-qa/2026-07-30/lol-quality-round-12/` | Gráficos 63→68. Piso autoral fingerprinted publicado e verificado byte a byte; casts, sombras e as outras quatro arenas continuam como gargalos explícitos. |
-| 018 | Qualidade LoL · rodada 13 · ACK/replay exatamente-uma-vez de ações | in_progress | Codex `/root` | 2026-07-30T05:13:38-03:00 | `afc4e78` + Worker `53cabbe1` | — | baseline público e trace pendentes | — | baseline mobile pendente | validar bomba/habilidade sob drop, duplicação, atraso, F5 e rematch sem repetição | auditoria adversarial pendente | `artifacts/comparar-qa/2026-07-30/lol-quality-round-13/` | Uma melhoria: stream confiável separado para ações, com epoch, sequência, ACK cumulativo, outbox limitada e replay idempotente. Movimento permanece em seu transporte atual. |
+| 018 | Qualidade LoL · rodada 13 · ACK/replay exatamente-uma-vez de ações | verified_live | Codex `/root` | 2026-07-30T05:13:38-03:00 | `afc4e78` + Worker `53cabbe1` | `669d745` · Oracle `e9fdc93` · Worker `dbb42e55` | ✅ baseline, partida e F5, 1440×900 | ⚠️ 844×390 emulado; físico pendente | ✅ 844×390 + gate 390×844 emulados | ✅ bomba/habilidade sob gap, drop, duplicação, atraso, rejeição e F5; soak 10 min com 2.299/2.299 ACKs | ✅ 141/141 + 75/75 + servidor 55/55; skipped 0/0; reauditoria P0/P1/P2=0 | `artifacts/comparar-qa/2026-07-30/lol-quality-round-13/` | Netcode 72→78. Stream confiável separado, FIFO persistida, ACK cumulativo e replay idempotente publicados. Rotação do bearer, reconciliação adaptativa e dispositivos/redes físicas continuam pendentes. |
 
 ## Placar de qualidade — baseline do programa
 
@@ -67,7 +67,7 @@ meta de 90% vale para cada aspecto do vertical slice, nunca para a média.
 | Gráficos | 68/100 | casts ainda têm silhuetas/deformações inferiores à referência, faltam sombras suaves e as outras quatro arenas ainda usam materiais anteriores |
 | Som | 74/100 | faltam teste auditivo, mix medido, material original mais rico e feedback local reconciliado |
 | Mecânicas | 62/100 | faltam cast lock, resolução simultânea neutra e fidelidade fina dos kits |
-| Netcode | 72/100 | bombas/habilidades ainda são one-shot sem ACK; o bearer de retomada ainda não rotaciona e faltam soak/reconexão sob perda severa |
+| Netcode | 78/100 | o bearer de retomada ainda não rotaciona; faltam reconciliação/clock sync adaptativos e soak em dispositivos e redes físicas sob perda severa |
 | Fluidez | 63/100 | faltam trace p95/p99, matriz física, locomoção íntegra de Zed e eliminação do parse síncrono do catálogo VAT de 95,53 MiB |
 
 Notas têm caps de evidência: sem testes perceptuais, trace p95/p99, soak e
@@ -401,18 +401,66 @@ P0/P1/P2 bloqueador. O ganho conservador é somente Gráficos 63→68: casts,
 sombras suaves e materiais das demais arenas permanecem fora do escopo e sem
 pontuação nesta rodada.
 
+### Rodada 13 — ações exatamente-uma-vez publicadas
+
+Bombas e habilidades saíam do cliente como mensagens one-shot: uma perda podia
+apagar a ação e uma retransmissão manual não tinha identidade para impedir
+efeito duplo. A melhoria única desta rodada introduz um stream confiável
+independente do movimento, com epoch, `actionSeq`, ACK cumulativo, fila FIFO
+persistida antes do envio, limite de 16 entradas e replay do head a cada 120 ms.
+O cliente restaura a fila no F5 antes de publicar a sessão e falha fechado, com
+alerta acessível dentro da partida, se o navegador não puder persistir a ação.
+
+O servidor aceita somente a próxima sequência do epoch atual. Um gap fica sem
+ACK; uma duplicata recebe o cursor corrente sem reaplicar a ação. Rejeições
+mecânicas e ações atrasadas de outra rodada são consumidas sem efeito para não
+travar o FIFO. A capacidade confiável é monotônica durante resume e só é
+zerada nos limites explícitos de nova sessão, leave ou expiração. O rollout
+servidor-primeiro preservou clientes legados enquanto o Worker antigo estava
+ativo.
+
+No trace público, `seq=2` adiantada permaneceu em ACK 0; `seq=1` criou uma única
+bomba e avançou ACK 1; uma duplicata conflitante de `seq=1` foi inerte. A
+`seq=2` rejeitada pela mecânica avançou o cursor sem efeito. Um envio ambíguo de
+`seq=3` sobreviveu ao F5 e foi resolvido uma única vez, e a habilidade `seq=4`
+foi confirmada. O cliente visível voltou à mesma rodada em 5.380 ms. As
+capturas desktop, landscape, portrait e pós-F5 comprovam cobertura visual; o
+baseline e o depois não são o mesmo estado, portanto não são usados como
+comparação pixel a pixel.
+
+O soak live medido durou 600.091 ms: 2.299 ações canônicas produziram exatamente
+2.299 transições de ACK, mesmo com 179 primeiros envios descartados, 260
+duplicatas, atrasos de até 520 ms, 15 F5/resumes e 15 substituições de socket.
+Foram atravessadas sete rodadas sem bombas, explosões, projéteis ou sons para as
+ações deliberadamente fora da rodada corrente. Houve zero erro WebSocket, zero
+fechamento inesperado e zero ciclo de tick/snapshot pulado. Depois da limpeza,
+salas, partidas, sockets e fila voltaram a zero, com os dois clocks parados.
+
+A Oracle recebeu `e9fdc93` com backup anterior ao rollout; o cliente final
+`669d745` foi publicado no Worker
+`dbb42e55-17ed-483a-8ff5-59293e97d919`. Homepage respondeu 200 e o
+`online-duel.js` servido coincidiu byte a byte com o build local pelo SHA-256
+`c2c009097cd9531c7555f7726cb15b340e29ec6420bcdf76b757084a218cc83c`.
+As reauditorias de cliente e servidor terminaram com P0/P1/P2=0. O token do
+workflow GitHub continua inválido (Cloudflare 9106); a publicação final foi
+feita pela sessão OAuth válida do proprietário e esse P2 operacional não
+afeta o artefato em produção. O ganho conservador é somente Netcode 72→78.
+
 ## Validações automatizadas
 
-- raiz da árvore exata da release gráfica: 141/141 testes passaram;
-- `online/`: build Vinext validado e 63/63 testes passaram;
-- `online/server/`: core 20/20, runtime/fencing 5/5, serialização 3/3,
-  rate limit 3/3, transporte 12/12, rematch 1/1, matchmaking 1/1 e resume 9/9;
-- `npm run deploy -- --dry-run` passou com upload total de 4.949,63 KiB e
-  3.020,06 KiB gzip antes da publicação do mesmo pacote;
-- produção: homepage 200, WebP fingerprinted 200/208.558 bytes com SHA-256
-  local exato e manifesto remoto idêntico ao pacote local;
-- navegador visível: desktop 1440×900, landscape 844×390 com controles touch e
-  portrait 390×844 com gate de orientação; WebGL2 e consoles limpos;
+- raiz da árvore exata da release: 141/141 testes passaram;
+- `online/`: build Vinext validado, 75/75 testes passaram e lint terminou com
+  zero erros e quatro warnings preexistentes de `<img>`;
+- `online/server/`: 55/55 testes passaram, incluindo sequência/ACK de duas
+  cadeiras, rejeição mecânica, resume monotônico, rematch, leave e expiração;
+- o dry-run Cloudflare passou com 93 assets, upload total de 4.949,63 KiB e
+  3.020,07 KiB gzip;
+- produção: homepage 200, API smoke controlado 400/`unknown_action`, hash HTTP
+  exato do cliente e protocolo v1 comprovado em dois WebSockets;
+- soak live de 10 min: 2.299/2.299 ACKs, 179 drops, 260 duplicatas, 15 F5,
+  skipped tick/snapshot 0/0 e limpeza completa;
+- navegador visível: desktop 1440×900, landscape 844×390 com controles touch,
+  portrait 390×844 com gate de orientação e restauração após F5;
 - nenhum Playwright headless ou `headless_shell` foi iniciado.
 
 ## Rodadas
@@ -433,3 +481,4 @@ pontuação nesta rodada.
 | 2026-07-30 | Codex `/root` | 015 | 1 `verified_live` | `d114a11`; Oracle `d114a11`; Worker `e0597eb4-69eb-44e4-9d8a-c3475ff682d6` | Rodada 10: movimento ganhou epoch, sequência exata, ACK pós-tick e replay HOL limitado; rolling deploy servidor→cliente passou, 140/140 + 46/46 + 33/33 gates, hash HTTP exato, dois clientes visíveis e trace live `0→1→2`. Netcode 60→66. |
 | 2026-07-30 | Codex `/root` | 016 | 1 `verified_live` | `a21c49f`; Oracle `a21c49f`; Worker `be838e1a-652c-48c3-8390-52e7245ae521` | Rodada 11: bearer autenticado por assento, substituição atômica, grace de 20 s, fencing e presença restaurada após F5; 140/140 + 63/63 + servidor 54/54, hash público exato e prova com dois clientes/input real. Netcode 66→72. |
 | 2026-07-30 | Codex `/root` | 017 | 1 `verified_live` | `80503b1`; Worker `53cabbe1-06e8-4b7f-bbc0-75772f70749a` | Rodada 12: piso Salt Lens autoral, fingerprinted e isolado, com hierarquia macro/micro, mesmo custo de draw e hash HTTP exato; 141/141 + 63/63 + servidor 54/54, WebGL2 visível e revisão sem P0–P2. Gráficos 63→68. |
+| 2026-07-30 | Codex `/root` | 018 | 1 `verified_live` | `669d745`; Oracle `e9fdc93`; Worker `dbb42e55-17ed-483a-8ff5-59293e97d919` | Rodada 13: bombas e habilidades ganharam sequência, ACK causal, FIFO persistida e replay idempotente; 141/141 + 75/75 + servidor 55/55, trace público, hash exato e soak de 2.299 ações sob drop/duplicação/F5. Netcode 72→78. |
