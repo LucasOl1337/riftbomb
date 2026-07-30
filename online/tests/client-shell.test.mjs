@@ -47,7 +47,7 @@ test("deduplicates unchanged runtime snapshots before React state updates", () =
   }
 });
 
-test("ships a real client shell while keeping the classic runtime reversible", async () => {
+test("ships a real client shell with one canonical game runtime", async () => {
   const [page, styles, data] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
     readFile(new URL("app/globals.css", root), "utf8"),
@@ -58,7 +58,7 @@ test("ships a real client shell while keeping the classic runtime reversible", a
     assert.match(data, new RegExp(`id: "${mode}"`));
   }
   assert.match(page, /\/riftbomb\.html\?client=1/);
-  assert.match(page, /\/\?legacy=1/);
+  assert.doesNotMatch(page, /LegacyClient|\/\?legacy=1/);
   assert.match(page, /create-room/);
   assert.match(page, /quick-match/);
   assert.match(page, /cancel-quick-match/);
@@ -84,6 +84,25 @@ test("keeps the selected mode promise visible on portrait phones", async () => {
   assert.match(
     styles,
     /@media \(max-width: 780px\) and \(orientation: portrait\)[\s\S]*?\.match-config \{[\s\S]*?top: 6\.4rem;/,
+  );
+});
+
+test("keeps the consolidated Bot V1 profile visible across setup widths", async () => {
+  const [page, styles, data] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+    readFile(new URL("app/riftbomb-client.ts", root), "utf8"),
+  ]);
+
+  assert.match(page, /activeMode === "solo"[\s\S]*?OPONENTE DE TREINO/);
+  assert.match(page, /training-bot-card__metric--intelligence/);
+  assert.match(page, /<small>INTELIGÊNCIA<\/small>/);
+  assert.match(page, /<small>ESPECIALIDADE<\/small>/);
+  assert.match(data, /intelligence: "4\/5 · Tático adaptativo"/);
+  assert.match(styles, /\.training-bot-card__weakness \{[\s\S]*?display: grid;/);
+  assert.match(
+    styles,
+    /@media \(max-width: 520px\)[\s\S]*?\.config-section--training-bot \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/,
   );
 });
 

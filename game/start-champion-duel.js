@@ -4,18 +4,6 @@
     let sfx;
     let game;
     let lastFrame = performance.now();
-    let selectedLocalPlayer = 1;
-
-    function updatePlayerSelector(playerId) {
-      selectedLocalPlayer = playerId === 2 ? 2 : 1;
-      UI.playerSelectorButtons.forEach((button) => {
-        const selected = Number(button.dataset.selectPlayer) === selectedLocalPlayer;
-        button.setAttribute("aria-pressed", String(selected));
-      });
-      if (UI.playerConfigLabel) UI.playerConfigLabel.textContent = `P${selectedLocalPlayer} / UNIT`;
-      const champion = selectedLocalPlayer === 2 ? game.selectedChampion2 : game.selectedChampion;
-      game.presentation.selectChampion(champion, selectedLocalPlayer);
-    }
 
     function configurePlayerView(playerId = 1, options = {}) {
       const localPlayerId = playerId === 2 ? 2 : 1;
@@ -47,6 +35,7 @@
     }
 
     async function beginGame() {
+      if (game.mode === "playing") return;
       UI.start.disabled = true;
       UI.start.textContent = "Loading selected arena…";
       void sfx.start().catch((error) => console.warn("Audio will resume after player input:", error));
@@ -62,7 +51,6 @@
       UI.start.textContent = "Arena ready";
       game.start();
       if (game.p2Human) configurePlayerView(1, { shared: true, localMultiplayer: true });
-      UI.intro.classList.add("is-gone");
       UI.chrome.classList.remove("is-hidden");
       UI.chrome.setAttribute("aria-hidden", "false");
       UI.chrome.removeAttribute("inert");
@@ -121,12 +109,12 @@
       document.documentElement.classList.add("is-match-active");
       document.body.classList.add("is-match-active");
       // Online lobby banner must never sit over mobile skills.
-      const onlineBanner = document.querySelector(".online-connection");
+      const onlineBanner = document.querySelector(".runtime-network-status");
       if (onlineBanner) {
         onlineBanner.hidden = true;
         onlineBanner.textContent = "";
       }
-      document.querySelector(".online-panel")?.setAttribute("hidden", "");
+      document.querySelector(".runtime-network-controls")?.setAttribute("hidden", "");
       // fluid-bg is a second WebGL surface — kill it during match on phones.
       const fluid = document.querySelector("fluid-bg, #riftbomb-background");
       if (fluid) {
@@ -351,207 +339,6 @@
       addEventListener("blur", () => unpress(), { passive: true });
     }
 
-    const arenaPreviewTextures = new Map();
-
-    function loadArenaPreviewTexture(source) {
-      if (!source) return Promise.resolve(null);
-      if (!arenaPreviewTextures.has(source)) {
-        arenaPreviewTextures.set(source, new Promise((resolve) => {
-          const image = new Image();
-          image.decoding = "async";
-          image.onload = () => resolve(image);
-          image.onerror = () => resolve(null);
-          image.src = source;
-        }));
-      }
-      return arenaPreviewTextures.get(source);
-    }
-
-    function fillPolygon(context, points, fill, texture = null, alpha = 1) {
-      context.save();
-      context.beginPath();
-      context.moveTo(points[0][0], points[0][1]);
-      for (let index = 1; index < points.length; index++) {
-        context.lineTo(points[index][0], points[index][1]);
-      }
-      context.closePath();
-      context.fillStyle = fill;
-      context.fill();
-      if (texture) {
-        const pattern = context.createPattern(texture, "repeat");
-        if (pattern) {
-          context.globalAlpha = alpha;
-          context.fillStyle = pattern;
-          context.fill();
-        }
-      }
-      context.restore();
-    }
-
-    async function paintArenaPreview(canvas, grid, arena, loadTextures = true) {
-      const theme = game.arenaTemplate(arena.id).theme;
-      const sources = {
-        floor: ARENA_TEXTURES[theme.floor],
-        wall: ARENA_TEXTURES[theme.wall],
-        wallTop: ARENA_TEXTURES[theme.wallTop],
-        crate: ARENA_TEXTURES.crate,
-        crateTop: ARENA_TEXTURES.crateTop
-      };
-      const textureEntries = loadTextures
-        ? await Promise.all(
-          Object.entries(sources).map(async ([key, source]) => [key, await loadArenaPreviewTexture(source)])
-        )
-        : Object.keys(sources).map((key) => [key, null]);
-      if (!canvas.isConnected) return;
-      const textures = Object.fromEntries(textureEntries);
-      const dpr = Math.min(devicePixelRatio || 1, 2);
-      const width = 360;
-      const height = 178;
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
-      const context = canvas.getContext("2d");
-      context.setTransform(dpr, 0, 0, dpr, 0, 0);
-      context.imageSmoothingEnabled = true;
-
-      const backdrop = context.createLinearGradient(0, 0, 0, height);
-      backdrop.addColorStop(0, theme.clear);
-      backdrop.addColorStop(1, theme.base);
-      context.fillStyle = backdrop;
-      context.fillRect(0, 0, width, height);
-
-      const halfW = 10.8;
-      const halfH = 5.25;
-      const originX = width / 2;
-      const originY = 16;
-      const safe = new Set([
-        `${grid.length - 2},1`, `${grid.length - 3},1`, `${grid.length - 2},2`,
-        `1,${grid[0].length - 2}`, `2,${grid[0].length - 2}`, `1,${grid[0].length - 3}`
-      ]);
-      const diamond = (x, y) => [
-        [x, y - halfH],
-        [x + halfW, y],
-        [x, y + halfH],
-        [x - halfW, y]
-      ];
-
-      for (let r = 0; r < grid.length; r++) {
-        for (let c = 0; c < grid[r].length; c++) {
-          const x = originX + (c - r) * halfW;
-          const y = originY + (c + r) * halfH;
-          fillPolygon(context, diamond(x, y), theme.floorB, textures.floor, 0.78);
-          if (safe.has(`${r},${c}`)) {
-            const glow = context.createRadialGradient(x, y, 0, x, y, halfW * 1.15);
-            glow.addColorStop(0, `${theme.crystal}e6`);
-            glow.addColorStop(0.5, `${theme.crystal}55`);
-            glow.addColorStop(1, `${theme.crystal}00`);
-            context.fillStyle = glow;
-            context.beginPath();
-            context.ellipse(x, y, halfW * 1.25, halfH * 1.55, 0, 0, Math.PI * 2);
-            context.fill();
-          }
-        }
-      }
-
-      for (let r = 0; r < grid.length; r++) {
-        for (let c = 0; c < grid[r].length; c++) {
-          const type = grid[r][c];
-          if (!type) continue;
-          const x = originX + (c - r) * halfW;
-          const y = originY + (c + r) * halfH;
-          const rise = type === 1 ? 12.5 : 9.2;
-          const top = diamond(x, y - rise);
-          const base = diamond(x, y);
-          const side = type === 1 ? theme.stone : "#59331e";
-          const sideTexture = type === 1 ? textures.wall : textures.crate;
-          const topTexture = type === 1 ? textures.wallTop : textures.crateTop;
-          fillPolygon(context, [top[3], top[2], base[2], base[3]], side, sideTexture, 0.72);
-          fillPolygon(context, [top[1], top[2], base[2], base[1]], theme.base, sideTexture, 0.58);
-          fillPolygon(context, top, type === 1 ? theme.stoneTop : "#9b6337", topTexture, 0.86);
-          context.strokeStyle = type === 1 ? `${theme.crystal}38` : "#d49a5b45";
-          context.lineWidth = 0.6;
-          context.beginPath();
-          context.moveTo(top[0][0], top[0][1]);
-          for (let index = 1; index < top.length; index++) context.lineTo(top[index][0], top[index][1]);
-          context.closePath();
-          context.stroke();
-        }
-      }
-
-      const shade = context.createLinearGradient(0, 0, width, height);
-      shade.addColorStop(0, "rgb(0 0 0 / 34%)");
-      shade.addColorStop(0.5, "rgb(0 0 0 / 0%)");
-      shade.addColorStop(1, "rgb(0 0 0 / 44%)");
-      context.fillStyle = shade;
-      context.fillRect(0, 0, width, height);
-      context.strokeStyle = `${theme.crystal}70`;
-      context.lineWidth = 1;
-      context.strokeRect(0.5, 0.5, width - 1, height - 1);
-    }
-
-    function createArenaPreview(grid, arena, loadImmediately = false) {
-      const canvas = document.createElement("canvas");
-      canvas.className = "arena-mini";
-      canvas.dataset.arena = arena.id;
-      canvas.setAttribute("aria-hidden", "true");
-      let requested = false;
-      const request = () => {
-        if (requested) return;
-        requested = true;
-        void paintArenaPreview(canvas, grid, arena);
-      };
-      if (loadImmediately) request();
-      else void paintArenaPreview(canvas, grid, arena, false);
-      return { canvas, request };
-    }
-
-    function buildArenaPicker() {
-      const host = document.getElementById("arena-select") || document.querySelector(".arena-select");
-      if (!host || !game) return;
-      const heading = document.createElement("span");
-      heading.className = "micro";
-      heading.textContent = `[ ARENAS ] · ${game.listArenas().length} real previews`;
-      host.replaceChildren(heading);
-      game.listArenas().forEach((arena) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "arena-choice";
-        button.dataset.arena = arena.id;
-        button.setAttribute("role", "radio");
-        button.setAttribute("aria-checked", String(arena.id === game.selectedArena));
-        button.title = arena.blurb;
-        const previewShell = document.createElement("div");
-        previewShell.className = "arena-preview-shell";
-        const previewLabel = document.createElement("span");
-        previewLabel.className = "arena-preview-label micro";
-        previewLabel.textContent = "REAL ARENA VIEW";
-        previewLabel.setAttribute("aria-hidden", "true");
-        const preview = createArenaPreview(
-          game.previewGrid(arena.id),
-          arena,
-          arena.id === game.selectedArena
-        );
-        previewShell.append(preview.canvas, previewLabel);
-        const title = document.createElement("strong");
-        title.textContent = arena.label;
-        const blurb = document.createElement("small");
-        blurb.textContent = arena.blurb;
-        button.append(previewShell, title, blurb);
-        button.addEventListener("pointerenter", preview.request, { once: true });
-        button.addEventListener("focus", preview.request, { once: true });
-        button.addEventListener("click", () => {
-          preview.request();
-          game.selectArena(arena.id);
-          UI.arenaChoices.forEach((choice) => {
-            choice.setAttribute("aria-checked", String(choice.dataset.arena === arena.id));
-          });
-          heading.textContent = `[ ARENA ] ${arena.label.toUpperCase()}`;
-          UI.live.textContent = `Arena: ${arena.label} — ${arena.blurb}`;
-        });
-        host.appendChild(button);
-      });
-      UI.arenaChoices = [...host.querySelectorAll(".arena-choice")];
-    }
-
     function boot() {
       sfx = new SfxEngine();
       const previewRenderer = {
@@ -562,17 +349,7 @@
         ensureChampionModels() { return Promise.resolve(); }
       };
       game = new Game(previewRenderer, sfx, new BrowserMatchPresentation());
-      buildArenaPicker();
-      UI.championChoices.forEach((button) => button.addEventListener("click", () => {
-        if (selectedLocalPlayer === 2) game.selectChampion2(button.dataset.champion);
-        else game.selectChampion(button.dataset.champion);
-        updatePlayerSelector(selectedLocalPlayer);
-      }));
-      UI.playerSelectorButtons.forEach((button) => button.addEventListener("click", () => {
-        const playerId = Number(button.dataset.selectPlayer) === 2 ? 2 : 1;
-        if (playerId === 2 && game.mode === "intro") game.activatePlayerTwo();
-        updatePlayerSelector(playerId);
-      }));
+      game.activateBotOpponent();
       try {
         renderer = new Renderer(UI.canvas);
         game.renderer = renderer;
@@ -583,7 +360,6 @@
           .filter(Boolean);
         void renderer.ensureChampionModels(embeddedModels);
         if (modelReviewMode) {
-          UI.intro.classList.add("is-gone");
           game.enemies = [];
           const reviewEnemy = {
             id: 9001,
@@ -621,7 +397,6 @@
           void enterMatchPresentation();
         });
         UI.guideOpen.addEventListener("click", openGuide);
-        UI.guideOpenIntro.addEventListener("click", openGuide);
         UI.guideClose.addEventListener("click", closeGuide);
         UI.guide.addEventListener("cancel", (event) => {
           event.preventDefault();
@@ -637,12 +412,13 @@
           game.castAbility(Number(button.dataset.p2Slot), game.players[1]);
         }));
         requestAnimationFrame(frame);
+        if (window.self === window.top && !modelReviewMode) void beginGame();
       } catch (error) {
         console.error(error);
         UI.start.disabled = true;
         UI.start.textContent = "WebGL2 is required";
-        UI.intro.querySelector(".intro-lede").textContent =
-          "This browser could not initialize the WebGL2 arena. Open the file in a current Chrome, Edge, Firefox, or Safari build with hardware acceleration enabled.";
+        UI.live.textContent =
+          "This browser could not initialize the WebGL2 arena. Use a current browser with hardware acceleration enabled.";
       }
     }
 

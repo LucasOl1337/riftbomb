@@ -201,6 +201,29 @@ function blastPathClear(bomb, r, c, grid) {
   return true;
 }
 
+/** Product-facing identity and measured record for the trained V1 bot. */
+const V1_RENEKTON_PROFILE = Object.freeze({
+  id: "v1-renekton",
+  name: "V1 Renekton",
+  callsign: "Dominus-01",
+  champion: "renekton",
+  version: "1.0",
+  intelligence: Object.freeze({ level: 4, maximum: 5, label: "Tático adaptativo" }),
+  description: "Um duelista treinado para abrir a arena, sobreviver ao próprio cerco e converter vantagem em combos de Renekton.",
+  specialties: Object.freeze([
+    "Fuga temporal de explosões",
+    "Abertura de rotas com bombas",
+    "Leitura dos hábitos do rival",
+    "Combo E → R → W → Q → Dice"
+  ]),
+  stats: Object.freeze([
+    Object.freeze({ value: "100–0", label: "certificação vs baseline", detail: "100 partidas · seed 42" }),
+    Object.freeze({ value: "100%", label: "sobrevivência à 1ª bomba", detail: "certificação oficial" }),
+    Object.freeze({ value: "60%", label: "vitórias no espelho V1", detail: "100 partidas de self-play" })
+  ]),
+  weakness: "Especialista em Renekton; ainda não pilota kits de outros campeões."
+});
+
 /**
  * V1 rival model — what the V1 learns ABOUT the rival across the rounds of
  * one match (cycle 10, B7).
@@ -2710,4 +2733,5 @@ function createV1Policy({ champion = null, profile = "rift", random = Math.rando
 
 RIFTBOMB_BOTS.createV1Policy = createV1Policy;
 RIFTBOMB_BOTS.createRenektonPilot = createRenektonPilot;
+RIFTBOMB_BOTS.profiles = Object.freeze([V1_RENEKTON_PROFILE]);
 })();

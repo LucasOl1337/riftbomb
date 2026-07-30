@@ -208,8 +208,8 @@ test("movement and actions use independent bounded streams with causal ACK and r
   assert.match(client, /actionAlert\.setAttribute\("role", "alert"\)/);
   assert.match(client, /showActionDeliveryError\(message\)/,
     "a fail-closed action must remain visibly actionable during the match");
-  assert.match(clientCss, /\.online-action-alert \{[\s\S]*position: fixed;[\s\S]*z-index: 15;/);
-  assert.doesNotMatch(clientCss, /is-match-active[^\n]*online-action-alert/,
+  assert.match(clientCss, /\.runtime-action-alert \{[\s\S]*position: fixed;[\s\S]*z-index: 15;/);
+  assert.doesNotMatch(clientCss, /is-match-active[^\n]*runtime-action-alert/,
     "match mode must not hide its critical action-delivery alert");
   assert.match(client, /if \(!sendOnlineAction\("bomb"\)\) return false/);
   assert.match(client, /if \(!sendOnlineAction\("ability", slot\)\) return false/);
@@ -586,7 +586,7 @@ test("loads only the playable champion models selected in the lobby", async () =
   const champions = ["katarina", "zed", "renekton", "vladimir", "gangplank"];
 
   assert.equal(names.length, 1);
-  assert.ok(Buffer.byteLength(game) < 750_000);
+  assert.ok(Buffer.byteLength(game) < 760_000);
   // The trained V1 pilot ships as a separate asset, never inline: the solo
   // CPU loads it on demand and falls back to the baseline if it is missing.
   assert.match(game, /<script src="\/bot-v1\.js"><\/script>/);
@@ -718,7 +718,8 @@ test("ships server-authoritative room and snapshot behavior", async () => {
   assert.match(client, /localOnlinePlayerId\(\)/);
   assert.match(client, /const abilityKeys = \{ KeyQ: 0, KeyF: 1, KeyE: 2, KeyR: 3 \}/);
   assert.match(client, /guestAction\("ability", abilityKeys\[event\.code\]\)/);
-  assert.match(client, /CREATE CHALLENGE LINK/);
+  assert.match(client, /action === "create-challenge"/);
+  assert.doesNotMatch(client, /CREATE CHALLENGE LINK/);
   assert.match(client, /type: "quick-match"/);
   assert.match(client, /function startQuickMatch/);
   assert.match(server, /quickMatchQueue/);

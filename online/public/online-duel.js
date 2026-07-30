@@ -485,119 +485,59 @@
   // Timers are suspended automatically while a page is in BFCache. Clearing
   // this interval on pagehide would make a restored match lose replay forever.
 
-  const panel = document.createElement("section");
-  panel.className = "online-panel";
+  // The modern React shell owns every visible lobby control. This hidden proxy
+  // keeps the authoritative networking runtime independent from presentation.
+  const panel = document.createElement("div");
+  panel.className = "runtime-network-controls";
   panel.dataset.mode = "offline";
-  panel.setAttribute("aria-label", "Online PvP lobby");
+  panel.hidden = true;
+  panel.setAttribute("aria-hidden", "true");
   panel.innerHTML = `
-    <div class="online-panel__head">
-      <div>
-        <span class="online-kicker">ONLINE PVP</span>
-        <strong>CREATE YOUR DUEL</strong>
-        <span class="online-panel__lede">Pick a format. The match runs on our São Paulo server.</span>
-      </div>
-      <span class="online-server"><i aria-hidden="true"></i> SÃO PAULO · ONLINE</span>
-    </div>
-    <div class="online-panel__actions">
-      <button type="button" class="online-action online-action--primary" id="online-create">
-        <span class="online-action__index">01</span>
-        <span><strong>QUICK MATCH</strong><small>Automatic opponent · current champion + arena · first to 3</small></span>
-        <b aria-hidden="true">→</b>
-      </button>
-      <button type="button" class="online-action" id="online-show-invite" aria-expanded="false" aria-controls="online-invite-preset">
-        <span class="online-action__index">02</span>
-        <span><strong>CHALLENGE LINK</strong><small>Preset both fighters + arena · first to 10</small></span>
-        <b aria-hidden="true">+</b>
-      </button>
-      <button type="button" class="online-action" id="online-show-join" aria-expanded="false" aria-controls="online-join-form">
-        <span class="online-action__index">03</span>
-        <span><strong>JOIN A LOBBY</strong><small>Enter a six-character room code</small></span>
-        <b aria-hidden="true">→</b>
-      </button>
-      <button type="button" class="online-action online-action--quiet" id="online-offline">
-        <span><strong>SOLO / LOCAL</strong><small>Play on this device</small></span>
-        <b aria-hidden="true">↗</b>
-      </button>
-    </div>
-    <form class="online-invite-preset" id="online-invite-preset" hidden>
-      <div class="online-form__head">
-        <span class="online-kicker">CHALLENGE SETUP</span>
-        <strong>Lock the match before sharing</strong>
-        <small>Your opponent opens the link and joins with this exact preset.</small>
-      </div>
-      <div class="online-form__fields">
-        <label><span>YOUR CHAMPION</span><select id="online-invite-host">
-          ${CHAMPIONS.map((champion) => `<option value="${champion}">${championNameSafe(champion)}</option>`).join("")}
-        </select></label>
-        <label><span>RIVAL CHAMPION</span><select id="online-invite-guest">
-          ${CHAMPIONS.map((champion) => `<option value="${champion}"${champion === "zed" ? " selected" : ""}>${championNameSafe(champion)}</option>`).join("")}
-        </select></label>
-        <label><span>ARENA</span><select id="online-invite-arena">
-          ${ARENAS.map((arena) => `<option value="${arena}">${ARENA_NAMES[arena]}</option>`).join("")}
-        </select></label>
-      </div>
-      <div class="online-form__submit">
-        <span class="micro" id="online-preset-summary">KATARINA VS ZED · FIRST TO 10</span>
-        <button type="submit">CREATE CHALLENGE LINK <b aria-hidden="true">→</b></button>
-      </div>
+    <button type="button" id="online-create">Quick match</button>
+    <button type="button" id="online-show-invite" aria-expanded="false" aria-controls="online-invite-preset">Challenge</button>
+    <button type="button" id="online-show-join" aria-expanded="false" aria-controls="online-join-form">Join</button>
+    <button type="button" id="online-offline">Offline</button>
+    <form id="online-invite-preset" hidden>
+      <select id="online-invite-host" aria-label="Host champion">
+        ${CHAMPIONS.map((champion) => `<option value="${champion}">${championNameSafe(champion)}</option>`).join("")}
+      </select>
+      <select id="online-invite-guest" aria-label="Rival champion">
+        ${CHAMPIONS.map((champion) => `<option value="${champion}"${champion === "zed" ? " selected" : ""}>${championNameSafe(champion)}</option>`).join("")}
+      </select>
+      <select id="online-invite-arena" aria-label="Arena">
+        ${ARENAS.map((arena) => `<option value="${arena}">${ARENA_NAMES[arena]}</option>`).join("")}
+      </select>
+      <span id="online-preset-summary">Katarina vs Zed</span>
+      <button type="submit">Create challenge</button>
     </form>
-    <form class="online-panel__join" id="online-join-form" hidden>
-      <div class="online-form__head">
-        <span class="online-kicker">JOIN LOBBY</span>
-        <strong>Enter the room code</strong>
-        <small>Ask the host for the six characters shown in their lobby.</small>
-      </div>
-      <div class="online-join-code">
-        <label class="sr-only" for="online-code">Lobby code</label>
-        <input id="online-code" name="code" maxlength="6" autocomplete="off"
-          inputmode="text" placeholder="------" aria-label="Six character lobby code">
-        <button type="submit">CONNECT <b aria-hidden="true">→</b></button>
-      </div>
+    <form id="online-join-form" hidden>
+      <input id="online-code" name="code" maxlength="6" autocomplete="off" inputmode="text" aria-label="Lobby code">
+      <button type="submit">Connect</button>
     </form>
-    <div class="online-panel__lobby" id="online-lobby" hidden>
-      <ol class="online-lobby-progress" aria-label="Lobby progress">
-        <li data-progress="created"><i>1</i><span>ROOM CREATED</span></li>
-        <li data-progress="connected"><i>2</i><span>RIVAL CONNECTED</span></li>
-        <li data-progress="ready"><i>3</i><span>READY TO FIGHT</span></li>
-      </ol>
-      <div class="online-panel__room">
-        <div class="online-room-identity"><span class="micro" id="online-room-label">LOBBY CODE</span>
-          <div class="online-room-code" id="online-room-code" aria-live="polite">------</div></div>
-        <button type="button" id="online-copy">COPY CODE</button>
-      </div>
-      <input class="online-invite-url" id="online-invite-url" readonly hidden
-        aria-label="Direct challenge invite link">
-      <div class="online-players">
-        <article class="online-player" data-player="host">
-          <span class="online-player__badge">P1</span>
-          <span class="online-player__info"><span class="online-player__side">HOST · BLUE</span><strong id="online-host-champion">Katarina</strong></span>
-          <span class="online-player__state" id="online-host-state">HOST</span>
-        </article>
-        <article class="online-player" data-player="guest">
-          <span class="online-player__badge">P2</span>
-          <span class="online-player__info"><span class="online-player__side">RIVAL · RED</span><strong id="online-guest-champion">Zed</strong></span>
-          <span class="online-player__state" id="online-guest-state">WAITING</span>
-        </article>
-      </div>
-      <div class="online-ready-row">
-        <span class="micro" id="online-role-help">Admin chooses the arena.</span>
-        <button type="button" id="online-ready" hidden>I'M READY</button>
-      </div>
+    <div id="online-lobby" hidden>
+      <span id="online-room-label">Lobby code</span>
+      <span id="online-room-code" aria-live="polite">------</span>
+      <button type="button" id="online-copy">Copy code</button>
+      <input id="online-invite-url" readonly hidden aria-label="Challenge link">
+      <strong id="online-host-champion">Katarina</strong>
+      <span id="online-host-state">Host</span>
+      <strong id="online-guest-champion">Zed</strong>
+      <span id="online-guest-state">Waiting</span>
+      <span id="online-role-help">Host controls the lobby.</span>
+      <button type="button" id="online-ready" hidden>Ready</button>
     </div>
-    <p class="online-status micro" id="online-status" role="status" aria-live="polite">
-      Choose Quick Lobby, create a preset challenge, or join a friend.
-    </p>
+    <p id="online-status" role="status" aria-live="polite"></p>
   `;
-  document.querySelector(".intro-actions")?.before(panel);
+  document.body.appendChild(panel);
 
   const connection = document.createElement("div");
-  connection.className = "online-connection";
+  connection.className = "runtime-network-status";
   connection.hidden = true;
   connection.textContent = "Online link";
   document.body.appendChild(connection);
 
   const actionAlert = document.createElement("div");
-  actionAlert.className = "online-action-alert";
+  actionAlert.className = "runtime-action-alert";
   actionAlert.hidden = true;
   actionAlert.setAttribute("role", "alert");
   actionAlert.setAttribute("aria-live", "assertive");
@@ -788,7 +728,7 @@
     return state.resumeToken;
   }
 
-  function returnToIntroUi() {
+  function returnToSetupState() {
     try {
       game.mode = "intro";
       game.p2Human = false;
@@ -796,16 +736,15 @@
       game.presentation.matchTarget = 3;
       game.resetPlayers?.();
       if (UI.end) UI.end.hidden = true;
-      if (UI.intro) UI.intro.classList.remove("is-gone");
       if (UI.chrome) {
         UI.chrome.classList.add("is-hidden");
         UI.chrome.setAttribute("aria-hidden", "true");
         UI.chrome.setAttribute("inert", "");
       }
       UI.start.disabled = false;
-      UI.start.textContent = `>>> DEPLOY ${game.player?.name?.toUpperCase?.() || "KATARINA"}`;
+      UI.start.textContent = "Match ready";
     } catch (error) {
-      console.warn("Could not fully reset intro UI", error);
+      console.warn("Could not fully reset setup state", error);
     }
   }
 
@@ -824,10 +763,10 @@
     game.matchTarget = 3;
     game.presentation.matchTarget = 3;
     game.p2Human = false;
-    if (wasPlaying || fromMatch) returnToIntroUi();
+    if (wasPlaying || fromMatch) returnToSetupState();
     else if (game.mode === "intro") game.resetPlayers?.();
     UI.start.disabled = false;
-    UI.start.textContent = `>>> DEPLOY ${game.player?.name?.toUpperCase?.() || "KATARINA"}`;
+    UI.start.textContent = "Match ready";
     setStatus(
       fromMatch
         ? "You left the match. Create or join a lobby to play again."
@@ -907,18 +846,6 @@
     publishClientState("busy");
   }
 
-  function setChampionButtons(champion) {
-    UI.championChoices.forEach((button) =>
-      button.setAttribute("aria-pressed", String(button.dataset.champion === champion))
-    );
-  }
-
-  function setArenaButtons(arena) {
-    UI.arenaChoices.forEach((button) =>
-      button.setAttribute("aria-checked", String(button.dataset.arena === arena))
-    );
-  }
-
   function updateLobbyDisplay() {
     hostChampionLabel.textContent = championName(state.hostChampion);
     guestChampionLabel.textContent = championName(state.guestChampion);
@@ -957,7 +884,6 @@
     panel.dataset.mode = role;
     document.body.classList.toggle("is-online-match", role !== "offline");
     lobbyBox.hidden = role === "offline";
-    panel.querySelector(".online-panel__head strong").textContent = role === "offline" ? "CREATE YOUR DUEL" : "MATCH LOBBY";
     readyButton.hidden = role !== "guest" || state.inviteMode;
     roleHelp.textContent = state.inviteMode
       ? `Challenge preset locked · first to ${INVITE_MATCH_TARGET} eliminations.`
@@ -1013,7 +939,7 @@
       if (generation !== lifecycleGeneration || state.role === "offline") return false;
       await beginConfiguredGame();
       if (generation !== lifecycleGeneration || state.role === "offline") {
-        returnToIntroUi();
+        returnToSetupState();
         return false;
       }
       matchRuntimeEpoch = epoch;
@@ -1261,7 +1187,6 @@
       updateConnection("connected", `ONLINE · LOBBY ${state.roomCode} · SÃO PAULO SERVER`);
       sendLobby();
     } else {
-      setChampionButtons(state.guestChampion);
       if (state.inviteMode) {
         setStatus("Challenge connected. Loading preset champions…", "ok");
         await state.inviteAssetsReady;
@@ -1299,7 +1224,7 @@
       clearSession();
       setBusy(false);
       setOnlineRole("offline");
-      if (wasPlaying) returnToIntroUi();
+      if (wasPlaying) returnToSetupState();
       setStatus("The host closed this lobby. Create or join another one.", "error");
       return;
     }
@@ -1377,8 +1302,6 @@
       game.selectArena(state.arena);
       game.resetPlayers();
     }
-    setChampionButtons(state.role === "guest" ? state.guestChampion : state.hostChampion);
-    setArenaButtons(state.arena);
     updateLobbyDisplay();
   }
 
@@ -1753,8 +1676,6 @@
     }
     game.presentation.matchTarget = state.matchTarget;
     state.inviteAssetsReady = renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
-    setChampionButtons(state.role === "guest" ? state.guestChampion : state.hostChampion);
-    setArenaButtons(state.arena);
   }
 
   async function startQuickMatch(options = {}) {
@@ -1774,8 +1695,6 @@
     state.quickMatch = true;
     game.selectChampion(state.hostChampion);
     game.selectArena(state.arena);
-    setChampionButtons(state.hostChampion);
-    setArenaButtons(state.arena);
     setBusy(true);
     setStatus("Entrando na fila do Quick Match…", "ok");
     updateConnection("waiting", "QUICK MATCH · CONECTANDO À FILA");
@@ -1842,7 +1761,6 @@
     state.guestReady = state.inviteMode;
     roomLabel.textContent = state.inviteMode ? "DIRECT CHALLENGE" : "JOINED LOBBY";
     roomCode.textContent = code;
-    setChampionButtons(state.guestChampion);
     setBusy(true);
     setStatus(state.inviteMode ? `Activating challenge ${code}…` : `Joining lobby ${code}…`);
     updateLobbyDisplay();
@@ -1914,10 +1832,10 @@
     game.matchTarget = 3;
     game.presentation.matchTarget = 3;
     game.p2Human = false;
-    if (game.mode === "playing" || game.mode === "matchover") returnToIntroUi();
+    if (game.mode === "playing" || game.mode === "matchover") returnToSetupState();
     else if (game.mode === "intro") game.resetPlayers();
     UI.start.disabled = false;
-    UI.start.textContent = `>>> DEPLOY ${game.player.name.toUpperCase()}`;
+    UI.start.textContent = "Match ready";
     setStatus("Solo/local selected. Online lobby controls are disabled.", "ok");
     publishClientState("offline");
   }
@@ -1958,8 +1876,6 @@
     }
     reliableAction.hydrate(saved.actionDelivery);
     setOnlineRole(saved.role);
-    setChampionButtons(saved.role === "guest" ? state.guestChampion : state.hostChampion);
-    setArenaButtons(state.arena);
     roomLabel.textContent = state.inviteMode ? "CHALLENGE LINK · RESUME" : "LOBBY CODE · RESUME";
     roomCode.textContent = state.roomCode;
     if (saved.role === "host" && state.inviteMode) state.inviteUrl = challengeUrl(state.roomCode);
@@ -2235,53 +2151,6 @@
     }
   }, true);
 
-  UI.championChoices.forEach((button) => {
-    button.addEventListener("click", (event) => {
-      if (!state.inviteMode || state.role === "offline") return;
-      event.preventDefault(); event.stopImmediatePropagation();
-      setStatus("This challenge link has locked champions.", "ok");
-    }, true);
-    button.addEventListener("click", (event) => {
-      if (state.role !== "guest") return;
-      event.preventDefault(); event.stopImmediatePropagation();
-      if (!validChampion(button.dataset.champion)) return;
-      state.guestChampion = button.dataset.champion;
-      void renderer.ensureChampionModel(state.guestChampion);
-      state.guestReady = false;
-      setChampionButtons(state.guestChampion);
-      sendGuestConfig();
-      updateLobbyDisplay();
-      setStatus(`${championName(state.guestChampion)} selected. Press READY when finished.`, "ok");
-    }, true);
-    button.addEventListener("click", () => {
-      if (state.role !== "host") return;
-      state.hostChampion = game.selectedChampion;
-      state.guestReady = false;
-      updateLobbyDisplay();
-      sendLobby();
-    });
-  });
-
-  UI.arenaChoices.forEach((button) => {
-    button.addEventListener("click", (event) => {
-      if (!state.inviteMode || state.role === "offline") return;
-      event.preventDefault(); event.stopImmediatePropagation();
-      setStatus("This challenge link has a locked arena.", "ok");
-    }, true);
-    button.addEventListener("click", (event) => {
-      if (state.role !== "guest") return;
-      event.preventDefault(); event.stopImmediatePropagation();
-      setStatus("Only the lobby admin chooses the arena.", "error");
-    }, true);
-    button.addEventListener("click", () => {
-      if (state.role !== "host") return;
-      state.arena = game.selectedArena;
-      state.guestReady = false;
-      updateLobbyDisplay();
-      sendLobby();
-    });
-  });
-
   readyButton.addEventListener("click", () => {
     if (state.role !== "guest" || !state.connected) return;
     state.guestReady = !state.guestReady;
@@ -2367,7 +2236,6 @@
       state.guestChampion = champion;
       state.guestReady = false;
       void renderer.ensureChampionModel(champion);
-      setChampionButtons(champion);
       sendGuestConfig();
       updateLobbyDisplay();
       setStatus(`${championName(champion)} selected. Press READY when finished.`, "ok");
@@ -2375,7 +2243,6 @@
     }
     game.selectChampion(champion);
     state.hostChampion = champion;
-    setChampionButtons(champion);
     if (state.role === "host") {
       state.guestReady = false;
       sendLobby();
@@ -2408,7 +2275,6 @@
     }
     game.selectArena(arena);
     state.arena = arena;
-    setArenaButtons(arena);
     if (state.role === "host") {
       state.guestReady = false;
       sendLobby();
@@ -2422,12 +2288,17 @@
     const champion = validChampion(payload.champion) ? payload.champion : "katarina";
     const guestChampion = validChampion(payload.guestChampion) ? payload.guestChampion : "zed";
     const arena = validArena(payload.arena) ? payload.arena : ARENAS[0];
-    game.p2Human = payload.mode === "local";
     game.selectChampion(champion);
-    game.selectChampion2(guestChampion);
+    if (payload.mode === "local") {
+      game.selectChampion2(guestChampion);
+      game.activatePlayerTwo();
+    } else {
+      game.activateBotOpponent();
+      if (!game.selectBotOpponent(payload.bot)) game.selectChampion2(guestChampion);
+    }
     game.selectArena(arena);
     state.hostChampion = champion;
-    state.guestChampion = guestChampion;
+    state.guestChampion = game.selectedChampion2;
     state.arena = arena;
     state.matchTarget = 3;
     await originalBeginGame();
@@ -2556,11 +2427,6 @@
     }
   }
 
-  document.querySelector(".intro-lede").textContent =
-    "Create a lightweight lobby, choose champion and arena, then duel online without pause.";
-  const feature = [...document.querySelectorAll(".intro-notes span")]
-    .find((item) => item.textContent.includes("Local PvP") || item.textContent.includes("Online PvP"));
-  if (feature) feature.textContent = "Online PvP · independent controls";
   setTimeout(() => {
     void renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
   });

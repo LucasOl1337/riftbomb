@@ -1,0 +1,83 @@
+{
+  "ok": true,
+  "verdict": "pass",
+  "confidence": 0.891,
+  "estimatedFidelity": 0.891,
+  "targetThreshold": 0.7,
+  "materialId": "black-forged",
+  "sourceImage": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\material-crops\\black-forged.png",
+  "outDir": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged",
+  "palette": [
+    "#1D2024",
+    "#35393D",
+    "#515D66",
+    "#8197A4",
+    "#101010"
+  ],
+  "maps": {
+    "albedo": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_albedo.png",
+      "url": "black-forged_albedo.png",
+      "channel": "albedo",
+      "source": "reference-pixel-extraction"
+    },
+    "roughness": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_roughness.png",
+      "url": "black-forged_roughness.png",
+      "channel": "roughness",
+      "source": "reference-pixel-extraction"
+    },
+    "height": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+      "url": "black-forged_height.png",
+      "channel": "height",
+      "source": "reference-pixel-extraction"
+    },
+    "normal": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_normal.png",
+      "url": "black-forged_normal.png",
+      "channel": "normal",
+      "source": "reference-pixel-extraction"
+    },
+    "ao": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_ao.png",
+      "url": "black-forged_ao.png",
+      "channel": "ao",
+      "source": "reference-pixel-extraction"
+    }
+  },
+  "diagnostics": {
+    "sourceWidth": 230,
+    "sourceHeight": 125,
+    "mapSize": 1024,
+    "cropBBoxPixels": {
+      "x": 0,
+      "y": 0,
+      "width": 230,
+      "height": 125
+    },
+    "mask": {
+      "backgroundColor": "#1D1F22",
+      "backgroundNoise": 2.236,
+      "transparentPixelFraction": 0.0,
+      "foregroundCoverage": 0.5231
+    },
+    "mapStats": {
+      "valueRange": 0.4095,
+      "heightP90Gradient": 0.04147,
+      "roughnessBase": 0.709,
+      "roughnessVariation": 0.087,
+      "normalStrength": 0.205,
+      "blurRadius": 21
+    },
+    "palette": [
+      "#1D2024",
+      "#35393D",
+      "#515D66",
+      "#8197A4",
+      "#101010"
+    ]
+  },
+  "warnings": [],
+  "limitation": "single-image PBR extraction is an estimate; 70%+ extraction confidence still needs render screenshot review"
+}

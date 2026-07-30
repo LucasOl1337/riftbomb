@@ -78,29 +78,9 @@ button:disabled {
   transition: opacity 260ms ease;
 }
 
-.game-shell.is-match-live .game-frame,
-.game-frame--legacy {
+.game-shell.is-match-live .game-frame {
   opacity: 1;
   pointer-events: auto;
-}
-
-.game-shell--legacy {
-  background: #05070b;
-}
-
-.legacy-return {
-  position: fixed;
-  z-index: 30;
-  top: 12px;
-  left: 12px;
-  padding: 10px 14px;
-  border: 1px solid rgb(255 255 255 / 20%);
-  color: #dce7e8;
-  background: rgb(4 9 13 / 86%);
-  font-size: 11px;
-  font-weight: 750;
-  letter-spacing: 0.08em;
-  text-decoration: none;
 }
 
 .client-boot {
@@ -533,37 +513,6 @@ button:disabled {
   line-height: 1;
 }
 
-.classic-link {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: auto;
-  margin: 8px 22px 20px;
-  padding-top: 16px;
-  padding-right: 0;
-  padding-bottom: 0;
-  padding-left: 0;
-  border-right: 0;
-  border-bottom: 0;
-  border-left: 0;
-  border-top: 1px solid var(--line);
-  color: #778e95;
-  background: transparent;
-  font-size: 10px;
-  font-weight: 720;
-  letter-spacing: 0.06em;
-  text-decoration: none;
-}
-
-.classic-link:hover {
-  color: var(--text);
-}
-
-.classic-link svg {
-  width: 15px;
-  height: 15px;
-}
-
 .client-stage {
   position: relative;
   min-width: 0;
@@ -810,6 +759,71 @@ button:disabled {
 .config-section--rival .champion-choice.is-selected::after {
   background: #d16d70;
   box-shadow: 0 0 9px rgb(209 109 112 / 52%);
+}
+
+.training-bot-card {
+  display: grid;
+  grid-template-columns: 42px minmax(130px, 1fr) minmax(178px, 1.35fr) repeat(2, minmax(120px, 1fr));
+  align-items: center;
+  gap: 10px 14px;
+  min-width: 0;
+  min-height: 78px;
+  padding: 11px 13px 10px;
+  border: 1px solid rgb(114 212 220 / 38%);
+  background: linear-gradient(90deg, rgb(21 62 69 / 72%), rgb(3 12 17 / 72%));
+  box-shadow: inset 0 0 24px rgb(114 212 220 / 5%);
+}
+
+.training-bot-card__mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 1px solid var(--cyan);
+  color: var(--cyan-bright);
+  background: rgb(4 17 23 / 76%);
+  box-shadow: inset 0 0 18px rgb(114 212 220 / 8%);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.training-bot-card__identity,
+.training-bot-card__metric {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.training-bot-card small {
+  color: #718a91;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+}
+
+.training-bot-card strong {
+  color: #dce9e9;
+  font-size: 10px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.training-bot-card__weakness {
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid rgb(145 188 197 / 12%);
+  color: #91a6ab;
+}
+
+.training-bot-card__weakness strong {
+  color: #aebfc2;
+  font-weight: 650;
 }
 
 .arena-list {
@@ -1299,6 +1313,16 @@ button:disabled {
   .room-code-field {
     grid-template-columns: 106px minmax(150px, 220px) minmax(90px, 1fr);
   }
+
+  .training-bot-card {
+    grid-template-columns: 38px minmax(112px, 1fr) repeat(3, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .training-bot-card__mark {
+    width: 38px;
+    height: 38px;
+  }
 }
 
 @media (max-width: 1020px) {
@@ -1380,11 +1404,6 @@ button:disabled {
     font-size: 12px;
   }
 
-  .classic-link {
-    margin: 4px 14px 13px;
-    font-size: 8px;
-  }
-
   .client-hero-copy {
     top: 24px;
     left: 25px;
@@ -1453,6 +1472,28 @@ button:disabled {
 
   .room-code-field small {
     display: none;
+  }
+
+  .training-bot-card {
+    grid-template-columns: 36px repeat(2, minmax(0, 1fr));
+    padding: 10px;
+  }
+
+  .training-bot-card__mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .training-bot-card__identity {
+    grid-column: 2 / -1;
+  }
+
+  .training-bot-card__metric--intelligence {
+    grid-column: 1 / -1;
+  }
+
+  .training-bot-card__weakness {
+    grid-column: 1 / -1;
   }
 
   .party-rail__head {
@@ -1586,13 +1627,6 @@ button:disabled {
 
   .mode-item__chevron {
     display: none;
-  }
-
-  .classic-link {
-    gap: 5px;
-    margin: 3px 9px 8px;
-    padding-top: 8px;
-    font-size: 6px;
   }
 
   .client-hero-copy {
@@ -1828,8 +1862,7 @@ button:disabled {
     border-bottom: 1px solid var(--line);
   }
 
-  .mode-rail__heading,
-  .classic-link {
+  .mode-rail__heading {
     display: none;
   }
 
@@ -1933,6 +1966,32 @@ button:disabled {
   .champion-grid,
   .arena-list {
     grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .config-section--training-bot {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .config-section--training-bot .config-section__label {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .config-section--training-bot .config-section__label small {
+    display: block;
+  }
+
+  .training-bot-card {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .training-bot-card__metric,
+  .training-bot-card__weakness {
+    grid-column: 1 / -1;
   }
 }
 

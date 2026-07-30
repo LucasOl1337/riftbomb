@@ -76,22 +76,17 @@
     const modelReviewPose = modelReviewQuery.get("pose") || "idle";
     const modelReviewAction = modelReviewQuery.get("action") || "";
     const requestedModelReviewFrame = Number.parseInt(modelReviewQuery.get("frame") || "0", 10);
-    const modelReviewMode = ["katarina", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron"].includes(modelReviewTarget);
+    const modelReviewMode = ["katarina", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron", "bomb"].includes(modelReviewTarget);
 
     const UI = {
       app: $("#app"),
       canvas: $("#arena"),
-      intro: $("#intro"),
+      runtimeBootstrap: $("#runtime-bootstrap"),
       start: $("#start-game"),
       chrome: $("#chrome"),
       guide: $("#combat-guide"),
       guideOpen: $("#open-guide"),
-      guideOpenIntro: $("#open-guide-intro"),
       guideClose: $("#close-guide"),
-      championChoices: $$(".champion-choice"),
-      playerSelectorButtons: $$("[data-select-player]"),
-      playerConfigLabel: $("#player-config-label"),
-      arenaChoices: $$(".arena-choice"),
       championPortrait: $("#champion-portrait"),
       playerName: $("#player-name"),
       matchSubtitle: $("#match-subtitle"),
@@ -100,9 +95,7 @@
       waveLabel: $("#wave-label"),
       waveNumber: $("#wave-number"),
       enemyCount: $("#enemy-count"),
-      hearts: $("#hearts"),
       playerCard: $(".player-card"),
-      healthFill: $("#health-fill"),
       resourceFill: $("#resource-fill"),
       combo: $("#combo"),
       comboLabel: $("#combo-label"),
@@ -149,8 +142,6 @@
       touchUltArt: $("#touch-ult-art"),
       playerTwoHud: $("#player-two-hud"),
       playerTwoName: $("#player-two-name"),
-      playerTwoHealth: $("#player-two-health"),
-      playerTwoHealthFill: $("#player-two-health-fill"),
       playerTwoSkillButtons: $$("[data-p2-slot]"),
       playerTwoBombButton: $("[data-p2-action='bomb']"),
       minimapPlayer: $("#minimap-player"),
@@ -503,7 +494,7 @@
         this.mainUniforms = this.uniforms(this.mainProgram, [
           "uModel", "uViewProjection", "uColor", "uCamera", "uTime", "uBeat",
           "uEmissive", "uMaterial", "uAlpha", "uAlbedo", "uAlbedoTop", "uMapId",
-          "uFloorProfile"
+          "uFloorProfile", "uArenaProfile"
         ]);
         this.arenaFxUniforms = this.uniforms(this.arenaFxProgram, [
           "uModel", "uViewProjection", "uTime", "uBeat", "uPrimary", "uSecondary",
@@ -538,6 +529,11 @@
           skillDisc: this.createMesh(buildSkillDisc(this.mobilePerf ? 24 : 56)),
           skillCoin: this.createMesh(buildSkillCoin(this.mobilePerf ? 20 : 48))
         };
+        if (globalThis.RIFTBOMB_NACRE_APPEARANCE?.buildGrowthMesh) {
+          this.meshes.nacreGrowth = this.createMesh(
+            globalThis.RIFTBOMB_NACRE_APPEARANCE.buildGrowthMesh(this.mobilePerf)
+          );
+        }
         const katarinaDaggerSource = PLAYABLE_CHAMPIONS?.katarina?.dagger;
         if (katarinaDaggerSource) {
           const binary = atob(katarinaDaggerSource);
@@ -1422,6 +1418,7 @@
           crateTop: ["crateTop"],
           floorLattice: ["floorLattice"],
           floorClearing: ["floorClearing"],
+          nacreGrowth: ["nacreGrowth"],
           floorLabyrinth: ["floorLabyrinth"],
           floorForts: ["floorForts"],
           floorPit: ["floorPit"],
@@ -1442,6 +1439,7 @@
           crateTop: [90, 62, 40, 255],
           floorLattice: [138, 90, 58, 255],
           floorClearing: [40, 90, 96, 255],
+          nacreGrowth: [108, 94, 88, 255],
           floorLabyrinth: [28, 40, 52, 255],
           floorForts: [52, 110, 48, 255],
           floorPit: [28, 36, 58, 255],
@@ -1476,7 +1474,8 @@
           this.arenaTextures.floorLattice,
           this.arenaTextures.crate,
           this.arenaTextures.wallLattice,
-          null
+          null,
+          this.arenaTextures.nacreGrowth
         ];
       }
 
@@ -1501,11 +1500,13 @@
           || wall;
         this.arenaMapTextures[1] = floor;
         this.arenaMapTextures[3] = wall;
+        this.arenaMapTextures[5] = this.arenaTextures[theme.soft] || this.arenaTextures.nacreGrowth;
         this.arenaTextures.wall = wall;
         this.arenaTextures.wallTop = wallTop;
         this.arenaFloorProfile = floorKey === "floorLattice" || floorKey === "floorPit"
           ? 1
           : 0;
+        this.arenaMaterialProfile = floorKey === "floorClearing" ? 1 : 0;
       }
 
       themeColor(theme, key, fallback) {
@@ -1714,6 +1715,7 @@
           this.mainUniforms.uFloorProfile,
           useMap === 1 ? (this.arenaFloorProfile || 0) : 0
         );
+        gl.uniform1f(this.mainUniforms.uArenaProfile, this.arenaMaterialProfile || 0);
         const white = this.arenaWhiteTexture;
         let side = white;
         let top = white;
@@ -1753,6 +1755,7 @@
           this.mainUniforms.uFloorProfile,
           useMap === 1 ? (this.arenaFloorProfile || 0) : 0
         );
+        gl.uniform1f(this.mainUniforms.uArenaProfile, this.arenaMaterialProfile || 0);
         const white = this.arenaWhiteTexture;
         let side = white;
         let top = white;
@@ -1858,6 +1861,63 @@
           const pulse = 1 + Math.sin(phase * 1.6) * 0.045;
           el.style.transform = `translate3d(0,0,0) scale(${(distScale * pulse).toFixed(3)})`;
           el.title = p.label || "Skill unlock";
+        }
+      }
+
+      /** Keep each contestant's health attached to their champion in the arena. */
+      syncCharacterHealthDom(players) {
+        let layer = this.characterHealthLayer;
+        if (!layer) {
+          layer = document.getElementById("character-health-layer");
+          this.characterHealthLayer = layer;
+        }
+        if (!layer) return;
+
+        const contestants = (players || []).filter(Boolean);
+        while (layer.children.length > contestants.length) layer.removeChild(layer.lastChild);
+        while (layer.children.length < contestants.length) {
+          const el = document.createElement("div");
+          el.className = "character-health";
+          el.innerHTML = `
+            <div class="character-health__label"></div>
+            <div class="character-health__meter">
+              <b class="character-health__level"></b>
+              <div class="character-health__track"><i></i></div>
+            </div>
+          `;
+          layer.appendChild(el);
+        }
+
+        const vp = this.lastViewProjection;
+        const cam = this.lastCamera || [0, 12, 11];
+        const canvasRect = this.canvas.getBoundingClientRect();
+        for (let i = 0; i < contestants.length; i++) {
+          const player = contestants[i];
+          const el = layer.children[i];
+          const champion = String(player.champion || "unit").toLowerCase();
+          const barHeight = champion === "renekton" ? 2.55
+            : champion === "katarina" ? 2.05
+              : champion === "zed" ? 2.25
+                : 2.35;
+          const uv = projectPoint(vp, [player.x, barHeight, player.z]);
+          const visible = player.alive !== false &&
+            uv[0] >= -0.05 && uv[0] <= 1.05 && uv[1] >= -0.05 && uv[1] <= 1.05;
+          el.style.visibility = visible ? "visible" : "hidden";
+          if (!visible) continue;
+
+          const maxHealth = Math.max(1, Number(player.maxHealth) || 100);
+          const health = clamp(Number(player.health) || 0, 0, maxHealth);
+          const ratio = health / maxHealth;
+          el.style.left = `${(canvasRect.left + uv[0] * canvasRect.width).toFixed(1)}px`;
+          el.style.top = `${(canvasRect.top + (1 - uv[1]) * canvasRect.height).toFixed(1)}px`;
+          const dist = Math.hypot(player.x - cam[0], barHeight - cam[1], player.z - cam[2]);
+          const scale = clamp(10 / Math.max(dist, 5), 0.72, 1.08);
+          el.style.setProperty("--health-scale", scale.toFixed(3));
+          const championName = champion.charAt(0).toUpperCase() + champion.slice(1);
+          const level = (player.skillsUnlocked || []).filter(Boolean).length;
+          el.querySelector(".character-health__label").textContent = championName;
+          el.querySelector(".character-health__level").textContent = String(level);
+          el.querySelector("i").style.transform = `scaleX(${ratio.toFixed(4)})`;
         }
       }
 
@@ -3026,7 +3086,9 @@ drawKatarinaFallback(player, t, beat) {
         const shakeX = Math.sin(t * 61) * essentialShake * 0.2;
         const shakeZ = Math.cos(t * 47) * essentialShake * 0.16;
         const orbit = prefersReducedMotion || this.mobilePerf ? 0 : Math.sin(t * 0.16) * 0.32;
-        const reviewCamera = modelReviewTarget === "baron"
+        const reviewCamera = modelReviewTarget === "bomb"
+          ? { eye: [0, 2.15, 4.0], target: [0, 0.72, 0], fov: 0.54 }
+          : modelReviewTarget === "baron"
           ? { eye: [0, 3.75, 7.2], target: [0, 1.2, 0], fov: 0.68 }
           : modelReviewTarget === "herald"
             ? { eye: [0, 2.8, 5.2], target: [0, 0.85, 0], fov: 0.62 }
@@ -3090,6 +3152,10 @@ drawKatarinaFallback(player, t, beat) {
         gl.disable(gl.BLEND);
         const C = Renderer.colors;
         const theme = game.arenaTemplate ? game.arenaTemplate().theme : null;
+        const nacreAppearance = typeof RIFTBOMB_NACRE_APPEARANCE !== "undefined" &&
+          RIFTBOMB_NACRE_APPEARANCE.isTheme(theme)
+          ? RIFTBOMB_NACRE_APPEARANCE
+          : null;
         this.bindArenaTheme(theme);
         // Opaque tactical void from arena theme. Never transparent (was bleeding page grey).
         // Never "punch" dark clears toward mid-grey — CRT cockpit wants deep ink.
@@ -3123,8 +3189,9 @@ drawKatarinaFallback(player, t, beat) {
         this.draw("cube", [0, -0.42, 0], [halfW + 0.85, 0.18, halfD + 0.85], plinth, 0, 0.02);
         this.draw("cube", [0, -0.24, 0], [halfW + 0.52, 0.1, halfD + 0.52], lip, 0, 0.06);
         this.draw("cube", [0, -0.12, 0], [halfW + 0.22, 0.07, halfD + 0.22], floorA, 0, 0.04);
+        nacreAppearance?.drawBackdrop(this, halfW, halfD, t);
         // Hazard registration marks on stage corners (telemetry, not soft glow)
-        const mark = C.ember || [0.9, 0.16, 0.16];
+        const mark = nacreAppearance ? accent : (C.ember || [0.9, 0.16, 0.16]);
         for (const sx of [-1, 1]) {
           for (const sz of [-1, 1]) {
             this.draw("cube",
@@ -3145,6 +3212,7 @@ drawKatarinaFallback(player, t, beat) {
           }
         }
         this.drawArenaSurfaceFx(theme, halfW, halfD, vp, t, beat);
+        nacreAppearance?.drawFloorOrnaments(this, t, beat);
         // Stage edge stripe — low emissive, hard edge (not toy glow)
         this.draw("cube", [0, -0.02, halfD + 0.12], [halfW + 0.35, 0.04, 0.1], lip, 0, 0.12);
         this.draw("cube", [0, -0.02, -(halfD + 0.12)], [halfW + 0.35, 0.04, 0.1], lip, 0, 0.12);
@@ -3187,6 +3255,13 @@ drawKatarinaFallback(player, t, beat) {
             if (!tile) continue;
             if (tile === 1) {
               const frontEdge = r === game.rows - 1;
+              if (nacreAppearance) {
+                nacreAppearance.drawHardTile(this, {
+                  x, z, half, edge, frontEdge, row: r, col: c,
+                  rows: game.rows, cols: game.cols, t, beat
+                });
+                continue;
+              }
               const s = edge ? half * 0.96 : half * 0.82;
               // The camera looks from +Z: lower the near wall so it frames instead of occluding P1.
               const h = frontEdge ? 0.24 : (edge ? 0.4 : 0.34);
@@ -3195,6 +3270,12 @@ drawKatarinaFallback(player, t, beat) {
               this.draw("cube", [x, h + 0.035, z], [s, h, s],
                 textureTint, 0, 0.015, 0, 1, 0, 0, 3);
             } else if (tile === 2) {
+              if (nacreAppearance) {
+                nacreAppearance.drawBreakableTile(this, {
+                  x, z, half, row: r, col: c, t, beat
+                });
+                continue;
+              }
               const s = half * 0.72;
               this.draw("cube", [x, 0.012, z], [s * 1.08, 0.016, s * 1.08], [0.05, 0.03, 0.02], 0, 0, 0, 0.55);
               this.draw("cube", [x, 0.33, z], [s, 0.31, s],
@@ -3220,29 +3301,7 @@ drawKatarinaFallback(player, t, beat) {
 
         for (const blast of game.blasts) {
           const [x, z] = game.worldFromCell(blast.r, blast.c);
-          const life = clamp(1 - blast.age / blast.life, 0, 1);
-          const rise = Math.sin(life * Math.PI) * 0.18;
-          const pop = 1 + life * life * 0.3;
-          this.draw("cube", [x, -0.05 + rise, z],
-            [game.tile * 0.46 * pop, 0.055 + life * 0.06, game.tile * 0.46 * pop],
-            blast.core ? C.whiteGold : C.gold, 3, 2.8 + life * 4.5, t);
-          this.draw("crystal", [x, 0.38 + rise, z],
-            [0.16 + life * 0.18, 0.45 + life * 0.7, 0.16 + life * 0.18],
-            C.whiteGold, 3, 5.5 * life, t * 4.5 + blast.r);
-          // Incandescent core in the first instant of the detonation.
-          if (life > 0.62) {
-            const core = (life - 0.62) / 0.38;
-            this.draw("cube", [x, 0.16 + rise, z],
-              [game.tile * 0.3 * core, 0.34 * core, game.tile * 0.3 * core],
-              C.whiteGold, 3, 6.5 * core, t * 2);
-          }
-          // Ground shock ring spreading from the bomb core cell.
-          if (blast.core) {
-            const spread = 1 - life;
-            const ringRadius = 0.35 + spread * game.tile * 2.3;
-            this.draw("sphere", [x, 0.05, z], [ringRadius, 0.03, ringRadius],
-              C.gold, 4, life * life * 3.2, t, 0.5 * life);
-          }
+          RIFTBOMB_BOMB_APPEARANCE.drawExplosion(this, blast, x, z, t, beat, game.tile);
         }
 
         // Plant impact: a small camera kick the moment a new bomb lands.
@@ -3272,16 +3331,9 @@ drawKatarinaFallback(player, t, beat) {
             : 0;
           const bodyY = 0.34 + (1 - fall * fall) * 1.5 + bounce;
 
-          // Fuse escalation: blink and heat rise faster toward detonation.
           const heat = progress * progress;
           const flash = 0.5 + 0.5 * Math.sin(bomb.age * (6 + heat * 34) + bomb.id * 1.7);
           const pulse = 0.86 + Math.pow(progress, 3) * 0.28 + flash * heat * 0.12;
-          const heatMix = heat * (0.25 + flash * 0.75);
-          const shell = [
-            lerp(C.bomb[0], C.whiteGold[0], heatMix),
-            lerp(C.bomb[1], C.whiteGold[1], heatMix),
-            lerp(C.bomb[2], C.whiteGold[2], heatMix)
-          ];
 
           // Plant shockwave: a team ring that expands and fades in 0.45s.
           const landRing = clamp(bomb.age / 0.45, 0, 1);
@@ -3292,20 +3344,13 @@ drawKatarinaFallback(player, t, beat) {
           }
           this.draw("sphere", [bomb.x, 0.055, bomb.z], [0.55, 0.035, 0.55],
             teamGlow, 4, 1.2 + beat + flash * heat * 2.4, t, 0.42);
-          this.draw("sphere", [bomb.x, bodyY, bomb.z],
-            [0.38 * pulse * (1 + squash * 0.7), 0.38 * pulse * (1 - squash), 0.38 * pulse * (1 + squash * 0.7)],
-            shell, 3, 0.55 + pulse * beat + heat * (1.5 + flash * 2.5), t * 0.7);
-          const sparkSpeed = 4 + progress * 15;
-          this.draw("crystal",
-            [bomb.x + Math.cos(t * sparkSpeed) * 0.19, bodyY + 0.48 + Math.sin(t * 5) * 0.05, bomb.z + Math.sin(t * sparkSpeed) * 0.19],
-            [0.08, 0.2 + heat * 0.12, 0.08], heat > 0.55 ? C.whiteGold : teamGlow, 3, 3 + beat * 3 + heat * 4, -t * 2);
-          // Final stress: a white-hot core pulses through the last fuse stretch.
-          if (progress > 0.82) {
-            const core = (progress - 0.82) / 0.18;
-            this.draw("sphere", [bomb.x, bodyY, bomb.z],
-              [0.2 * pulse * core, 0.2 * pulse * core, 0.2 * pulse * core],
-              C.whiteGold, 3, 4 + flash * 5, t);
-          }
+          RIFTBOMB_BOMB_APPEARANCE.drawBomb(this, bomb, t, beat, {
+            bodyY,
+            progress,
+            pulse,
+            squash,
+            teamGlow
+          });
         }
 
         for (const pickup of game.pickups) {
@@ -3460,7 +3505,16 @@ drawKatarinaFallback(player, t, beat) {
         }
 
         const player = game.player;
-        if (modelReviewMode && modelReviewTarget === "katarina" && player) {
+        if (modelReviewMode && modelReviewTarget === "bomb") {
+          RIFTBOMB_BOMB_APPEARANCE.drawBomb(this, {
+            id: 1,
+            x: 0,
+            z: 0,
+            age: 0.45,
+            fuse: 2.35,
+            ownerId: 1
+          }, t, beat, { review: true });
+        } else if (modelReviewMode && modelReviewTarget === "katarina" && player) {
           this.drawKatarina({
             ...player,
             champion: "katarina",
@@ -3591,6 +3645,9 @@ drawKatarinaFallback(player, t, beat) {
             this.syncSkillTokenDom(game.pickups, t);
             this.lastSkillTokenSync = now;
           }
+          this.syncCharacterHealthDom(game.players || [player]);
+        } else if (this.characterHealthLayer) {
+          this.characterHealthLayer.replaceChildren();
         }
 
         const frameMs = dt * 1000;
@@ -3788,6 +3845,7 @@ drawKatarinaFallback(player, t, beat) {
       uniform sampler2D uAlbedoTop;
       uniform float uMapId;
       uniform float uFloorProfile;
+      uniform float uArenaProfile;
       out vec4 outColor;
 
       float hash21(vec2 p) {
@@ -3880,6 +3938,13 @@ drawKatarinaFallback(player, t, beat) {
             uv = clamp(vLocal.xz * 0.5 + 0.5, 0.0, 1.0);
             albedo = texture(uAlbedo, uv).rgb;
             mapUv = uv;
+          } else if (uMapId > 4.5 && uMapId < 5.5) {
+            vec3 weights = pow(abs(N), vec3(4.0));
+            weights /= max(weights.x + weights.y + weights.z, 0.001);
+            vec3 sampleX = texture(uAlbedo, mirroredTile(vLocal.zy * 0.38 + 0.5)).rgb;
+            vec3 sampleY = texture(uAlbedo, mirroredTile(vLocal.xz * 0.38 + 0.5)).rgb;
+            vec3 sampleZ = texture(uAlbedo, mirroredTile(vLocal.xy * 0.38 + 0.5)).rgb;
+            albedo = sampleX * weights.x + sampleY * weights.y + sampleZ * weights.z;
           } else if (uMapId > 1.5 && uMapId < 2.5) {
             // CRATE: one full face of the X-panel art — never tile/fract or multi-scale
             // (tiling turned the X into a pixel soup).
@@ -3923,6 +3988,12 @@ drawKatarinaFallback(player, t, beat) {
             }
           }
           mapped = 1.0;
+          // Nacre albedos are authored as bright oyster stone. Grade them in-scene
+          // so the material keeps detail under the shared HDR/post stack instead of
+          // clipping into the white prototype look.
+          if (uArenaProfile > 0.5) {
+            albedo *= vec3(0.86, 0.88, 0.87);
+          }
           // Recompute lighting terms after bump
           ndlKey = max(dot(N, Lkey), 0.0);
           ndlFill = max(dot(N, Lfill), 0.0);

@@ -17,7 +17,7 @@ Camera, scale, and language this kit is built for:
 | Piece | File | Identity |
 | --- | --- | --- |
 | `floorLattice` | `textures/ground/floor-salt-lens-combat-band-6ffb0854.webp` | Low-noise sandstone combat bands — Salt Lens Array |
-| `floorClearing` | `textures/ground/floor-clearing.webp` | Nacre / turquoise mineral — Nacre Hollow |
+| `floorClearing` | `textures/ground/floor-clearing-v3.webp` | Carved pearl-stone with shell rings — Nacre Hollow |
 | `floorLabyrinth` | `textures/ground/floor-labyrinth.webp` | Frosted steel — Cinderfrost Works |
 | `floorForts` | `textures/ground/floor-forts.webp` | **Green** moss/grass turf — Aeolian Bastions |
 | `floorPit` | `textures/ground/floor-storm-eye-combat-field-99509f91.webp` | Low-noise navy basalt/stormglass field — Storm-Eye Basin |

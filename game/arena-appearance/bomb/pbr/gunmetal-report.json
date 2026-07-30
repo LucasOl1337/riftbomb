@@ -1,0 +1,83 @@
+{
+  "ok": true,
+  "verdict": "pass",
+  "confidence": 0.909,
+  "estimatedFidelity": 0.909,
+  "targetThreshold": 0.7,
+  "materialId": "gunmetal",
+  "sourceImage": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\material-crops\\gunmetal.png",
+  "outDir": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal",
+  "palette": [
+    "#323335",
+    "#494949",
+    "#5E6A74",
+    "#0A0A0B",
+    "#B8C4C9"
+  ],
+  "maps": {
+    "albedo": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_albedo.png",
+      "url": "gunmetal_albedo.png",
+      "channel": "albedo",
+      "source": "reference-pixel-extraction"
+    },
+    "roughness": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_roughness.png",
+      "url": "gunmetal_roughness.png",
+      "channel": "roughness",
+      "source": "reference-pixel-extraction"
+    },
+    "height": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_height.png",
+      "url": "gunmetal_height.png",
+      "channel": "height",
+      "source": "reference-pixel-extraction"
+    },
+    "normal": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_normal.png",
+      "url": "gunmetal_normal.png",
+      "channel": "normal",
+      "source": "reference-pixel-extraction"
+    },
+    "ao": {
+      "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_ao.png",
+      "url": "gunmetal_ao.png",
+      "channel": "ao",
+      "source": "reference-pixel-extraction"
+    }
+  },
+  "diagnostics": {
+    "sourceWidth": 430,
+    "sourceHeight": 82,
+    "mapSize": 1024,
+    "cropBBoxPixels": {
+      "x": 0,
+      "y": 0,
+      "width": 430,
+      "height": 82
+    },
+    "mask": {
+      "backgroundColor": "#1C1E21",
+      "backgroundNoise": 12.45,
+      "transparentPixelFraction": 0.0,
+      "foregroundCoverage": 0.601
+    },
+    "mapStats": {
+      "valueRange": 0.4872,
+      "heightP90Gradient": 0.0498,
+      "roughnessBase": 0.707,
+      "roughnessVariation": 0.089,
+      "normalStrength": 0.215,
+      "blurRadius": 21
+    },
+    "palette": [
+      "#323335",
+      "#494949",
+      "#5E6A74",
+      "#0A0A0B",
+      "#B8C4C9"
+    ]
+  },
+  "warnings": [],
+  "limitation": "single-image PBR extraction is an estimate; 70%+ extraction confidence still needs render screenshot review"
+}

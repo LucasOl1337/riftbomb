@@ -50,22 +50,23 @@
           floor: "floorClearing",
           wall: "wallClearing",
           wallTop: "wallTopClearing",
-          clear: "#041014",
-          base: "#082c31",
-          floorA: "#12373a",
-          floorB: "#0a292d",
-          lane: "#9eb6aa",
-          river: "#126c72",
-          riverLight: "#4cced3",
-          stone: "#5f716c",
-          stoneTop: "#d8e6d8",
-          crystal: "#4cced3",
-          accent: "#ff6b58",
+          soft: "nacreGrowth",
+          clear: "#021216",
+          base: "#08282c",
+          floorA: "#b8b2a6",
+          floorB: "#817f78",
+          lane: "#d8d1c2",
+          river: "#12565c",
+          riverLight: "#54c9cc",
+          stone: "#777c78",
+          stoneTop: "#ddd8ca",
+          crystal: "#54c9cc",
+          accent: "#78cfca",
           fx: Object.freeze({
             motif: 1,
             primary: "#4cced3",
-            secondary: "#ff6b58",
-            intensity: 0.74,
+            secondary: "#c6a7c7",
+            intensity: 0.26,
             speed: 0.32,
             density: 0.82
           })
@@ -272,6 +273,7 @@
         this.shadowId = 0;
         this.selectedChampion = "katarina";
         this.selectedChampion2 = "zed";
+        this.selectedBot = null;
         this.localPlayerId = 1;
         this.selectedArena = ARENA_TEMPLATES[0].id;
         this.round = 0;
@@ -617,6 +619,29 @@
         this.presentation.update(this);
       }
 
+      selectBotOpponent(botId) {
+        if (this.mode !== "intro" || typeof RIFTBOMB_BOTS === "undefined") return false;
+        const profile = RIFTBOMB_BOTS.profiles?.find((candidate) => candidate.id === botId);
+        if (!profile) return false;
+        this.p2Human = false;
+        this.selectedBot = profile.id;
+        this.selectedChampion2 = profile.champion;
+        this.resetPlayers();
+        this.botPolicy = this.createBotPolicy();
+        this.resetBotPolicy();
+        this.presentation.update(this);
+        return true;
+      }
+
+      activateBotOpponent() {
+        if (this.mode !== "intro") return;
+        this.p2Human = false;
+        const defaultBot = this.selectedBot || (typeof RIFTBOMB_BOTS === "undefined"
+          ? null
+          : RIFTBOMB_BOTS.profiles?.[0]?.id);
+        if (defaultBot) this.selectBotOpponent(defaultBot);
+      }
+
       start() {
         this.mode = "playing";
         this.seed = (Date.now() ^ 0xA57A2026) >>> 0;
@@ -666,6 +691,7 @@
       activatePlayerTwo() {
         if (this.p2Human) return;
         this.p2Human = true;
+        this.selectedBot = null;
         const p2 = this.players[1];
         if (p2) {
           p2.aiDx = 0;

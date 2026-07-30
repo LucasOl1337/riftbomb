@@ -3,7 +3,7 @@
   "displayName": "Arena floor",
   "maps": {
     "saltLens": "textures/ground/floor-salt-lens-combat-band-6ffb0854.webp",
-    "nacreHollow": "textures/ground/floor-clearing.webp",
+    "nacreHollow": "textures/ground/floor-clearing-v3.webp",
     "cinderfrost": "textures/ground/floor-labyrinth.webp",
     "stormEye": "textures/ground/floor-storm-eye-combat-field-99509f91.webp"
   },

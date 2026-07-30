@@ -38,15 +38,11 @@
         const championName = presentation.name;
         const matchTarget = this.matchTarget || 3;
         document.documentElement.dataset.champion = selectedChampion;
-        UI.championChoices.forEach((button) =>
-          button.setAttribute("aria-pressed", String(button.dataset.champion === selectedChampion))
-        );
         UI.championPortrait.src = presentation.portrait;
         UI.championPortrait.alt = presentation.alt;
         UI.playerName.textContent = `P${playerId} / ${championName.toUpperCase()}`;
         UI.matchSubtitle.textContent = `${championName} ready · first to ${matchTarget}`;
         UI.abilityDock.setAttribute("aria-label", `${championName} abilities`);
-        UI.start.textContent = `>>> DEPLOY P${playerId} ${championName.toUpperCase()}`;
 
         const icons = [UI.bombIcon, UI.dashIcon, UI.mineIcon, UI.ultIcon];
         const art = presentation.art;
@@ -55,16 +51,6 @@
           icon.style.backgroundImage = `url(${art[index]})`;
           icon.textContent = "";
         });
-        for (const [key, config] of Object.entries(presentations)) {
-          if (!config.passive) continue;
-          const glyph = UI.championChoices
-            .find((button) => button.dataset.champion === key)
-            ?.querySelector(".champion-glyph");
-          if (!glyph) continue;
-          glyph.style.backgroundImage = `linear-gradient(rgb(15 2 8 / 8%), rgb(15 2 8 / 46%)), url(${config.passive})`;
-          glyph.textContent = "";
-        }
-
         UI.bombKey.textContent = "Q";
         UI.dashKey.textContent = "F";
         UI.mineKey.textContent = "E";
@@ -109,10 +95,7 @@
         const localMultiplayer = document.body.classList.contains("is-local-multiplayer");
         UI.playerTwoHud.hidden = !localMultiplayer;
         if (!localMultiplayer) return;
-        const health = clamp(player.health / player.maxHealth, 0, 1);
         UI.playerTwoName.textContent = `P2 · ${player.name.toUpperCase()}`;
-        UI.playerTwoHealth.textContent = player.alive ? `${Math.ceil(health * 100)}%` : "ELIMINATED";
-        UI.playerTwoHealthFill.style.transform = `scaleX(${health})`;
         const cooldowns = [player.qCooldown, player.wCooldown, player.eCooldown, player.rCooldown];
         const unlocked = player.skillsUnlocked || [true, true, true, true];
         UI.playerTwoSkillButtons.forEach((button, slot) => {
@@ -175,14 +158,6 @@
         UI.playerCard.dataset.blueBombs = String(match.activeBombsFor(p1));
         UI.playerCard.dataset.redBombs = String(match.activeBombsFor(p2));
         UI.playerCard.dataset.round = String(match.round);
-        const healthRatio = clamp(p1.health / p1.maxHealth, 0, 1);
-        UI.hearts.setAttribute("aria-label", p1.alive
-          ? `${p1.name} has ${Math.ceil(healthRatio * 100)} percent health`
-          : `${p1.name} is eliminated`);
-        $$("#hearts .heart").forEach((heart, index) =>
-          heart.classList.toggle("is-empty", !p1.alive || healthRatio <= index / 5)
-        );
-        UI.healthFill.style.transform = `scaleX(${healthRatio})`;
         UI.combo.classList.add("is-live");
         UI.comboLabel.textContent = `RIVAL · ${p2.name.toUpperCase()} · ${match.p2Human ? "HUMAN" : "CPU"}`;
         const available = Math.max(0, p1.maxBombs - match.activeBombsFor(p1));

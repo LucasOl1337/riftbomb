@@ -193,7 +193,7 @@ test("duplicate controls for one input epoch share a single asynchronous runtime
     "game",
     "state",
     "beginConfiguredGame",
-    "returnToIntroUi",
+    "returnToSetupState",
     `
       let lifecycleGeneration = 3;
       let matchRuntimeEpoch = 0;
@@ -230,7 +230,7 @@ test("duplicate controls for one input epoch share a single asynchronous runtime
 
 test("quick pending resume persists before handshake and reuses the exact bearer after reload", async () => {
   const source = await readFile(sourceUrl, "utf8");
-  const declarations = extract(source, "function savePendingResume", "  function returnToIntroUi");
+  const declarations = extract(source, "function savePendingResume", "  function returnToSetupState");
   const values = new Map();
   const sessionStorage = {
     getItem: (key) => values.get(key) ?? null,
@@ -346,7 +346,7 @@ test("a challenge URL matching the saved room chooses resume instead of a fresh 
   assert.equal(sessionMatchesRoom({ roomCode: "ABC234" }, "abc234"), true);
   assert.equal(sessionMatchesRoom({ roomCode: "ABC234" }, "XYZ567"), false);
 
-  const startup = extract(source, "const parentRoom =", "  document.querySelector");
+  const startup = extract(source, "const parentRoom =", "  publishClientState(\"ready\")");
   assert.match(startup, /const resumeParentSession = sessionMatchesRoom\(startupSession, parentRoom\)/);
   assert.match(startup, /if \(resumeParentSession\)/);
   assert.match(source, /if \(parentRoom && !resumeParentSession\) return;/);

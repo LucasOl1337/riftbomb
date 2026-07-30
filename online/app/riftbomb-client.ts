@@ -143,6 +143,18 @@ export const ARENAS: ReadonlyArray<{
   },
 ] as const;
 
+/** Product-facing projection of the trained bot profile owned by bot-opponent/v1. */
+export const TRAINING_BOT = Object.freeze({
+  id: "v1-renekton",
+  name: "V1 Renekton",
+  callsign: "Dominus-01",
+  champion: "renekton" as ChampionId,
+  intelligence: "4/5 · Tático adaptativo",
+  record: "100–0 vs baseline",
+  survival: "100% na primeira bomba",
+  weakness: "Especialista em Renekton",
+});
+
 export const MODES: ReadonlyArray<{
   id: ClientMode;
   eyebrow: string;

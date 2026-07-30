@@ -10,7 +10,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import {
   ARENAS,
@@ -18,6 +17,7 @@ import {
   INITIAL_RUNTIME_STATE,
   MODES,
   RIFTBOMB_BRIDGE_VERSION,
+  TRAINING_BOT,
   arenaById,
   championById,
   isRuntimeStateMessage,
@@ -97,47 +97,17 @@ function ModeIcon({ mode }: { mode: ClientMode }) {
   );
 }
 
-function RuntimeFrame({
-  frameRef,
-  legacy = false,
-}: {
-  frameRef?: RefObject<HTMLIFrameElement | null>;
-  legacy?: boolean;
-}) {
+function RuntimeFrame({ frameRef }: { frameRef?: RefObject<HTMLIFrameElement | null> }) {
   return (
     <iframe
       ref={frameRef}
-      className={legacy ? "game-frame game-frame--legacy" : "game-frame"}
-      src={legacy ? "/riftbomb.html" : "/riftbomb.html?client=1"}
+      className="game-frame"
+      src="/riftbomb.html?client=1"
       title="Riftbomb Online"
       allow="autoplay; fullscreen; gamepad; screen-wake-lock"
       tabIndex={-1}
     />
   );
-}
-
-function LegacyClient() {
-  return (
-    <main className="game-shell game-shell--legacy">
-      <RuntimeFrame legacy />
-      <button
-        className="legacy-return"
-        type="button"
-        onClick={() => window.location.assign("/")}
-      >
-        Voltar ao novo client
-      </button>
-    </main>
-  );
-}
-
-function subscribeToLocation(callback: () => void) {
-  window.addEventListener("popstate", callback);
-  return () => window.removeEventListener("popstate", callback);
-}
-
-function currentSearch() {
-  return window.location.search;
 }
 
 function formatRuntimeStatus(runtime: RuntimeState) {
@@ -201,9 +171,6 @@ export default function Home() {
   const [presentationNotice, setPresentationNotice] = useState(
     "No iPhone, desative o bloqueio de rotação e vire o aparelho. Para jogar sem bordas, adicione o Riftbomb à Tela de Início.",
   );
-  const search = useSyncExternalStore(subscribeToLocation, currentSearch, () => "");
-  const legacy = new URLSearchParams(search).get("legacy") === "1";
-
   const sendCommand = useCallback(
     (action: string, payload?: Record<string, unknown>) => {
       const target = frameRef.current?.contentWindow;
@@ -251,8 +218,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (legacy === false) sendCommand("sync");
-  }, [legacy, sendCommand]);
+    sendCommand("sync");
+  }, [sendCommand]);
 
   useEffect(() => {
     if (runtime.phase !== "match") return;
@@ -268,7 +235,7 @@ export default function Home() {
   const inMatch = runtime.phase === "match";
   const isGuest = runtime.role === "guest";
   const isHost = runtime.role === "host";
-  const showRivalPicker = ["solo", "local", "challenge"].includes(activeMode);
+  const showRivalPicker = ["local", "challenge"].includes(activeMode);
   const primaryDisabled =
     !bridgeReady ||
     (runtime.busy && !runtime.matchmaking) ||
@@ -283,6 +250,7 @@ export default function Home() {
   function chooseMode(mode: ClientMode) {
     if (inLobby || runtime.matchmaking) return;
     setActiveMode(mode);
+    if (mode === "solo") setRivalChampion(TRAINING_BOT.champion);
     setClientNotice("");
   }
 
@@ -407,6 +375,7 @@ export default function Home() {
       champion,
       guestChampion: rivalChampion,
       arena,
+      ...(activeMode === "solo" ? { bot: TRAINING_BOT.id } : {}),
     });
   }
 
@@ -507,8 +476,6 @@ export default function Home() {
     runtime.rivalConnected,
   ]);
 
-  if (legacy) return <LegacyClient />;
-
   return (
     <main className={`game-shell${inMatch ? " is-match-live" : ""}`}>
       <RuntimeFrame frameRef={frameRef} />
@@ -607,16 +574,6 @@ export default function Home() {
               ))}
             </div>
 
-            <button
-              className="classic-link"
-              type="button"
-              onClick={() => window.location.assign("/?legacy=1")}
-            >
-              <Icon>
-                <path d="M4 6h16v12H4zM8 10h8M8 14h5" />
-              </Icon>
-              Interface clássica
-            </button>
           </aside>
 
           <section className="client-stage">
@@ -726,12 +683,43 @@ export default function Home() {
                 </div>
               </div>
 
-              {showRivalPicker ? (
+              {activeMode === "solo" ? (
+                <div className="config-section config-section--training-bot">
+                  <div className="config-section__label">
+                    <span>OPONENTE DE TREINO</span>
+                    <small>Perfil V1 consolidado</small>
+                  </div>
+                  <article
+                    className="training-bot-card"
+                    aria-label={`${TRAINING_BOT.name}: ${TRAINING_BOT.intelligence}`}
+                  >
+                    <span className="training-bot-card__mark" aria-hidden="true">V1</span>
+                    <span className="training-bot-card__identity">
+                      <small>{TRAINING_BOT.callsign}</small>
+                      <strong>{TRAINING_BOT.name}</strong>
+                    </span>
+                    <span className="training-bot-card__metric training-bot-card__metric--intelligence">
+                      <small>INTELIGÊNCIA</small>
+                      <strong>{TRAINING_BOT.intelligence}</strong>
+                    </span>
+                    <span className="training-bot-card__metric">
+                      <small>CERTIFICAÇÃO</small>
+                      <strong>{TRAINING_BOT.record}</strong>
+                    </span>
+                    <span className="training-bot-card__metric">
+                      <small>SOBREVIVÊNCIA</small>
+                      <strong>{TRAINING_BOT.survival}</strong>
+                    </span>
+                    <span className="training-bot-card__weakness">
+                      <small>ESPECIALIDADE</small>
+                      <strong>{TRAINING_BOT.weakness}</strong>
+                    </span>
+                  </article>
+                </div>
+              ) : showRivalPicker ? (
                 <div className="config-section config-section--rival">
                   <div className="config-section__label">
-                    <span>
-                      {activeMode === "solo" ? "RIVAL CPU" : "CHAMPION RIVAL"}
-                    </span>
+                    <span>CHAMPION RIVAL</span>
                     <small>{selectedRival.role}</small>
                   </div>
                   <div className="champion-grid champion-grid--compact">

@@ -33,74 +33,19 @@
       <button type="button" class="primary" id="landscape-gate-action">Já virei · verificar orientação</button>
     </div>
   </div>
-  <a class="skip-link" href="#start-game">Skip to game controls</a>
+  <a class="skip-link" href="#arena">Skip to arena</a>
 
   <main id="app">
     <canvas id="arena" role="img" aria-label="Shared local arena or online player camera"></canvas>
+    <div id="character-health-layer" class="character-health-layer" aria-hidden="true"></div>
     <div id="skill-token-layer" class="skill-token-layer" aria-hidden="true"></div>
     <div class="fx-grain" aria-hidden="true"></div>
     <div class="frame" aria-hidden="true"></div>
 
-    <section class="intro" id="intro" aria-labelledby="title">
-      <div class="intro-content">
-        <div class="season-tag micro">[ UNOFFICIAL FAN PROTOTYPE · REV 2.6 ]</div>
-        <div class="lol-wordmark" aria-hidden="true">LEAGUE <small>/</small> LEGENDS</div>
-        <h1 id="title"><span>RIFTBOMB</span><em>/// Champions of the Bomber Rift</em></h1>
-        <p class="intro-lede">
-          Select unit for Player 1. Clear Hextech crates. Collect power-ups.
-          Deploy champion kits under Bomber Rift rules. Local versus · adaptive CPU.
-        </p>
-        <div class="player-selector" role="group" aria-label="Choose which local player to configure">
-          <button type="button" data-select-player="1" aria-pressed="true">P1 · WASD / Q F E R</button>
-          <button type="button" data-select-player="2" aria-pressed="false">P2 · ARROWS / J K L ;</button>
-        </div>
-        <div class="champion-select" role="group" aria-label="Choose champion for the selected player">
-          <span class="micro" id="player-config-label">P1 / UNIT</span>
-          <button class="champion-choice" data-champion="katarina" aria-pressed="true">
-            <span class="champion-glyph" aria-hidden="true">⚔</span>
-            <strong>Katarina</strong>
-            <small>Battle Queen · Q F E R</small>
-          </button>
-          <button class="champion-choice" data-champion="zed" aria-pressed="false">
-            <span class="champion-glyph" aria-hidden="true">◈</span>
-            <strong>Zed</strong>
-            <small>Master of Shadows · Q F E R</small>
-          </button>
-          <button class="champion-choice" data-champion="renekton" aria-pressed="false">
-            <span class="champion-glyph" aria-hidden="true">☀</span>
-            <strong>Renekton</strong>
-            <small>Butcher of the Sands · Q F E R</small>
-          </button>
-          <button class="champion-choice" data-champion="vladimir" aria-pressed="false">
-            <span class="champion-glyph" aria-hidden="true">◆</span>
-            <strong>Vladimir</strong>
-            <small>Crimson Reaper · Q F E R</small>
-          </button>
-          <button class="champion-choice" data-champion="gangplank" aria-pressed="false">
-            <span class="champion-glyph" aria-hidden="true">⚓</span>
-            <strong>Gangplank</strong>
-            <small>Saltwater Scourge · Q F E R</small>
-          </button>
-        </div>
-        <div class="arena-select" id="arena-select" role="radiogroup" aria-label="Choose arena layout template">
-          <span class="micro">[ ARENA TEMPLATE ] · 5 layouts</span>
-          <!-- Choices filled from Game.listArenas() at boot -->
-        </div>
-        <div class="intro-actions">
-          <button class="primary" id="start-game">>>> DEPLOY KATARINA</button>
-          <button class="secondary" id="open-guide-intro">[ ARENA RULES ]</button>
-        </div>
-        <div class="intro-notes micro" aria-label="Game features">
-          <span>Best of five</span>
-          <span>Breakable Hextech blocks</span>
-          <span>Five playable champions</span>
-          <span>Local PvP · adaptive CPU</span>
-        </div>
-        <p class="legal">
-          Unofficial, non-commercial fan prototype; not endorsed by Riot Games. League of Legends, Katarina, Zed, Renekton, Vladimir, Gangplank, Summoner’s Rift and related marks belong to Riot Games. Champion meshes, textures and animation data are derived from locally installed Riot game assets; code, arena geometry, visual systems, and procedural combat effects are original to this prototype.
-        </p>
-      </div>
-    </section>
+    <!-- Internal command target for the modern same-origin client bridge. -->
+    <div id="runtime-bootstrap" hidden aria-hidden="true">
+      <button type="button" id="start-game" tabindex="-1">Start match</button>
+    </div>
 
     <div class="chrome is-hidden" id="chrome" aria-hidden="true" inert>
       <header class="topbar">
@@ -123,15 +68,7 @@
             src="data:image/webp;base64,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">
           <div class="player-line">
             <span class="micro" id="player-name">P1 · Katarina</span>
-            <div class="hearts" id="hearts" aria-label="Blue Katarina is alive">
-              <i class="heart" aria-hidden="true"></i>
-              <i class="heart" aria-hidden="true"></i>
-              <i class="heart" aria-hidden="true"></i>
-              <i class="heart" aria-hidden="true"></i>
-              <i class="heart" aria-hidden="true"></i>
-            </div>
           </div>
-          <div class="health-track" aria-hidden="true"><span id="health-fill"></span></div>
           <div class="mana-track" aria-hidden="true"><span id="resource-fill"></span></div>
         </section>
       </header>
@@ -197,9 +134,7 @@
       <section class="player-two-hud" id="player-two-hud" aria-label="Player 2 status" hidden>
         <div class="player-two-hud__head">
           <strong id="player-two-name">P2 · RED ZED</strong>
-          <span id="player-two-health">100%</span>
         </div>
-        <div class="player-two-health" aria-hidden="true"><span id="player-two-health-fill"></span></div>
         <div class="player-two-skills" aria-label="Player 2 abilities">
           <button type="button" data-p2-action="bomb"><kbd>Enter</kbd><span>Bomb</span></button>
           <button type="button" data-p2-slot="0"><kbd>J / 1</kbd><span>Q</span></button>
@@ -351,6 +286,8 @@
   <script src="./load-playable-champion-models.js"></script>
   <script src="./arena-appearance/load-arena-appearance.js"></script>
   <script src="./arena-appearance/plan-arena-texture-loads.js"></script>
+  <script src="./arena-appearance/draw-black-bomb.js"></script>
+  <script src="./arena-appearance/draw-nacre-hollow.js"></script>
   <script src="./apply-combat-rules.js"></script>
   <script src="./apply-readable-combat.js"></script>
   <script src="./draw-bomber-rift.js"></script>

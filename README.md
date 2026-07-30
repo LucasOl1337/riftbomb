@@ -4,16 +4,17 @@ Protótipo PvP de arena inspirado em Bomberman e League of Legends, com WebGL2,
 efeitos de combate procedurais e cinco campeões jogáveis: Katarina, Zed,
 Renekton, Vladimir e Gangplank.
 
-## Jogar
+## Jogar e desenvolver localmente
 
-`riftbomb.html` é o jogo completo e autocontido. Abra o arquivo diretamente ou sirva esta
-pasta:
+Use a mesma aplicação e a mesma rota principal da produção:
 
 ```powershell
-python -m http.server 4177 --bind 127.0.0.1
+npm run dev
 ```
 
-Depois acesse `http://127.0.0.1:4177/riftbomb.html`.
+Depois acesse `http://127.0.0.1:4174/`. O comando recompila e empacota o runtime antes
+de iniciar o shell moderno. `game/play-riftbomb.html` e `riftbomb.html` são entradas
+internas do runtime e não constituem um segundo frontend.
 
 ## PvP online
 
@@ -38,7 +39,7 @@ npm test
 
 ## Mudar o jogo
 
-`game/play-riftbomb.html` é a entrada editável. Ela declara a ordem dos módulos; o build
+`game/play-riftbomb.html` é a entrada editável do runtime. Ela declara a ordem dos módulos; o build
 descobre essa ordem, empacota os modelos e gera `riftbomb.html`. A página costura módulos nomeados pela
 capacidade que entregam:
 

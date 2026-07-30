@@ -18,8 +18,9 @@ do relógio, bombas, dano, placar ou transições de rodada.
 
 ## Estrutura
 
-- `public/online-duel.js`: lobby, controles independentes e sincronização;
-- `public/online-duel.css`: interface responsiva do modo online;
+- `app/page.tsx`: único frontend de lobby, seleção e entrada na partida;
+- `public/online-duel.js`: bridge interna de comandos e sincronização do runtime;
+- `public/online-duel.css`: somente alertas operacionais do runtime;
 - `app/api/pvp/route.ts`: criação, entrada e encerramento de salas;
 - `server/`: motor headless, protocolo WebSocket e instalação na Oracle;
 - `scripts/package-riftbomb.mjs`: divide o `riftbomb.html` da raiz em partes
@@ -60,6 +61,3 @@ npm run deploy:build
 ```
 
 O Worker `riftbomb-online` usa a base D1 `riftbomb-online` e o custom domain `bombpvp.com`.
-A versão legada em ChatGPT Sites permanece em:
-
-https://riftbomb-online.juliherreiro.chatgpt.site

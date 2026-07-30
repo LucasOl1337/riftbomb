@@ -20,17 +20,11 @@
         <span data-combat-hp="p1"></span>
         <span data-combat-hp="p2"></span>
       `;
-      document.querySelector(".player-card")?.appendChild(hud);
+      document.getElementById("chrome")?.appendChild(hud);
 
       const style = document.createElement("style");
       style.textContent = `
-        .combat-hp-readout{display:grid;grid-template-columns:1fr 1fr;gap:.35rem .75rem;width:100%;margin-top:.4rem;font:700 clamp(.66rem,1.2vw,.82rem)/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.045em;text-transform:uppercase}
-        .combat-hp-readout span{padding:.3rem .45rem;border:1px solid rgb(255 255 255 / 18%);background:rgb(0 0 0 / 34%);white-space:nowrap}
-        .combat-hp-readout span:last-child{text-align:right}
-        .combat-hp-readout span[data-critical="true"]{animation:combat-critical 1s steps(2,end) infinite}
-        .combat-rule-card{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:.45rem .9rem;margin-top:.65rem;padding:.55rem .7rem;border:1px solid rgb(255 255 255 / 16%);background:rgb(0 0 0 / 28%);font:700 .72rem/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;text-transform:uppercase;letter-spacing:.04em}
-        @keyframes combat-critical{50%{opacity:.48}}
-        @media(max-width:720px){.combat-hp-readout{grid-template-columns:1fr}.combat-hp-readout span:last-child{text-align:left}}
+        .combat-hp-readout{position:fixed!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
       `;
       document.head.appendChild(style);
     }
@@ -54,20 +48,6 @@
     );
   }
 
-  function installIntroRules() {
-    if (document.getElementById("combat-rule-card")) return;
-    const card = document.createElement("div");
-    card.id = "combat-rule-card";
-    card.className = "combat-rule-card";
-    card.innerHTML = `
-      <span>100 HP each</span>
-      <span>Arena bomb: ${RIFTBOMB_COMBAT.arenaBombDamage} damage</span>
-      <span>0 HP: eliminated</span>
-      <span>Shield: blocks one complete hit</span>
-    `;
-    document.querySelector(".intro-notes")?.after(card);
-  }
-
   function install(match) {
     if (!match || match.__combatPresentationInstalled) return;
     installRiftbombCombatRules(match);
@@ -79,7 +59,6 @@
       installCombatHud(currentMatch);
     };
 
-    installIntroRules();
     match.presentation.update(match);
   }
 

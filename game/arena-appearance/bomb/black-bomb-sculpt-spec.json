@@ -1,0 +1,5480 @@
+{
+  "targetName": "Riftbomb Black Bomb",
+  "targetId": "riftbomb-black-bomb",
+  "schemaVersion": "2.1",
+  "terminologyProfile": {
+    "domain": "real-time procedural Three.js asset",
+    "geometryTerms": [
+      "silhouette",
+      "topology",
+      "primitive",
+      "bevel",
+      "chamfer",
+      "taper",
+      "bend",
+      "boolean cut",
+      "edge loop",
+      "surface normal",
+      "displacement"
+    ],
+    "materialTerms": [
+      "albedo",
+      "baseColor",
+      "roughness",
+      "metalness",
+      "normal map",
+      "bump map",
+      "ambient occlusion",
+      "cavity dirt",
+      "edge wear",
+      "clearcoat"
+    ],
+    "lightingTerms": [
+      "key light",
+      "fill light",
+      "rim light",
+      "HDRI/environment reflection",
+      "contact shadow"
+    ],
+    "descriptionRule": "Use measurable 3D graphics terms. Avoid vague words unless they are paired with concrete geometry/material/shader parameters."
+  },
+  "sourceImage": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\black-bomb-reference.png",
+  "referenceCamera": {
+    "solved": true,
+    "fovDegrees": 34,
+    "aspect": 1.7768,
+    "orientation": {
+      "yaw": -28,
+      "pitch": -18,
+      "roll": 0
+    },
+    "positionHint": [
+      2.8,
+      2.25,
+      4.6
+    ],
+    "note": "Reference sheet includes matching front, side, and top views; gameplay verification uses the arena's existing isometric camera."
+  },
+  "suitability": "pass",
+  "scores": {
+    "object_isolation": 3,
+    "silhouette_readability": 3,
+    "depth_inference": 3,
+    "primitive_decomposition": 3,
+    "material_procedurality": 3,
+    "occlusion_risk": 1,
+    "interaction_fit": 3
+  },
+  "preSpecAssessment": {
+    "objectClass": {
+      "primaryType": "faceted spherical demolition bomb",
+      "primaryDomain": "object",
+      "formLanguage": [
+        "hard-surface",
+        "geometric",
+        "radially symmetric"
+      ],
+      "structureKind": [
+        "compound object",
+        "layered shell",
+        "detachable assembly"
+      ],
+      "motionPotential": [
+        "whole-object transform",
+        "effect-emitter",
+        "detachable",
+        "destructible"
+      ],
+      "materialFamilies": [
+        "forged metal",
+        "painted metal",
+        "brushed steel",
+        "braided fiber",
+        "emissive ember"
+      ],
+      "notes": "Single consistent three-view concept sheet. Hidden underside is inferred by radial symmetry."
+    },
+    "complexity": {
+      "tier": "complex",
+      "scores": {
+        "silhouetteComplexity": 2,
+        "componentCount": 3,
+        "hierarchyDepth": 2,
+        "repetitionDensity": 2,
+        "materialLayerCount": 2,
+        "localDetailDensity": 2,
+        "occlusionRisk": 1,
+        "actionReadinessNeed": 3
+      },
+      "estimatedCounts": {
+        "macroComponents": 4,
+        "mesoComponents": 12,
+        "microFeatureGroups": 10,
+        "materialLayers": 5,
+        "repetitionSystems": 3
+      },
+      "reasoning": [
+        "The spherical silhouette is simple, but six separable armor petals, radial fasteners, stepped fuse hardware, braided cord, five material responses, and detonation rigging require a complex hierarchy.",
+        "The game camera is distant, so silhouette, value separation, emissive timing, and real bevel relief take priority over invisible underside detail."
+      ]
+    },
+    "specDepthDecision": {
+      "requiredDepth": "complex",
+      "minimumComponentLevels": [
+        "macro",
+        "meso",
+        "micro"
+      ],
+      "needsRepetitionSystems": true,
+      "needsMaterialLocalOverrides": true,
+      "needsMultipleReviewViews": true,
+      "needsActionReadyHierarchy": true,
+      "rationale": "Choose simple/moderate/complex/ultra-complex from observed structure, not from a hardcoded domain."
+    },
+    "unknownsToResolveBeforeImplementation": [],
+    "detailInventory": {
+      "scanMethod": "component-zones",
+      "targetMinDetails": 10,
+      "note": "All ten observed details map to generated geometry or material overrides.",
+      "details": [
+        {
+          "id": "petal-bevels",
+          "kind": "bevel",
+          "description": "Real chamfered rims catch a cool highlight around each of the six armor petals.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "geometry",
+          "mapsTo": {
+            "type": "component.localFeatures",
+            "ref": "armor-assembly/edge-chamfer"
+          },
+          "evidenceRef": "front-and-top",
+          "confidence": 0.9
+        },
+        {
+          "id": "radial-seams",
+          "kind": "seam",
+          "description": "Dark recessed radial seams separate the armor petals.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "geometry+ao",
+          "mapsTo": {
+            "type": "component.localFeatures",
+            "ref": "armor-assembly/radial-seam"
+          },
+          "evidenceRef": "front-and-top",
+          "confidence": 0.9
+        },
+        {
+          "id": "equator-wear",
+          "kind": "scratch",
+          "description": "Equatorial reinforcement band has restrained directional edge wear.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "roughness+albedo",
+          "mapsTo": {
+            "type": "material.localOverrides",
+            "ref": "gunmetal/equator-edge-wear"
+          },
+          "evidenceRef": "front",
+          "confidence": 0.9
+        },
+        {
+          "id": "fastener-row",
+          "kind": "fastener",
+          "description": "Four recessed gunmetal cross-head fasteners repeat radially.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "geometry",
+          "mapsTo": {
+            "type": "component.localFeatures",
+            "ref": "fastener-cluster/radial-fasteners"
+          },
+          "evidenceRef": "front-and-top",
+          "confidence": 0.9
+        },
+        {
+          "id": "fastener-grooves",
+          "kind": "groove",
+          "description": "Cross-shaped recessed grooves remain legible on each fastener head.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "geometry+ao",
+          "mapsTo": {
+            "type": "component.localFeatures",
+            "ref": "fastener-cluster/cross-grooves"
+          },
+          "evidenceRef": "front",
+          "confidence": 0.9
+        },
+        {
+          "id": "neck-rings",
+          "kind": "ridge",
+          "description": "Two stepped forged-steel neck rings transition from shell to fuse socket.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "geometry",
+          "mapsTo": {
+            "type": "component.localFeatures",
+            "ref": "fuse-neck/stepped-rings"
+          },
+          "evidenceRef": "front",
+          "confidence": 0.9
+        },
+        {
+          "id": "braided-fuse",
+          "kind": "ridge",
+          "description": "Alternating diagonal relief gives the fuse a braided silhouette and grazing-light response.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "geometry+normal",
+          "mapsTo": {
+            "type": "component.localFeatures",
+            "ref": "fuse-cord/braided-ridges"
+          },
+          "evidenceRef": "front",
+          "confidence": 0.9
+        },
+        {
+          "id": "ember-core",
+          "kind": "emissive",
+          "description": "Orange-white fuse ember blooms without recoloring the black shell.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "emissive",
+          "mapsTo": {
+            "type": "material.localOverrides",
+            "ref": "ember/hot-core"
+          },
+          "evidenceRef": "front",
+          "confidence": 0.9
+        },
+        {
+          "id": "base-contact",
+          "kind": "stain",
+          "description": "Low base collar is darker and rougher at the ground contact edge.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "roughness+ao",
+          "mapsTo": {
+            "type": "material.localOverrides",
+            "ref": "gunmetal/contact-darkening"
+          },
+          "evidenceRef": "front",
+          "confidence": 0.9
+        },
+        {
+          "id": "forged-pitting",
+          "kind": "stain",
+          "description": "Sparse forged-steel micro-pitting breaks broad black highlights.",
+          "region": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "units": "normalized"
+          },
+          "scale": "micro-to-meso",
+          "affects": "normal+roughness",
+          "mapsTo": {
+            "type": "material.localOverrides",
+            "ref": "black-forged/micro-pitting"
+          },
+          "evidenceRef": "front-and-side",
+          "confidence": 0.9
+        }
+      ]
+    },
+    "anatomy": {
+      "applies": false,
+      "styleHeads": 0,
+      "proportions": {
+        "headUnit": 0,
+        "torso": 0,
+        "legs": 0,
+        "shoulderWidth": 0,
+        "hipWidth": 0
+      },
+      "pose": {
+        "type": "unassessed",
+        "jointAngles": {}
+      },
+      "faceLandmarks": {
+        "eyeLine": 0,
+        "eyeSpacing": 0,
+        "noseBase": 0,
+        "mouthLine": 0,
+        "hairline": 0
+      },
+      "features": [],
+      "confidence": 0,
+      "note": "Only meaningful when objectClass.primaryDomain is character or hybrid. Set applies=true and fill from forge/stage1_intake/extract_landmarks.py. See grimoire/character/reconstruction.md and grimoire/character/likeness_maximization.md."
+    },
+    "sourceImage": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\black-bomb-reference.png"
+  },
+  "qualityContract": {
+    "qualityBar": "complex",
+    "definitionOfDone": [
+      "At gameplay scale the prop reads immediately as a compact black bomb rather than a disc or pickup.",
+      "Six armor petals, equatorial band, stepped neck, grounded base, radial fasteners, braided fuse, and ember remain distinguishable under the isometric arena camera.",
+      "Fuse acceleration, shell stress, petal separation, detonation core, shock ring, fire lanes, smoke, embers, and metal debris form one continuous animation.",
+      "The object stays predominantly near-black; heat is confined to seams, fuse ember, and detonation."
+    ],
+    "minimumSpecDepth": {
+      "macroComponents": 3,
+      "mesoComponents": 8,
+      "microFeatureGroups": 5,
+      "materialLayers": 3,
+      "repetitionSystems": 1,
+      "reviewViewpoints": 4
+    },
+    "featureGroups": [
+      {
+        "id": "bomb-silhouette",
+        "name": "Spherical shell, grounded base, neck, and curved fuse silhouette",
+        "required": true,
+        "qualityCriteria": [
+          "The body is wider than the base, the fuse breaks the top silhouette, and no view reads as a flat coin."
+        ],
+        "evidenceRefs": [
+          "front-and-side",
+          "top"
+        ],
+        "failureModes": [
+          "disc silhouette",
+          "floating sphere",
+          "fuse too thin to read"
+        ]
+      },
+      {
+        "id": "armor-assembly",
+        "name": "Six-petal armor and equatorial reinforcement assembly",
+        "required": true,
+        "qualityCriteria": [
+          "Six repeated curved petals have real gaps and bevel highlights; the equatorial band remains continuous."
+        ],
+        "evidenceRefs": [
+          "front-and-top"
+        ],
+        "failureModes": [
+          "monolithic sphere",
+          "painted-on seams",
+          "oversized band hides petals"
+        ]
+      },
+      {
+        "id": "fuse-hardware",
+        "name": "Stepped neck, braided fuse, and animated ember",
+        "required": true,
+        "qualityCriteria": [
+          "Cord is rooted in the neck socket and the ember is the only pre-detonation hot accent."
+        ],
+        "evidenceRefs": [
+          "front"
+        ],
+        "failureModes": [
+          "floating fuse",
+          "straight plastic rod",
+          "whole shell flashes white"
+        ]
+      },
+      {
+        "id": "black-metal-lookdev",
+        "name": "Readable near-black forged, satin, and gunmetal material separation",
+        "required": true,
+        "qualityCriteria": [
+          "Black values preserve form under neutral and grazing light; gunmetal fasteners and band separate by roughness, not bright albedo."
+        ],
+        "evidenceRefs": [
+          "front-and-side"
+        ],
+        "failureModes": [
+          "flat black silhouette",
+          "gray plastic",
+          "gold or red body"
+        ]
+      },
+      {
+        "id": "detonation-continuity",
+        "name": "Bomb-to-explosion continuity",
+        "required": true,
+        "qualityCriteria": [
+          "Recognizable petals and fasteners become debris while the core, shock ring, cardinal fire lanes, smoke, and embers follow the generated VFX sequence."
+        ],
+        "evidenceRefs": [
+          "explosion-sequence"
+        ],
+        "failureModes": [
+          "instant white sphere",
+          "blue magic",
+          "circular blast loses cross-shaped gameplay read"
+        ]
+      }
+    ],
+    "visualDeltaChecks": [
+      "sphere-to-base-to-fuse silhouette ratio",
+      "six-petal radial spacing and seam depth",
+      "equator band thickness versus shell radius",
+      "near-black forged/satin/gunmetal roughness separation",
+      "fuse curvature, braid cadence, and ember isolation",
+      "explosion phase continuity and cross-lane readability"
+    ],
+    "antiShallowSpecRules": [
+      "Do not proceed to code if qualityContract.qualityBar is unassessed.",
+      "Do not proceed to code if the spec only contains a root component for a moderate or complex object.",
+      "Do not proceed to code if required featureGroups are not represented by componentTree, materials, or repetitionSystems.",
+      "Do not proceed to code if visible local features are described only in prose and not attached to components/materials/evidenceRefs.",
+      "Do not proceed past structural-pass if attached child parts lack attachment.parentSocket, localStart, localEnd, embedDepth/overlap, and gapTolerance.",
+      "Do not pass material look-dev when albedo is reused as roughness, height, normal, or AO.",
+      "Do not pass material look-dev without macro, meso, and micro surface frequency bands for close-up materials.",
+      "Do not pass reference-fidelity material look-dev from a source image without usable referencePbr maps or an explicit documented limitation.",
+      "Do not patch a spec with extracted PBR maps when extraction confidence is below the target threshold unless the user explicitly accepts lower fidelity.",
+      "Do not place adjacent separate-geometry parts below 0.02 world-unit seam overlap (source: grimoire/build/geometry_patterns.md).",
+      "Do not satisfy raised or recessed relief, fasteners, or grip structure with a map alone when the feature affects form; use geometry or displacement (source: grimoire/build/geometry_patterns.md)."
+    ]
+  },
+  "qualityTargets": {
+    "targetFidelity": 0.7,
+    "mustMatch": [
+      "macro silhouette and proportions",
+      "primary material albedo/roughness response",
+      "reference-derived PBR material response at or above 0.7 confidence when source pixels are usable",
+      "most recognizable local features"
+    ],
+    "niceToHave": [
+      "micro scratches, stains, chips, and dirt masks",
+      "secondary lighting match"
+    ],
+    "fpsTarget": 60,
+    "reviewViewpoints": [
+      "front",
+      "three-quarter",
+      "side",
+      "thickness-axis",
+      "long-axis"
+    ]
+  },
+  "selfCorrectLoop": {
+    "enabled": true,
+    "visualAcceptance": {
+      "reviewer": "ai-vision",
+      "threshold": 0.7,
+      "comparisonArtifactRequired": true,
+      "layerScoresRequired": true,
+      "codePixelDiffIsAcceptanceAuthority": false,
+      "scoringRule": "AI vision must inspect a side-by-side reference/render sheet and score the current pass from 0 to 1. Pixel-diff code may assist diagnostics but cannot approve a pass.",
+      "requiredLayerScores": [
+        "silhouetteProportion",
+        "componentStructure",
+        "formDetail",
+        "materialSurface",
+        "lightingCamera"
+      ],
+      "featureReviewPolicy": {
+        "enabled": true,
+        "reviewUnit": "semantic-subsystem",
+        "maxCriticalFeaturesPerPass": 5,
+        "maxImportantFeaturesPerPass": 3,
+        "criticalDefaultThreshold": 0.8,
+        "importantAverageThreshold": 0.65,
+        "adaptiveEscalation": true,
+        "singleImagePairOnly": true,
+        "selectionRule": "Choose only the most visually salient, identity-defining, user-prioritized, or high-risk semantic systems. Group repeated parts instead of reviewing every mesh. AI vision scores every selected feature from the same full reference/render pair."
+      }
+    },
+    "reviewAfterPasses": [
+      "blockout",
+      "structural-pass",
+      "form-refinement",
+      "material-pass",
+      "surface-pass",
+      "lighting-pass",
+      "interaction-pass",
+      "optimization-pass"
+    ],
+    "allowedActions": [
+      "continue",
+      "refine-spec",
+      "refine-code",
+      "request-input",
+      "stop"
+    ],
+    "specRefineTriggers": [
+      "missing component",
+      "wrong primitive family",
+      "wrong proportions",
+      "material layer under-specified",
+      "local feature not traceable to viewEvidence",
+      "reference ambiguity discovered during implementation"
+    ],
+    "codeRefineTriggers": [
+      "spec is adequate but generated geometry/material does not match",
+      "browser render differs from reference",
+      "performance budget exceeded",
+      "lighting hides geometry or material response"
+    ],
+    "stopCriteria": [
+      "target fidelity reached or user accepts current approximation",
+      "remaining gaps require new reference images or manual art"
+    ],
+    "screenshotPolicy": {
+      "requiredForPasses": [
+        "blockout",
+        "structural-pass",
+        "form-refinement",
+        "material-pass",
+        "surface-pass",
+        "lighting-pass",
+        "interaction-pass"
+      ],
+      "preferredCapture": "in-app-browser-screenshot",
+      "fallbackCapture": "user-supplied-screenshot-path",
+      "minimumEvidence": "Each visual pass needs a reference image, rendered screenshot, side-by-side comparison sheet, AI vision score, layer scores, and critique before choosing continue.",
+      "reviewPairRule": "Compare the same camera/viewpoint whenever possible; do not judge a front reference against a random render angle.",
+      "acceptanceAuthority": "AI vision review of the comparison sheet. Code-generated pixel similarity is not sufficient evidence."
+    }
+  },
+  "featureReviewTargets": [
+    {
+      "id": "bomb-silhouette",
+      "name": "Body/base/neck/fuse silhouette",
+      "tier": "critical",
+      "passIds": [
+        "blockout"
+      ],
+      "minimumScore": 0.8,
+      "mustPass": true,
+      "componentRefs": [
+        "pressure-shell",
+        "base-collar",
+        "fuse-neck",
+        "fuse-cord"
+      ],
+      "evidenceRefs": [
+        "front-and-side"
+      ]
+    },
+    {
+      "id": "armor-assembly",
+      "name": "Six-petal armor assembly",
+      "tier": "critical",
+      "passIds": [
+        "structural-pass",
+        "form-refinement"
+      ],
+      "minimumScore": 0.8,
+      "mustPass": true,
+      "componentRefs": [
+        "armor-assembly",
+        "equator-band"
+      ],
+      "evidenceRefs": [
+        "front-and-top"
+      ]
+    },
+    {
+      "id": "fuse-hardware",
+      "name": "Fuse hardware and braid",
+      "tier": "critical",
+      "passIds": [
+        "form-refinement",
+        "interaction-pass"
+      ],
+      "minimumScore": 0.78,
+      "mustPass": true,
+      "componentRefs": [
+        "fuse-neck",
+        "fuse-cord",
+        "ember-tip"
+      ],
+      "evidenceRefs": [
+        "front-and-side"
+      ]
+    },
+    {
+      "id": "black-metal-lookdev",
+      "name": "Near-black PBR value separation",
+      "tier": "critical",
+      "passIds": [
+        "material-pass",
+        "surface-pass",
+        "lighting-pass"
+      ],
+      "minimumScore": 0.75,
+      "mustPass": true,
+      "componentRefs": [
+        "pressure-shell",
+        "armor-assembly",
+        "equator-band",
+        "fastener-cluster"
+      ],
+      "evidenceRefs": [
+        "front-and-side"
+      ]
+    },
+    {
+      "id": "detonation-continuity",
+      "name": "Bomb-to-explosion continuity",
+      "tier": "critical",
+      "passIds": [
+        "interaction-pass"
+      ],
+      "minimumScore": 0.78,
+      "mustPass": true,
+      "componentRefs": [
+        "armor-assembly",
+        "detonation-core",
+        "ember-spark-socket"
+      ],
+      "evidenceRefs": [
+        "explosion-sequence"
+      ]
+    }
+  ],
+  "sculptPipeline": {
+    "passGateMode": "locked-sequential",
+    "passOrder": [
+      "blockout",
+      "structural-pass",
+      "form-refinement",
+      "material-pass",
+      "surface-pass",
+      "lighting-pass",
+      "interaction-pass",
+      "optimization-pass"
+    ],
+    "currentPass": "blockout",
+    "completedPasses": [],
+    "lastCompletedPass": "",
+    "blockedReason": "",
+    "nextRequiredEvidence": [
+      "Silhouette reads correctly without materials.",
+      "Quality contract has named all required macro feature groups before code generation.",
+      "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold.",
+      "browser render screenshot from your agent's browser/screenshot tool",
+      "single side-by-side full reference/render comparison sheet",
+      "all critical semantic feature scores at or above their thresholds",
+      "self-correction review appended with action=continue before the next pass"
+    ]
+  },
+  "lookDevTargets": {
+    "qualityPriority": "reference-fidelity",
+    "materialPass": {
+      "albedoPaletteRequired": true,
+      "roughnessVariationRequired": true,
+      "normalOrBumpRequired": true,
+      "localOverridesRequired": true,
+      "minimumTextureResolution": 1024,
+      "preferredTextureResolution": 2048,
+      "independentMapChannels": [
+        "albedo",
+        "roughness",
+        "height",
+        "normal",
+        "ambient-occlusion"
+      ],
+      "requiredSurfaceFrequencyBands": [
+        "macro",
+        "meso",
+        "micro"
+      ],
+      "geometryReliefRequiredWhenSilhouetteAffected": true,
+      "referencePbrExtraction": {
+        "requiredWhenSourceImagePresent": true,
+        "targetThreshold": 0.7,
+        "stopOnLowConfidence": true,
+        "script": "forge/stage1_intake/extract_pbr_evidence.py",
+        "acceptedLimitation": "single-image extraction is reference-derived inference, not exact photogrammetry"
+      },
+      "mustAvoid": [
+        "single flat albedo per material",
+        "uniform roughness",
+        "albedo texture reused as roughness/height/normal/AO",
+        "single-frequency random noise",
+        "plastic-looking smooth bark, stone, cloth, foliage, or aged material",
+        "local color/detail described only in prose without material masks",
+        "claiming exact PBR recovery when confidence is below the target threshold"
+      ]
+    },
+    "lightingPass": {
+      "requiredTerms": [
+        "key light",
+        "fill light",
+        "rim or environment light",
+        "exposure",
+        "tone mapping",
+        "background",
+        "contact shadow"
+      ],
+      "mustAvoid": [
+        "ambient-only lighting",
+        "flat value range",
+        "missing contact shadow",
+        "reference lighting copied without separating material readability"
+      ]
+    },
+    "screenshotReview": [
+      "Compare albedo palette and local color zones.",
+      "Compare roughness/normal/bump response under light.",
+      "Compare cavity dirt, edge wear, stains, moss, scratches, or other local masks.",
+      "Compare key/fill/rim structure, exposure, tone mapping, background, and contact shadows.",
+      "Capture a neutral-light render to verify material readability without reference lighting.",
+      "Capture a grazing-light close-up to expose flat normals, uniform roughness, tiling, and plastic highlights.",
+      "Capture a reference-matched render from the same camera framing as the source."
+    ]
+  },
+  "actionReadiness": {
+    "contract": "Every macro/meso component should be generated as a stable named Object3D pivot node with a mesh child, action metadata, optional sockets, collider proxy, and destruction metadata.",
+    "defaultRigType": "detonation-ready-procedural-rig",
+    "rootMotionNode": "root",
+    "requiredComponentFields": [
+      "id",
+      "parent",
+      "transform",
+      "attachment for child appendages, connectors, limbs, tubes, handles, legs, horns, wings, branches, or cables",
+      "actionProfile.animationRole",
+      "actionProfile.pivot",
+      "actionProfile.collider",
+      "actionProfile.destruction"
+    ],
+    "transformChannels": [
+      "translate",
+      "rotate",
+      "scale",
+      "bend",
+      "twist",
+      "detach",
+      "visibility",
+      "material-state"
+    ],
+    "authoringRules": [
+      "Do not collapse independently movable parts into one mesh.",
+      "Put transforms on component pivot groups, not only on raw meshes.",
+      "For attached child parts, put the pivot at the semantic root/socket and build visible geometry from localStart to localEnd.",
+      "Represent hinge, socket, detachable, and breakable intent even when no animation is implemented yet.",
+      "Use simplified collider proxies for runtime physics instead of visual mesh colliders by default."
+    ],
+    "destructionPolicy": {
+      "defaultBreakable": true,
+      "fractureGroupNaming": "armor-shell, hardware, fuse, detonation-core",
+      "debrisStrategy": "Reuse named armor petals and fasteners as deterministic fragments, then add a small capped ember/spark particle set."
+    }
+  },
+  "assumptions": [
+    "Underside repeats the visible six-petal radial construction.",
+    "Internal mechanism is intentionally abstracted as an emissive core because the reference provides no mechanical cutaway.",
+    "Renderer-native procedural meshes replace Three.js primitives because Riftbomb uses a custom WebGL2 wrapper."
+  ],
+  "coordinateFrame": {
+    "front": "+Z, camera-facing hero side",
+    "up": "+Y",
+    "scaleReference": "body radius 0.38 gameplay world units"
+  },
+  "silhouette": {
+    "boundingShape": "faceted sphere with a flat base collar and asymmetric curved fuse",
+    "aspectRatios": [
+      "shell width:height = 1:0.96",
+      "total prop height:shell width = 1.55:1"
+    ],
+    "symmetry": "six-fold radial shell symmetry; fuse breaks symmetry",
+    "dominantCurves": [
+      "spherical pressure shell",
+      "shallow armor-petal crown",
+      "five-segment fuse arc"
+    ],
+    "negativeSpaces": [
+      "radial petal seams",
+      "gap inside curved fuse arc"
+    ],
+    "landmarks": [
+      "base collar",
+      "equator band",
+      "six armor petals",
+      "stepped neck",
+      "ember tip"
+    ]
+  },
+  "viewEvidence": [
+    {
+      "id": "front-and-side",
+      "view": "front/side orthographic pair",
+      "imageRegion": {
+        "x": 0,
+        "y": 0,
+        "width": 0.67,
+        "height": 1,
+        "units": "normalized"
+      },
+      "observations": [
+        "faceted spherical body",
+        "equatorial band",
+        "four visible fasteners",
+        "stepped neck",
+        "curved braided fuse",
+        "low base"
+      ],
+      "confidence": 0.96
+    },
+    {
+      "id": "top",
+      "view": "top orthographic",
+      "imageRegion": {
+        "x": 0.67,
+        "y": 0,
+        "width": 0.33,
+        "height": 1,
+        "units": "normalized"
+      },
+      "observations": [
+        "six radial armor petals",
+        "central fuse socket",
+        "radial fastener rhythm"
+      ],
+      "confidence": 0.93
+    },
+    {
+      "id": "explosion-sequence",
+      "view": "four-stage isometric VFX sequence",
+      "imageRegion": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1,
+        "units": "normalized"
+      },
+      "observations": [
+        "ignition flash",
+        "petal debris",
+        "cardinal fire lanes",
+        "thin shock ring",
+        "charcoal smoke",
+        "red embers"
+      ],
+      "confidence": 0.9
+    }
+  ],
+  "componentTree": [
+    {
+      "id": "root",
+      "name": "Riftbomb Black Bomb",
+      "level": "macro",
+      "role": "runtime-root",
+      "importance": 1,
+      "confidence": 0.92,
+      "primitive": "sphere",
+      "topologyClass": "assembled-solid",
+      "topologyRationale": "Stable runtime pivot and spherical collider proxy; visible geometry lives in named child assemblies.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": null,
+      "attachment": null,
+      "dimensions": {
+        "width": 1,
+        "height": 1.55,
+        "depth": 1,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "root",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "sphere",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "root",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "black-forged"
+        }
+      },
+      "material": "black-forged",
+      "materialLayers": [
+        "black-forged"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "blockout",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(8, 11, 14, 1)",
+        "secondaryAlbedo": "rgba(18, 23, 28, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "pressure-shell",
+      "name": "Pressure shell",
+      "level": "macro",
+      "role": "body",
+      "importance": 1,
+      "confidence": 0.92,
+      "primitive": "sphere",
+      "topologyClass": "continuous-sculpt",
+      "topologyRationale": "Single radially symmetric curved pressure vessel under the separable armor shell.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "root",
+      "attachment": null,
+      "dimensions": {
+        "width": 1,
+        "height": 0.96,
+        "depth": 1,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "sphere",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "pressure-shell",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "black-forged"
+        }
+      },
+      "material": "black-forged",
+      "materialLayers": [
+        "black-forged"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "micro-pitting",
+          "type": "normal-relief",
+          "mapsTo": "black-forged.micro-pitting",
+          "confidence": 0.9
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "blockout",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(8, 11, 14, 1)",
+        "secondaryAlbedo": "rgba(18, 23, 28, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "armor-assembly",
+      "name": "Armor assembly",
+      "level": "macro",
+      "role": "detachable-shell",
+      "importance": 1,
+      "confidence": 0.92,
+      "primitive": "instanced-cluster",
+      "topologyClass": "conforming-shell",
+      "topologyRationale": "Six thin curved plates conform to the pressure shell and separate along radial seams.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "root",
+      "attachment": null,
+      "dimensions": {
+        "width": 1.06,
+        "height": 1,
+        "depth": 1.06,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "detachable-fragment",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": true,
+          "fractureGroup": "armor-shell",
+          "seamRefs": [
+            "radial-seams"
+          ],
+          "detachableFragments": [
+            "armor-assembly"
+          ],
+          "breakImpulse": 1,
+          "debrisMaterial": "satin-armor"
+        }
+      },
+      "material": "satin-armor",
+      "materialLayers": [
+        "satin-armor"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "edge-chamfer",
+          "type": "chamfer",
+          "bevelRadius": 0.025,
+          "segments": 2,
+          "confidence": 0.95
+        },
+        {
+          "id": "radial-seam",
+          "type": "recessed-groove",
+          "width": 0.018,
+          "depth": 0.014,
+          "confidence": 0.94
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "blockout",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(21, 26, 31, 1)",
+        "secondaryAlbedo": "rgba(33, 40, 47, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "detonation-core",
+      "name": "Detonation core",
+      "level": "macro",
+      "role": "effect-emitter",
+      "importance": 1,
+      "confidence": 0.92,
+      "primitive": "sphere",
+      "topologyClass": "assembled-solid",
+      "topologyRationale": "Compact internal volume anchors ignition, core flash, fire jets, shockwave, and debris impulses.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "root",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.42,
+        "height": 0.42,
+        "depth": 0.42,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "sphere",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "detonation-core",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "ember"
+        }
+      },
+      "material": "ember",
+      "materialLayers": [
+        "ember"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "blockout",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(255, 106, 0, 1)",
+        "secondaryAlbedo": "rgba(255, 245, 194, 1)",
+        "materialClass": "ceramic",
+        "materialClassConfidence": 0.7,
+        "evidenceRefs": [
+          "front-and-side",
+          "explosion-sequence"
+        ]
+      }
+    },
+    {
+      "id": "armor-petal-1",
+      "name": "Armor petal 1",
+      "level": "meso",
+      "role": "detachable-plate",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "extrude",
+      "topologyClass": "conforming-shell",
+      "topologyRationale": "Closed spherical patch with real thickness and chamfered radial boundaries.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "armor-assembly",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.48,
+        "height": 0.88,
+        "depth": 0.12,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "detachable-fragment",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": true,
+          "fractureGroup": "armor-shell",
+          "seamRefs": [
+            "radial-seams"
+          ],
+          "detachableFragments": [
+            "armor-petal-1"
+          ],
+          "breakImpulse": 1,
+          "debrisMaterial": "satin-armor"
+        }
+      },
+      "material": "satin-armor",
+      "materialLayers": [
+        "satin-armor"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "edge-chamfer",
+          "type": "chamfer",
+          "bevelRadius": 0.025,
+          "segments": 2,
+          "confidence": 0.95
+        },
+        {
+          "id": "radial-seam",
+          "type": "recessed-groove",
+          "width": 0.018,
+          "depth": 0.014,
+          "confidence": 0.94
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(21, 26, 31, 1)",
+        "secondaryAlbedo": "rgba(33, 40, 47, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "armor-petal-2",
+      "name": "Armor petal 2",
+      "level": "meso",
+      "role": "detachable-plate",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "extrude",
+      "topologyClass": "conforming-shell",
+      "topologyRationale": "Closed spherical patch with real thickness and chamfered radial boundaries.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "armor-assembly",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.48,
+        "height": 0.88,
+        "depth": 0.12,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "detachable-fragment",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": true,
+          "fractureGroup": "armor-shell",
+          "seamRefs": [
+            "radial-seams"
+          ],
+          "detachableFragments": [
+            "armor-petal-2"
+          ],
+          "breakImpulse": 1,
+          "debrisMaterial": "satin-armor"
+        }
+      },
+      "material": "satin-armor",
+      "materialLayers": [
+        "satin-armor"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "edge-chamfer",
+          "type": "chamfer",
+          "bevelRadius": 0.025,
+          "segments": 2,
+          "confidence": 0.95
+        },
+        {
+          "id": "radial-seam",
+          "type": "recessed-groove",
+          "width": 0.018,
+          "depth": 0.014,
+          "confidence": 0.94
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(21, 26, 31, 1)",
+        "secondaryAlbedo": "rgba(33, 40, 47, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "armor-petal-3",
+      "name": "Armor petal 3",
+      "level": "meso",
+      "role": "detachable-plate",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "extrude",
+      "topologyClass": "conforming-shell",
+      "topologyRationale": "Closed spherical patch with real thickness and chamfered radial boundaries.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "armor-assembly",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.48,
+        "height": 0.88,
+        "depth": 0.12,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "detachable-fragment",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": true,
+          "fractureGroup": "armor-shell",
+          "seamRefs": [
+            "radial-seams"
+          ],
+          "detachableFragments": [
+            "armor-petal-3"
+          ],
+          "breakImpulse": 1,
+          "debrisMaterial": "satin-armor"
+        }
+      },
+      "material": "satin-armor",
+      "materialLayers": [
+        "satin-armor"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "edge-chamfer",
+          "type": "chamfer",
+          "bevelRadius": 0.025,
+          "segments": 2,
+          "confidence": 0.95
+        },
+        {
+          "id": "radial-seam",
+          "type": "recessed-groove",
+          "width": 0.018,
+          "depth": 0.014,
+          "confidence": 0.94
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(21, 26, 31, 1)",
+        "secondaryAlbedo": "rgba(33, 40, 47, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "armor-petal-4",
+      "name": "Armor petal 4",
+      "level": "meso",
+      "role": "detachable-plate",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "extrude",
+      "topologyClass": "conforming-shell",
+      "topologyRationale": "Closed spherical patch with real thickness and chamfered radial boundaries.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "armor-assembly",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.48,
+        "height": 0.88,
+        "depth": 0.12,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "detachable-fragment",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": true,
+          "fractureGroup": "armor-shell",
+          "seamRefs": [
+            "radial-seams"
+          ],
+          "detachableFragments": [
+            "armor-petal-4"
+          ],
+          "breakImpulse": 1,
+          "debrisMaterial": "satin-armor"
+        }
+      },
+      "material": "satin-armor",
+      "materialLayers": [
+        "satin-armor"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "edge-chamfer",
+          "type": "chamfer",
+          "bevelRadius": 0.025,
+          "segments": 2,
+          "confidence": 0.95
+        },
+        {
+          "id": "radial-seam",
+          "type": "recessed-groove",
+          "width": 0.018,
+          "depth": 0.014,
+          "confidence": 0.94
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(21, 26, 31, 1)",
+        "secondaryAlbedo": "rgba(33, 40, 47, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "armor-petal-5",
+      "name": "Armor petal 5",
+      "level": "meso",
+      "role": "detachable-plate",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "extrude",
+      "topologyClass": "conforming-shell",
+      "topologyRationale": "Closed spherical patch with real thickness and chamfered radial boundaries.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "armor-assembly",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.48,
+        "height": 0.88,
+        "depth": 0.12,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "detachable-fragment",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": true,
+          "fractureGroup": "armor-shell",
+          "seamRefs": [
+            "radial-seams"
+          ],
+          "detachableFragments": [
+            "armor-petal-5"
+          ],
+          "breakImpulse": 1,
+          "debrisMaterial": "satin-armor"
+        }
+      },
+      "material": "satin-armor",
+      "materialLayers": [
+        "satin-armor"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "edge-chamfer",
+          "type": "chamfer",
+          "bevelRadius": 0.025,
+          "segments": 2,
+          "confidence": 0.95
+        },
+        {
+          "id": "radial-seam",
+          "type": "recessed-groove",
+          "width": 0.018,
+          "depth": 0.014,
+          "confidence": 0.94
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(21, 26, 31, 1)",
+        "secondaryAlbedo": "rgba(33, 40, 47, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "armor-petal-6",
+      "name": "Armor petal 6",
+      "level": "meso",
+      "role": "detachable-plate",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "extrude",
+      "topologyClass": "conforming-shell",
+      "topologyRationale": "Closed spherical patch with real thickness and chamfered radial boundaries.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "armor-assembly",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.48,
+        "height": 0.88,
+        "depth": 0.12,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "detachable-fragment",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": true,
+          "fractureGroup": "armor-shell",
+          "seamRefs": [
+            "radial-seams"
+          ],
+          "detachableFragments": [
+            "armor-petal-6"
+          ],
+          "breakImpulse": 1,
+          "debrisMaterial": "satin-armor"
+        }
+      },
+      "material": "satin-armor",
+      "materialLayers": [
+        "satin-armor"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "edge-chamfer",
+          "type": "chamfer",
+          "bevelRadius": 0.025,
+          "segments": 2,
+          "confidence": 0.95
+        },
+        {
+          "id": "radial-seam",
+          "type": "recessed-groove",
+          "width": 0.018,
+          "depth": 0.014,
+          "confidence": 0.94
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(21, 26, 31, 1)",
+        "secondaryAlbedo": "rgba(33, 40, 47, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "equator-band",
+      "name": "Equatorial reinforcement band",
+      "level": "meso",
+      "role": "reinforcement",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "torus",
+      "topologyClass": "assembled-solid",
+      "topologyRationale": "Continuous thick metal ring crossing all armor panels at the equator.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "root",
+      "attachment": null,
+      "dimensions": {
+        "width": 1.08,
+        "height": 0.12,
+        "depth": 1.08,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "equator-band",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "gunmetal"
+        }
+      },
+      "material": "gunmetal",
+      "materialLayers": [
+        "gunmetal"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "edge-wear",
+          "type": "scratch-cluster",
+          "mapsTo": "gunmetal.equator-edge-wear",
+          "confidence": 0.88
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(48, 56, 64, 1)",
+        "secondaryAlbedo": "rgba(89, 99, 107, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "base-collar",
+      "name": "Grounding base collar",
+      "level": "meso",
+      "role": "base",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "cylinder",
+      "topologyClass": "assembled-solid",
+      "topologyRationale": "Low stepped cylinder provides a stable grounded silhouette and contact plane.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "root",
+      "attachment": {
+        "parentId": "root",
+        "parentSocket": "shell-bottom",
+        "localStart": [
+          0,
+          -0.5,
+          0
+        ],
+        "localEnd": [
+          0,
+          -0.42,
+          0
+        ],
+        "embedDepth": 0.03,
+        "overlap": 0.03,
+        "contactType": "overlap",
+        "gapTolerance": 0.004,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      },
+      "dimensions": {
+        "width": 0.64,
+        "height": 0.12,
+        "depth": 0.64,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          -0.48,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "base-collar",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "gunmetal"
+        }
+      },
+      "material": "gunmetal",
+      "materialLayers": [
+        "gunmetal"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "contact-darkening",
+          "type": "stain",
+          "mapsTo": "gunmetal.contact-darkening",
+          "confidence": 0.9
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(48, 56, 64, 1)",
+        "secondaryAlbedo": "rgba(89, 99, 107, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "fuse-neck",
+      "name": "Fuse neck and socket",
+      "level": "meso",
+      "role": "reinforcement",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "cylinder",
+      "topologyClass": "assembled-solid",
+      "topologyRationale": "Two stepped cylinders overlap the shell crown and receive the fuse cord.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "root",
+      "attachment": {
+        "parentId": "root",
+        "parentSocket": "shell-crown",
+        "localStart": [
+          0,
+          0.43,
+          0
+        ],
+        "localEnd": [
+          0,
+          0.62,
+          0
+        ],
+        "embedDepth": 0.035,
+        "overlap": 0.035,
+        "contactType": "socket",
+        "gapTolerance": 0.004,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      },
+      "dimensions": {
+        "width": 0.34,
+        "height": 0.24,
+        "depth": 0.34,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0.5,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "fuse-neck",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "black-forged"
+        }
+      },
+      "material": "black-forged",
+      "materialLayers": [
+        "black-forged"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "stepped-rings",
+          "type": "raised-ridge",
+          "count": 2,
+          "confidence": 0.96
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(8, 11, 14, 1)",
+        "secondaryAlbedo": "rgba(18, 23, 28, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "fuse-cord",
+      "name": "Braided fuse cord",
+      "level": "meso",
+      "role": "effect-fuse",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "tube",
+      "topologyClass": "fiber-strand",
+      "topologyRationale": "Five attached tube segments follow the observed asymmetric fuse arc.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "fuse-neck",
+      "attachment": {
+        "parentId": "fuse-neck",
+        "parentSocket": "fuse-socket",
+        "localStart": [
+          0,
+          0.1,
+          0
+        ],
+        "localEnd": [
+          0.34,
+          0.48,
+          0
+        ],
+        "baseRadius": 0.055,
+        "endRadius": 0.045,
+        "embedDepth": 0.04,
+        "overlap": 0.04,
+        "contactType": "socket",
+        "gapTolerance": 0.005,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      },
+      "dimensions": {
+        "width": 0.44,
+        "height": 0.5,
+        "depth": 0.08,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0.63,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "capsule",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "fuse-cord",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "fuse-fiber"
+        }
+      },
+      "material": "fuse-fiber",
+      "materialLayers": [
+        "fuse-fiber"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "braided-ridges",
+          "type": "raised-ridge",
+          "count": 10,
+          "confidence": 0.88
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(20, 21, 23, 1)",
+        "secondaryAlbedo": "rgba(40, 41, 43, 1)",
+        "materialClass": "fabric",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "ember-tip",
+      "name": "Fuse ember",
+      "level": "meso",
+      "role": "effect-socket",
+      "importance": 0.85,
+      "confidence": 0.92,
+      "primitive": "sphere",
+      "topologyClass": "assembled-solid",
+      "topologyRationale": "Small faceted emissive cap anchors sparks and fuse-light timing.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "fuse-cord",
+      "attachment": {
+        "parentId": "fuse-cord",
+        "parentSocket": "fuse-tip",
+        "localStart": [
+          0.32,
+          0.46,
+          0
+        ],
+        "localEnd": [
+          0.36,
+          0.5,
+          0
+        ],
+        "baseRadius": 0.05,
+        "endRadius": 0.035,
+        "embedDepth": 0.02,
+        "overlap": 0.02,
+        "contactType": "overlap",
+        "gapTolerance": 0.004,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      },
+      "dimensions": {
+        "width": 0.12,
+        "height": 0.12,
+        "depth": 0.12,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0.34,
+          1.1,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "sphere",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "ember-tip",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "ember"
+        }
+      },
+      "material": "ember",
+      "materialLayers": [
+        "ember"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "hot-core",
+          "type": "emissive",
+          "intensity": 5,
+          "confidence": 0.98
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "structural",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(255, 106, 0, 1)",
+        "secondaryAlbedo": "rgba(255, 245, 194, 1)",
+        "materialClass": "ceramic",
+        "materialClassConfidence": 0.7,
+        "evidenceRefs": [
+          "front-and-side",
+          "explosion-sequence"
+        ]
+      }
+    },
+    {
+      "id": "fastener-cluster",
+      "name": "Radial fastener cluster",
+      "level": "micro",
+      "role": "hardware",
+      "importance": 0.7,
+      "confidence": 0.92,
+      "primitive": "instanced-cluster",
+      "topologyClass": "surface-relief",
+      "topologyRationale": "Four repeated recessed metal heads sit proud of selected armor petals.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "armor-assembly",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.12,
+        "height": 0.12,
+        "depth": 0.04,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "fastener-cluster",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "gunmetal"
+        }
+      },
+      "material": "gunmetal",
+      "materialLayers": [
+        "gunmetal"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [
+        {
+          "id": "radial-fasteners",
+          "type": "fastener",
+          "count": 4,
+          "distribution": "radial",
+          "confidence": 0.92
+        },
+        {
+          "id": "cross-grooves",
+          "type": "recessed-groove",
+          "count": 8,
+          "confidence": 0.86
+        }
+      ],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "detail",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(48, 56, 64, 1)",
+        "secondaryAlbedo": "rgba(89, 99, 107, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "petal-bevel-relief",
+      "name": "Petal bevel relief",
+      "level": "micro",
+      "role": "surface-relief",
+      "importance": 0.7,
+      "confidence": 0.92,
+      "primitive": "extrude",
+      "topologyClass": "surface-relief",
+      "topologyRationale": "Narrow raised rims affect highlights and remain attached to their parent petals.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "armor-assembly",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.49,
+        "height": 0.89,
+        "depth": 0.02,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "petal-bevel-relief",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "gunmetal"
+        }
+      },
+      "material": "gunmetal",
+      "materialLayers": [
+        "gunmetal"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "detail",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(48, 56, 64, 1)",
+        "secondaryAlbedo": "rgba(89, 99, 107, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "radial-seam-relief",
+      "name": "Radial seam relief",
+      "level": "micro",
+      "role": "surface-relief",
+      "importance": 0.7,
+      "confidence": 0.92,
+      "primitive": "extrude",
+      "topologyClass": "surface-relief",
+      "topologyRationale": "Real gaps separate plates and supply AO rather than a painted line.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "armor-assembly",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.02,
+        "height": 0.88,
+        "depth": 0.02,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "radial-seam-relief",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "black-forged"
+        }
+      },
+      "material": "black-forged",
+      "materialLayers": [
+        "black-forged"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "detail",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(8, 11, 14, 1)",
+        "secondaryAlbedo": "rgba(18, 23, 28, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "fuse-braid-relief",
+      "name": "Fuse braid relief",
+      "level": "micro",
+      "role": "surface-relief",
+      "importance": 0.7,
+      "confidence": 0.92,
+      "primitive": "instanced-cluster",
+      "topologyClass": "surface-relief",
+      "topologyRationale": "Alternating short relief bands ride the cord segments and move with the fuse.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "fuse-cord",
+      "attachment": null,
+      "dimensions": {
+        "width": 0.06,
+        "height": 0.04,
+        "depth": 0.06,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "box",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "fuse-braid-relief",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "gunmetal"
+        }
+      },
+      "material": "gunmetal",
+      "materialLayers": [
+        "gunmetal"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "detail",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(48, 56, 64, 1)",
+        "secondaryAlbedo": "rgba(89, 99, 107, 1)",
+        "materialClass": "metal",
+        "materialClassConfidence": 0.94,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      }
+    },
+    {
+      "id": "ember-spark-socket",
+      "name": "Ember spark socket",
+      "level": "micro",
+      "role": "effect-socket",
+      "importance": 0.7,
+      "confidence": 0.92,
+      "primitive": "sphere",
+      "topologyClass": "assembled-solid",
+      "topologyRationale": "Named point source for procedural sparks and final fuse acceleration.",
+      "geometryDescriptor": {
+        "topologyIntent": "low-poly blockout with bevel-ready edges",
+        "edgeTreatment": {
+          "type": "none",
+          "bevelRadius": 0,
+          "segments": 1
+        },
+        "deformationStack": [],
+        "uvStrategy": "generated procedural coordinates",
+        "normalStrategy": "vertex normals from generated geometry"
+      },
+      "parent": "ember-tip",
+      "attachment": {
+        "parentId": "ember-tip",
+        "parentSocket": "spark-origin",
+        "localStart": [
+          0,
+          0,
+          0
+        ],
+        "localEnd": [
+          0,
+          0.02,
+          0
+        ],
+        "embedDepth": 0.01,
+        "overlap": 0.01,
+        "contactType": "embedded",
+        "gapTolerance": 0.002,
+        "evidenceRefs": [
+          "front-and-side"
+        ]
+      },
+      "dimensions": {
+        "width": 0.04,
+        "height": 0.04,
+        "depth": 0.04,
+        "units": "relative-to-shell-radius",
+        "confidence": 0.92
+      },
+      "transform": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ],
+        "scale": [
+          1,
+          1,
+          1
+        ]
+      },
+      "actionProfile": {
+        "animationRole": "static-part",
+        "pivot": {
+          "mode": "center",
+          "localPosition": [
+            0,
+            0,
+            0
+          ],
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "confidence": 0.5
+        },
+        "transformChannels": {
+          "translate": true,
+          "rotate": true,
+          "scale": true,
+          "bend": false,
+          "twist": false,
+          "detach": false,
+          "visibility": true,
+          "materialState": true
+        },
+        "sockets": [],
+        "collider": {
+          "type": "sphere",
+          "offset": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "isTrigger": false,
+          "notes": "Gameplay uses the existing bomb collision cell; proxy documents visual part intent."
+        },
+        "constraints": [],
+        "destruction": {
+          "breakable": false,
+          "fractureGroup": "ember-spark-socket",
+          "seamRefs": [],
+          "detachableFragments": [],
+          "breakImpulse": 0,
+          "debrisMaterial": "ember"
+        }
+      },
+      "material": "ember",
+      "materialLayers": [
+        "ember"
+      ],
+      "deformations": [],
+      "joints": [],
+      "seams": [],
+      "localFeatures": [],
+      "surfaceDetail": {
+        "macroRoughness": 0,
+        "microRoughness": 0,
+        "bumpAmplitude": 0,
+        "normalPattern": "",
+        "displacementPattern": "",
+        "occlusionPattern": "",
+        "edgeWearPattern": "",
+        "notes": ""
+      },
+      "evidenceRefs": [
+        "front-and-side",
+        "top"
+      ],
+      "details": [],
+      "fidelityTier": "detail",
+      "colorMaterialRecipe": {
+        "dominantAlbedo": "rgba(255, 106, 0, 1)",
+        "secondaryAlbedo": "rgba(255, 245, 194, 1)",
+        "materialClass": "ceramic",
+        "materialClassConfidence": 0.7,
+        "evidenceRefs": [
+          "front-and-side",
+          "explosion-sequence"
+        ]
+      }
+    }
+  ],
+  "materials": [
+    {
+      "id": "black-forged",
+      "name": "Near-black forged pressure steel",
+      "type": "standard",
+      "shaderModel": "MeshStandardMaterial / PBR approximation",
+      "baseColor": "#080B0E",
+      "color": "#080B0E",
+      "albedo": {
+        "dominant": "#080B0E",
+        "secondary": [],
+        "samplingNotes": "Sampled/normalized from the generated multi-view reference."
+      },
+      "colorVariation": {
+        "palette": [
+          "#080B0E"
+        ],
+        "pattern": "sparse forged variation",
+        "amplitude": 0.035,
+        "heightCorrelation": 0.18
+      },
+      "textureResolution": 1024,
+      "textureProjection": {
+        "mode": "uv",
+        "repeat": [
+          2,
+          2
+        ],
+        "anisotropy": 8,
+        "texelDensityIntent": "Preserve stable world/object-scale detail; do not stretch micro detail with component scale."
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "macro",
+          "frequency": 2,
+          "amplitude": 0.423,
+          "role": "reference-derived broad albedo and height breakup"
+        },
+        {
+          "id": "meso",
+          "frequency": 14,
+          "amplitude": 0.324,
+          "role": "reference-derived cracks, ridges, pores, grain, or leaf clusters"
+        },
+        {
+          "id": "micro",
+          "frequency": 72,
+          "amplitude": 0.14,
+          "role": "reference-derived micro highlight breakup under grazing light"
+        }
+      ],
+      "roughness": {
+        "base": 0.32,
+        "variation": 0.12,
+        "map": "independent-procedural-field",
+        "localResponse": "cavities rougher; worn edges slightly smoother"
+      },
+      "metalness": {
+        "base": 0.78,
+        "variation": 0.08
+      },
+      "normal": {
+        "pattern": "independent forged micro-pitting field",
+        "strength": 0.16,
+        "scale": 64,
+        "space": "tangent"
+      },
+      "bump": {
+        "pattern": "reference-derived height field",
+        "amplitude": 0.019,
+        "map": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+          "url": "black-forged_height.png",
+          "channel": "height",
+          "source": "reference-pixel-extraction"
+        }
+      },
+      "displacement": {
+        "pattern": "none",
+        "amplitude": 0,
+        "scale": 1,
+        "silhouetteAffects": false
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.32,
+        "contactShadowBias": 0.42,
+        "notes": "Concentrate in radial seams, fastener recesses, neck steps, and ground contact."
+      },
+      "wear": {
+        "edgeWear": 0,
+        "scratches": [],
+        "chips": []
+      },
+      "dirt": {
+        "amount": 0,
+        "cavityBias": 0,
+        "color": "#2F2A22"
+      },
+      "localOverrides": [
+        {
+          "id": "micro-pitting",
+          "region": "pressure shell and neck",
+          "roughness": 0.4,
+          "normalStrength": 0.16,
+          "evidenceRefs": [
+            "front-and-side"
+          ]
+        }
+      ],
+      "shaderNotes": [
+        "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+        "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+        "Use normal/bump/displacement only when they map to observed surface relief.",
+        "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there.",
+        "Reference-derived maps are estimates from image pixels; verify with neutral, grazing, and reference-matched renders.",
+        "Do not treat baked image shadows as final albedo; rerun extraction with a tighter material crop if highlights/shadows pollute the maps."
+      ],
+      "notes": "Procedural renderer-native approximation; no reference texture is projected onto the live game prop.",
+      "referencePbr": {
+        "version": "1.0",
+        "sourceImage": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\material-crops\\black-forged.png",
+        "extractor": "stage1_intake/extract_pbr_evidence.py",
+        "method": "single-image pixel evidence with de-lighting estimate; not photogrammetry",
+        "usable": true,
+        "verdict": "pass",
+        "confidence": 0.891,
+        "estimatedFidelity": 0.891,
+        "targetThreshold": 0.7,
+        "hardLimit": "A single image cannot uniquely recover true albedo/roughness/normal/AO; maps are reference-derived estimates.",
+        "maps": {
+          "albedo": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_albedo.png",
+            "url": "black-forged_albedo.png",
+            "channel": "albedo",
+            "source": "reference-pixel-extraction"
+          },
+          "roughness": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_roughness.png",
+            "url": "black-forged_roughness.png",
+            "channel": "roughness",
+            "source": "reference-pixel-extraction"
+          },
+          "height": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+            "url": "black-forged_height.png",
+            "channel": "height",
+            "source": "reference-pixel-extraction"
+          },
+          "normal": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_normal.png",
+            "url": "black-forged_normal.png",
+            "channel": "normal",
+            "source": "reference-pixel-extraction"
+          },
+          "ao": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_ao.png",
+            "url": "black-forged_ao.png",
+            "channel": "ao",
+            "source": "reference-pixel-extraction"
+          }
+        },
+        "diagnostics": {
+          "sourceWidth": 230,
+          "sourceHeight": 125,
+          "mapSize": 1024,
+          "cropBBoxPixels": {
+            "x": 0,
+            "y": 0,
+            "width": 230,
+            "height": 125
+          },
+          "mask": {
+            "backgroundColor": "#1D1F22",
+            "backgroundNoise": 2.236,
+            "transparentPixelFraction": 0,
+            "foregroundCoverage": 0.5231
+          },
+          "mapStats": {
+            "valueRange": 0.4095,
+            "heightP90Gradient": 0.04147,
+            "roughnessBase": 0.709,
+            "roughnessVariation": 0.087,
+            "normalStrength": 0.205,
+            "blurRadius": 21
+          },
+          "palette": [
+            "#1D2024",
+            "#35393D",
+            "#515D66",
+            "#8197A4",
+            "#101010"
+          ]
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "satin-armor",
+      "name": "Satin black armor coating",
+      "type": "standard",
+      "shaderModel": "MeshStandardMaterial / PBR approximation",
+      "baseColor": "#151A1F",
+      "color": "#151A1F",
+      "albedo": {
+        "dominant": "#151A1F",
+        "secondary": [],
+        "samplingNotes": "Sampled/normalized from the generated multi-view reference."
+      },
+      "colorVariation": {
+        "palette": [
+          "#151A1F"
+        ],
+        "pattern": "sparse forged variation",
+        "amplitude": 0.035,
+        "heightCorrelation": 0.18
+      },
+      "textureResolution": 1024,
+      "textureProjection": {
+        "mode": "uv",
+        "repeat": [
+          2,
+          2
+        ],
+        "anisotropy": 8,
+        "texelDensityIntent": "Preserve stable world/object-scale detail; do not stretch micro detail with component scale."
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "macro",
+          "frequency": 2,
+          "amplitude": 0.423,
+          "role": "reference-derived broad albedo and height breakup"
+        },
+        {
+          "id": "meso",
+          "frequency": 14,
+          "amplitude": 0.324,
+          "role": "reference-derived cracks, ridges, pores, grain, or leaf clusters"
+        },
+        {
+          "id": "micro",
+          "frequency": 72,
+          "amplitude": 0.14,
+          "role": "reference-derived micro highlight breakup under grazing light"
+        }
+      ],
+      "roughness": {
+        "base": 0.28,
+        "variation": 0.12,
+        "map": "independent-procedural-field",
+        "localResponse": "cavities rougher; worn edges slightly smoother"
+      },
+      "metalness": {
+        "base": 0.38,
+        "variation": 0.08
+      },
+      "normal": {
+        "pattern": "independent forged micro-pitting field",
+        "strength": 0.16,
+        "scale": 64,
+        "space": "tangent"
+      },
+      "bump": {
+        "pattern": "reference-derived height field",
+        "amplitude": 0.019,
+        "map": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+          "url": "black-forged_height.png",
+          "channel": "height",
+          "source": "reference-pixel-extraction"
+        }
+      },
+      "displacement": {
+        "pattern": "none",
+        "amplitude": 0,
+        "scale": 1,
+        "silhouetteAffects": false
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.32,
+        "contactShadowBias": 0.42,
+        "notes": "Concentrate in radial seams, fastener recesses, neck steps, and ground contact."
+      },
+      "wear": {
+        "edgeWear": 0,
+        "scratches": [],
+        "chips": []
+      },
+      "dirt": {
+        "amount": 0,
+        "cavityBias": 0,
+        "color": "#2F2A22"
+      },
+      "localOverrides": [
+        {
+          "id": "bevel-catchlight",
+          "region": "petal chamfer crests",
+          "roughness": 0.16,
+          "evidenceRefs": [
+            "front-and-top"
+          ]
+        }
+      ],
+      "shaderNotes": [
+        "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+        "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+        "Use normal/bump/displacement only when they map to observed surface relief.",
+        "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there.",
+        "Reference-derived maps are estimates from image pixels; verify with neutral, grazing, and reference-matched renders.",
+        "Do not treat baked image shadows as final albedo; rerun extraction with a tighter material crop if highlights/shadows pollute the maps."
+      ],
+      "notes": "Procedural renderer-native approximation; no reference texture is projected onto the live game prop.",
+      "referencePbr": {
+        "version": "1.0",
+        "sourceImage": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\material-crops\\satin-armor.png",
+        "extractor": "stage1_intake/extract_pbr_evidence.py",
+        "method": "single-image pixel evidence with de-lighting estimate; not photogrammetry",
+        "usable": true,
+        "verdict": "pass",
+        "confidence": 0.902,
+        "estimatedFidelity": 0.902,
+        "targetThreshold": 0.7,
+        "hardLimit": "A single image cannot uniquely recover true albedo/roughness/normal/AO; maps are reference-derived estimates.",
+        "maps": {
+          "albedo": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_albedo.png",
+            "url": "satin-armor_albedo.png",
+            "channel": "albedo",
+            "source": "reference-pixel-extraction"
+          },
+          "roughness": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_roughness.png",
+            "url": "satin-armor_roughness.png",
+            "channel": "roughness",
+            "source": "reference-pixel-extraction"
+          },
+          "height": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_height.png",
+            "url": "satin-armor_height.png",
+            "channel": "height",
+            "source": "reference-pixel-extraction"
+          },
+          "normal": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_normal.png",
+            "url": "satin-armor_normal.png",
+            "channel": "normal",
+            "source": "reference-pixel-extraction"
+          },
+          "ao": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_ao.png",
+            "url": "satin-armor_ao.png",
+            "channel": "ao",
+            "source": "reference-pixel-extraction"
+          }
+        },
+        "diagnostics": {
+          "sourceWidth": 260,
+          "sourceHeight": 210,
+          "mapSize": 1024,
+          "cropBBoxPixels": {
+            "x": 0,
+            "y": 0,
+            "width": 260,
+            "height": 210
+          },
+          "mask": {
+            "backgroundColor": "#252323",
+            "backgroundNoise": 24.413,
+            "transparentPixelFraction": 0,
+            "foregroundCoverage": 0.3156
+          },
+          "mapStats": {
+            "valueRange": 0.4507,
+            "heightP90Gradient": 0.05506,
+            "roughnessBase": 0.691,
+            "roughnessVariation": 0.1,
+            "normalStrength": 0.221,
+            "blurRadius": 21
+          },
+          "palette": [
+            "#525151",
+            "#717375",
+            "#1B1C1E",
+            "#2D3237",
+            "#BDC9CE"
+          ]
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "gunmetal",
+      "name": "Brushed gunmetal hardware",
+      "type": "standard",
+      "shaderModel": "MeshStandardMaterial / PBR approximation",
+      "baseColor": "#303840",
+      "color": "#303840",
+      "albedo": {
+        "dominant": "#303840",
+        "secondary": [],
+        "samplingNotes": "Sampled/normalized from the generated multi-view reference."
+      },
+      "colorVariation": {
+        "palette": [
+          "#303840"
+        ],
+        "pattern": "sparse forged variation",
+        "amplitude": 0.035,
+        "heightCorrelation": 0.18
+      },
+      "textureResolution": 1024,
+      "textureProjection": {
+        "mode": "uv",
+        "repeat": [
+          2,
+          2
+        ],
+        "anisotropy": 8,
+        "texelDensityIntent": "Preserve stable world/object-scale detail; do not stretch micro detail with component scale."
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "macro",
+          "frequency": 2,
+          "amplitude": 0.423,
+          "role": "reference-derived broad albedo and height breakup"
+        },
+        {
+          "id": "meso",
+          "frequency": 14,
+          "amplitude": 0.324,
+          "role": "reference-derived cracks, ridges, pores, grain, or leaf clusters"
+        },
+        {
+          "id": "micro",
+          "frequency": 72,
+          "amplitude": 0.14,
+          "role": "reference-derived micro highlight breakup under grazing light"
+        }
+      ],
+      "roughness": {
+        "base": 0.24,
+        "variation": 0.12,
+        "map": "independent-procedural-field",
+        "localResponse": "cavities rougher; worn edges slightly smoother"
+      },
+      "metalness": {
+        "base": 0.92,
+        "variation": 0.08
+      },
+      "normal": {
+        "pattern": "independent forged micro-pitting field",
+        "strength": 0.16,
+        "scale": 64,
+        "space": "tangent"
+      },
+      "bump": {
+        "pattern": "reference-derived height field",
+        "amplitude": 0.019,
+        "map": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+          "url": "black-forged_height.png",
+          "channel": "height",
+          "source": "reference-pixel-extraction"
+        }
+      },
+      "displacement": {
+        "pattern": "none",
+        "amplitude": 0,
+        "scale": 1,
+        "silhouetteAffects": false
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.32,
+        "contactShadowBias": 0.42,
+        "notes": "Concentrate in radial seams, fastener recesses, neck steps, and ground contact."
+      },
+      "wear": {
+        "edgeWear": 0,
+        "scratches": [],
+        "chips": []
+      },
+      "dirt": {
+        "amount": 0,
+        "cavityBias": 0,
+        "color": "#2F2A22"
+      },
+      "localOverrides": [
+        {
+          "id": "equator-edge-wear",
+          "region": "equator band outer edges",
+          "roughness": 0.12,
+          "color": "#59636B",
+          "evidenceRefs": [
+            "front"
+          ]
+        },
+        {
+          "id": "contact-darkening",
+          "region": "base collar lower edge",
+          "roughness": 0.5,
+          "color": "#11161A",
+          "evidenceRefs": [
+            "front"
+          ]
+        }
+      ],
+      "shaderNotes": [
+        "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+        "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+        "Use normal/bump/displacement only when they map to observed surface relief.",
+        "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there.",
+        "Reference-derived maps are estimates from image pixels; verify with neutral, grazing, and reference-matched renders.",
+        "Do not treat baked image shadows as final albedo; rerun extraction with a tighter material crop if highlights/shadows pollute the maps."
+      ],
+      "notes": "Procedural renderer-native approximation; no reference texture is projected onto the live game prop.",
+      "referencePbr": {
+        "version": "1.0",
+        "sourceImage": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\material-crops\\gunmetal.png",
+        "extractor": "stage1_intake/extract_pbr_evidence.py",
+        "method": "single-image pixel evidence with de-lighting estimate; not photogrammetry",
+        "usable": true,
+        "verdict": "pass",
+        "confidence": 0.909,
+        "estimatedFidelity": 0.909,
+        "targetThreshold": 0.7,
+        "hardLimit": "A single image cannot uniquely recover true albedo/roughness/normal/AO; maps are reference-derived estimates.",
+        "maps": {
+          "albedo": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_albedo.png",
+            "url": "gunmetal_albedo.png",
+            "channel": "albedo",
+            "source": "reference-pixel-extraction"
+          },
+          "roughness": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_roughness.png",
+            "url": "gunmetal_roughness.png",
+            "channel": "roughness",
+            "source": "reference-pixel-extraction"
+          },
+          "height": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_height.png",
+            "url": "gunmetal_height.png",
+            "channel": "height",
+            "source": "reference-pixel-extraction"
+          },
+          "normal": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_normal.png",
+            "url": "gunmetal_normal.png",
+            "channel": "normal",
+            "source": "reference-pixel-extraction"
+          },
+          "ao": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_ao.png",
+            "url": "gunmetal_ao.png",
+            "channel": "ao",
+            "source": "reference-pixel-extraction"
+          }
+        },
+        "diagnostics": {
+          "sourceWidth": 430,
+          "sourceHeight": 82,
+          "mapSize": 1024,
+          "cropBBoxPixels": {
+            "x": 0,
+            "y": 0,
+            "width": 430,
+            "height": 82
+          },
+          "mask": {
+            "backgroundColor": "#1C1E21",
+            "backgroundNoise": 12.45,
+            "transparentPixelFraction": 0,
+            "foregroundCoverage": 0.601
+          },
+          "mapStats": {
+            "valueRange": 0.4872,
+            "heightP90Gradient": 0.0498,
+            "roughnessBase": 0.707,
+            "roughnessVariation": 0.089,
+            "normalStrength": 0.215,
+            "blurRadius": 21
+          },
+          "palette": [
+            "#323335",
+            "#494949",
+            "#5E6A74",
+            "#0A0A0B",
+            "#B8C4C9"
+          ]
+        },
+        "warnings": []
+      }
+    },
+    {
+      "id": "fuse-fiber",
+      "name": "Charcoal braided fuse fiber",
+      "type": "standard",
+      "shaderModel": "MeshStandardMaterial / PBR approximation",
+      "baseColor": "#141517",
+      "color": "#141517",
+      "albedo": {
+        "dominant": "#141517",
+        "secondary": [],
+        "samplingNotes": "Sampled/normalized from the generated multi-view reference."
+      },
+      "colorVariation": {
+        "palette": [
+          "#141517"
+        ],
+        "pattern": "sparse forged variation",
+        "amplitude": 0.035,
+        "heightCorrelation": 0.18
+      },
+      "textureResolution": 1024,
+      "textureProjection": {
+        "mode": "uv",
+        "repeat": [
+          2,
+          2
+        ],
+        "anisotropy": 8,
+        "texelDensityIntent": "Preserve stable world/object-scale detail; do not stretch micro detail with component scale."
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "macro",
+          "frequency": 2,
+          "amplitude": 0.423,
+          "role": "reference-derived broad albedo and height breakup"
+        },
+        {
+          "id": "meso",
+          "frequency": 14,
+          "amplitude": 0.324,
+          "role": "reference-derived cracks, ridges, pores, grain, or leaf clusters"
+        },
+        {
+          "id": "micro",
+          "frequency": 72,
+          "amplitude": 0.14,
+          "role": "reference-derived micro highlight breakup under grazing light"
+        }
+      ],
+      "roughness": {
+        "base": 0.88,
+        "variation": 0.12,
+        "map": "independent-procedural-field",
+        "localResponse": "cavities rougher; worn edges slightly smoother"
+      },
+      "metalness": {
+        "base": 0,
+        "variation": 0.08
+      },
+      "normal": {
+        "pattern": "independent forged micro-pitting field",
+        "strength": 0.16,
+        "scale": 64,
+        "space": "tangent"
+      },
+      "bump": {
+        "pattern": "reference-derived height field",
+        "amplitude": 0.019,
+        "map": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+          "url": "black-forged_height.png",
+          "channel": "height",
+          "source": "reference-pixel-extraction"
+        }
+      },
+      "displacement": {
+        "pattern": "none",
+        "amplitude": 0,
+        "scale": 1,
+        "silhouetteAffects": false
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.32,
+        "contactShadowBias": 0.42,
+        "notes": "Concentrate in radial seams, fastener recesses, neck steps, and ground contact."
+      },
+      "wear": {
+        "edgeWear": 0,
+        "scratches": [],
+        "chips": []
+      },
+      "dirt": {
+        "amount": 0,
+        "cavityBias": 0,
+        "color": "#2F2A22"
+      },
+      "localOverrides": [
+        {
+          "id": "braid-highlight",
+          "region": "alternating diagonal braid ridges",
+          "roughness": 0.62,
+          "evidenceRefs": [
+            "front-and-side"
+          ]
+        }
+      ],
+      "shaderNotes": [
+        "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+        "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+        "Use normal/bump/displacement only when they map to observed surface relief.",
+        "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there.",
+        "Reference-derived maps are estimates from image pixels; verify with neutral, grazing, and reference-matched renders.",
+        "Do not treat baked image shadows as final albedo; rerun extraction with a tighter material crop if highlights/shadows pollute the maps."
+      ],
+      "notes": "Procedural renderer-native approximation; no reference texture is projected onto the live game prop.",
+      "referencePbr": {
+        "version": "1.0",
+        "sourceImage": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\material-crops\\black-forged.png",
+        "extractor": "stage1_intake/extract_pbr_evidence.py",
+        "method": "single-image pixel evidence with de-lighting estimate; not photogrammetry",
+        "usable": true,
+        "verdict": "pass",
+        "confidence": 0.891,
+        "estimatedFidelity": 0.891,
+        "targetThreshold": 0.7,
+        "hardLimit": "A single image cannot uniquely recover true albedo/roughness/normal/AO; maps are reference-derived estimates.",
+        "maps": {
+          "albedo": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_albedo.png",
+            "url": "black-forged_albedo.png",
+            "channel": "albedo",
+            "source": "reference-pixel-extraction"
+          },
+          "roughness": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_roughness.png",
+            "url": "black-forged_roughness.png",
+            "channel": "roughness",
+            "source": "reference-pixel-extraction"
+          },
+          "height": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+            "url": "black-forged_height.png",
+            "channel": "height",
+            "source": "reference-pixel-extraction"
+          },
+          "normal": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_normal.png",
+            "url": "black-forged_normal.png",
+            "channel": "normal",
+            "source": "reference-pixel-extraction"
+          },
+          "ao": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_ao.png",
+            "url": "black-forged_ao.png",
+            "channel": "ao",
+            "source": "reference-pixel-extraction"
+          }
+        },
+        "diagnostics": {
+          "sourceWidth": 230,
+          "sourceHeight": 125,
+          "mapSize": 1024,
+          "cropBBoxPixels": {
+            "x": 0,
+            "y": 0,
+            "width": 230,
+            "height": 125
+          },
+          "mask": {
+            "backgroundColor": "#1D1F22",
+            "backgroundNoise": 2.236,
+            "transparentPixelFraction": 0,
+            "foregroundCoverage": 0.5231
+          },
+          "mapStats": {
+            "valueRange": 0.4095,
+            "heightP90Gradient": 0.04147,
+            "roughnessBase": 0.709,
+            "roughnessVariation": 0.087,
+            "normalStrength": 0.205,
+            "blurRadius": 21
+          },
+          "palette": [
+            "#1D2024",
+            "#35393D",
+            "#515D66",
+            "#8197A4",
+            "#101010"
+          ]
+        },
+        "warnings": []
+      },
+      "qualityTier": "utility"
+    },
+    {
+      "id": "ember",
+      "name": "Incandescent fuse and detonation core",
+      "type": "standard",
+      "shaderModel": "MeshStandardMaterial / PBR approximation",
+      "baseColor": "#FF6A00",
+      "color": "#FF6A00",
+      "albedo": {
+        "dominant": "#FF6A00",
+        "secondary": [],
+        "samplingNotes": "Sampled/normalized from the generated multi-view reference."
+      },
+      "colorVariation": {
+        "palette": [
+          "#FF6A00"
+        ],
+        "pattern": "sparse forged variation",
+        "amplitude": 0.035,
+        "heightCorrelation": 0.18
+      },
+      "textureResolution": 1024,
+      "textureProjection": {
+        "mode": "uv",
+        "repeat": [
+          2,
+          2
+        ],
+        "anisotropy": 8,
+        "texelDensityIntent": "Preserve stable world/object-scale detail; do not stretch micro detail with component scale."
+      },
+      "surfaceFrequencyBands": [
+        {
+          "id": "macro",
+          "frequency": 2,
+          "amplitude": 0.423,
+          "role": "reference-derived broad albedo and height breakup"
+        },
+        {
+          "id": "meso",
+          "frequency": 14,
+          "amplitude": 0.324,
+          "role": "reference-derived cracks, ridges, pores, grain, or leaf clusters"
+        },
+        {
+          "id": "micro",
+          "frequency": 72,
+          "amplitude": 0.14,
+          "role": "reference-derived micro highlight breakup under grazing light"
+        }
+      ],
+      "roughness": {
+        "base": 0.16,
+        "variation": 0.12,
+        "map": "independent-procedural-field",
+        "localResponse": "cavities rougher; worn edges slightly smoother"
+      },
+      "metalness": {
+        "base": 0,
+        "variation": 0.08
+      },
+      "normal": {
+        "pattern": "independent forged micro-pitting field",
+        "strength": 0.16,
+        "scale": 64,
+        "space": "tangent"
+      },
+      "bump": {
+        "pattern": "reference-derived height field",
+        "amplitude": 0.019,
+        "map": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+          "url": "black-forged_height.png",
+          "channel": "height",
+          "source": "reference-pixel-extraction"
+        }
+      },
+      "displacement": {
+        "pattern": "none",
+        "amplitude": 0,
+        "scale": 1,
+        "silhouetteAffects": false
+      },
+      "ambientOcclusion": {
+        "cavityStrength": 0.32,
+        "contactShadowBias": 0.42,
+        "notes": "Concentrate in radial seams, fastener recesses, neck steps, and ground contact."
+      },
+      "wear": {
+        "edgeWear": 0,
+        "scratches": [],
+        "chips": []
+      },
+      "dirt": {
+        "amount": 0,
+        "cavityBias": 0,
+        "color": "#2F2A22"
+      },
+      "localOverrides": [
+        {
+          "id": "hot-core",
+          "region": "fuse tip and detonation center",
+          "emissive": "#FFF5C2",
+          "emissiveIntensity": 5,
+          "evidenceRefs": [
+            "front-and-side",
+            "explosion-sequence"
+          ]
+        }
+      ],
+      "shaderNotes": [
+        "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+        "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+        "Use normal/bump/displacement only when they map to observed surface relief.",
+        "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there.",
+        "Reference-derived maps are estimates from image pixels; verify with neutral, grazing, and reference-matched renders.",
+        "Do not treat baked image shadows as final albedo; rerun extraction with a tighter material crop if highlights/shadows pollute the maps."
+      ],
+      "notes": "Procedural renderer-native approximation; no reference texture is projected onto the live game prop.",
+      "referencePbr": {
+        "version": "1.0",
+        "sourceImage": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\material-crops\\black-forged.png",
+        "extractor": "stage1_intake/extract_pbr_evidence.py",
+        "method": "single-image pixel evidence with de-lighting estimate; not photogrammetry",
+        "usable": true,
+        "verdict": "pass",
+        "confidence": 0.891,
+        "estimatedFidelity": 0.891,
+        "targetThreshold": 0.7,
+        "hardLimit": "A single image cannot uniquely recover true albedo/roughness/normal/AO; maps are reference-derived estimates.",
+        "maps": {
+          "albedo": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_albedo.png",
+            "url": "black-forged_albedo.png",
+            "channel": "albedo",
+            "source": "reference-pixel-extraction"
+          },
+          "roughness": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_roughness.png",
+            "url": "black-forged_roughness.png",
+            "channel": "roughness",
+            "source": "reference-pixel-extraction"
+          },
+          "height": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+            "url": "black-forged_height.png",
+            "channel": "height",
+            "source": "reference-pixel-extraction"
+          },
+          "normal": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_normal.png",
+            "url": "black-forged_normal.png",
+            "channel": "normal",
+            "source": "reference-pixel-extraction"
+          },
+          "ao": {
+            "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_ao.png",
+            "url": "black-forged_ao.png",
+            "channel": "ao",
+            "source": "reference-pixel-extraction"
+          }
+        },
+        "diagnostics": {
+          "sourceWidth": 230,
+          "sourceHeight": 125,
+          "mapSize": 1024,
+          "cropBBoxPixels": {
+            "x": 0,
+            "y": 0,
+            "width": 230,
+            "height": 125
+          },
+          "mask": {
+            "backgroundColor": "#1D1F22",
+            "backgroundNoise": 2.236,
+            "transparentPixelFraction": 0,
+            "foregroundCoverage": 0.5231
+          },
+          "mapStats": {
+            "valueRange": 0.4095,
+            "heightP90Gradient": 0.04147,
+            "roughnessBase": 0.709,
+            "roughnessVariation": 0.087,
+            "normalStrength": 0.205,
+            "blurRadius": 21
+          },
+          "palette": [
+            "#1D2024",
+            "#35393D",
+            "#515D66",
+            "#8197A4",
+            "#101010"
+          ]
+        },
+        "warnings": []
+      },
+      "emissive": {
+        "color": "#FF6A00",
+        "intensity": 5
+      },
+      "qualityTier": "utility"
+    }
+  ],
+  "repetitionSystems": [
+    {
+      "id": "armor-petals",
+      "componentRef": "armor-assembly",
+      "primitive": "spherical-segment",
+      "count": 6,
+      "distribution": "radial around +Y at 60-degree intervals",
+      "variation": "none; reference is manufactured and symmetric",
+      "buildsGeometry": true,
+      "instances": 6,
+      "localFeatureRefs": [
+        "armor-petals.edge-chamfer",
+        "armor-petals.radial-seam"
+      ],
+      "evidenceRefs": [
+        "front-and-top"
+      ]
+    },
+    {
+      "id": "fasteners",
+      "componentRef": "fastener-cluster",
+      "primitive": "cylinder",
+      "count": 4,
+      "distribution": "two upper and two lower front-facing petal positions",
+      "variation": "none",
+      "buildsGeometry": true,
+      "instances": 4,
+      "localFeatureRefs": [
+        "fastener-cluster.radial-fasteners",
+        "fastener-cluster.cross-grooves"
+      ],
+      "evidenceRefs": [
+        "front-and-top"
+      ]
+    },
+    {
+      "id": "fuse-braid",
+      "componentRef": "fuse-braid-relief",
+      "primitive": "torus-band",
+      "count": 10,
+      "distribution": "alternating diagonal bands along five tube segments",
+      "variation": "alternate rotation sign",
+      "buildsGeometry": true,
+      "instances": 10,
+      "localFeatureRefs": [
+        "fuse-cord.braided-ridges"
+      ],
+      "evidenceRefs": [
+        "front-and-side"
+      ]
+    }
+  ],
+  "buildPasses": [
+    {
+      "id": "blockout",
+      "goal": "Match macro silhouette and proportions.",
+      "componentRefs": [
+        "root",
+        "pressure-shell",
+        "armor-assembly",
+        "detonation-core",
+        "base-collar",
+        "fuse-neck",
+        "fuse-cord"
+      ],
+      "acceptance": [
+        "Silhouette reads correctly without materials.",
+        "Quality contract has named all required macro feature groups before code generation.",
+        "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+      ]
+    },
+    {
+      "id": "structural-pass",
+      "goal": "Build the component hierarchy implied by the pre-spec complexity assessment.",
+      "componentRefs": [
+        "root",
+        "pressure-shell",
+        "armor-assembly",
+        "detonation-core",
+        "armor-petal-1",
+        "armor-petal-2",
+        "armor-petal-3",
+        "armor-petal-4",
+        "armor-petal-5",
+        "armor-petal-6",
+        "equator-band",
+        "base-collar",
+        "fuse-neck",
+        "fuse-cord",
+        "ember-tip"
+      ],
+      "acceptance": [
+        "Macro, meso, and repeated structures meet qualityContract.minimumSpecDepth.",
+        "Parent-child relations, joints, seams, sockets, and contact points are explicit.",
+        "Every attached child appendage/connector has parentSocket, localStart/localEnd, contactType, embedDepth or overlap, and gapTolerance.",
+        "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+      ]
+    },
+    {
+      "id": "form-refinement",
+      "goal": "Refine shape, deformation, bevels, tapers, curves, asymmetry, and visible local geometry.",
+      "componentRefs": [
+        "root",
+        "pressure-shell",
+        "armor-assembly",
+        "detonation-core",
+        "armor-petal-1",
+        "armor-petal-2",
+        "armor-petal-3",
+        "armor-petal-4",
+        "armor-petal-5",
+        "armor-petal-6",
+        "equator-band",
+        "base-collar",
+        "fuse-neck",
+        "fuse-cord",
+        "ember-tip",
+        "fastener-cluster",
+        "petal-bevel-relief",
+        "radial-seam-relief",
+        "fuse-braid-relief",
+        "ember-spark-socket"
+      ],
+      "acceptance": [
+        "Important visible forms are represented in component geometryDescriptor, deformations, localFeatures, or repetitionSystems.",
+        "Endpoint-based child parts are rooted at their attachment sockets and do not visibly float away from parents.",
+        "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+      ]
+    },
+    {
+      "id": "material-pass",
+      "goal": "Match material color, roughness, bump, and local variation.",
+      "componentRefs": [
+        "root",
+        "pressure-shell",
+        "armor-assembly",
+        "detonation-core",
+        "armor-petal-1",
+        "armor-petal-2",
+        "armor-petal-3",
+        "armor-petal-4",
+        "armor-petal-5",
+        "armor-petal-6",
+        "equator-band",
+        "base-collar",
+        "fuse-neck",
+        "fuse-cord",
+        "ember-tip",
+        "fastener-cluster",
+        "petal-bevel-relief",
+        "radial-seam-relief",
+        "fuse-braid-relief",
+        "ember-spark-socket"
+      ],
+      "acceptance": [
+        "Reference-derived albedo palette records dominant, secondary, and accent colors per visible material.",
+        "Each important material defines roughness variation and at least one normal/bump/displacement response.",
+        "Local material overrides, dirt/wear/stains/moss/chips/scratches or equivalent masks are tied to evidenceRefs.",
+        "Thin, transparent, reflective, wet, or fibrous materials document alpha/transmission/clearcoat/metalness/fiber response when relevant.",
+        "Generated preview uses procedural albedo/roughness/bump texture or vertex color variation instead of one flat color.",
+        "Generated preview uses independent PBR maps at 1024px or higher for the quality-first tier.",
+        "If source pixels are available, referencePbr extraction passed at confidence >= 0.7 or the pass is stopped/requesting better references.",
+        "Macro, meso, and micro surface frequency bands are visible at the intended review distance without obvious tiling.",
+        "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+      ]
+    },
+    {
+      "id": "surface-pass",
+      "goal": "Add procedural surface locality such as normal/bump/displacement, AO, dirt, stains, chips, grain, moss, scratches, and wear.",
+      "componentRefs": [
+        "root",
+        "pressure-shell",
+        "armor-assembly",
+        "detonation-core",
+        "armor-petal-1",
+        "armor-petal-2",
+        "armor-petal-3",
+        "armor-petal-4",
+        "armor-petal-5",
+        "armor-petal-6",
+        "equator-band",
+        "base-collar",
+        "fuse-neck",
+        "fuse-cord",
+        "ember-tip",
+        "fastener-cluster",
+        "petal-bevel-relief",
+        "radial-seam-relief",
+        "fuse-braid-relief",
+        "ember-spark-socket"
+      ],
+      "acceptance": [
+        "Every required material feature group has local overrides or surfaceDetail tied to evidenceRefs.",
+        "A grazing-angle close-up proves that normal/height detail breaks highlights naturally and does not read as smooth plastic.",
+        "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+      ]
+    },
+    {
+      "id": "lighting-pass",
+      "goal": "Make material and form readable under neutral turntable lighting plus optional reference lighting.",
+      "componentRefs": [
+        "root",
+        "pressure-shell",
+        "armor-assembly",
+        "detonation-core",
+        "armor-petal-1",
+        "armor-petal-2",
+        "armor-petal-3",
+        "armor-petal-4",
+        "armor-petal-5",
+        "armor-petal-6",
+        "equator-band",
+        "base-collar",
+        "fuse-neck",
+        "fuse-cord",
+        "ember-tip",
+        "fastener-cluster",
+        "petal-bevel-relief",
+        "radial-seam-relief",
+        "fuse-braid-relief",
+        "ember-spark-socket"
+      ],
+      "acceptance": [
+        "lightingFromPhoto identifies key light direction/color/intensity, fill light, rim or environment light, and ambient color.",
+        "Exposure, tone mapping, background color/gradient, shadow softness, and contact shadow behavior are specified.",
+        "Lighting does not hide geometry/material gaps and screenshots can be compared fairly to the reference.",
+        "Neutral, grazing, and reference-matched lighting checks distinguish material errors from lighting errors.",
+        "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+      ]
+    },
+    {
+      "id": "interaction-pass",
+      "goal": "Make the model ready for future animation, transformation, physics, or destruction.",
+      "componentRefs": [
+        "root",
+        "pressure-shell",
+        "armor-assembly",
+        "detonation-core",
+        "armor-petal-1",
+        "armor-petal-2",
+        "armor-petal-3",
+        "armor-petal-4",
+        "armor-petal-5",
+        "armor-petal-6",
+        "equator-band",
+        "base-collar",
+        "fuse-neck",
+        "fuse-cord",
+        "ember-tip",
+        "fastener-cluster",
+        "petal-bevel-relief",
+        "radial-seam-relief",
+        "fuse-braid-relief",
+        "ember-spark-socket"
+      ],
+      "acceptance": [
+        "Macro and movable meso components have stable pivot nodes.",
+        "Sockets, collider proxies, and destruction metadata are present for future runtime actions.",
+        "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+      ]
+    },
+    {
+      "id": "optimization-pass",
+      "goal": "Protect runtime performance after visual fidelity is accepted.",
+      "componentRefs": [
+        "armor-assembly",
+        "fastener-cluster",
+        "petal-bevel-relief",
+        "radial-seam-relief",
+        "fuse-braid-relief",
+        "ember-spark-socket"
+      ],
+      "acceptance": [
+        "Triangle count, draw calls, instancing, LOD strategy, and FPS target are documented or verified.",
+        "Repeated detail is instanced or simplified where possible without breaking silhouette/material believability."
+      ]
+    }
+  ],
+  "visualEvidence": [
+    {
+      "timestamp": "2026-07-30T15:19:54.590275+00:00",
+      "passId": "blockout",
+      "estimatedFidelity": 0.0,
+      "aiVisionScore": null,
+      "visualAcceptanceThreshold": 0.7,
+      "layerScores": {},
+      "featureReviews": [],
+      "referenceScreenshot": "game/arena-appearance/bomb/black-bomb-reference.png",
+      "renderScreenshot": "",
+      "comparisonImage": "",
+      "cameraView": "three-quarter",
+      "notes": "Open the local review URL in a normal browser and capture the visible bomb.",
+      "aiVisionNotes": ""
+    }
+  ],
+  "reviewHistory": [
+    {
+      "timestamp": "2026-07-30T15:19:54.590275+00:00",
+      "passId": "blockout",
+      "estimatedFidelity": 0.0,
+      "aiVisionScore": null,
+      "visualAcceptanceThreshold": 0.7,
+      "layerScores": {},
+      "featureReviews": [],
+      "action": "request-input",
+      "summary": "Blockout code is integrated, but both authorized visible browser surfaces blocked localhost before page load; visual acceptance cannot be scored without a user-supplied screenshot.",
+      "matched": [
+        "source reference admitted",
+        "strict sculpt spec passes",
+        "blockout code syntax passes",
+        "review URL responds HTTP 200"
+      ],
+      "mismatches": [
+        "render screenshot unavailable due browser URL policy"
+      ],
+      "specFixes": [],
+      "codeFixes": [],
+      "evidence": [
+        "game/arena-appearance/bomb/black-bomb-reference.png",
+        "http://localhost:4174/game/play-riftbomb.html?model=bomb"
+      ],
+      "visualEvidence": {
+        "referenceScreenshot": "game/arena-appearance/bomb/black-bomb-reference.png",
+        "renderScreenshot": "",
+        "comparisonImage": "",
+        "cameraView": "three-quarter",
+        "notes": "Open the local review URL in a normal browser and capture the visible bomb.",
+        "aiVisionNotes": ""
+      }
+    }
+  ],
+  "lodPlan": [
+    {
+      "tier": "near",
+      "distance": 0,
+      "strategy": "full component tree and material layers"
+    },
+    {
+      "tier": "far",
+      "distance": 30,
+      "strategy": "merge static components and reduce local feature geometry"
+    }
+  ],
+  "performanceBudget": {
+    "qualityPriority": "gameplay-readability",
+    "targetTriangles": 9000,
+    "maxDrawCalls": 80,
+    "textureSize": 0,
+    "fpsTarget": 60,
+    "optimizationPolicy": "Procedural mesh reuse for petals, fasteners, braid, flame lobes, and debris; reduce repeated micro relief on mobile."
+  },
+  "lightingFromPhoto": [
+    {
+      "type": "key",
+      "direction": [
+        -0.6,
+        0.8,
+        0.45
+      ],
+      "color": "#E7F4FF",
+      "intensity": 1.8,
+      "shadowSoftness": 0.42
+    },
+    {
+      "type": "fill",
+      "direction": [
+        0.7,
+        0.35,
+        0.25
+      ],
+      "color": "#66798A",
+      "intensity": 0.38
+    },
+    {
+      "type": "rim",
+      "direction": [
+        0.3,
+        0.65,
+        -0.9
+      ],
+      "color": "#5CC9FF",
+      "intensity": 0.7
+    },
+    {
+      "type": "environment",
+      "color": "#17212A",
+      "intensity": 0.34,
+      "exposure": 1.05,
+      "toneMapping": "ACES-like",
+      "background": "#11151A",
+      "ground shadow": "soft, compact, opacity 0.32"
+    }
+  ],
+  "proceduralStrategy": [
+    "Block out macro silhouette first.",
+    "Add component hierarchy and joints.",
+    "Create stable pivot groups, sockets, collider proxies, and destruction metadata before visual polish.",
+    "Refine forms with bevels, tapers, bends, and procedural noise.",
+    "Run reference PBR extraction for important source-image materials and stop when confidence is below the target threshold.",
+    "Add material variation before adding expensive micro-geometry."
+  ],
+  "animationAnchors": [
+    "root: landing drop, bounce, squash, whole-object pulse",
+    "fuse-cord: progressive ember travel and heat cadence",
+    "ember-spark-socket: spark orbit and pre-detonation acceleration",
+    "armor-petal-1..6: radial stress offset and detonation debris",
+    "detonation-core: ignition flash, cardinal jets, shockwave, smoke, and ember emitter"
+  ],
+  "destructionAnchors": [
+    "armor-shell fracture group separates six named petals along radial seams",
+    "fastener cluster emits smaller gunmetal debris after petal separation",
+    "detonation core remains an effect socket and never becomes a fake visible mechanism"
+  ],
+  "risks": [
+    "Near-black materials can collapse under the existing arena exposure; preserve roughness and emissive separation rather than raising albedo to gray.",
+    "At gameplay distance too many micro meshes can alias; keep petal gaps, band, base, fuse, and ember before fastener grooves.",
+    "Smoke translucency is expensive in the custom renderer; use bounded deterministic volumes and particle caps on mobile."
+  ],
+  "localSpecSearch": {
+    "collection": "core_3d",
+    "query": "Riftbomb Black Bomb faceted forged steel spherical bomb armor petals fuse fasteners action-ready destructible",
+    "index": {
+      "status": "rebuilt",
+      "reason": "missing",
+      "fingerprint": "ac4f0bc9028e34083dbb5d5531ae3df7699c8e7641d5f8e6d42e7492ea1be1d0"
+    },
+    "matches": [
+      {
+        "record_id": "core.runtime-hierarchy",
+        "file_path": "grimoire/readiness/action_rigging.md",
+        "heading": "Hierarchy Pattern",
+        "key_path": null,
+        "score": 5.123657718064,
+        "snippets": [
+          "An action-ready model uses a root, component pivot groups, visual meshes, sockets, collider metadata or proxies, and destruction-group metadata."
+        ],
+        "source_refs": [
+          {
+            "path": "grimoire/readiness/action_rigging.md",
+            "heading": "Hierarchy Pattern",
+            "key_path": null
+          }
+        ],
+        "evidence_refs": [
+          {
+            "kind": "source",
+            "ref": "grimoire/readiness/action_rigging.md"
+          },
+          {
+            "kind": "notebooklm-research",
+            "ref": "notebooklm:4b03c2f9-8393-411f-b5b4-039ab9532843",
+            "note": "Validated generic schema vocabulary; numeric claims remain backed by local source_refs."
+          }
+        ]
+      },
+      {
+        "record_id": "core.pbr-anisotropy",
+        "file_path": "docs/raw/img2threejs-skill-dataset.json",
+        "heading": null,
+        "key_path": "categories.material_pbr[6]",
+        "score": 2.761412737115,
+        "snippets": [
+          "... highlights (not round) that stay aligned with visible brush/groove marks as the view angle changes; Common on brushed steel/titanium knife finishes and gunsmith metal bases Dấu hiệu nhận diện: Điểm sáng kéo dài, có vệt (không tròn) luôn ..."
+        ],
+        "source_refs": [
+          {
+            "path": "docs/raw/img2threejs-skill-dataset.json",
+            "heading": null,
+            "key_path": "categories.material_pbr[6]"
+          }
+        ],
+        "evidence_refs": [
+          {
+            "kind": "source",
+            "ref": "docs/raw/img2threejs-skill-dataset.json",
+            "note": "img2threejs NotebookLM research distillation"
+          }
+        ]
+      },
+      {
+        "record_id": "core.pbr-wearness-alpha-mask",
+        "file_path": "docs/raw/img2threejs-skill-dataset.json",
+        "heading": null,
+        "key_path": "categories.material_pbr[9]",
+        "score": 2.637270505976,
+        "snippets": [
+          "... visible scratches/chips even at low float (Factory New range); Alpha <128: durable, resists scratching; Alpha = 0 (black): absolute durability, paint never scratches regardless of float value Dấu hiệu nhận diện: Alpha ~196: sơn bong ..."
+        ],
+        "source_refs": [
+          {
+            "path": "docs/raw/img2threejs-skill-dataset.json",
+            "heading": null,
+            "key_path": "categories.material_pbr[9]"
+          }
+        ],
+        "evidence_refs": [
+          {
+            "kind": "source",
+            "ref": "docs/raw/img2threejs-skill-dataset.json",
+            "note": "img2threejs NotebookLM research distillation"
+          }
+        ]
+      }
+    ]
+  },
+  "pbrExtractionHistory": [
+    {
+      "materialId": "black-forged",
+      "confidence": 0.891,
+      "verdict": "pass",
+      "usable": true,
+      "maps": {
+        "albedo": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_albedo.png",
+          "url": "black-forged_albedo.png",
+          "channel": "albedo",
+          "source": "reference-pixel-extraction"
+        },
+        "roughness": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_roughness.png",
+          "url": "black-forged_roughness.png",
+          "channel": "roughness",
+          "source": "reference-pixel-extraction"
+        },
+        "height": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_height.png",
+          "url": "black-forged_height.png",
+          "channel": "height",
+          "source": "reference-pixel-extraction"
+        },
+        "normal": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_normal.png",
+          "url": "black-forged_normal.png",
+          "channel": "normal",
+          "source": "reference-pixel-extraction"
+        },
+        "ao": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\black-forged\\black-forged_ao.png",
+          "url": "black-forged_ao.png",
+          "channel": "ao",
+          "source": "reference-pixel-extraction"
+        }
+      }
+    },
+    {
+      "materialId": "satin-armor",
+      "confidence": 0.902,
+      "verdict": "pass",
+      "usable": true,
+      "maps": {
+        "albedo": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_albedo.png",
+          "url": "satin-armor_albedo.png",
+          "channel": "albedo",
+          "source": "reference-pixel-extraction"
+        },
+        "roughness": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_roughness.png",
+          "url": "satin-armor_roughness.png",
+          "channel": "roughness",
+          "source": "reference-pixel-extraction"
+        },
+        "height": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_height.png",
+          "url": "satin-armor_height.png",
+          "channel": "height",
+          "source": "reference-pixel-extraction"
+        },
+        "normal": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_normal.png",
+          "url": "satin-armor_normal.png",
+          "channel": "normal",
+          "source": "reference-pixel-extraction"
+        },
+        "ao": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\satin-armor\\satin-armor_ao.png",
+          "url": "satin-armor_ao.png",
+          "channel": "ao",
+          "source": "reference-pixel-extraction"
+        }
+      }
+    },
+    {
+      "materialId": "gunmetal",
+      "confidence": 0.909,
+      "verdict": "pass",
+      "usable": true,
+      "maps": {
+        "albedo": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_albedo.png",
+          "url": "gunmetal_albedo.png",
+          "channel": "albedo",
+          "source": "reference-pixel-extraction"
+        },
+        "roughness": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_roughness.png",
+          "url": "gunmetal_roughness.png",
+          "channel": "roughness",
+          "source": "reference-pixel-extraction"
+        },
+        "height": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_height.png",
+          "url": "gunmetal_height.png",
+          "channel": "height",
+          "source": "reference-pixel-extraction"
+        },
+        "normal": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_normal.png",
+          "url": "gunmetal_normal.png",
+          "channel": "normal",
+          "source": "reference-pixel-extraction"
+        },
+        "ao": {
+          "path": "C:\\Projetos\\riftbomb\\game\\arena-appearance\\bomb\\pbr\\gunmetal\\gunmetal_ao.png",
+          "url": "gunmetal_ao.png",
+          "channel": "ao",
+          "source": "reference-pixel-extraction"
+        }
+      }
+    }
+  ]
+}

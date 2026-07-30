@@ -149,11 +149,12 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   const theme = {
     floor: "floorClearing",
     wall: "wallClearing",
-    wallTop: "wallTopClearing"
+    wallTop: "wallTopClearing",
+    soft: "nacreGrowth"
   };
   assert.deepEqual(
     [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(theme)],
-    ["crate", "crateTop", "floorClearing", "wallClearing", "wallTopClearing"]
+    ["nacreGrowth", "floorClearing", "wallClearing", "wallTopClearing"]
   );
   assert.deepEqual(
     [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(null)],
@@ -165,10 +166,7 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   assert.match(renderer, /ensureArenaTextures\(theme\)/);
   assert.match(renderer, /RIFTBOMB_ARENA_TEXTURE_PLAN\.forTheme\(theme\)/);
   assert.match(controls, /renderer\.ensureArenaTextures\(game\.arenaTemplate\(\)\.theme\)/);
-  assert.match(controls, /arena\.id === game\.selectedArena/);
-  assert.match(controls, /paintArenaPreview\(canvas, grid, arena, false\)/);
-  assert.match(controls, /addEventListener\("pointerenter", preview\.request/);
-  assert.match(controls, /addEventListener\("focus", preview\.request/);
+  assert.doesNotMatch(controls, /paintArenaPreview|createArenaPreview|buildArenaPicker/);
   assert.doesNotMatch(controls, /renderer\.arenaTexturesReady/);
 
   const themePattern = /theme: Object\.freeze\(\{\s*floor: "([^"]+)",\s*wall: "([^"]+)",\s*wallTop: "([^"]+)"/g;
@@ -190,6 +188,10 @@ test("arena textures load only for the selected or explored arena", async (t) =>
     if (key === "floorPit") {
       return path.join("ground", "floor-storm-eye-combat-field-99509f91.webp");
     }
+    if (key === "floorClearing") {
+      return path.join("ground", "floor-clearing-v3.webp");
+    }
+    if (key === "nacreGrowth") return path.join("props", "nacre-growth-albedo.webp");
     const directory = key.startsWith("floor") ? "ground" : "walls";
     const fileName = key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
     return path.join(directory, `${fileName}.webp`);
@@ -197,7 +199,7 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   const texturesDirectory = path.join(gameDirectory, "arena-appearance", "textures");
   const measuredThemes = await Promise.all(themes.map(async (arenaTheme) => {
     const keys = [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(arenaTheme)];
-    assert.equal(keys.length, 5, `arena boot must request exactly 5 textures, received ${keys.length}`);
+    assert.ok(keys.length <= 5, `arena boot must request at most 5 textures, received ${keys.length}`);
     const sizes = await Promise.all(keys.map(async (key) => (
       await stat(path.join(texturesDirectory, texturePathForKey(key)))
     ).size));
@@ -451,6 +453,23 @@ test("the solo CPU enters through bot-opponent instead of being duplicated in ma
   assert.doesNotMatch(rules, /const choices = \[\s*\{ dx: 1, dz: 0 \}/);
 });
 
+test("combat health is rendered over contestants instead of inside the skill HUD", async () => {
+  const sourceDocument = await readFile(sourcePath, "utf8");
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const styles = await readFile(path.join(gameDirectory, "show-champion-duel.css"), "utf8");
+
+  assert.match(sourceDocument, /id="character-health-layer"/);
+  assert.doesNotMatch(sourceDocument, /id="health-fill"/);
+  assert.doesNotMatch(sourceDocument, /id="player-two-health(?:-fill)?"/);
+  assert.match(renderer, /syncCharacterHealthDom\(game\.players \|\| \[player\]\)/);
+  assert.match(renderer, /const level = \(player\.skillsUnlocked \|\| \[\]\)\.filter\(Boolean\)\.length/);
+  assert.match(renderer, /canvasRect\.left \+ uv\[0\] \* canvasRect\.width/);
+  assert.match(renderer, /champion === "renekton" \? 2\.55/);
+  assert.match(styles, /\.character-health__track/);
+  assert.match(styles, /repeating-linear-gradient/);
+  assert.match(styles, /#78df48/);
+});
+
 test("bot skill intents reach castAbility through the human input entrypoint", async () => {
   const sourceDocument = await readFile(sourcePath, "utf8");
   const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
@@ -473,6 +492,7 @@ test("bot skill intents reach castAbility through the human input entrypoint", a
   const v1Context = vm.createContext({ console });
   v1Context.RIFTBOMB_BOTS = {
     buildWorldView: () => ({}),
+    profiles: [{ id: "v1-renekton", name: "V1 Renekton", champion: "renekton" }],
     createRenektonPilot: () => ({ id: "renekton" }),
     createV1Policy: ({ champion = null }) => ({
       champion: champion?.id ?? null,
@@ -485,6 +505,12 @@ test("bot skill intents reach castAbility through the human input entrypoint", a
   const v1Match = new v1Context.Game({ ensureChampionModel() {} }, { effect() {} }, presentation);
   // P2 defaults to Zed: no champion module yet, shared arena brain only…
   assert.equal(v1Match.botPolicy.champion, null);
+  // The training menu selects a bot identity, which selects its compatible
+  // champion and policy as one atomic product choice.
+  assert.equal(v1Match.selectBotOpponent("v1-renekton"), true);
+  assert.equal(v1Match.selectedBot, "v1-renekton");
+  assert.equal(v1Match.selectedChampion2, "renekton");
+  assert.equal(v1Match.botPolicy.champion, "renekton");
   // …and picking Renekton for P2 swaps in the Renekton pilot.
   v1Match.selectChampion2("renekton");
   assert.equal(v1Match.botPolicy.champion, "renekton");
@@ -515,6 +541,50 @@ test("bot skill intents reach castAbility through the human input entrypoint", a
   vm.runInContext(`${rules}\nglobalThis.Game = Game;`, fallbackContext);
   const fallbackMatch = new fallbackContext.Game({ ensureChampionModel() {} }, { effect() {} }, presentation);
   assert.equal(fallbackMatch.botPolicy.profile, "rift");
+});
+
+test("the modern client presents the V1 opponent as a measured product", async () => {
+  const sourceDocument = await readFile(sourcePath, "utf8");
+  const startup = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
+  const onlineRuntime = await readFile(path.join(repositoryRoot, "online", "public", "online-duel.js"), "utf8");
+  const client = await readFile(path.join(repositoryRoot, "online", "app", "page.tsx"), "utf8");
+  const clientData = await readFile(path.join(repositoryRoot, "online", "app", "riftbomb-client.ts"), "utf8");
+  const profile = await readFile(path.join(repositoryRoot, "bot-opponent", "v1", "bot-profile.mjs"), "utf8");
+
+  assert.match(sourceDocument, /id="runtime-bootstrap"[^>]+hidden/);
+  assert.doesNotMatch(sourceDocument, /data-match-mode|id="bot-roster"/);
+  assert.match(startup, /game\.activateBotOpponent\(\)/);
+  assert.match(client, /activeMode === "solo"[\s\S]*OPONENTE DE TREINO/);
+  assert.match(client, /bot: TRAINING_BOT\.id/);
+  assert.match(clientData, /id: "v1-renekton"/);
+  assert.match(onlineRuntime, /game\.selectBotOpponent\(payload\.bot\)/);
+  assert.match(profile, /id: "v1-renekton"/);
+  assert.match(profile, /champion: "renekton"/);
+  assert.match(profile, /level: 4, maximum: 5/);
+  assert.match(profile, /100 partidas · seed 42/);
+});
+
+test("the obsolete red setup frontend cannot return through source or runtime assets", async () => {
+  const [sourceDocument, gameStyles, startup, client, clientStyles, onlineRuntime, onlineStyles] =
+    await Promise.all([
+      readFile(sourcePath, "utf8"),
+      readFile(path.join(gameDirectory, "show-champion-duel.css"), "utf8"),
+      readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8"),
+      readFile(path.join(repositoryRoot, "online", "app", "page.tsx"), "utf8"),
+      readFile(path.join(repositoryRoot, "online", "app", "globals.css"), "utf8"),
+      readFile(path.join(repositoryRoot, "online", "public", "online-duel.js"), "utf8"),
+      readFile(path.join(repositoryRoot, "online", "public", "online-duel.css"), "utf8"),
+    ]);
+
+  assert.match(sourceDocument, /id="runtime-bootstrap" hidden aria-hidden="true"/);
+  assert.doesNotMatch(sourceDocument, /id="intro"|class="intro|UNOFFICIAL FAN PROTOTYPE|Champions of the Bomber Rift/);
+  assert.doesNotMatch(gameStyles, /(?:^|[,{]\s*)\.intro\b|#intro|champion-select|arena-select|match-mode-selector|bot-card/);
+  assert.match(startup, /window\.self === window\.top && !modelReviewMode/);
+  assert.doesNotMatch(client, /LegacyClient|legacy=1|Interface clássica/);
+  assert.doesNotMatch(clientStyles, /game-shell--legacy|classic-link|legacy-return/);
+  assert.doesNotMatch(onlineRuntime, /online-panel|intro-actions|intro-lede|intro-notes/);
+  assert.doesNotMatch(onlineStyles, /online-panel|online-connection|online-action-alert/);
+  assert.match(onlineRuntime, /runtime-network-controls/);
 });
 
 test("match rules cross one presentation seam without requiring a DOM", async () => {
@@ -1277,7 +1347,7 @@ test("real VAT binaries preserve CPU fallback samples after tiled GPU packing", 
   assert.match(renderer, /normalize\(mix\(previousNormal, currentNormal, uTransition\)\)/);
 });
 
-test("arena modular kit packs seventeen authored texture sources", async () => {
+test("arena modular kit packs eighteen authored texture sources", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
   const packedTextures = await readFile(
     path.join(gameDirectory, "arena-appearance", "load-arena-appearance.js"),
@@ -1292,9 +1362,56 @@ test("arena modular kit packs seventeen authored texture sources", async () => {
   assert.match(renderer, /wallPit:\s*\["wallPit"\]/);
   assert.equal(
     [...packedTextures.matchAll(/data:image\/webp;base64,/g)].length,
-    17,
-    "the offline build must embed each modular kit source once (5 floors + 5 walls + 5 tops + 2 crates)"
+    18,
+    "the offline build must embed each modular kit source once, including Nacre growth"
   );
+});
+
+test("Nacre Hollow renders its authored shell kit instead of generic crates", async () => {
+  const document = await readFile(sourcePath, "utf8");
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const nacre = await readFile(
+    path.join(gameDirectory, "arena-appearance", "draw-nacre-hollow.js"),
+    "utf8"
+  );
+
+  assert.match(document, /arena-appearance\/draw-nacre-hollow\.js/);
+  assert.match(renderer, /RIFTBOMB_NACRE_APPEARANCE\.isTheme\(theme\)/);
+  assert.match(renderer, /nacreAppearance\.drawBreakableTile/);
+  assert.match(nacre, /theme\?\.floor === "floorClearing"/);
+  assert.match(nacre, /buildGrowthMesh/);
+  assert.match(renderer, /this\.meshes\.nacreGrowth/);
+  assert.match(renderer, /nacreGrowth:\s*\["nacreGrowth"\]/);
+  assert.match(renderer, /uMapId > 4\.5 && uMapId < 5\.5/);
+  assert.match(nacre, /drawFloorOrnaments/);
+  assert.match(nacre, /drawBreakableTile/);
+});
+
+test("the authored black bomb and explosion sequence drive live gameplay", async () => {
+  const bombDirectory = path.join(gameDirectory, "arena-appearance", "bomb");
+  const [document, renderer, appearance, bombReference, explosionReference, specSource] =
+    await Promise.all([
+      readFile(sourcePath, "utf8"),
+      readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8"),
+      readFile(path.join(gameDirectory, "arena-appearance", "draw-black-bomb.js"), "utf8"),
+      readFile(path.join(bombDirectory, "black-bomb-reference.png")),
+      readFile(path.join(bombDirectory, "black-bomb-explosion-reference.png")),
+      readFile(path.join(bombDirectory, "black-bomb-sculpt-spec.json"), "utf8"),
+    ]);
+  const spec = JSON.parse(specSource);
+
+  assert.equal(bombReference.subarray(1, 4).toString("ascii"), "PNG");
+  assert.equal(explosionReference.subarray(1, 4).toString("ascii"), "PNG");
+  assert.match(document, /arena-appearance\/draw-black-bomb\.js[\s\S]*draw-bomber-rift\.js/);
+  assert.match(renderer, /RIFTBOMB_BOMB_APPEARANCE\.drawBomb\(this, bomb/);
+  assert.match(renderer, /RIFTBOMB_BOMB_APPEARANCE\.drawExplosion\(this, blast/);
+  assert.match(appearance, /function drawArmorPetals/);
+  assert.match(appearance, /for \(let index = 0; index < 6; index\+\+\)/);
+  assert.match(appearance, /function drawExplosion/);
+  assert.match(appearance, /shockRadius/);
+  assert.match(appearance, /SMOKE/);
+  assert.ok(spec.componentTree.filter((component) => component.id.startsWith("armor-petal-")).length >= 6);
+  assert.ok(spec.qualityContract.featureGroups.some((group) => group.id === "detonation-continuity"));
 });
 
 test("arena render does not reference an undeclared turret color", async () => {
@@ -1313,6 +1430,7 @@ test("the build retains the five playable champions and duel rules", async () =>
   assert.doesNotMatch(document, /\bZiggs\b/);
 
   assert.match(document, /first to 3/i);
-  assert.match(document, /Breakable Hextech blocks/);
-  assert.match(document, /Local PvP/);
+  assert.match(document, /id="runtime-bootstrap" hidden/);
+  assert.match(document, /id="chrome"/);
+  assert.doesNotMatch(document, /id="intro"|UNOFFICIAL FAN PROTOTYPE|Champions of the Bomber Rift/);
 });

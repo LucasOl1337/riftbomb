@@ -4,6 +4,7 @@ const sources = [
   // The V1 arena brain wraps the baseline policy, so the bundle inlines it
   // to stay self-contained when load-baseline-bot.js is absent.
   new URL("./baseline-policy.mjs", import.meta.url),
+  new URL("./v1/bot-profile.mjs", import.meta.url),
   new URL("./v1/read-rival.mjs", import.meta.url),
   new URL("./v1/personality.mjs", import.meta.url),
   new URL("./v1/v1-memory.mjs", import.meta.url),
@@ -34,6 +35,7 @@ export async function packageV1Bot() {
     ...modules.map(browserSource),
     "RIFTBOMB_BOTS.createV1Policy = createV1Policy;",
     "RIFTBOMB_BOTS.createRenektonPilot = createRenektonPilot;",
+    "RIFTBOMB_BOTS.profiles = Object.freeze([V1_RENEKTON_PROFILE]);",
     "})();",
     ""
   ].join("\n");
