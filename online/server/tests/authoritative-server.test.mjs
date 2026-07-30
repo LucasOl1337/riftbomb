@@ -755,10 +755,42 @@ test("websocket authenticated F5 resume atomically replaces an open socket and p
   await waitUntil(() => room.inputApplied[1] === 2, "post-resume input ACK");
   assert.equal(room.inputs[1], 4);
 
+  const reconnectPresenceOffset = host.messages.length;
+  replacement.socket.terminate();
+  await waitUntil(() => room.players[1]?.socket === null, "resumed guest disconnect");
+  await waitForMessage(
+    host,
+    (message) => message.type === "presence" && message.playerId === 2 &&
+      message.connected === false,
+    "resumed guest disconnect presence"
+  );
+  const reconnected = track(await openClient(port, {
+    type: "hello", room: "AUTH24", role: "guest", ready: true,
+    resumeProtocol: 1, resumeToken: guestToken
+  }));
+  assert.equal(
+    reconnected.messages.find(({ type }) => type === "connected")?.resume.resumed,
+    true
+  );
+  const recoveredPresence = await waitForMessage(
+    host,
+    (message) => message.type === "presence" && message.playerId === 2 &&
+      message.connected === true,
+    "resumed guest recovery presence"
+  );
+  assert.equal(recoveredPresence.connected, true);
+  assert.deepEqual(
+    host.messages.slice(reconnectPresenceOffset)
+      .filter((message) => message.type === "presence" && message.playerId === 2)
+      .map(({ connected }) => connected),
+    [false, true]
+  );
+
   const serializedTraffic = JSON.stringify([
     ...host.messages,
     ...guest.messages,
-    ...replacement.messages
+    ...replacement.messages,
+    ...reconnected.messages
   ]);
   assert.equal(serializedTraffic.includes(hostToken), false);
   assert.equal(serializedTraffic.includes(guestToken), false);

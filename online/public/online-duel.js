@@ -962,10 +962,16 @@
           }
           return;
         }
-        if (message.type === "presence" && message.connected === false) {
-          state.rivalConnected = false;
-          setStatus(`Player ${message.playerId} disconnected. Waiting briefly for reconnection.`, "error");
-          updateConnection("waiting", `ONLINE · LOBBY ${state.roomCode} · RECONNECTING PLAYER ${message.playerId}`);
+        if (message.type === "presence") {
+          if (message.playerId === localOnlinePlayerId()) return;
+          state.rivalConnected = message.connected === true;
+          if (state.rivalConnected) {
+            setStatus(`Player ${message.playerId} reconnected. Match continues.`, "ok");
+            updateConnection("connected", `ONLINE · LOBBY ${state.roomCode} · PLAYER ${message.playerId} RECONNECTED`);
+          } else {
+            setStatus(`Player ${message.playerId} disconnected. Waiting briefly for reconnection.`, "error");
+            updateConnection("waiting", `ONLINE · LOBBY ${state.roomCode} · RECONNECTING PLAYER ${message.playerId}`);
+          }
           updateLobbyDisplay();
           return;
         }

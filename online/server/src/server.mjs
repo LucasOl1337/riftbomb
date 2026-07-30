@@ -294,6 +294,7 @@ function attachPlayerToRoom(socket, message, room, role, {
   }
   const previousSocket = current?.socket || null;
   const resumed = Boolean(current);
+  const reconnected = resumed && !previousSocket;
   const player = current || {
     ready: role === "host" || Boolean(message.ready),
     disconnectedAt: 0,
@@ -354,6 +355,9 @@ function attachPlayerToRoom(socket, message, room, role, {
       type: "start",
       input: authoritativeRooms.inputProtocol(room)
     });
+  }
+  if (reconnected) {
+    broadcast(room, { type: "presence", playerId: index + 1, connected: true });
   }
   broadcast(room, authoritativeRooms.lobbyMessage(room));
   void authoritativeRooms.start(room);

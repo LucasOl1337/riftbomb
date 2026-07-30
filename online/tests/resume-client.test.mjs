@@ -382,6 +382,15 @@ test("confirmed lobbies resume only their existing protected seat", async () => 
   assert.match(resume, /state\.sessionConfirmed = saved\.confirmed === true/);
 });
 
+test("presence recovery clears the rival disconnect state", async () => {
+  const source = await readFile(sourceUrl, "utf8");
+  const connection = extract(source, "function connectAuthoritative", "  async function onConnected");
+  assert.match(connection, /if \(message\.type === "presence"\)/);
+  assert.match(connection, /message\.playerId === localOnlinePlayerId\(\)/);
+  assert.match(connection, /state\.rivalConnected = message\.connected === true/);
+  assert.match(connection, /Player \$\{message\.playerId\} reconnected\. Match continues\./);
+});
+
 test("explicit leave revokes the protected server seat before local cleanup", async () => {
   const source = await readFile(sourceUrl, "utf8");
   const release = extract(source, "function releaseCurrentSeat", "  function receiveSnapshot");
