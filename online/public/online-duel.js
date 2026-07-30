@@ -596,6 +596,15 @@
   connection.textContent = "Online link";
   document.body.appendChild(connection);
 
+  const actionAlert = document.createElement("div");
+  actionAlert.className = "online-action-alert";
+  actionAlert.hidden = true;
+  actionAlert.setAttribute("role", "alert");
+  actionAlert.setAttribute("aria-live", "assertive");
+  actionAlert.setAttribute("aria-atomic", "true");
+  document.body.appendChild(actionAlert);
+  let actionAlertTimer = 0;
+
   const $p = (selector) => panel.querySelector(selector);
   const createButton = $p("#online-create");
   const showInviteButton = $p("#online-show-invite");
@@ -854,6 +863,22 @@
     status.dataset.tone = tone;
     UI.live.textContent = message;
     publishClientState("status");
+  }
+
+  function showActionDeliveryError(message) {
+    clearTimeout(actionAlertTimer);
+    actionAlert.textContent = message;
+    actionAlert.hidden = false;
+    actionAlertTimer = setTimeout(() => {
+      actionAlert.hidden = true;
+      actionAlert.textContent = "";
+    }, 8000);
+  }
+
+  function clearActionDeliveryError() {
+    clearTimeout(actionAlertTimer);
+    actionAlert.hidden = true;
+    actionAlert.textContent = "";
   }
 
   function updateConnection(kind, message) {
@@ -2002,8 +2027,11 @@
     if (reliableAction.currentMode() === "reliable") {
       const queued = reliableAction.queue(kind, slot, game.round);
       if (!queued && reliableAction.currentFailure() === "storage") {
-        setStatus("Browser storage unavailable; action was not sent to protect the match.", "error");
+        const message = "Action blocked: browser storage is unavailable. Reload after enabling site data.";
+        setStatus(message, "error");
+        showActionDeliveryError(message);
       }
+      if (queued) clearActionDeliveryError();
       return queued;
     }
     if (reliableAction.currentMode() !== "legacy") return false;

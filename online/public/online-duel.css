@@ -405,6 +405,37 @@ body.is-online-match .online-connection { display: none !important; }
 .online-connection[data-state="connected"]::before { background: #56e6b1; }
 .online-connection[data-state="disconnected"]::before { background: #ff6b5b; }
 
+.online-action-alert {
+  position: fixed;
+  z-index: 15;
+  top: max(76px, calc(env(safe-area-inset-top) + 56px));
+  left: 50%;
+  width: max-content;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 12px 16px;
+  transform: translateX(-50%);
+  border: 1px solid rgb(255 90 72 / 78%);
+  border-left-width: 4px;
+  background: rgb(25 6 7 / 94%);
+  box-shadow: 0 12px 36px rgb(0 0 0 / 48%), 0 0 20px rgb(255 69 52 / 14%);
+  color: #ffd2cb;
+  font: 800 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: .035em;
+  text-align: center;
+  pointer-events: none;
+}
+
+.online-action-alert[hidden] { display: none; }
+
+@media (max-height: 500px) {
+  .online-action-alert {
+    top: max(44px, calc(env(safe-area-inset-top) + 36px));
+    max-width: min(480px, calc(100vw - 24px));
+    padding: 8px 12px;
+    font-size: 9px;
+  }
+}
+
 body.is-online-match #pause-toggle { display: none !important; }
 body.is-online-match .arena-choice,
 body.is-online-match .champion-choice { touch-action: manipulation; }

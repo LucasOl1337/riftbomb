@@ -238,11 +238,15 @@ test("capability negotiation uses one-shot legacy only when the field is absent"
     "sendControl",
     "game",
     "setStatus",
+    "showActionDeliveryError",
+    "clearActionDeliveryError",
     `"use strict"; ${senderDeclaration}; return sendOnlineAction;`
   )(
     stream,
     (message) => { target.push(structuredClone(message)); return true; },
     { round: 9 },
+    () => {},
+    () => {},
     () => {}
   );
 
@@ -276,11 +280,14 @@ test("the gameplay sender reports a fail-closed storage error", () => {
   const senderEnd = source.indexOf("\n  game.placeBomb", senderStart);
   const senderDeclaration = source.slice(senderStart, senderEnd);
   const statuses = [];
+  const alerts = [];
   const sendOnlineAction = new Function(
     "reliableAction",
     "sendControl",
     "game",
     "setStatus",
+    "showActionDeliveryError",
+    "clearActionDeliveryError",
     `"use strict"; ${senderDeclaration}; return sendOnlineAction;`
   )(
     {
@@ -290,13 +297,53 @@ test("the gameplay sender reports a fail-closed storage error", () => {
     },
     () => true,
     { round: 7 },
-    (...args) => statuses.push(args)
+    (...args) => statuses.push(args),
+    (message) => alerts.push(message),
+    () => {}
   );
 
   assert.equal(sendOnlineAction("bomb"), false);
   assert.deepEqual(statuses, [[
-    "Browser storage unavailable; action was not sent to protect the match.", "error"
+    "Action blocked: browser storage is unavailable. Reload after enabling site data.", "error"
   ]]);
+  assert.deepEqual(alerts, [
+    "Action blocked: browser storage is unavailable. Reload after enabling site data."
+  ]);
+});
+
+test("the match alert becomes visible, assertive and self-clearing", () => {
+  assert.match(source, /actionAlert\.setAttribute\("role", "alert"\)/);
+  assert.match(source, /actionAlert\.setAttribute\("aria-live", "assertive"\)/);
+  const alertStart = source.indexOf("  function showActionDeliveryError");
+  const alertEnd = source.indexOf("\n  function updateConnection", alertStart);
+  assert.ok(alertStart >= 0 && alertEnd > alertStart);
+  const alertDeclarations = source.slice(alertStart, alertEnd);
+  const actionAlert = { hidden: true, textContent: "" };
+  const scheduled = [];
+  const timers = [];
+  const { showActionDeliveryError, clearActionDeliveryError } = new Function(
+    "actionAlert", "clearTimeout", "setTimeout", "actionAlertTimer",
+    `"use strict"; ${alertDeclarations}; return { showActionDeliveryError, clearActionDeliveryError };`
+  )(
+    actionAlert,
+    (timer) => timers.push(timer),
+    (callback, delay) => { scheduled.push({ callback, delay }); return 41; },
+    0
+  );
+
+  showActionDeliveryError("Storage unavailable");
+  assert.equal(actionAlert.hidden, false);
+  assert.equal(actionAlert.textContent, "Storage unavailable");
+  assert.equal(scheduled[0].delay, 8000);
+  scheduled[0].callback();
+  assert.equal(actionAlert.hidden, true);
+  assert.equal(actionAlert.textContent, "");
+
+  showActionDeliveryError("Retry");
+  clearActionDeliveryError();
+  assert.equal(actionAlert.hidden, true);
+  assert.equal(actionAlert.textContent, "");
+  assert.ok(timers.includes(41));
 });
 
 test("transport replay cannot call gameplay prediction", () => {
@@ -306,4 +353,82 @@ test("transport replay cannot call gameplay prediction", () => {
   );
   assert.doesNotMatch(replayBody, /placeBomb|castAbility|offlinePlaceBomb|offlineCastAbility|game\./);
   assert.match(replayBody, /transmit\(outbox\[0\], true\)/);
+});
+
+test("the real bomb and ability wrappers predict once while transport replays only the envelope", () => {
+  let now = 0;
+  const sent = [];
+  const stream = createReliableActionStream({
+    now: () => now,
+    persist() {},
+    send(message) { sent.push(structuredClone(message)); return true; }
+  });
+  stream.negotiate(protocol(13, 0), 0);
+
+  const senderStart = source.indexOf("  function sendOnlineAction");
+  const senderEnd = source.indexOf("\n  game.placeBomb", senderStart);
+  const senderDeclaration = source.slice(senderStart, senderEnd);
+  const game = {
+    bombs: [],
+    player: { id: 1 },
+    round: 5
+  };
+  const sendOnlineAction = new Function(
+    "reliableAction", "sendControl", "game", "setStatus",
+    "showActionDeliveryError", "clearActionDeliveryError",
+    `"use strict"; ${senderDeclaration}; return sendOnlineAction;`
+  )(stream, () => true, game, () => {}, () => {}, () => {});
+
+  const wrappersStart = source.indexOf("  game.placeBomb =");
+  const wrappersEnd = source.indexOf("\n  if (typeof offlineRequestDash", wrappersStart);
+  assert.ok(wrappersStart >= 0 && wrappersEnd > wrappersStart);
+  const wrappers = source.slice(wrappersStart, wrappersEnd);
+  let bombPredictions = 0;
+  let abilityPredictions = 0;
+  const state = {
+    role: "host",
+    connected: true,
+    socket: {},
+    pendingGuestBombs: []
+  };
+  new Function(
+    "game", "state", "offlinePlaceBomb", "localOnlinePlayer", "sendOnlineAction",
+    "offlineCastAbility", "performance",
+    `"use strict"; ${wrappers}`
+  )(
+    game,
+    state,
+    (actor) => {
+      bombPredictions += 1;
+      game.bombs.push({ id: bombPredictions, ownerId: actor.id, passOwners: [] });
+      return true;
+    },
+    () => game.player,
+    sendOnlineAction,
+    (slot, actor, options) => {
+      abilityPredictions += 1;
+      assert.equal(slot, 0);
+      assert.equal(actor, game.player);
+      assert.deepEqual(options, { buffer: false });
+      return true;
+    },
+    { now: () => now }
+  );
+
+  assert.equal(game.placeBomb(game.player), true);
+  assert.equal(bombPredictions, 1);
+  assert.equal(sent.length, 1);
+  now = 120;
+  assert.equal(stream.replay(), true);
+  assert.equal(bombPredictions, 1, "a bomb replay must not repeat local prediction");
+  assert.deepEqual(sent[1], sent[0]);
+
+  stream.synchronize(protocol(13, 1), 0);
+  assert.equal(game.castAbility(0, game.player), true);
+  assert.equal(abilityPredictions, 1);
+  assert.equal(sent.at(-1).actionSeq, 2);
+  now = 240;
+  assert.equal(stream.replay(), true);
+  assert.equal(abilityPredictions, 1, "an ability replay must not repeat local prediction");
+  assert.deepEqual(sent.at(-1), sent.at(-2));
 });

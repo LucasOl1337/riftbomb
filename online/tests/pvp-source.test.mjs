@@ -148,10 +148,11 @@ test("uses one authoritative WebSocket transport", async () => {
 });
 
 test("movement and actions use independent bounded streams with causal ACK and replay", async () => {
-  const [client, server, rooms] = await Promise.all([
+  const [client, server, rooms, clientCss] = await Promise.all([
     readFile(new URL("public/online-duel.js", root), "utf8"),
     readFile(new URL("server/src/server.mjs", root), "utf8"),
-    readFile(new URL("server/src/authoritative-rooms.mjs", root), "utf8")
+    readFile(new URL("server/src/authoritative-rooms.mjs", root), "utf8"),
+    readFile(new URL("public/online-duel.css", root), "utf8")
   ]);
 
   assert.match(client, /function createReliableInputStream/);
@@ -189,6 +190,12 @@ test("movement and actions use independent bounded streams with causal ACK and r
   assert.match(client, /reliableAction\.negotiate\(message\.action/);
   assert.match(client, /reliableAction\.synchronize\(data\.action/);
   assert.match(client, /function sendOnlineAction/);
+  assert.match(client, /actionAlert\.setAttribute\("role", "alert"\)/);
+  assert.match(client, /showActionDeliveryError\(message\)/,
+    "a fail-closed action must remain visibly actionable during the match");
+  assert.match(clientCss, /\.online-action-alert \{[\s\S]*position: fixed;[\s\S]*z-index: 15;/);
+  assert.doesNotMatch(clientCss, /is-match-active[^\n]*online-action-alert/,
+    "match mode must not hide its critical action-delivery alert");
   assert.match(client, /if \(!sendOnlineAction\("bomb"\)\) return false/);
   assert.match(client, /if \(!sendOnlineAction\("ability", slot\)\) return false/);
   assert.match(client,
