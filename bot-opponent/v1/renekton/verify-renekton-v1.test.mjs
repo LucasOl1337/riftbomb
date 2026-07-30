@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { createRenektonMemory, resetRenektonMemory } from "./renekton-memory.mjs";
-import { createRenektonPilot, evaluateRenektonSkill } from "./renekton-skills.mjs";
+import { createRenektonPilot, dashBodyBlocked, evaluateRenektonSkill, sliceDashLanding } from "./renekton-skills.mjs";
 
 function makeView(overrides = {}) {
   const cols = 13;
   const rows = 11;
   const tile = 1;
-  const grid = Array.from({ length: rows }, () => Array(cols).fill(0));
+  const grid = overrides.grid ?? Array.from({ length: rows }, () => Array(cols).fill(0));
   return {
     meta: { cols, rows, tile, roundAge: 5, ...(overrides.meta ?? {}) },
     grid,
@@ -559,4 +559,192 @@ test("renekton memory reset restores the initial tactical state", () => {
   memory.skillHesitation = 1.2;
   resetRenektonMemory(memory);
   assert.deepEqual(memory, createRenektonMemory());
+});
+
+// --- Cycle 13: escape-dash landing must leave the body free -----------------
+
+// The arena border shape (walls on the rim) with the measured wedge cells:
+// the cycle-9 facing rule aimed the escape dash along the corridor, the
+// game's sweep landed the body box overlapping a solid, and the bot froze
+// until its own open-route bomb killed it (96/96 seed-42 round losses).
+function borderedGrid() {
+  const cols = 13;
+  const rows = 11;
+  return Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c) =>
+      r === 0 || c === 0 || r === rows - 1 || c === cols - 1 ? 1 : 0));
+}
+
+test("renekton holds the escape dash when the landing wedges against a solid", () => {
+  const memory = createRenektonMemory();
+  const grid = borderedGrid();
+  grid[1][8] = 2; // crate seals the left exit
+  grid[2][9] = 2; // crate seals the downward exit
+  grid[2][10] = 1; // hard solid: the escape route turns down only at c11
+  // Fresh own bomb on the self cell: the route runs +x along the corridor,
+  // the facing is already +x (aligned with the first hop) — but the dash
+  // lands one sweep step short of the border wall, box overlapping it.
+  const bombs = [
+    { id: 9, r: 1, c: 9, x: 3, z: -4, range: 2, fuse: 2.35, age: 0,
+      exploded: false, ownerId: 2, passOwners: [2] }
+  ];
+  const held = evaluateRenektonSkill(
+    makeView({ grid, bombs, rival: { x: 0, z: 4 }, self: { x: 3.4, z: -4, lastDx: 1, lastDz: 0 } }),
+    memory,
+    () => 0.5
+  );
+  assert.equal(held, null); // a wedged landing holds; the temporal escape walks
+});
+
+test("renekton fires the escape dash when the aligned landing leaves the body free", () => {
+  const memory = createRenektonMemory();
+  const grid = borderedGrid();
+  grid[1][4] = 2; // left exit sealed
+  grid[2][5] = 2; // downward exit sealed
+  grid[2][6] = 1; // hard solid: the route runs along row 1
+  const bombs = [
+    { id: 9, r: 1, c: 5, x: -1, z: -4, range: 2, fuse: 2.35, age: 0,
+      exploded: false, ownerId: 2, passOwners: [2] }
+  ];
+  // Same corridor dash as the wedge case, but the corridor ahead is open:
+  // the landing box is free and the cast fires.
+  const skill = evaluateRenektonSkill(
+    makeView({ grid, bombs, rival: { x: 0, z: 4 }, self: { x: -0.6, z: -4, lastDx: 1, lastDz: 0 } }),
+    memory,
+    () => 0.5
+  );
+  assert.equal(skill.slot, "e");
+  assert.equal(skill.reason, "escape-danger");
+});
+
+test("sliceDashLanding stops one sweep step before a solid", () => {
+  const view = makeView({ grid: borderedGrid(), self: { x: 3.4, z: -4, lastDx: 1, lastDz: 0 } });
+  const slice = sliceDashLanding(view, false);
+  assert.ok(Math.abs(slice.x - 5.32) < 0.01);
+  assert.equal(slice.z, -4);
+  // The Dice (recast) reach is longer, but the same wall ends the sweep.
+  const dice = sliceDashLanding(view, true);
+  assert.ok(Math.abs(dice.x - 5.32) < 0.01);
+});
+
+test("sliceDashLanding passes crates but stops before any live bomb", () => {
+  const grid = borderedGrid();
+  grid[1][10] = 2; // a crate breaks and lets the sweep through
+  const clear = makeView({ grid, self: { x: 3.4, z: -4, lastDx: 1, lastDz: 0 } });
+  assert.ok(Math.abs(sliceDashLanding(clear, false).x - 5.32) < 0.01);
+  const bombs = [
+    { id: 7, r: 1, c: 11, x: 5, z: -4, range: 2, fuse: 2.35, age: 0,
+      exploded: false, ownerId: 1, passOwners: [] }
+  ];
+  const blocked = makeView({ grid, bombs, self: { x: 3.4, z: -4, lastDx: 1, lastDz: 0 } });
+  // 4.60 would sit within 0.48 of the bomb, so the last landing is 4.36.
+  assert.ok(Math.abs(sliceDashLanding(blocked, false).x - 4.36) < 0.01);
+});
+
+test("dashBodyBlocked mirrors the movement collision box", () => {
+  const grid = borderedGrid();
+  // A box corner overlapping the border wall blocks; open corridor is free.
+  assert.equal(dashBodyBlocked(makeView({ grid }), 5.32, -4), true);
+  assert.equal(dashBodyBlocked(makeView({ grid }), 0, -4), false);
+  // A live bomb overlapping the box blocks — unless the self may cross it.
+  const rival = { id: 7, r: 1, c: 6, x: 0.5, z: -4, range: 2, fuse: 2.35, age: 0,
+    exploded: false, ownerId: 1, passOwners: [] };
+  assert.equal(dashBodyBlocked(makeView({ grid, bombs: [rival] }), 0, -4), true);
+  const own = { ...rival, id: 8, ownerId: 2, passOwners: [2] };
+  assert.equal(dashBodyBlocked(makeView({ grid, bombs: [own] }), 0, -4), false);
+});
+
+// --- Cycle 14: engage and offensive-Dice landings must leave the body free --
+//
+// Same wedge mechanism as cycle 13, through the two remaining dash paths:
+// the branch-6 engage (`close-distance`) and the offensive Dice
+// (`dice-through`/`dice-finish`). The dash carries PAST the rival — the
+// rival never blocks the game's sweep — so the planned landing can sit
+// behind the target, wedged against a solid. Policy (documented in the
+// renekton-skills.mjs header): the engage is always gated (no clock — the
+// bot just walks to melee); the offensive Dice is always gated too, even
+// with the window closing, because an expired window leaves the bot on its
+// safe cell while a wedged landing may freeze it in the open.
+
+test("renekton holds the engage E when the landing past the rival wedges", () => {
+  const memory = createRenektonMemory();
+  const grid = borderedGrid();
+  // Same corridor as the cycle-13 wedge case: aligned with the rival on
+  // row 1, facing +x, safe cell, in reach — but the sweep lands one step
+  // short of the border wall, the body box overlapping it.
+  const held = evaluateRenektonSkill(
+    makeView({ grid, rival: { x: 5.2, z: -4 }, self: { x: 3.4, z: -4, lastDx: 1, lastDz: 0 } }),
+    memory,
+    () => 0.5
+  );
+  assert.equal(held, null); // held like an aim miss: navigation walks to melee
+  assert.equal(memory.comboStep, 0); // no combo started
+});
+
+test("renekton fires the engage E when the known-facing landing leaves the body free", () => {
+  const memory = createRenektonMemory();
+  const grid = borderedGrid();
+  // Same engage, but the corridor ahead is open: the landing box is free
+  // and the cast fires (the gate does not block good engages).
+  const skill = evaluateRenektonSkill(
+    makeView({ grid, rival: { x: 1.2, z: -4 }, self: { x: -0.6, z: -4, lastDx: 1, lastDz: 0 } }),
+    memory,
+    () => 0.5
+  );
+  assert.equal(skill.slot, "e");
+  assert.equal(skill.reason, "close-distance");
+  assert.equal(memory.comboStep, 1);
+});
+
+test("renekton holds the offensive Dice when the landing wedges", () => {
+  const memory = createRenektonMemory();
+  memory.comboStep = 3; // combo done, recast window open — the Dice exit-through case
+  memory.comboUntil = 10;
+  const grid = borderedGrid();
+  const held = evaluateRenektonSkill(
+    makeView({
+      grid,
+      rival: { x: 5.2, z: -4 },
+      self: { x: 3.4, z: -4, renektonDashRecast: 2.5, eCooldown: 13, rCooldown: 30, lastDx: 1, lastDz: 0 }
+    }),
+    memory,
+    () => 0.5
+  );
+  assert.equal(held, null); // the window rots on the safe cell
+  assert.equal(memory.comboStep, 3); // no ask, no reset
+});
+
+test("renekton holds the Dice finish on a wedged landing even with the kill available", () => {
+  const memory = createRenektonMemory();
+  const grid = borderedGrid();
+  const held = evaluateRenektonSkill(
+    makeView({
+      grid,
+      rival: { x: 5.2, z: -4, health: 20, maxHealth: 100 },
+      self: { x: 3.4, z: -4, fury: 60, renektonDashRecast: 2.5, eCooldown: 13, lastDx: 1, lastDz: 0 }
+    }),
+    memory,
+    () => 0.5
+  );
+  assert.equal(held, null);
+});
+
+test("renekton lets the Dice window rot on a wedged landing even at last call", () => {
+  const memory = createRenektonMemory();
+  memory.comboStep = 3;
+  memory.comboUntil = 10;
+  const grid = borderedGrid();
+  // recastClosing (< DICE_LAST_CALL) overrides the FACING, never the
+  // landing: a spent Dice into a wedge can freeze the bot in the open,
+  // while an expired window leaves it standing on its safe cell.
+  const held = evaluateRenektonSkill(
+    makeView({
+      grid,
+      rival: { x: 5.2, z: -4 },
+      self: { x: 3.4, z: -4, renektonDashRecast: 0.5, eCooldown: 13, rCooldown: 30, lastDx: 1, lastDz: 0 }
+    }),
+    memory,
+    () => 0.5
+  );
+  assert.equal(held, null);
 });

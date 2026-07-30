@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { createV1Policy } from "./create-v1-policy.mjs";
+import { unwedgeMovement } from "./plan-arena-actions.mjs";
+import { createV1Memory } from "./v1-memory.mjs";
 
 function makeView(overrides = {}) {
   const cols = 13;
@@ -116,4 +118,92 @@ test("v1 idles safely when the world view is null (bot dead, round live)", () =>
   const policy = createV1Policy({ champion, random: () => 0.5 });
   const intent = policy.think(null, 0.016);
   assert.deepEqual(intent, { dx: 0, dz: 0, plantBomb: false, skill: null });
+});
+
+// --- Cycle 15: wedge recovery ----------------------------------------------
+//
+// A dash landing can leave the collision box overlapping a solid; every
+// later move is rejected and the bot starves frozen (the seed-42 drawn
+// rounds). Only another dash moves the body center out — the recovery
+// steers the facing toward the free landing and casts "e".
+
+// Self frozen against the top border (row 0 solid): the body box at
+// (0, -4.56) overlaps row 0, so every cardinal move is rejected; the only
+// dash with a free landing points south (dz = 1).
+function wedgedView(selfOverrides = {}) {
+  const view = makeView({
+    self: { x: 0, z: -4.56, lastDx: 0, lastDz: -1, ...selfOverrides },
+    rival: { x: 0, z: 4 }
+  });
+  view.grid[0].fill(1);
+  view.dt = 0.1; // the wedge watch reads the view's dt
+  return view;
+}
+
+test("wedge recovery steers the facing south, then casts the dash", () => {
+  const memory = createV1Memory();
+  const view = wedgedView();
+  let intent = { dx: 0, dz: -1, plantBomb: false, skill: null };
+  for (let i = 0; i < 13; i += 1) {
+    intent = unwedgeMovement(view, { dx: 0, dz: -1, plantBomb: false, skill: null }, memory, {});
+  }
+  // Freeze declared: steer toward the free landing, no cast before the
+  // facing is prepared.
+  assert.deepEqual([intent.dx, intent.dz], [0, 1]);
+  assert.equal(intent.skill, null);
+  // Facing prepared (the game copies the steered intent into lastDx/lastDz):
+  // the next evaluation fires the dash.
+  view.self.lastDx = 0;
+  view.self.lastDz = 1;
+  intent = unwedgeMovement(view, { dx: 0, dz: 1, plantBomb: false, skill: null }, memory, {});
+  assert.equal(intent.skill, "e");
+});
+
+test("wedge recovery holds while the dash is on cooldown", () => {
+  const memory = createV1Memory();
+  const view = wedgedView({ eCooldown: 5 });
+  let intent = null;
+  for (let i = 0; i < 15; i += 1) {
+    intent = unwedgeMovement(view, { dx: 0, dz: -1, plantBomb: false, skill: null }, memory, {});
+  }
+  assert.equal(intent.skill, null);
+  assert.deepEqual([intent.dx, intent.dz], [0, -1]); // untouched intent
+  assert.ok(memory.freezeTime >= 1.2, "freeze time keeps accumulating");
+});
+
+test("wedge recovery never fires while the bot moves or waits deliberately", () => {
+  const memory = createV1Memory();
+  const view = wedgedView();
+  // Progress: the position changes between thinks.
+  let intent = { dx: 0, dz: -1, plantBomb: false, skill: null };
+  for (let i = 0; i < 20; i += 1) {
+    view.self.z -= 0.1;
+    intent = unwedgeMovement(view, intent, memory, {});
+  }
+  assert.equal(memory.freezeTime, 0);
+  assert.equal(intent.skill, null);
+  // Deliberate wait IN THE OPEN (box free, zero intent): nothing accumulates.
+  const openView = makeView({ self: { x: 0, z: 0 }, rival: { x: 0, z: 4 } });
+  openView.dt = 0.1;
+  for (let i = 0; i < 20; i += 1) {
+    intent = unwedgeMovement(openView, { dx: 0, dz: 0, plantBomb: false, skill: null }, memory, {});
+  }
+  assert.equal(memory.freezeTime, 0);
+  assert.equal(intent.skill, null);
+});
+
+test("wedge watch survives idle intent frames while physically frozen", () => {
+  // The measured seed-42 pattern: the baseline brain emits {0,0} frames
+  // between unstick commits; each one used to reset the watch and the
+  // recovery never fired.
+  const memory = createV1Memory();
+  const view = wedgedView();
+  let intent = null;
+  for (let i = 0; i < 14; i += 1) {
+    const moving = i % 2 === 0 ? { dx: 0, dz: -1 } : { dx: 0, dz: 0 };
+    intent = unwedgeMovement(view, { ...moving, plantBomb: false, skill: null }, memory, {});
+  }
+  assert.ok(memory.freezeTime >= 1.2, "idle frames must not reset the wedge watch");
+  assert.deepEqual([intent.dx, intent.dz], [0, 1]); // steering south
+  assert.equal(intent.skill, null); // facing not prepared yet
 });

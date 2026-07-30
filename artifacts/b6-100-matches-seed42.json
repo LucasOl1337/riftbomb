@@ -1,0 +1,31 @@
+{
+  "seed": 42,
+  "matches": 100,
+  "v1": {
+    "champion": "renekton",
+    "player": 2
+  },
+  "opponent": {
+    "policy": "baseline",
+    "player": 1,
+    "champion": "katarina"
+  },
+  "v1MatchWins": 100,
+  "baselineMatchWins": 0,
+  "drawnMatches": 0,
+  "v1WinRate": 1,
+  "rounds": 418,
+  "v1RoundWins": 300,
+  "v1RoundLosses": 16,
+  "drawnRounds": 102,
+  "v1FirstBombSurvivalRate": 1,
+  "v1PickupsPerRound": 9.6029,
+  "v1SkillsCast": {
+    "q": 467,
+    "w": 360,
+    "e": 1356,
+    "r": 53
+  },
+  "averageRoundSeconds": 50.77,
+  "timeouts": 0
+}

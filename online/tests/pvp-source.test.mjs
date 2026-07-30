@@ -587,7 +587,13 @@ test("loads only the playable champion models selected in the lobby", async () =
 
   assert.equal(names.length, 1);
   assert.ok(Buffer.byteLength(game) < 750_000);
-  assert.doesNotMatch(game, /RIFTBOMB_BOTS\.createV1Policy/);
+  // The trained V1 pilot ships as a separate asset, never inline: the solo
+  // CPU loads it on demand and falls back to the baseline if it is missing.
+  assert.match(game, /<script src="\/bot-v1\.js"><\/script>/);
+  assert.doesNotMatch(game, /RIFTBOMB_BOTS\.createV1Policy = createV1Policy/);
+  const botV1 = await readFile(new URL("public/bot-v1.js", root), "utf8");
+  assert.match(botV1, /RIFTBOMB_BOTS\.createV1Policy = createV1Policy/);
+  assert.match(botV1, /RIFTBOMB_BOTS\.createRenektonPilot = createRenektonPilot/);
   assert.doesNotMatch(game, /const PLAYABLE_CHAMPIONS = Object\.freeze\(\{/);
   assert.match(game, /window\.RIFTBOMB_PLAYABLE_CHAMPIONS = Object\.create\(null\)/);
   assert.match(game, /ensureChampionModels/);

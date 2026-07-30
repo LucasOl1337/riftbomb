@@ -9,6 +9,7 @@ tools/cdragon-data/
 # Local packages and temporary output
 *.tgz
 *.log
+*.pid
 *.tmp
 *.bak
 

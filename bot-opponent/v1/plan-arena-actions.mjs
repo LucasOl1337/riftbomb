@@ -11,6 +11,9 @@ import { cellFromWorld, dangerAt, isBlocked, worldFromCell } from "../baseline-p
 import { bfsField, nextStepToward, pathFromField } from "./navigate-arena.mjs";
 import { dangerTimeline, escapePlan } from "./danger-timeline.mjs";
 import { canPlantRouteBomb, findRouteCrate, hasTemporalBombEscape } from "./open-route.mjs";
+import { bombCutsRivalEscape, predictRivalCell } from "./read-rival.mjs";
+import { aggressionOf, aggressionPickupSlack } from "./personality.mjs";
+import { advantageEngageAllowed } from "./advantage.mjs";
 
 export function planArenaActions(view, intent, memory) {
   const { cols, rows, tile } = view.meta;
@@ -27,6 +30,20 @@ export function planArenaActions(view, intent, memory) {
 
   if (intent.plantBomb) {
     memory.lastBombReason = memory.objective === "press" ? "pressure-rival" : "clear-crates";
+  }
+
+  // Cut-escape pressure plant (B7): when the rival model proves that a
+  // bomb on the self cell covers BOTH the rival and his favorite escape
+  // destination, plant on purpose instead of waiting for the baseline's
+  // random aligned plants. The temporal escape proof keeps the V1's own
+  // survival ahead of the trap, and vetoBombWithoutEscape re-proves the
+  // plant downstream like any other.
+  if (!intent.plantBomb && memory.objective === "press"
+    && bombCutsRivalEscape(view, memory.rivalModel, cell)
+    && canPlantRouteBomb(view, cell)
+    && hasTemporalBombEscape(view, cell)) {
+    intent.plantBomb = true;
+    memory.lastBombReason = "cut-escape";
   }
 
   memory.lastDecision = {
@@ -61,7 +78,7 @@ function nearestPickupDistance(view, cell) {
 
 const ROUTE_COMMIT = 0.05; // seconds the routed heading holds in arena memory
 
-export function navigateObjective(view, intent, memory, arenaMemory) {
+export function navigateObjective(view, intent, memory, arenaMemory, personality = null) {
   memory.route = [];
   memory.targetCell = null;
   if (memory.objective === "escape") return intent;
@@ -70,8 +87,8 @@ export function navigateObjective(view, intent, memory, arenaMemory) {
   const { cols, rows, tile } = view.meta;
   const from = cellFromWorld(view.self.x, view.self.z, cols, rows, tile);
   const field = bfsField(view.grid, view.bombs, from, view.self.id);
-  const target = chooseRouteTarget(view, field);
-  if (!target) return openRouteObjective(view, intent, memory, arenaMemory, from, field);
+  const target = chooseRouteTarget(view, field, memory.rivalModel, personality);
+  if (!target) return openRouteObjective(view, intent, memory, arenaMemory, from, field, personality);
 
   const step = nextStepToward(view, target);
   if (!step) return intent; // no safe step: the baseline decision stands
@@ -102,22 +119,41 @@ function commitRouteStep(intent, memory, arenaMemory, step) {
   return intent;
 }
 
-function chooseRouteTarget(view, field) {
+function chooseRouteTarget(view, field, rivalModel = null, personality = null) {
   const reachable = (cell) => Number.isFinite(field.dist[cell.r]?.[cell.c]);
   const nearest = (cells) => cells
     .filter(reachable)
     .sort((a, b) => field.dist[a.r][a.c] - field.dist[b.r][b.c])[0] ?? null;
 
   // Skill orbs only unlock for the owner who broke the crate; rival orbs are
-  // dead weight for the V1 and are ignored entirely.
+  // dead weight for the V1 and are ignored entirely. The rival fallback aims
+  // at the PREDICTED cell (B7): interception, not pursuit — with no model
+  // data the prediction is the current cell, the old behavior.
   const ownOrbs = view.pickups.filter(
     (pickup) => pickup.type === "skill" && pickup.ownerId === view.self.id);
   const otherPickups = view.pickups.filter(
     (pickup) => !(pickup.type === "skill" && pickup.ownerId != null));
 
-  return nearest(ownOrbs)
-    ?? nearest(otherPickups)
-    ?? nearest([cellFromWorld(view.rival.x, view.rival.z, view.meta.cols, view.meta.rows, view.meta.tile)]);
+  const orb = nearest(ownOrbs);
+  if (orb) return orb;
+  const pickup = nearest(otherPickups);
+  const rival = nearest([predictRivalCell(rivalModel, view)]);
+
+  // Aggression (B8): above the neutral temperament the hunt outranks a
+  // pickup within the slack — the finisher walks toward the predicted
+  // rival cell instead of a distant errand. At or below neutral the slack
+  // is zero, the gate stays closed and the pickup keeps the old priority
+  // exactly (bit-identical to the pre-personality behavior). Cycle 12:
+  // even with slack the hunt only outranks the pickup when the measured
+  // advantage clears the temperament threshold — chasing at a
+  // disadvantage is what made blind aggression lose the mirror.
+  const slack = aggressionPickupSlack(aggressionOf(personality));
+  if (slack > 0 && pickup && rival
+    && field.dist[rival.r][rival.c] <= field.dist[pickup.r][pickup.c] + slack
+    && advantageEngageAllowed(view, { rivalModel }, personality)) {
+    return rival;
+  }
+  return pickup ?? rival;
 }
 
 // --- Route opening through crates ------------------------------------------
@@ -132,8 +168,8 @@ function chooseRouteTarget(view, field) {
 // Target priority mirrors chooseRouteTarget: own skill orbs first, then
 // pickups, then the rival cell.
 
-function openRouteObjective(view, intent, memory, arenaMemory, from, field) {
-  const target = chooseBlockedTarget(view, from);
+function openRouteObjective(view, intent, memory, arenaMemory, from, field, personality = null) {
+  const target = chooseBlockedTarget(view, from, memory.rivalModel, personality);
   if (!target) return intent;
   const routeCrate = findRouteCrate(view, from, target);
   if (!routeCrate) return intent; // sealed by solids: the baseline decision stands
@@ -170,7 +206,7 @@ function openRouteObjective(view, intent, memory, arenaMemory, from, field) {
 
 // Same priority as chooseRouteTarget but over unreachable targets, ranked
 // by manhattan distance — the route crate search measures the real cost.
-function chooseBlockedTarget(view, from) {
+function chooseBlockedTarget(view, from, rivalModel = null, personality = null) {
   const manhattan = (cell) => Math.abs(cell.r - from.r) + Math.abs(cell.c - from.c);
   const nearest = (cells) => cells
     .slice()
@@ -181,9 +217,20 @@ function chooseBlockedTarget(view, from) {
   const otherPickups = view.pickups.filter(
     (pickup) => !(pickup.type === "skill" && pickup.ownerId != null));
 
-  return nearest(ownOrbs)
-    ?? nearest(otherPickups)
-    ?? nearest([cellFromWorld(view.rival.x, view.rival.z, view.meta.cols, view.meta.rows, view.meta.tile)]);
+  const orb = nearest(ownOrbs);
+  if (orb) return orb;
+  const pickup = nearest(otherPickups);
+  const rival = nearest([predictRivalCell(rivalModel, view)]);
+
+  // Same aggression gate as chooseRouteTarget, over manhattan distance:
+  // at or below neutral the slack is zero and the pickup priority stands;
+  // above it the measured advantage must still clear the threshold (B12).
+  const slack = aggressionPickupSlack(aggressionOf(personality));
+  if (slack > 0 && pickup && rival && manhattan(rival) <= manhattan(pickup) + slack
+    && advantageEngageAllowed(view, { rivalModel }, personality)) {
+    return rival;
+  }
+  return pickup ?? rival;
 }
 
 // One safe step that increases the distance to the crate; holds position
@@ -370,4 +417,192 @@ function bestAlternative(view, intent) {
   }
 
   return best; // null only when every direction (including waiting) scores -Infinity
+}
+
+// --- Wedge recovery --------------------------------------------------------
+//
+// A dash landing can leave the collision box (radius 0.3, the moveEntity
+// rule) overlapping a solid: every later move is rejected at the
+// destination check, so the bot starves frozen in place — the cycle-15
+// seed-42 diagnosis found the V1 frozen against the border wall for 80+
+// seconds in EVERY drawn timeout round (an escape dash through the
+// last-call exception saved it from the blast and wedged it for the rest
+// of the round). Walking can never undo the overlap; only another dash
+// moves the body CENTER out of it (the game's sweep only checks the
+// center). The recovery: zero progress for UNWEDGE_FREEZE seconds while
+// the bot wants to move — or with the body box already overlapping a
+// solid, whatever the intent (a wedged bot sees idle frames that would
+// reset a purely intent-based watch; a deliberate wait in the open still
+// counts nothing) — then steer the facing toward the cardinal direction
+// whose mirrored dash landing is free, and cast the dash once the facing
+// points there. Danger frames belong to the temporal escape and its dash
+// gates, and a bomb-boxed bot (no free landing anywhere) simply waits for
+// the blast — the recovery only fires when a dash strictly improves on
+// standing still.
+
+const UNWEDGE_FREEZE = 1.2;      // seconds wanting to move with zero progress
+const UNWEDGE_AIM = 0.9;         // facing·direction dot that lets the cast fire
+const UNWEDGE_MIN_TRAVEL = 0.5;  // tiles; a shorter dash changes nothing
+// Mirrors of the dash/collision rules in game/run-champion-bomb-duel.js
+// (castRenektonE sweep, moveEntity/isBlocked collision) — same values as
+// the DASH_*/BODY_* constants in renekton-skills.mjs, renamed because the
+// V1 bundle inlines both modules in one scope.
+const UNWEDGE_STEP = 0.24;       // sweep increment of castRenektonE
+const UNWEDGE_BOMB_STOP = 0.48;  // bomb proximity that ends the sweep
+const UNWEDGE_SLICE_TILES = 2.75;
+const UNWEDGE_DICE_TILES = 3.15;
+const UNWEDGE_BODY_RADIUS = 0.3;
+const UNWEDGE_BODY_BOMB = 0.55;
+const UNWEDGE_MOVE_STEP = 0.1;   // one moveEntity step in the frozen test
+
+const UNWEDGE_DIRECTIONS = [
+  { dx: 1, dz: 0 },
+  { dx: -1, dz: 0 },
+  { dx: 0, dz: 1 },
+  { dx: 0, dz: -1 }
+];
+
+export function unwedgeMovement(view, intent, memory, arenaMemory) {
+  if (!view.self?.alive) return intent;
+  const { self } = view;
+  const last = memory.unwedgeLastPosition;
+  memory.unwedgeLastPosition = { x: self.x, z: self.z };
+  const moved = last ? Math.hypot(self.x - last.x, self.z - last.z) : Infinity;
+  const progressed = moved >= STALL_PROGRESS;
+  // The freeze watch cannot rely on the intent alone: a wedged bot sees
+  // zero-intent frames whenever the baseline brain idles between unstick
+  // commits, and each one would reset the watch (the measured seed-42
+  // pattern). A body box already overlapping a solid IS frozen no matter
+  // what the intent says this frame; a bot waiting deliberately in the open
+  // (box free, no movement intent) still accumulates nothing.
+  const wantsMove = intent.dx !== 0 || intent.dz !== 0;
+  const physicallyFrozen = !progressed && unwedgeFrozen(view, self.x, self.z);
+  memory.freezeTime = !progressed && (wantsMove || physicallyFrozen)
+    ? (memory.freezeTime ?? 0) + (view.dt ?? 0)
+    : 0;
+  if ((memory.freezeTime ?? 0) < UNWEDGE_FREEZE) return intent;
+  // Danger frames belong to the temporal escape and the pilot's gated
+  // escape dash; freezing there is their problem to solve first.
+  const { cols, rows, tile } = view.meta;
+  const cell = cellFromWorld(self.x, self.z, cols, rows, tile);
+  if (dangerAt(cell.r, cell.c, view.grid, view.bombs, view.blasts) > 0) return intent;
+  if (!unwedgeSkillReady(self)) return intent;
+
+  const direction = bestUnwedgeDirection(view);
+  if (!direction) return intent; // boxed by bombs: wait for the blast
+
+  // Facing first: the dash travels along lastDx/lastDz, which the game sets
+  // from the movement INTENT even when the move itself is rejected. One
+  // steered frame prepares the facing; the cast fires on the next.
+  const facingLength = Math.hypot(self.lastDx ?? 0, self.lastDz ?? 0);
+  const aligned = facingLength > 1e-6
+    && (self.lastDx / facingLength) * direction.dx
+      + (self.lastDz / facingLength) * direction.dz >= UNWEDGE_AIM;
+  intent.dx = direction.dx;
+  intent.dz = direction.dz;
+  if (arenaMemory) {
+    arenaMemory.lastDx = direction.dx;
+    arenaMemory.lastDz = direction.dz;
+    arenaMemory.commit = UNSTICK_COMMIT;
+  }
+  if (aligned) {
+    intent.skill = "e";
+    memory.freezeTime = 0; // one shot per freeze; progress resets it anyway
+  }
+  return intent;
+}
+
+// The longest dash whose landing leaves the bot able to move, among the
+// four cardinal directions — or null when every landing stays frozen
+// (bombs box the bot in).
+function bestUnwedgeDirection(view) {
+  let best = null;
+  let bestTravel = 0;
+  for (const direction of UNWEDGE_DIRECTIONS) {
+    const landing = unwedgeDashLanding(view, direction.dx, direction.dz);
+    if (!landing || landing.travel < view.meta.tile * UNWEDGE_MIN_TRAVEL) continue;
+    if (unwedgeFrozen(view, landing.x, landing.z, landing.crossed)) continue;
+    if (landing.travel > bestTravel) {
+      bestTravel = landing.travel;
+      best = direction;
+    }
+  }
+  return best;
+}
+
+// Where a Slice (or Dice, while the recast window is open) fired along
+// (dx, dz) would land: mirrors the castRenektonE sweep — the center
+// advances UNWEDGE_STEP at a time, a solid cell or any live bomb ends it,
+// crates break and let it through. Crossed crate cells ride along in
+// `crossed`: the game destroys them during the sweep, so the landing test
+// must see them as already open.
+function unwedgeDashLanding(view, dx, dz) {
+  const { cols, rows, tile } = view.meta;
+  const { self } = view;
+  const recast = (self.renektonDashRecast ?? 0) > 0;
+  const maxDistance = tile * (recast ? UNWEDGE_DICE_TILES : UNWEDGE_SLICE_TILES);
+  let x = self.x;
+  let z = self.z;
+  let travel = 0;
+  const crossed = [];
+  for (let distance = UNWEDGE_STEP; distance <= maxDistance; distance += UNWEDGE_STEP) {
+    const nx = self.x + dx * distance;
+    const nz = self.z + dz * distance;
+    const landingCell = cellFromWorld(nx, nz, cols, rows, tile);
+    const cellValue = view.grid[landingCell.r]?.[landingCell.c];
+    if (cellValue === 1) break;
+    if (cellValue === 2
+      && !crossed.some((cross) => cross.r === landingCell.r && cross.c === landingCell.c)) {
+      crossed.push(landingCell);
+    }
+    const bombBlocked = view.bombs.some((bomb) => !bomb.exploded
+      && Math.abs(nx - bomb.x) < UNWEDGE_BOMB_STOP
+      && Math.abs(nz - bomb.z) < UNWEDGE_BOMB_STOP);
+    if (bombBlocked) break;
+    x = nx;
+    z = nz;
+    travel = distance;
+  }
+  return travel > 0 ? { x, z, travel, crossed } : null;
+}
+
+// Frozen means EXACTLY what moveEntity implies: every cardinal one-step
+// destination is blocked. (An overlap alone is not enough — the step that
+// moves AWAY from the overlapped cell is accepted, which is also how the
+// wedged position differs from a merely close wall.) Crossed crates count
+// as open: the dash that produced the landing already destroyed them.
+function unwedgeFrozen(view, x, z, crossed = []) {
+  return UNWEDGE_DIRECTIONS.every((direction) => unwedgeMoveBlocked(
+    view, x + direction.dx * UNWEDGE_MOVE_STEP, z + direction.dz * UNWEDGE_MOVE_STEP, crossed));
+}
+
+// One moveEntity destination test at radius UNWEDGE_BODY_RADIUS: the box
+// corners must sit on open cells (crossed crates count as open) and no
+// live bomb the self may not cross may overlap the box.
+function unwedgeMoveBlocked(view, x, z, crossed = []) {
+  const { cols, rows, tile } = view.meta;
+  for (const [px, pz] of [
+    [x - UNWEDGE_BODY_RADIUS, z - UNWEDGE_BODY_RADIUS],
+    [x + UNWEDGE_BODY_RADIUS, z - UNWEDGE_BODY_RADIUS],
+    [x - UNWEDGE_BODY_RADIUS, z + UNWEDGE_BODY_RADIUS],
+    [x + UNWEDGE_BODY_RADIUS, z + UNWEDGE_BODY_RADIUS]
+  ]) {
+    const corner = cellFromWorld(px, pz, cols, rows, tile);
+    const cellValue = view.grid[corner.r]?.[corner.c];
+    if (cellValue === undefined || cellValue === 1) return true;
+    if (cellValue === 2
+      && !crossed.some((cross) => cross.r === corner.r && cross.c === corner.c)) return true;
+  }
+  return view.bombs.some((bomb) => !bomb.exploded
+    && !bomb.passOwners?.includes(view.self.id)
+    && Math.abs(x - bomb.x) < tile * UNWEDGE_BODY_BOMB + UNWEDGE_BODY_RADIUS
+    && Math.abs(z - bomb.z) < tile * UNWEDGE_BODY_BOMB + UNWEDGE_BODY_RADIUS);
+}
+
+// Slice readiness from the WorldView: the kit slot unlocked, the cooldown
+// over — or the recast window open, which ignores the cooldown (game rule).
+function unwedgeSkillReady(self) {
+  if (Array.isArray(self.skillsUnlocked) && self.skillsUnlocked[2] === false) return false;
+  if ((self.renektonDashRecast ?? 0) > 0) return true;
+  return (self.eCooldown ?? 0) <= 0;
 }

@@ -4,8 +4,11 @@ const sources = [
   // The V1 arena brain wraps the baseline policy, so the bundle inlines it
   // to stay self-contained when load-baseline-bot.js is absent.
   new URL("./baseline-policy.mjs", import.meta.url),
+  new URL("./v1/read-rival.mjs", import.meta.url),
+  new URL("./v1/personality.mjs", import.meta.url),
   new URL("./v1/v1-memory.mjs", import.meta.url),
   new URL("./v1/danger-timeline.mjs", import.meta.url),
+  new URL("./v1/advantage.mjs", import.meta.url),
   new URL("./v1/navigate-arena.mjs", import.meta.url),
   new URL("./v1/open-route.mjs", import.meta.url),
   new URL("./v1/plan-arena-actions.mjs", import.meta.url),

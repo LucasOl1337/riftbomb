@@ -14,9 +14,10 @@ estar indexados por este hub.
 
 1. [Guia consolidado do projeto](PROJECT-GUIDE.md)
 2. [Handoff da sessão de 2026-07-30 — rodada 15 / Marca Fatal](HANDOFF-2026-07-30-0847-BRT-RIFTBOMB-ROUND-15.md)
-3. [Matriz canônica do programa comparar-qa](../docs/qa/comparar-qa/matriz.md)
-4. [Regras obrigatórias para agentes](../AGENTS.md)
-5. [Proibição de Playwright headless](../STOP-HEADLESS-PLAYWRIGHT.md)
+3. [Handoff do treinamento Bot V1 / Renekton](handoff-bot-v1-renekton-2026-07-30.md)
+4. [Matriz canônica do programa comparar-qa](../docs/qa/comparar-qa/matriz.md)
+5. [Regras obrigatórias para agentes](../AGENTS.md)
+6. [Proibição de Playwright headless](../STOP-HEADLESS-PLAYWRIGHT.md)
 
 ## Índice da documentação canônica
 
