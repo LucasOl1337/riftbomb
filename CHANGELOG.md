@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-30
+
+### Release v1.3.0
+
+- Consolidated online reliability rounds 9–15: authored ability routing,
+  causal movement ACK/replay, authenticated session resume, reliable one-shot
+  actions and authoritative Zed Death Mark commitment.
+- Added the trained Renekton V1 CPU pilot with advantage evaluation, rival
+  modeling, personality and deterministic training coverage.
+- Added the authored Salt Lens and Storm-Eye floors with provenance, payload
+  budgets and release verification.
+- Preserved the complete 20-round performance ledger and the local landing and
+  game-feel QA evidence produced by the overnight agents.
+- Added complete player-facing and operational notes in
+  [`PATCH_NOTES_V1.3.0.md`](PATCH_NOTES_V1.3.0.md).
+
 ## 2026-07-28
 
 ### Combat HP clarity
