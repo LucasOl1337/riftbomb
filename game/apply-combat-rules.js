@@ -69,6 +69,7 @@
       label,
       quiet = false,
       shieldInvulnerability = 0.48,
+      rules = {},
     ) {
       const numericDamage = Number(damage) || 0;
       const legacyDamage = !Number.isInteger(numericDamage) && Math.abs(numericDamage) <= 1
@@ -91,6 +92,7 @@
         label,
         quiet,
         shieldInvulnerability,
+        rules,
       );
 
       // Death Mark stores fractional legacy damage. Restore that bookkeeping

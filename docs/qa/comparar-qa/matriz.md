@@ -24,12 +24,12 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 
 | Métrica | Quantidade |
 |---|---:|
-| Total inventariado | 19 |
+| Total inventariado | 20 |
 | Aprovadas | 0 |
 | Mudança necessária | 0 |
 | Corrigidas localmente | 6 |
 | Verificadas ao vivo | 12 |
-| Em andamento | 0 |
+| Em andamento | 1 |
 | Reauditoria necessária | 0 |
 | Bloqueadas | 1 |
 | Não testadas | 0 |
@@ -57,6 +57,7 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | 017 | Qualidade LoL · rodada 12 · material original do piso da arena | verified_live | Codex `/root` | 2026-07-30T04:08:04-03:00 | `3cb5a11` + Worker `be838e1a` | `80503b1` · Worker `53cabbe1` | ✅ antes 1440×900; depois local/live no mesmo enquadramento | ✅ antes/local/live 844×390 emulado, controles touch visíveis | ✅ bloqueio correto 390×844 e gameplay 844×390 emulados | ✅ colisão e regras intactas; perfil Salt Lens isolado, 5 taps e mesmo draw | ✅ 141/141 + 63/63 + servidor 54/54; WebGL2 visível limpo; P0/P1/P2=0 | `artifacts/comparar-qa/2026-07-30/lol-quality-round-12/` | Gráficos 63→68. Piso autoral fingerprinted publicado e verificado byte a byte; casts, sombras e as outras quatro arenas continuam como gargalos explícitos. |
 | 018 | Qualidade LoL · rodada 13 · ACK/replay exatamente-uma-vez de ações | verified_live | Codex `/root` | 2026-07-30T05:13:38-03:00 | `afc4e78` + Worker `53cabbe1` | `669d745` · Oracle `e9fdc93` · Worker `dbb42e55` | ✅ baseline, partida e F5, 1440×900 | ⚠️ 844×390 emulado; físico pendente | ✅ 844×390 + gate 390×844 emulados | ✅ bomba/habilidade sob gap, drop, duplicação, atraso, rejeição e F5; soak 10 min com 2.299/2.299 ACKs | ✅ 141/141 + 75/75 + servidor 55/55; skipped 0/0; reauditoria P0/P1/P2=0 | `artifacts/comparar-qa/2026-07-30/lol-quality-round-13/` | Netcode 72→78. Stream confiável separado, FIFO persistida, ACK cumulativo e replay idempotente publicados. Rotação do bearer, reconciliação adaptativa e dispositivos/redes físicas continuam pendentes. |
 | 019 | Qualidade LoL · rodada 14 · piso competitivo da Storm‑Eye | verified_live | Codex `/root` | 2026-07-30T06:41:28-03:00 | `bb696e8` + Worker `dbb42e55` | `6f34f00` · Worker `7641f165` | ✅ antes/local/live no viewport solicitado 1440×900; bitmap visível 1440×780 | ⚠️ físico não reexecutado | ✅ antes/local/live 844×390 + gate 390×844 emulados; bitmaps limitados pelo host registrados | ✅ colisão e regras intactas; perfil Storm‑Eye isolado, 2 taps de albedo + 3 de bump e zero sampler/passe/draw adicional | ✅ 142/142 + 75/75 + servidor 55/55; WebGL2 visível limpo; P0/P1/P2=0 | `artifacts/comparar-qa/2026-07-30/lol-quality-round-14/` | Gráficos 68→72. Piso autoral fingerprinted reduziu ruído global em 68,01% e contraste macro em 79,37%; casts, sombras e as outras três arenas permanecem gargalos. |
+| 020 | Qualidade LoL · rodada 15 · compromisso autoritativo da Marca Fatal do Zed | in_progress | Codex `/root` | 2026-07-30T07:53:23-03:00 | `9c88c5f` · Worker `7641f165` | — | baseline pendente | físico pendente | emulação pendente | 🔄 preparação, investida, inalvejabilidade, lock e resolução única em implementação | baseline limpo; gates pendentes | `artifacts/comparar-qa/2026-07-30/lol-quality-round-15/` | A implementação atual teleporta, marca e cria sombra no mesmo instante; a rodada vai substituir isso pela sequência autoritativa de duas fases da referência, sem alterar transporte ou scheduler. |
 
 ## Placar de qualidade — baseline do programa
 

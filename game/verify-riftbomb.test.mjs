@@ -875,7 +875,7 @@ test("real ability casts select their authored VAT actions across the roster", a
   };
   const expectedDurations = {
     katarina: [0.42, 0.42, 0.42, 1.65],
-    zed: [0.48, 0.48, 0.52, 0.68],
+    zed: [0.48, 0.48, 0.52, 0.6],
     renekton: [0.58, 0.56, 0.46, 0.72],
     vladimir: [0.56, 1.45, 0.62, 0.66],
     gangplank: [0.48, 0.4, 0.42, 0.7]
@@ -987,6 +987,43 @@ test("real ability casts select their authored VAT actions across the roster", a
     }
   }
 
+  const stagedZed = await createAuthoritativeDuel({
+    hostChampion: "zed", guestChampion: "katarina", seed: 703
+  });
+  const [stagedPlayer, stagedTarget] = stagedZed.players;
+  stagedZed.p2Human = true;
+  stagedPlayer.skillsUnlocked = [true, true, true, true];
+  stagedPlayer.invulnerable = 0;
+  stagedPlayer.x = 0;
+  stagedPlayer.z = 0;
+  stagedTarget.x = 0;
+  stagedTarget.z = 2;
+  stagedTarget.invulnerable = 0;
+  for (let row = 1; row < stagedZed.rows - 1; row += 1) {
+    for (let column = 1; column < stagedZed.cols - 1; column += 1) {
+      stagedZed.grid[row][column] = 0;
+    }
+  }
+  assert.equal(stagedZed.castAbility(3, stagedPlayer, { buffer: false }), true);
+  stagedZed.update(0.6);
+  assert.equal(stagedPlayer.abilityAnimAction, "rStrike");
+  assert.equal(stagedPlayer.abilityAnimDuration, 0.35);
+  assert.equal(stagedPlayer.abilityAnimRemaining, 0.35);
+  const stagedMetadata = JSON.parse(await readFile(
+    path.join(repositoryRoot, "champions", "zed", "playable-model", "zed-model-metadata.json"),
+    "utf8"
+  ));
+  const stagedResolver = new ResolverHarness();
+  stagedResolver.zedAnimation = {
+    frameCount: stagedMetadata.frameCount,
+    actions: stagedMetadata.animationActions,
+    clips: stagedMetadata.animationClips
+  };
+  const strikeFrame = stagedResolver.resolveChampionAnimation(stagedPlayer, 1.6, "zed");
+  assert.equal(strikeFrame?.key, "rStrike");
+  assert.equal(strikeFrame?.clipKey, stagedMetadata.animationActions.rStrike,
+    "the dash phase must route to Zed's authored Spell4_Strike clip");
+
   const buffered = await createAuthoritativeDuel({
     hostChampion: "gangplank",
     guestChampion: "katarina",
@@ -1024,7 +1061,6 @@ test("real ability casts select their authored VAT actions across the roster", a
   assert.equal(rejectedPlayer.abilityAnimRemaining, 0);
 
   const flashbackSequences = [
-    { champion: "zed", first: 3, second: 0, elapsed: 0.49, staleTimer: "zedUltAnim" },
     { champion: "renekton", first: 1, second: 2, elapsed: 0.47, staleTimer: "renektonSlashAnim" },
     { champion: "gangplank", first: 3, second: 0, elapsed: 0.49, staleTimer: "gangplankUltAnim" }
   ];

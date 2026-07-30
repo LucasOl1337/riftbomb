@@ -1518,16 +1518,23 @@
         authoritativeLocal.x - previousLocal.x,
         authoritativeLocal.z - previousLocal.z
       );
-      state.localPlayerTarget = {
-        playerId: authoritativeLocal.id,
-        x: authoritativeLocal.x,
-        z: authoritativeLocal.z
-      };
-      if (distance < game.tile) {
-        authoritativeLocal.x = previousLocal.x;
-        authoritativeLocal.z = previousLocal.z;
-      } else {
+      if (typeof game.canMoveContestant === "function" &&
+          !game.canMoveContestant(authoritativeLocal)) {
+        // A commitment snapshot is already the visual authority. Never blend
+        // toward a stale pre-cast prediction while Zed vanishes or dashes.
         state.localPlayerTarget = null;
+      } else {
+        state.localPlayerTarget = {
+          playerId: authoritativeLocal.id,
+          x: authoritativeLocal.x,
+          z: authoritativeLocal.z
+        };
+        if (distance < game.tile) {
+          authoritativeLocal.x = previousLocal.x;
+          authoritativeLocal.z = previousLocal.z;
+        } else {
+          state.localPlayerTarget = null;
+        }
       }
     }
     if (previousRemote && authoritativeRemote && data.round === previousRound) {
@@ -1596,6 +1603,10 @@
   function predictLocalMovement(dt) {
     const player = localOnlinePlayer();
     if (!player?.alive || game.mode !== "playing" || game.roundLocked) return;
+    if (typeof game.canMoveContestant === "function" && !game.canMoveContestant(player)) {
+      player.moving = false;
+      return;
+    }
     const input = state.role === "guest" ? state.localInput : hostLocalInput();
     let dx = Number(input.right) - Number(input.left);
     let dz = Number(input.down) - Number(input.up);
@@ -1628,6 +1639,10 @@
     const target = state.localPlayerTarget;
     const local = game.players.find((player) => player.id === target?.playerId);
     if (!local || !target || game.mode !== "playing") return;
+    if (typeof game.canMoveContestant === "function" && !game.canMoveContestant(local)) {
+      state.localPlayerTarget = null;
+      return;
+    }
     const blend = 1 - Math.exp(-10 * dt);
     local.x += (target.x - local.x) * blend;
     local.z += (target.z - local.z) * blend;

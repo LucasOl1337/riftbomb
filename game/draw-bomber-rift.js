@@ -2138,18 +2138,24 @@ drawKatarinaFallback(player, t, beat) {
 
       drawZed(player, t, beat, shadow = false) {
         const C = Renderer.colors;
+        const deathMarkCommitment = !shadow ? player.zedDeathMarkCommitment : null;
+        const deathMarkAlpha = deathMarkCommitment?.phase === "windup" ? 0.28 : 0.55;
         if (!this.zedReady) {
           this.draw("sphere", [player.x, 0.72, player.z], [0.34, 0.72, 0.3],
-            shadow ? C.zedShadow : C.zedSteel, 2, shadow ? 1.4 : 0.18, player.facing, shadow ? 0.48 : 1);
+            shadow ? C.zedShadow : C.zedSteel, 2, shadow ? 1.4 : 0.18, player.facing,
+            shadow ? 0.48 : deathMarkCommitment ? deathMarkAlpha : 1);
           this.draw("crystal", [player.x, 1.38, player.z], [0.3, 0.38, 0.28],
-            C.zedCrimson, 3, 1.8 + beat, player.facing, shadow ? 0.5 : 1);
+            C.zedCrimson, 3, 1.8 + beat, player.facing,
+            shadow ? 0.5 : deathMarkCommitment ? deathMarkAlpha : 1);
           return;
         }
         if (this.zedCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "zed")) {
           this.draw("sphere", [player.x, 0.72, player.z], [0.34, 0.72, 0.3],
-            shadow ? C.zedShadow : C.zedSteel, 2, shadow ? 1.4 : 0.18, player.facing, shadow ? 0.48 : 1);
+            shadow ? C.zedShadow : C.zedSteel, 2, shadow ? 1.4 : 0.18, player.facing,
+            shadow ? 0.48 : deathMarkCommitment ? deathMarkAlpha : 1);
           this.draw("crystal", [player.x, 1.38, player.z], [0.3, 0.38, 0.28],
-            C.zedCrimson, 3, 1.8 + beat, player.facing, shadow ? 0.5 : 1);
+            C.zedCrimson, 3, 1.8 + beat, player.facing,
+            shadow ? 0.5 : deathMarkCommitment ? deathMarkAlpha : 1);
           return;
         }
 
@@ -2157,7 +2163,7 @@ drawKatarinaFallback(player, t, beat) {
         const teleport = player.zedUltAnim > 0 ? 1 : 0;
         const slash = player.zedSlashAnim > 0 ? 1 : 0;
         const hurt = player.hurt > 0 ? 1 : 0;
-        const invulnerable = player.invulnerable > 0 ? 1 : 0;
+        const invulnerable = player.invulnerable > 0 || deathMarkCommitment ? 1 : 0;
         const moving = player.moving ? 1 : 0;
         const castDuration = player.castDuration || 0.48;
         const castProgress = player.castAnim > 0
@@ -2165,7 +2171,7 @@ drawKatarinaFallback(player, t, beat) {
           : 0;
         const cast = player.castAnim > 0 ? Math.sin(castProgress * Math.PI) : 0;
         const ultProgress = player.zedUltAnim > 0
-          ? clamp(1 - player.zedUltAnim / 0.68, 0, 1)
+          ? clamp(1 - player.zedUltAnim / 0.95, 0, 1)
           : 0;
         const ultPose = player.zedUltAnim > 0 ? Math.sin(ultProgress * Math.PI) : 0;
         const idleMix = prefersReducedMotion ? 0.5 : 0.5 + Math.sin(t * 2.25 + (player.id || 0)) * 0.5;
@@ -2200,7 +2206,7 @@ drawKatarinaFallback(player, t, beat) {
             voracity: slash,
             dash: teleport * 0.35,
             skill: Math.max(ultPose, slash * 0.72, cast * 0.5, teleport * 0.35 * 0.32),
-            alpha: shadow ? 0.8 :
+            alpha: shadow ? 0.8 : deathMarkCommitment ? deathMarkAlpha :
               (invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1)
           });
         } else {
@@ -2226,7 +2232,8 @@ drawKatarinaFallback(player, t, beat) {
           gl.uniform1f(this.katarinaUniforms.uShadow, shadow ? 1 : 0);
           gl.uniform1f(this.katarinaUniforms.uStyle, 1);
           gl.uniform1f(this.katarinaUniforms.uAlpha, shadow ? 0.8 :
-            (invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1));
+            deathMarkCommitment ? deathMarkAlpha :
+              (invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1));
           gl.activeTexture(gl.TEXTURE0);
           gl.bindTexture(gl.TEXTURE_2D, this.zedTexture);
           gl.uniform1i(this.katarinaUniforms.uChampion, 0);
@@ -2298,7 +2305,7 @@ drawKatarinaFallback(player, t, beat) {
         const abilityAnimRemaining = Math.max(0, Number(player.abilityAnimRemaining) || 0);
         const abilityAnimDuration = Math.max(0, Number(player.abilityAnimDuration) || 0);
         const abilityAnimAction = abilityAnimRemaining > 0 && abilityAnimDuration > 0 &&
-          ["q", "w", "e", "r"].includes(player.abilityAnimAction) &&
+          ["q", "w", "e", "r", "rStrike"].includes(player.abilityAnimAction) &&
           animation.actions[player.abilityAnimAction]
           ? player.abilityAnimAction
           : "";
@@ -2342,6 +2349,7 @@ drawKatarinaFallback(player, t, beat) {
           }
         } else if (abilityAnimAction) {
           // The authoritative game publishes the exact authored Q/W/E/R action
+          // (plus Zed's separate R strike phase)
           // and its own visual lifetime. This outranks overlapping legacy VFX
           // timers, so one ability cannot briefly borrow another ability's clip.
           desired = action(abilityAnimAction, abilityAnimRemaining, abilityAnimDuration);

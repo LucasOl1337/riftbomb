@@ -55,6 +55,21 @@ test("loads the online duel layer into the reconstructed game", async () => {
   assert.doesNotMatch(page, /<script>[\s\S]*<\/script>/);
 });
 
+test("online movement prediction honors the canonical contestant lock", async () => {
+  const source = await readFile(new URL("public/online-duel.js", root), "utf8");
+  const prediction = extractFunctionDeclaration(
+    source,
+    "predictLocalMovement",
+    "  function interpolateRemoteHost"
+  );
+  assert.match(prediction, /game\.canMoveContestant\(player\)/);
+  assert.match(prediction, /player\.moving = false;\s+return;/);
+  assert.ok(
+    prediction.indexOf("game.canMoveContestant(player)") < prediction.indexOf("game.moveEntity(player"),
+    "a committed Zed must be stopped before optimistic position mutation"
+  );
+});
+
 test("embeds the packaged manifest to remove its serial boot request", async () => {
   const page = await readFile(new URL("public/riftbomb.html", root), "utf8");
   const loader = await readFile(new URL("public/riftbomb-loader.js", root), "utf8");

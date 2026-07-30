@@ -89,3 +89,9 @@ Também é possível importar somente campeões específicos passando seus nomes
 origem exata no metadata e executa a verificação de integridade após cada campeão.
 
 Projeto de fã não comercial e não endossado pela Riot Games.
+
+## Documentação para desenvolvimento
+
+O índice consolidado, os handoffs datados e o guia operacional ficam em
+[`DocsDev/`](DocsDev/README.md). Contratos específicos continuam junto de seus
+módulos e são indexados por essa central.

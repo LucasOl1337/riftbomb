@@ -186,7 +186,22 @@
         UI.combo.classList.add("is-live");
         UI.comboLabel.textContent = `RIVAL · ${p2.name.toUpperCase()} · ${match.p2Human ? "HUMAN" : "CPU"}`;
         const available = Math.max(0, p1.maxBombs - match.activeBombsFor(p1));
-        const locked = !p1.alive || match.roundLocked || p1.ultChannel > 0 || p1.vladimirPool > 0;
+        const deathMarkCommitment = p1.zedDeathMarkCommitment || null;
+        const deathMarkCommitmentRemaining = typeof match.zedDeathMarkCommitmentRemaining === "function"
+          ? match.zedDeathMarkCommitmentRemaining(p1)
+          : 0;
+        const deathMarkPhaseRemaining = Math.max(0,
+          Number(deathMarkCommitment?.phaseRemaining) || 0);
+        const deathMarkBufferWindow = deathMarkCommitmentRemaining > 0 &&
+          deathMarkCommitmentRemaining <= 0.15 + 1e-6;
+        const incapacitated = !p1.alive || match.roundLocked || p1.ultChannel > 0 ||
+          p1.vladimirPool > 0;
+        const locked = incapacitated ||
+          (deathMarkCommitmentRemaining > 0 && !deathMarkBufferWindow);
+        const bombLocked = incapacitated || deathMarkCommitmentRemaining > 0;
+        UI.playerCard.dataset.deathMarkPhase = deathMarkCommitment?.phase || "";
+        UI.playerCard.dataset.deathMarkCommitment = deathMarkCommitmentRemaining.toFixed(3);
+        UI.playerCard.dataset.deathMarkBufferWindow = deathMarkBufferWindow ? "open" : "closed";
         const unlocked = p1.skillsUnlocked || [true, true, true, true];
         const skillLabel = (name, value, isUnlocked) => {
           // LOCK badge is visual; keep name short so the dock stays readable
@@ -207,7 +222,7 @@
         };
         UI.arenaBombLabel.textContent = available > 0 ? `Arena bomb · ${available}` : "Arena bomb · planted";
         UI.arenaBombFill.style.transform = `scaleX(${available > 0 ? 1 : 0.18})`;
-        UI.arenaBombAction.disabled = locked || available <= 0;
+        UI.arenaBombAction.disabled = bombLocked || available <= 0;
         UI.arenaBombAction.classList.remove("is-locked");
         if (p1.champion === "katarina") {
           UI.resourceFill.style.transform = "scaleX(0.82)";
@@ -253,13 +268,17 @@
           UI.rangeLabel.textContent = skillLabel("Shadow Slash", p1.eCooldown, unlocked[2]);
           UI.shieldLabel.textContent = !unlocked[3]
             ? "Death Mark"
-            : deathMark
+            : deathMarkCommitment
+              ? `Death Mark · ${deathMarkCommitment.phase === "windup" ? "vanish" : "dash"} ${deathMarkPhaseRemaining.toFixed(1)}s`
+              : deathMark
               ? `Death Mark · detonates ${Math.max(0, deathMark.fuse - deathMark.age).toFixed(1)}s`
               : skillLabel("Death Mark", p1.rCooldown, true);
           UI.bombFill.style.transform = `scaleX(${unlocked[0] ? 1 - clamp(p1.qCooldown / 5.6, 0, 1) : 0})`;
           UI.dashFill.style.transform = `scaleX(${unlocked[1] ? (livingShadow && p1.zedSwapWindow > 0 ? 1 : 1 - clamp(p1.wCooldown / 14, 0, 1)) : 0})`;
           UI.mineFill.style.transform = `scaleX(${unlocked[2] ? 1 - clamp(p1.eCooldown / 5.2, 0, 1) : 0})`;
-          UI.ultFill.style.transform = `scaleX(${unlocked[3] ? (deathMark ? 1 - deathMark.age / deathMark.fuse : 1 - clamp(p1.rCooldown / 30, 0, 1)) : 0})`;
+          UI.ultFill.style.transform = `scaleX(${unlocked[3] ? (deathMarkCommitment
+            ? 1 - clamp(deathMarkCommitmentRemaining / 0.95, 0, 1)
+            : deathMark ? 1 - deathMark.age / deathMark.fuse : 1 - clamp(p1.rCooldown / 30, 0, 1)) : 0})`;
           gateSkill(UI.bombAction, 0, p1.qCooldown > 0);
           gateSkill(UI.dashAction, 1, p1.wCooldown > 0 && !(livingShadow && p1.zedSwapWindow > 0));
           gateSkill(UI.mineAction, 2, p1.eCooldown > 0);
