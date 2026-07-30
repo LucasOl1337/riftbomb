@@ -2564,8 +2564,19 @@
       .score-meta { display: grid; gap: 0.1rem; font-size: 0.55rem; }
       .boss-panel { top: 3rem; width: min(18rem, 42vw); }
       .ability-dock,
-      .guide-button,
       .minimap { display: none; }
+      html.is-match-active .guide-button {
+        position: fixed;
+        z-index: 58;
+        top: max(3.65rem, calc(env(safe-area-inset-top) + 3.2rem));
+        right: max(0.55rem, env(safe-area-inset-right));
+        bottom: auto;
+        left: auto;
+        display: block;
+        min-height: 2.45rem;
+        padding: 0 0.7rem;
+        background: rgb(14 14 15 / 92%);
+      }
       .event-feed { top: 14%; left: 50%; transform: translateX(-50%); width: min(28rem, 70vw); }
 
       /*

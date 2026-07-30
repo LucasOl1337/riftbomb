@@ -315,6 +315,78 @@
       "coverage": 1
     }
   ],
+  "poseQuality": {
+    "centerLimit": 2.05,
+    "maximumSpanMultiplier": 4,
+    "minimumSpanMultiplier": 0.12,
+    "repairedFrameCount": 7,
+    "repairedFrames": [
+      {
+        "clip": "Death",
+        "frameOffset": 7,
+        "reasons": [
+          "axis-1-expanded"
+        ]
+      },
+      {
+        "clip": "Zed_spell1.anm",
+        "frameOffset": 2,
+        "reasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ]
+      },
+      {
+        "clip": "Zed_spell1.anm",
+        "frameOffset": 3,
+        "reasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ]
+      },
+      {
+        "clip": "Zed_spell1.anm",
+        "frameOffset": 4,
+        "reasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ]
+      },
+      {
+        "clip": "Zed_spell1.anm",
+        "frameOffset": 5,
+        "reasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ]
+      },
+      {
+        "clip": "Zed_spell1.anm",
+        "frameOffset": 6,
+        "reasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ]
+      },
+      {
+        "clip": "Zed_idle3.anm",
+        "frameOffset": 6,
+        "reasons": [
+          "position-bounds-saturation"
+        ]
+      }
+    ]
+  },
   "animationActions": {
     "idle": "Zed_idle1.anm",
     "run": "Zed_run.anm",

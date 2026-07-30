@@ -35,7 +35,11 @@
       const dt = Math.min(0.05, Math.max(0.001, (now - lastFrame) / 1000));
       lastFrame = now;
       game.update(dt);
-      sfx.update(game, dt);
+      try {
+        sfx.update(game, dt);
+      } catch (error) {
+        console.warn("SFX update skipped for this frame:", error);
+      }
       renderer.render(game, sfx, dt, now);
       document.documentElement.style.setProperty("--beat", sfx.visualPulse().toFixed(3));
       UI.fxLabel.textContent = `Bloom · ${Math.round(sfx.intensity * 100)}%`;
@@ -90,6 +94,9 @@
     }
 
     async function lockLandscapeOrientation() {
+      // The top-level online client owns fullscreen. Nested fullscreen requests
+      // are unreliable on iOS and can leave a visible browser-sized border.
+      if (window.self !== window.top) return;
       try {
         const root = document.documentElement;
         if (!document.fullscreenElement) {
@@ -552,9 +559,11 @@
       try {
         renderer = new Renderer(UI.canvas);
         game.renderer = renderer;
-        const embeddedModels = game.players
-          .map((player) => player.champion)
-          .filter((champion) => PLAYABLE_CHAMPIONS[champion]);
+        const embeddedModels = [
+          ...game.players.map((player) => player.champion),
+          modelReviewTarget
+        ]
+          .filter(Boolean);
         void renderer.ensureChampionModels(embeddedModels);
         if (modelReviewMode) {
           UI.intro.classList.add("is-gone");

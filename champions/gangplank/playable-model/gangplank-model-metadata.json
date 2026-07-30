@@ -14,19 +14,19 @@
   ],
   "positionBounds": {
     "min": [
-      -1.8774338960647583,
-      0,
-      -1.665569543838501
+      -2.329068316936493,
+      -0.742,
+      -2.4387356777191163
     ],
     "max": [
-      1.845630168914795,
-      4.32878303527832,
-      2.3751652240753174
+      2.4900345940589905,
+      2.7961231632232666,
+      2.1521923382282258
     ],
     "range": [
-      3.7230640649795532,
-      4.32878303527832,
-      4.040734767913818
+      4.8191029109954835,
+      3.5381231632232666,
+      4.590928015947342
     ]
   },
   "materials": [
@@ -259,6 +259,70 @@
       "coverage": 1
     }
   ],
+  "poseQuality": {
+    "centerLimit": 2.12,
+    "maximumSpanMultiplier": 4,
+    "minimumSpanMultiplier": 0.12,
+    "repairedFrameCount": 8,
+    "repairedFrames": [
+      {
+        "clip": "Gangplank_Spell2.anm",
+        "frameOffset": 0,
+        "reasons": [
+          "mesh-collapsed"
+        ]
+      },
+      {
+        "clip": "Gangplank_Spell2.anm",
+        "frameOffset": 1,
+        "reasons": [
+          "mesh-collapsed"
+        ]
+      },
+      {
+        "clip": "Gangplank_Spell2.anm",
+        "frameOffset": 2,
+        "reasons": [
+          "mesh-collapsed"
+        ]
+      },
+      {
+        "clip": "Gangplank_Spell2.anm",
+        "frameOffset": 3,
+        "reasons": [
+          "mesh-collapsed"
+        ]
+      },
+      {
+        "clip": "Gangplank_Spell2.anm",
+        "frameOffset": 4,
+        "reasons": [
+          "mesh-collapsed"
+        ]
+      },
+      {
+        "clip": "Gangplank_Spell2.anm",
+        "frameOffset": 5,
+        "reasons": [
+          "mesh-collapsed"
+        ]
+      },
+      {
+        "clip": "Gangplank_Spell2.anm",
+        "frameOffset": 6,
+        "reasons": [
+          "mesh-collapsed"
+        ]
+      },
+      {
+        "clip": "Gangplank_Spell2.anm",
+        "frameOffset": 7,
+        "reasons": [
+          "mesh-collapsed"
+        ]
+      }
+    ]
+  },
   "animationActions": {
     "idle": "Idle1",
     "run": "Run_Haste",

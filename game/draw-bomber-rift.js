@@ -28,6 +28,47 @@
       return false;
     }
     const mobilePerfTarget = detectMobilePerfTarget();
+    function planVatTextureLayout(vertexCount, frameCount, maxTextureSize) {
+      if (!Number.isSafeInteger(vertexCount) || vertexCount < 1 ||
+          !Number.isSafeInteger(frameCount) || frameCount < 1 ||
+          !Number.isSafeInteger(maxTextureSize) || maxTextureSize < 1) {
+        throw new Error("VAT texture dimensions must be positive safe integers");
+      }
+      const texelCount = vertexCount * frameCount;
+      if (!Number.isSafeInteger(texelCount)) throw new Error("VAT texture is too large");
+      const width = Math.min(vertexCount, maxTextureSize);
+      const height = Math.ceil(texelCount / width);
+      if (height > maxTextureSize) {
+        throw new Error(
+          `VAT texture needs ${width}x${height}, above GPU limit ${maxTextureSize}`
+        );
+      }
+      return { width, height, texelCount, paddedTexelCount: width * height };
+    }
+    function sampleVatAnimationClip(animation, key, progress) {
+      const clip = animation?.clips?.[key];
+      const totalFrameCount = animation?.frameCount;
+      if (!clip || !Number.isFinite(progress) ||
+          !Number.isSafeInteger(totalFrameCount) || totalFrameCount < 1 ||
+          !Number.isSafeInteger(clip.startFrame) || clip.startFrame < 0 ||
+          !Number.isSafeInteger(clip.frameCount) || clip.frameCount < 1 ||
+          clip.startFrame + clip.frameCount > totalFrameCount) {
+        return null;
+      }
+      const phase = clip.loop
+        ? ((progress % 1) + 1) % 1
+        : clamp(progress, 0, 1);
+      const localFrame = phase * (clip.loop ? clip.frameCount : clip.frameCount - 1);
+      const localA = Math.floor(localFrame) % clip.frameCount;
+      const localB = clip.loop
+        ? (localA + 1) % clip.frameCount
+        : Math.min(clip.frameCount - 1, localA + 1);
+      return {
+        frameA: clip.startFrame + localA,
+        frameB: clip.startFrame + localB,
+        mix: localFrame - Math.floor(localFrame)
+      };
+    }
     const modelReviewTarget = new URLSearchParams(location.search).get("model") || "";
     const modelReviewPose = new URLSearchParams(location.search).get("pose") || "idle";
     const modelReviewMode = ["katarina", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron"].includes(modelReviewTarget);
@@ -441,6 +482,7 @@
         this.particleData = null;
         this.shocks = [];
         this.cameraShake = 0;
+        this.seenBombIds = new Set();
         this.viewPlayerId = 0;
         this.viewZoom = 0;
         this.lastViewProjection = new Float32Array(16);
@@ -471,7 +513,7 @@
         ]);
         this.vatChampionUniforms = this.uniforms(this.vatChampionProgram, [
           "uModel", "uViewProjection", "uChampion", "uPositionFrames", "uNormalFrames",
-          "uPositionMin", "uPositionRange", "uFrameA", "uFrameB", "uFrameMix",
+          "uPositionMin", "uPositionRange", "uVertexCount", "uFrameA", "uFrameB", "uFrameMix",
           "uPreviousFrameA", "uPreviousFrameB", "uPreviousFrameMix", "uTransition",
           "uCamera", "uTime", "uBeat", "uHurt", "uInvulnerable", "uLotus",
           "uVoracity", "uDash", "uShadow", "uStyle", "uAlpha", "uSkill"
@@ -493,12 +535,9 @@
         this.championModelInitialised = new Set();
         this.championModelLoadPromises = {};
         this.championAnimationStates = new Map();
-        // Desktop can warm the catalog; mobile only loads the champions in the match.
-        if (!this.mobilePerf) {
-          for (const champion of ["katarina", "zed", "renekton", "vladimir", "gangplank"]) {
-            if (PLAYABLE_CHAMPIONS[champion]) this.initialiseChampionModel(champion);
-          }
-        }
+        // Decode and upload only the champions requested by the match or model review.
+        // Warming the full VAT catalog would synchronously decode and reserve roughly
+        // 71 MiB of animation textures before the player chooses an arena.
         this.createArenaTextures();
         this.createSkillIconTextures();
         this.particleVao = gl.createVertexArray();
@@ -570,8 +609,8 @@
 
         try {
           if (packed.animation?.runtime === "vat-v1") {
-            // Stream the decoded pose through the proven vertex path used by Vladimir.
-            // This keeps the source VAT deterministic across WebGL drivers.
+            // Decode poses once into tiled GPU textures. Per-frame animation then
+            // changes only uniforms; no vertex arrays cross the CPU/GPU boundary.
             const animatedFallbackColors = {
               katarina: [42, 8, 18, 255],
               zed: [14, 13, 17, 255],
@@ -579,11 +618,23 @@
               vladimir: [48, 5, 18, 255],
               gangplank: [92, 58, 28, 255]
             };
-            return this.createCpuAnimatedChampionModel(
+            const fallbackToCpu = (error) => {
+              if (this.lost || this.gl.isContextLost?.()) return fail(error);
+              console.warn(`GPU VAT unavailable for ${champion}; using CPU fallback.`, error);
+              return this.createCpuAnimatedChampionModel(
+                champion,
+                packed,
+                animatedFallbackColors[champion]
+              ).then(finish, fail);
+            };
+            return this.createVatChampionModel(
               champion,
               packed,
               animatedFallbackColors[champion]
-            ).then(finish, fail);
+            ).then(
+              (ok) => ok ? finish(true) : fallbackToCpu(new Error("GPU VAT was not ready")),
+              fallbackToCpu
+            );
           }
           if (champion === "katarina") {
             return Promise.resolve(this.createKatarinaModel()).then(finish, fail);
@@ -918,8 +969,9 @@
             resolve(true);
           };
           image.onerror = () => {
-            console.error(`${key} game texture failed to decode.`);
-            resolve(false);
+            console.warn(`${key} game texture failed to decode; using its fallback material.`);
+            this[`${key}Ready`] = true;
+            resolve(true);
           };
           image.src = packed.texture;
         });
@@ -934,86 +986,138 @@
           this.loadPackedBinary(packed.normals, packed.normalsUrl, `${key} normals`),
         ]);
         const animation = packed.animation;
-        const [textureWidth, textureHeight] = animation.textureDimensions;
+        const vertexCount = animation.vertexCount;
+        const frameCount = animation.frameCount;
         const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-        if (textureWidth > maxTextureSize || textureHeight > maxTextureSize) {
-          throw new Error(
-            `${key} animation texture ${textureWidth}x${textureHeight} exceeds ${maxTextureSize}`
-          );
+        const layout = planVatTextureLayout(vertexCount, frameCount, maxTextureSize);
+        if (vertexBytes.byteLength !== vertexCount * 2 * Float32Array.BYTES_PER_ELEMENT ||
+            frameBytes.byteLength !== layout.texelCount * 4 * Uint16Array.BYTES_PER_ELEMENT ||
+            normalBytes.byteLength !== layout.texelCount * 4) {
+          throw new Error(`${key} animated model data is inconsistent`);
         }
+        const frameCopy = frameBytes.byteOffset % Uint16Array.BYTES_PER_ELEMENT === 0
+          ? frameBytes
+          : frameBytes.slice();
+        const positionSource = new Uint16Array(
+          frameCopy.buffer,
+          frameCopy.byteOffset,
+          frameCopy.byteLength / Uint16Array.BYTES_PER_ELEMENT
+        );
+        const positionData = layout.paddedTexelCount === layout.texelCount
+          ? positionSource
+          : new Uint16Array(layout.paddedTexelCount * 4);
+        if (positionData !== positionSource) positionData.set(positionSource);
+        const normalData = layout.paddedTexelCount === layout.texelCount
+          ? normalBytes
+          : new Uint8Array(layout.paddedTexelCount * 4);
+        if (normalData !== normalBytes) normalData.set(normalBytes);
 
+        const assertContextAvailable = () => {
+          if (this.lost || gl.isContextLost?.()) {
+            throw new Error(`${key} VAT upload stopped because the WebGL context was lost`);
+          }
+        };
+        const clearGlErrors = () => {
+          for (let attempt = 0; attempt < 8; attempt += 1) {
+            if (gl.getError() === gl.NO_ERROR) break;
+          }
+        };
+        const assertVatOperation = (label) => {
+          const error = gl.getError();
+          if (error !== gl.NO_ERROR) {
+            throw new Error(`${key} ${label} failed with WebGL error 0x${error.toString(16)}`);
+          }
+        };
         const vao = gl.createVertexArray();
         const vertexBuffer = gl.createBuffer();
         const indexBuffer = gl.createBuffer();
-        gl.bindVertexArray(vao);
-        gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, vertexBytes, gl.STATIC_DRAW);
-        const uvLocation = gl.getAttribLocation(this.vatChampionProgram, "aUv");
-        gl.enableVertexAttribArray(uvLocation);
-        gl.vertexAttribPointer(uvLocation, 2, gl.FLOAT, false, 2 * 4, 0);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexBytes, gl.STATIC_DRAW);
-        gl.bindVertexArray(null);
+        let positionFrames = null;
+        let normalFrames = null;
+        let texture = null;
+        const disposeIncompleteVat = () => {
+          if (positionFrames) gl.deleteTexture?.(positionFrames);
+          if (normalFrames) gl.deleteTexture?.(normalFrames);
+          if (texture) gl.deleteTexture?.(texture);
+          if (vertexBuffer) gl.deleteBuffer?.(vertexBuffer);
+          if (indexBuffer) gl.deleteBuffer?.(indexBuffer);
+          if (vao) gl.deleteVertexArray?.(vao);
+        };
+        try {
+          assertContextAvailable();
+          clearGlErrors();
+          gl.bindVertexArray(vao);
+          gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+          gl.bufferData(gl.ARRAY_BUFFER, vertexBytes, gl.STATIC_DRAW);
+          const uvLocation = gl.getAttribLocation(this.vatChampionProgram, "aUv");
+          gl.enableVertexAttribArray(uvLocation);
+          gl.vertexAttribPointer(uvLocation, 2, gl.FLOAT, false, 2 * 4, 0);
+          gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+          gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexBytes, gl.STATIC_DRAW);
+          gl.bindVertexArray(null);
+          assertVatOperation("mesh upload");
 
-        const positionFrames = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, positionFrames);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-        gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texImage2D(
-          gl.TEXTURE_2D,
-          0,
-          gl.RGBA16UI,
-          textureWidth,
-          textureHeight,
-          0,
-          gl.RGBA_INTEGER,
-          gl.UNSIGNED_SHORT,
-          new Uint16Array(
-            frameBytes.buffer,
-            frameBytes.byteOffset,
-            frameBytes.byteLength / Uint16Array.BYTES_PER_ELEMENT
-          )
-        );
+          positionFrames = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, positionFrames);
+          gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+          gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA16UI,
+            layout.width,
+            layout.height,
+            0,
+            gl.RGBA_INTEGER,
+            gl.UNSIGNED_SHORT,
+            positionData
+          );
+          assertVatOperation("position texture upload");
 
-        const normalFrames = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, normalFrames);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texImage2D(
-          gl.TEXTURE_2D,
-          0,
-          gl.RGBA8,
-          textureWidth,
-          textureHeight,
-          0,
-          gl.RGBA,
-          gl.UNSIGNED_BYTE,
-          normalBytes
-        );
+          normalFrames = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, normalFrames);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA8,
+            layout.width,
+            layout.height,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            normalData
+          );
+          assertVatOperation("normal texture upload");
 
-        const texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texImage2D(
-          gl.TEXTURE_2D,
-          0,
-          gl.RGBA8,
-          1,
-          1,
-          0,
-          gl.RGBA,
-          gl.UNSIGNED_BYTE,
-          new Uint8Array(fallbackRgba)
-        );
+          texture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA8,
+            1,
+            1,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            new Uint8Array(fallbackRgba)
+          );
+          assertVatOperation("fallback material upload");
+        } catch (error) {
+          disposeIncompleteVat();
+          throw error;
+        }
 
         this[`${key}Vao`] = vao;
         this[`${key}VertexBuffer`] = vertexBuffer;
@@ -1021,34 +1125,50 @@
         this[`${key}IndexCount`] = indexBytes.byteLength / 2;
         this[`${key}PositionFrames`] = positionFrames;
         this[`${key}NormalFrames`] = normalFrames;
+        this[`${key}FrameTextureLayout`] = layout;
         this[`${key}Animation`] = animation;
         this[`${key}Texture`] = texture;
         this[`${key}Ready`] = false;
-        this[`${key}ModelReadyPromise`] = new Promise((resolve) => {
+        this[`${key}ModelReadyPromise`] = new Promise((resolve, reject) => {
           const image = new Image();
           image.decoding = "async";
           image.onload = () => {
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-            gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-            gl.generateMipmap(gl.TEXTURE_2D);
-            const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
-            if (anisotropic) {
-              const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-              gl.texParameterf(
-                gl.TEXTURE_2D,
-                anisotropic.TEXTURE_MAX_ANISOTROPY_EXT,
-                Math.min(8, max)
-              );
+            try {
+              assertContextAvailable();
+              clearGlErrors();
+              gl.bindTexture(gl.TEXTURE_2D, texture);
+              // Model Viewer glTF UVs are already in atlas orientation.
+              gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+              gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+              gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+              gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+              gl.generateMipmap(gl.TEXTURE_2D);
+              const anisotropic = gl.getExtension("EXT_texture_filter_anisotropic");
+              if (anisotropic) {
+                const max = gl.getParameter(anisotropic.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+                gl.texParameterf(
+                  gl.TEXTURE_2D,
+                  anisotropic.TEXTURE_MAX_ANISOTROPY_EXT,
+                  Math.min(8, max)
+                );
+              }
+              assertVatOperation("diffuse texture upload");
+              this[`${key}Ready`] = true;
+              resolve(true);
+            } catch (error) {
+              if (this.lost || gl.isContextLost?.()) {
+                reject(error);
+                return;
+              }
+              console.warn(`${key} diffuse upload failed; using its fallback material.`, error);
+              this[`${key}Ready`] = true;
+              resolve(true);
             }
-            this[`${key}Ready`] = true;
-            resolve(true);
           };
           image.onerror = () => {
-            console.error(`${key} game texture failed to decode.`);
-            resolve(false);
+            console.warn(`${key} game texture failed to decode; using its fallback material.`);
+            this[`${key}Ready`] = true;
+            resolve(true);
           };
           image.src = packed.texture;
         });
@@ -1507,7 +1627,7 @@
       addShock(x, z, strength = 1) {
         this.shocks.unshift({ x, z, age: 0, strength });
         this.shocks.length = Math.min(this.shocks.length, 8);
-        this.cameraShake = Math.max(this.cameraShake, strength * 0.34);
+        this.cameraShake = Math.max(this.cameraShake, strength * 0.44);
         this.hitPulse = Math.max(this.hitPulse, strength);
       }
 
@@ -1877,35 +1997,48 @@ drawKatarinaFallback(player, t, beat) {
         const model = modelMatrix(player.x, 0.02 + bob, player.z,
           reviewScale, reviewScale, reviewScale, facing);
 
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.disable(gl.CULL_FACE);
-        gl.depthMask(true);
-        gl.useProgram(this.katarinaProgram);
-        gl.uniformMatrix4fv(this.katarinaUniforms.uModel, false, model);
-        gl.uniformMatrix4fv(this.katarinaUniforms.uViewProjection, false, this.lastViewProjection);
-        gl.uniform3fv(this.katarinaUniforms.uCamera, this.lastCamera);
-        gl.uniform1f(this.katarinaUniforms.uTime, t);
-        gl.uniform1f(this.katarinaUniforms.uBeat, beat);
-        gl.uniform1f(this.katarinaUniforms.uIdleMix, idleMix);
-        gl.uniform1f(this.katarinaUniforms.uRunMix, runMix);
-        gl.uniform1f(this.katarinaUniforms.uMoving, moving);
-        gl.uniform1f(this.katarinaUniforms.uCast, cast);
-        gl.uniform1f(this.katarinaUniforms.uHurt, hurt);
-        gl.uniform1f(this.katarinaUniforms.uInvulnerable, invulnerable);
-        gl.uniform1f(this.katarinaUniforms.uLotus, lotus);
-        gl.uniform1f(this.katarinaUniforms.uVoracity, voracity);
-        gl.uniform1f(this.katarinaUniforms.uDash, dash);
-        gl.uniform1f(this.katarinaUniforms.uShadow, 0);
-        gl.uniform1f(this.katarinaUniforms.uStyle, 0);
-        gl.uniform1f(this.katarinaUniforms.uAlpha,
-          invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.katarinaTexture);
-        gl.uniform1i(this.katarinaUniforms.uChampion, 0);
-        gl.bindVertexArray(this.katarinaVao);
-        gl.drawElements(gl.TRIANGLES, this.katarinaIndexCount, gl.UNSIGNED_SHORT, 0);
-        gl.bindVertexArray(null);
+        if (this.katarinaPositionFrames) {
+          this.drawVatChampion(player, t, beat, "katarina", 0, {
+            grounding: false,
+            model,
+            invulnerable: Boolean(invulnerable),
+            lotus,
+            voracity,
+            dash,
+            skill: Math.max(lotus, voracity * 0.72, cast * 0.5, dash * 0.32),
+            alpha: invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1
+          });
+        } else {
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+          gl.disable(gl.CULL_FACE);
+          gl.depthMask(true);
+          gl.useProgram(this.katarinaProgram);
+          gl.uniformMatrix4fv(this.katarinaUniforms.uModel, false, model);
+          gl.uniformMatrix4fv(this.katarinaUniforms.uViewProjection, false, this.lastViewProjection);
+          gl.uniform3fv(this.katarinaUniforms.uCamera, this.lastCamera);
+          gl.uniform1f(this.katarinaUniforms.uTime, t);
+          gl.uniform1f(this.katarinaUniforms.uBeat, beat);
+          gl.uniform1f(this.katarinaUniforms.uIdleMix, idleMix);
+          gl.uniform1f(this.katarinaUniforms.uRunMix, runMix);
+          gl.uniform1f(this.katarinaUniforms.uMoving, moving);
+          gl.uniform1f(this.katarinaUniforms.uCast, cast);
+          gl.uniform1f(this.katarinaUniforms.uHurt, hurt);
+          gl.uniform1f(this.katarinaUniforms.uInvulnerable, invulnerable);
+          gl.uniform1f(this.katarinaUniforms.uLotus, lotus);
+          gl.uniform1f(this.katarinaUniforms.uVoracity, voracity);
+          gl.uniform1f(this.katarinaUniforms.uDash, dash);
+          gl.uniform1f(this.katarinaUniforms.uShadow, 0);
+          gl.uniform1f(this.katarinaUniforms.uStyle, 0);
+          gl.uniform1f(this.katarinaUniforms.uAlpha,
+            invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1);
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, this.katarinaTexture);
+          gl.uniform1i(this.katarinaUniforms.uChampion, 0);
+          gl.bindVertexArray(this.katarinaVao);
+          gl.drawElements(gl.TRIANGLES, this.katarinaIndexCount, gl.UNSIGNED_SHORT, 0);
+          gl.bindVertexArray(null);
+        }
 
         gl.disable(gl.BLEND);
         gl.enable(gl.CULL_FACE);
@@ -1993,35 +2126,50 @@ drawKatarinaFallback(player, t, beat) {
 
         const scale = modelReviewMode ? 1.14 : 1;
         const model = modelMatrix(player.x, 0.02 + bob, player.z, scale, scale, scale, player.facing || 0);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.disable(gl.CULL_FACE);
-        gl.depthMask(!shadow);
-        gl.useProgram(this.katarinaProgram);
-        gl.uniformMatrix4fv(this.katarinaUniforms.uModel, false, model);
-        gl.uniformMatrix4fv(this.katarinaUniforms.uViewProjection, false, this.lastViewProjection);
-        gl.uniform3fv(this.katarinaUniforms.uCamera, this.lastCamera);
-        gl.uniform1f(this.katarinaUniforms.uTime, t);
-        gl.uniform1f(this.katarinaUniforms.uBeat, beat);
-        gl.uniform1f(this.katarinaUniforms.uIdleMix, idleMix);
-        gl.uniform1f(this.katarinaUniforms.uRunMix, runMix);
-        gl.uniform1f(this.katarinaUniforms.uMoving, moving);
-        gl.uniform1f(this.katarinaUniforms.uCast, cast);
-        gl.uniform1f(this.katarinaUniforms.uHurt, hurt);
-        gl.uniform1f(this.katarinaUniforms.uInvulnerable, invulnerable);
-        gl.uniform1f(this.katarinaUniforms.uLotus, ultPose);
-        gl.uniform1f(this.katarinaUniforms.uVoracity, slash);
-        gl.uniform1f(this.katarinaUniforms.uDash, teleport * 0.35);
-        gl.uniform1f(this.katarinaUniforms.uShadow, shadow ? 1 : 0);
-        gl.uniform1f(this.katarinaUniforms.uStyle, 1);
-        gl.uniform1f(this.katarinaUniforms.uAlpha, shadow ? 0.8 :
-          (invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1));
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, this.zedTexture);
-        gl.uniform1i(this.katarinaUniforms.uChampion, 0);
-        gl.bindVertexArray(this.zedVao);
-        gl.drawElements(gl.TRIANGLES, this.zedIndexCount, gl.UNSIGNED_SHORT, 0);
-        gl.bindVertexArray(null);
+        if (this.zedPositionFrames) {
+          this.drawVatChampion(player, t, beat, "zed", 1, {
+            grounding: false,
+            model,
+            shadow,
+            invulnerable: Boolean(invulnerable),
+            lotus: ultPose,
+            voracity: slash,
+            dash: teleport * 0.35,
+            skill: Math.max(ultPose, slash * 0.72, cast * 0.5, teleport * 0.35 * 0.32),
+            alpha: shadow ? 0.8 :
+              (invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1)
+          });
+        } else {
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+          gl.disable(gl.CULL_FACE);
+          gl.depthMask(!shadow);
+          gl.useProgram(this.katarinaProgram);
+          gl.uniformMatrix4fv(this.katarinaUniforms.uModel, false, model);
+          gl.uniformMatrix4fv(this.katarinaUniforms.uViewProjection, false, this.lastViewProjection);
+          gl.uniform3fv(this.katarinaUniforms.uCamera, this.lastCamera);
+          gl.uniform1f(this.katarinaUniforms.uTime, t);
+          gl.uniform1f(this.katarinaUniforms.uBeat, beat);
+          gl.uniform1f(this.katarinaUniforms.uIdleMix, idleMix);
+          gl.uniform1f(this.katarinaUniforms.uRunMix, runMix);
+          gl.uniform1f(this.katarinaUniforms.uMoving, moving);
+          gl.uniform1f(this.katarinaUniforms.uCast, cast);
+          gl.uniform1f(this.katarinaUniforms.uHurt, hurt);
+          gl.uniform1f(this.katarinaUniforms.uInvulnerable, invulnerable);
+          gl.uniform1f(this.katarinaUniforms.uLotus, ultPose);
+          gl.uniform1f(this.katarinaUniforms.uVoracity, slash);
+          gl.uniform1f(this.katarinaUniforms.uDash, teleport * 0.35);
+          gl.uniform1f(this.katarinaUniforms.uShadow, shadow ? 1 : 0);
+          gl.uniform1f(this.katarinaUniforms.uStyle, 1);
+          gl.uniform1f(this.katarinaUniforms.uAlpha, shadow ? 0.8 :
+            (invulnerable && Math.floor(player.invulnerable * 14) % 2 === 0 ? 0.5 : 1));
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, this.zedTexture);
+          gl.uniform1i(this.katarinaUniforms.uChampion, 0);
+          gl.bindVertexArray(this.zedVao);
+          gl.drawElements(gl.TRIANGLES, this.zedIndexCount, gl.UNSIGNED_SHORT, 0);
+          gl.bindVertexArray(null);
+        }
 
         gl.depthMask(true);
         gl.disable(gl.BLEND);
@@ -2044,22 +2192,8 @@ drawKatarinaFallback(player, t, beat) {
       }
 
       sampleVatClip(animation, key, progress) {
-        const clip = animation?.clips?.[key];
-        if (!clip || !Number.isFinite(clip.frameCount) || clip.frameCount < 1) return null;
-        const phase = clip.loop
-          ? ((progress % 1) + 1) % 1
-          : clamp(progress, 0, 1);
-        const localFrame = phase * (clip.loop ? clip.frameCount : clip.frameCount - 1);
-        const localA = Math.floor(localFrame) % clip.frameCount;
-        const localB = clip.loop
-          ? (localA + 1) % clip.frameCount
-          : Math.min(clip.frameCount - 1, localA + 1);
-        return {
-          key,
-          frameA: clip.startFrame + localA,
-          frameB: clip.startFrame + localB,
-          mix: localFrame - Math.floor(localFrame)
-        };
+        const sample = sampleVatAnimationClip(animation, key, progress);
+        return sample ? { key, ...sample } : null;
       }
 
       sampleChampionAction(animation, action, progress) {
@@ -2280,12 +2414,21 @@ drawKatarinaFallback(player, t, beat) {
 
       drawVatChampion(player, t, beat, key, style, options = {}) {
         const C = Renderer.colors;
+        const accent = key === "katarina" ? C.katCrimsonDark
+          : key === "zed" ? C.zedCrimsonDark
+            : key === "renekton" ? C.renektonTeal
+              : key === "gangplank" ? C.gangplankGold
+                : C.vladimirCrimson;
+        const dark = key === "katarina" || key === "zed" ? C.shadow
+          : key === "renekton" ? C.renektonDark
+            : key === "gangplank" ? C.gangplankDark
+              : C.vladimirBloodDark;
         if (!this[`${key}Ready`]) {
           this.draw(
             "sphere",
             [player.x, 0.76, player.z],
             [0.4, 0.76, 0.34],
-            C.vladimirCrimson,
+            accent,
             2,
             0.3,
             player.facing
@@ -2294,7 +2437,7 @@ drawKatarinaFallback(player, t, beat) {
             "crystal",
             [player.x, 1.45, player.z],
             [0.28, 0.4, 0.26],
-            C.vladimirCrimson,
+            accent,
             3,
             1.6 + beat,
             player.facing
@@ -2303,70 +2446,84 @@ drawKatarinaFallback(player, t, beat) {
         }
 
         const frame = this.resolveChampionAnimation(player, t, key);
-        if (frame.hidden) return false;
+        if (!frame || frame.hidden) return false;
         const gl = this.gl;
         const animation = this[`${key}Animation`];
-        const invulnerable = player.invulnerable > 0 || player.vladimirPool > 0;
+        const invulnerable = options.invulnerable ?? (player.invulnerable > 0);
         const action = ["attack", "q", "poolDown", "poolUp", "e", "r"].includes(frame.key);
-        const skill = action ? 0.72 : 0;
+        const authoredSkill = frame.key === "r" ? 1
+          : frame.key === "e" ? 0.72
+            : frame.key === "poolDown" || frame.key === "poolUp" ? 0
+            : action ? 0.5
+              : 0;
+        const skill = options.skill ?? Math.max(
+          authoredSkill,
+          options.ult || 0,
+          (options.slash || 0) * 0.72,
+          (options.dash || 0) * 0.32
+        );
         const bob = prefersReducedMotion || action
           ? 0
           : Math.sin(t * (frame.key === "run" ? 11 : 2.2)) *
             (frame.key === "run" ? 0.016 : 0.009);
 
-        this.draw(
-          "sphere",
-          [player.x, 0.035, player.z],
-          [0.74, 0.035, 0.74],
-          C.blueSide,
-          4,
-          0.8 + beat,
-          t,
-          0.38
-        );
-        this.draw(
-          "torus",
-          [player.x, 0.064, player.z],
-          [0.56, 0.052, 0.56],
-          C.vladimirCrimson,
-          4,
-          0.68 + beat * 0.2 + (frame.key === "r" ? 2.2 : 0),
-          -t * 1.9,
-          0.72,
-          0,
-          Math.PI * 0.5
-        );
-        this.draw(
-          "sphere",
-          [player.x, 0.073, player.z],
-          [0.5, 0.034, 0.38],
-          C.vladimirBloodDark,
-          0,
-          0.025,
-          0,
-          0.88
-        );
+        if (options.grounding !== false) {
+          this.draw(
+            "sphere",
+            [player.x, 0.035, player.z],
+            [0.74, 0.035, 0.74],
+            C.blueSide,
+            4,
+            0.8 + beat,
+            t,
+            options.shadow ? 0.22 : 0.38
+          );
+          this.draw(
+            "torus",
+            [player.x, 0.064, player.z],
+            [0.56, 0.052, 0.56],
+            accent,
+            4,
+            0.68 + beat * 0.2 + (frame.key === "r" ? 2.2 : 0),
+            -t * 1.9,
+            options.shadow ? 0.34 : 0.72,
+            0,
+            Math.PI * 0.5
+          );
+          this.draw(
+            "sphere",
+            [player.x, 0.073, player.z],
+            [0.5, 0.034, 0.38],
+            dark,
+            0,
+            0.025,
+            0,
+            options.shadow ? 0.68 : 0.88
+          );
+        }
 
         const scale = options.scale || 1;
-        const model = modelMatrix(
+        const model = options.model || modelMatrix(
           player.x,
           0.02 + bob,
           player.z,
           scale,
           scale,
           scale,
-          player.facing || 0
+          options.facing ?? player.facing ?? 0
         );
         const uniforms = this.vatChampionUniforms;
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.disable(gl.CULL_FACE);
+        gl.depthMask(!options.shadow);
         gl.useProgram(this.vatChampionProgram);
         gl.uniformMatrix4fv(uniforms.uModel, false, model);
         gl.uniformMatrix4fv(uniforms.uViewProjection, false, this.lastViewProjection);
         gl.uniform3fv(uniforms.uCamera, this.lastCamera);
         gl.uniform3fv(uniforms.uPositionMin, animation.positionMin);
         gl.uniform3fv(uniforms.uPositionRange, animation.positionRange);
+        gl.uniform1i(uniforms.uVertexCount, animation.vertexCount);
         gl.uniform1i(uniforms.uFrameA, frame.frameA);
         gl.uniform1i(uniforms.uFrameB, frame.frameB);
         gl.uniform1f(uniforms.uFrameMix, frame.mix);
@@ -2378,17 +2535,21 @@ drawKatarinaFallback(player, t, beat) {
         gl.uniform1f(uniforms.uBeat, beat);
         gl.uniform1f(uniforms.uHurt, player.hurt > 0 ? 1 : 0);
         gl.uniform1f(uniforms.uInvulnerable, invulnerable ? 1 : 0);
-        gl.uniform1f(uniforms.uLotus, frame.key === "r" ? skill : 0);
-        gl.uniform1f(uniforms.uVoracity, frame.key === "e" ? skill : 0);
-        gl.uniform1f(uniforms.uDash, frame.key === "q" ? skill * 0.4 : 0);
-        gl.uniform1f(uniforms.uShadow, 0);
+        gl.uniform1f(uniforms.uLotus,
+          options.lotus ?? options.ult ?? (frame.key === "r" ? skill : 0));
+        gl.uniform1f(uniforms.uVoracity,
+          options.voracity ?? options.slash ?? (frame.key === "e" ? skill : 0));
+        gl.uniform1f(uniforms.uDash, options.dash ?? (frame.key === "q" ? skill * 0.4 : 0));
+        gl.uniform1f(uniforms.uShadow, options.shadow ? 1 : 0);
         gl.uniform1f(uniforms.uStyle, style);
         gl.uniform1f(uniforms.uSkill, skill);
         gl.uniform1f(
           uniforms.uAlpha,
-          player.invulnerable > 0 && Math.floor(player.invulnerable * 14) % 2 === 0
-            ? 0.52
-            : 1
+          options.alpha ?? (
+            player.invulnerable > 0 && Math.floor(player.invulnerable * 14) % 2 === 0
+              ? 0.52
+              : 1
+          )
         );
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this[`${key}Texture`]);
@@ -2403,6 +2564,7 @@ drawKatarinaFallback(player, t, beat) {
         gl.drawElements(gl.TRIANGLES, this[`${key}IndexCount`], gl.UNSIGNED_SHORT, 0);
         gl.bindVertexArray(null);
 
+        gl.depthMask(true);
         gl.disable(gl.BLEND);
         gl.enable(gl.CULL_FACE);
         gl.useProgram(this.mainProgram);
@@ -2506,17 +2668,24 @@ drawKatarinaFallback(player, t, beat) {
           ? Math.sin(ultProgress * Math.PI)
           : dominus ? 0.12 + Math.sin(t * 2.8) * 0.035 : 0;
         const scale = (modelReviewMode ? 1.08 : 0.92) * (dominus ? 1.16 : 1);
-        if (this.renektonCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "renekton")) {
-          this.draw("sphere", [player.x, 0.76, player.z], [0.4, 0.76, 0.34],
-            C.renektonTeal || C.vladimirCrimson, 2, 0.3, player.facing);
-          return;
-        }
-        this.drawPackedChampion(player, t, beat, "renekton", 2, {
+        const options = {
           scale,
           ult: ultPose,
           slash: player.renektonSlashAnim > 0 ? 1 : 0,
           dash: player.renektonDashAnim > 0 ? 0.72 : 0
-        });
+        };
+        if (this.renektonCpuAnimation) {
+          if (!this.prepareCpuAnimatedChampion(player, t, "renekton")) {
+            this.draw("sphere", [player.x, 0.76, player.z], [0.4, 0.76, 0.34],
+              C.renektonTeal || C.vladimirCrimson, 2, 0.3, player.facing);
+            return;
+          }
+          this.drawPackedChampion(player, t, beat, "renekton", 2, options);
+        } else if (this.renektonPositionFrames) {
+          this.drawVatChampion(player, t, beat, "renekton", 2, options);
+        } else {
+          this.drawPackedChampion(player, t, beat, "renekton", 2, options);
+        }
 
         if (dominus) {
           const pulse = 0.94 + Math.sin(t * 4.2) * 0.08;
@@ -2549,7 +2718,7 @@ drawKatarinaFallback(player, t, beat) {
         };
         if (this.vladimirCpuAnimation) {
           this.drawCpuAnimatedChampion(player, t, beat, "vladimir", 3, options);
-        } else if (this.vladimirAnimation?.runtime === "vat-v1") {
+        } else if (this.vladimirPositionFrames) {
           this.drawVatChampion(player, t, beat, "vladimir", 3, options);
         } else {
           this.drawPackedChampion(player, t, beat, "vladimir", 3, options);
@@ -2577,17 +2746,24 @@ drawKatarinaFallback(player, t, beat) {
           ? clamp(1 - player.gangplankUltAnim / 0.7, 0, 1)
           : 0;
         const ultPose = player.gangplankUltAnim > 0 ? Math.sin(ultProgress * Math.PI) : 0;
-        if (this.gangplankCpuAnimation && !this.prepareCpuAnimatedChampion(player, t, "gangplank")) {
-          this.draw("sphere", [player.x, 0.76, player.z], [0.4, 0.76, 0.34],
-            C.gangplankWood || C.vladimirCrimson, 2, 0.3, player.facing);
-          return;
-        }
-        this.drawPackedChampion(player, t, beat, "gangplank", 4, {
+        const options = {
           scale: modelReviewMode ? 1.14 : 1.05,
           ult: ultPose,
           slash: player.gangplankShotAnim > 0 ? 1 : 0,
           dash: player.gangplankKegAnim > 0 ? 0.55 : 0
-        });
+        };
+        if (this.gangplankCpuAnimation) {
+          if (!this.prepareCpuAnimatedChampion(player, t, "gangplank")) {
+            this.draw("sphere", [player.x, 0.76, player.z], [0.4, 0.76, 0.34],
+              C.gangplankWood || C.vladimirCrimson, 2, 0.3, player.facing);
+            return;
+          }
+          this.drawPackedChampion(player, t, beat, "gangplank", 4, options);
+        } else if (this.gangplankPositionFrames) {
+          this.drawVatChampion(player, t, beat, "gangplank", 4, options);
+        } else {
+          this.drawPackedChampion(player, t, beat, "gangplank", 4, options);
+        }
         if (player.shield > 0) this.drawShieldField(player, t, beat, 1.02, 0.8, 1.12);
       }
 
@@ -2927,24 +3103,90 @@ drawKatarinaFallback(player, t, beat) {
           const [x, z] = game.worldFromCell(blast.r, blast.c);
           const life = clamp(1 - blast.age / blast.life, 0, 1);
           const rise = Math.sin(life * Math.PI) * 0.18;
+          const pop = 1 + life * life * 0.3;
           this.draw("cube", [x, -0.05 + rise, z],
-            [game.tile * 0.46, 0.055 + life * 0.06, game.tile * 0.46],
+            [game.tile * 0.46 * pop, 0.055 + life * 0.06, game.tile * 0.46 * pop],
             blast.core ? C.whiteGold : C.gold, 3, 2.8 + life * 4.5, t);
           this.draw("crystal", [x, 0.38 + rise, z],
             [0.16 + life * 0.18, 0.45 + life * 0.7, 0.16 + life * 0.18],
             C.whiteGold, 3, 5.5 * life, t * 4.5 + blast.r);
+          // Incandescent core in the first instant of the detonation.
+          if (life > 0.62) {
+            const core = (life - 0.62) / 0.38;
+            this.draw("cube", [x, 0.16 + rise, z],
+              [game.tile * 0.3 * core, 0.34 * core, game.tile * 0.3 * core],
+              C.whiteGold, 3, 6.5 * core, t * 2);
+          }
+          // Ground shock ring spreading from the bomb core cell.
+          if (blast.core) {
+            const spread = 1 - life;
+            const ringRadius = 0.35 + spread * game.tile * 2.3;
+            this.draw("sphere", [x, 0.05, z], [ringRadius, 0.03, ringRadius],
+              C.gold, 4, life * life * 3.2, t, 0.5 * life);
+          }
+        }
+
+        // Plant impact: a small camera kick the moment a new bomb lands.
+        for (const bomb of game.bombs) {
+          if (this.seenBombIds.has(bomb.id)) continue;
+          this.seenBombIds.add(bomb.id);
+          if (bomb.age < 0.25) this.cameraShake = Math.max(this.cameraShake, 0.1);
+        }
+        if (this.seenBombIds.size > 24) {
+          const liveBombIds = new Set(game.bombs.map((bomb) => bomb.id));
+          for (const id of this.seenBombIds) {
+            if (!liveBombIds.has(id)) this.seenBombIds.delete(id);
+          }
         }
 
         for (const bomb of game.bombs) {
-          const pulse = 0.86 + Math.pow(clamp(bomb.age / bomb.fuse, 0, 1), 3) * 0.28;
+          const progress = clamp(bomb.age / bomb.fuse, 0, 1);
           const teamGlow = bomb.ownerId === 2 ? C.redSide : C.blueSide;
+
+          // Landing pose: the shell drops, bounces once and squashes on impact.
+          const fall = clamp(bomb.age / 0.24, 0, 1);
+          const bounceT = clamp((bomb.age - 0.24) / 0.34, 0, 1);
+          const bounce = Math.abs(Math.sin(bounceT * Math.PI)) * (1 - bounceT) * 0.2;
+          const squashT = clamp((bomb.age - 0.22) / 0.13, 0, 1);
+          const squash = bomb.age < 0.62
+            ? Math.sin(squashT * Math.PI) * 0.26 * (1 - bounceT * 0.45)
+            : 0;
+          const bodyY = 0.34 + (1 - fall * fall) * 1.5 + bounce;
+
+          // Fuse escalation: blink and heat rise faster toward detonation.
+          const heat = progress * progress;
+          const flash = 0.5 + 0.5 * Math.sin(bomb.age * (6 + heat * 34) + bomb.id * 1.7);
+          const pulse = 0.86 + Math.pow(progress, 3) * 0.28 + flash * heat * 0.12;
+          const heatMix = heat * (0.25 + flash * 0.75);
+          const shell = [
+            lerp(C.bomb[0], C.whiteGold[0], heatMix),
+            lerp(C.bomb[1], C.whiteGold[1], heatMix),
+            lerp(C.bomb[2], C.whiteGold[2], heatMix)
+          ];
+
+          // Plant shockwave: a team ring that expands and fades in 0.45s.
+          const landRing = clamp(bomb.age / 0.45, 0, 1);
+          if (landRing < 1) {
+            const ringRadius = 0.42 + landRing * 1.15;
+            this.draw("sphere", [bomb.x, 0.045, bomb.z], [ringRadius, 0.028, ringRadius],
+              teamGlow, 4, (1 - landRing) * 2.6, t, 0.55 * (1 - landRing));
+          }
           this.draw("sphere", [bomb.x, 0.055, bomb.z], [0.55, 0.035, 0.55],
-            teamGlow, 4, 1.2 + beat, t, 0.42);
-          this.draw("sphere", [bomb.x, 0.34, bomb.z], [0.38 * pulse, 0.38 * pulse, 0.38 * pulse],
-            C.bomb, 3, 0.55 + pulse * beat, t * 0.7);
+            teamGlow, 4, 1.2 + beat + flash * heat * 2.4, t, 0.42);
+          this.draw("sphere", [bomb.x, bodyY, bomb.z],
+            [0.38 * pulse * (1 + squash * 0.7), 0.38 * pulse * (1 - squash), 0.38 * pulse * (1 + squash * 0.7)],
+            shell, 3, 0.55 + pulse * beat + heat * (1.5 + flash * 2.5), t * 0.7);
+          const sparkSpeed = 4 + progress * 15;
           this.draw("crystal",
-            [bomb.x + Math.cos(t * 4) * 0.19, 0.82 + Math.sin(t * 5) * 0.05, bomb.z + Math.sin(t * 4) * 0.19],
-            [0.08, 0.2, 0.08], teamGlow, 3, 3 + beat * 3, -t * 2);
+            [bomb.x + Math.cos(t * sparkSpeed) * 0.19, bodyY + 0.48 + Math.sin(t * 5) * 0.05, bomb.z + Math.sin(t * sparkSpeed) * 0.19],
+            [0.08, 0.2 + heat * 0.12, 0.08], heat > 0.55 ? C.whiteGold : teamGlow, 3, 3 + beat * 3 + heat * 4, -t * 2);
+          // Final stress: a white-hot core pulses through the last fuse stretch.
+          if (progress > 0.82) {
+            const core = (progress - 0.82) / 0.18;
+            this.draw("sphere", [bomb.x, bodyY, bomb.z],
+              [0.2 * pulse * core, 0.2 * pulse * core, 0.2 * pulse * core],
+              C.whiteGold, 3, 4 + flash * 5, t);
+          }
         }
 
         for (const pickup of game.pickups) {
@@ -3768,6 +4010,7 @@ drawKatarinaFallback(player, t, beat) {
       uniform sampler2D uNormalFrames;
       uniform vec3 uPositionMin;
       uniform vec3 uPositionRange;
+      uniform int uVertexCount;
       uniform int uFrameA;
       uniform int uFrameB;
       uniform float uFrameMix;
@@ -3782,15 +4025,19 @@ drawKatarinaFallback(player, t, beat) {
       out vec3 vLocal;
       out float vSkill;
 
+      ivec2 frameTexel(int frame) {
+        int width = textureSize(uPositionFrames, 0).x;
+        int linear = frame * uVertexCount + gl_VertexID;
+        return ivec2(linear % width, linear / width);
+      }
+
       vec3 framePosition(int frame) {
-        uvec3 packed = texelFetch(uPositionFrames, ivec2(gl_VertexID, frame), 0).xyz;
+        uvec3 packed = texelFetch(uPositionFrames, frameTexel(frame), 0).xyz;
         return uPositionMin + (vec3(packed) / 65535.0) * uPositionRange;
       }
 
       vec3 frameNormal(int frame) {
-        return normalize(
-          texelFetch(uNormalFrames, ivec2(gl_VertexID, frame), 0).xyz * 2.0 - 1.0
-        );
+        return texelFetch(uNormalFrames, frameTexel(frame), 0).xyz * 2.0 - 1.0;
       }
 
       void main() {
@@ -3804,16 +4051,16 @@ drawKatarinaFallback(player, t, beat) {
           framePosition(uPreviousFrameB),
           uPreviousFrameMix
         );
-        vec3 currentNormal = normalize(mix(
+        vec3 currentNormal = mix(
           frameNormal(uFrameA),
           frameNormal(uFrameB),
           uFrameMix
-        ));
-        vec3 previousNormal = normalize(mix(
+        );
+        vec3 previousNormal = mix(
           frameNormal(uPreviousFrameA),
           frameNormal(uPreviousFrameB),
           uPreviousFrameMix
-        ));
+        );
         vec3 position = mix(previousPosition, currentPosition, uTransition);
         vec3 normal = normalize(mix(previousNormal, currentNormal, uTransition));
         vec4 world = uModel * vec4(position, 1.0);

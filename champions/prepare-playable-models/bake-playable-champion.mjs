@@ -243,6 +243,7 @@ if (config.runtime === "vat-v1") {
       key: clip.name,
       name: clip.name,
       actualName: clip.name,
+      action,
       clip,
       frameCount: action ? coreFrameCounts[action] : supportingFrameCount,
       loop
@@ -256,9 +257,95 @@ if (config.runtime === "vat-v1") {
     }
   }
   const unitScale = config.targetHeight / Math.max(1e-4, sourceHeight);
+  for (const positions of referencePositions) {
+    for (let index = 0; index < positions.length; index += 1) positions[index] *= unitScale;
+  }
   const positionFrames = [];
   const normalFrames = [];
   const animationClips = {};
+  const frameQuality = [];
+
+  const qualityEdges = [];
+  for (let meshIndex = 0; meshIndex < meshes.length; meshIndex += 1) {
+    const seenEdges = new Set();
+    const sourceIndices = meshes[meshIndex].geometry.index.array;
+    const reference = referencePositions[meshIndex];
+    for (let index = 0; index < sourceIndices.length; index += 3) {
+      const triangle = [sourceIndices[index], sourceIndices[index + 1], sourceIndices[index + 2]];
+      for (let edge = 0; edge < 3; edge += 1) {
+        const a = triangle[edge];
+        const b = triangle[(edge + 1) % 3];
+        const edgeKey = `${Math.min(a, b)}:${Math.max(a, b)}`;
+        if (seenEdges.has(edgeKey)) continue;
+        seenEdges.add(edgeKey);
+        const aOffset = a * 3;
+        const bOffset = b * 3;
+        const referenceLength = Math.hypot(
+          reference[aOffset] - reference[bOffset],
+          reference[aOffset + 1] - reference[bOffset + 1],
+          reference[aOffset + 2] - reference[bOffset + 2]
+        );
+        if (referenceLength > 1e-5) qualityEdges.push({
+          meshIndex, aOffset, bOffset, referenceLength
+        });
+      }
+    }
+  }
+
+  const profilePose = (meshPositions) => {
+    const samples = [[], [], []];
+    for (const values of meshPositions) {
+      for (let index = 0; index < values.length; index += 3) {
+        for (let axis = 0; axis < 3; axis += 1) samples[axis].push(values[index + axis]);
+      }
+    }
+    const low = [0, 0, 0];
+    const center = [0, 0, 0];
+    const high = [0, 0, 0];
+    const span = [0, 0, 0];
+    for (let axis = 0; axis < 3; axis += 1) {
+      samples[axis].sort((a, b) => a - b);
+      low[axis] = percentile(samples[axis], 0.01);
+      center[axis] = percentile(samples[axis], 0.5);
+      high[axis] = percentile(samples[axis], 0.99);
+      span[axis] = high[axis] - low[axis];
+    }
+    return { low, center, high, span };
+  };
+  const referenceProfile = profilePose(referencePositions);
+  const centerLimit = config.targetHeight;
+  const poseQualityReasons = (profile, meshPositions, strictGeometry) => {
+    const reasons = [];
+    for (let axis = 0; axis < 3; axis += 1) {
+      if (![profile.low[axis], profile.center[axis], profile.high[axis]].every(Number.isFinite)) {
+        reasons.push(`axis-${axis}-non-finite`);
+        continue;
+      }
+      const centerShift = Math.abs(profile.center[axis] - referenceProfile.center[axis]);
+      const maximumSpan = Math.max(config.targetHeight * 2, referenceProfile.span[axis] * 4);
+      const minimumSpan = Math.max(1e-4, referenceProfile.span[axis] * 0.12);
+      if (centerShift > centerLimit) reasons.push(`axis-${axis}-center-shift`);
+      if (profile.span[axis] > maximumSpan) reasons.push(`axis-${axis}-expanded`);
+      if (profile.span[axis] < minimumSpan) reasons.push(`axis-${axis}-collapsed`);
+    }
+    if (strictGeometry) {
+      const ratios = qualityEdges.map(({ meshIndex, aOffset, bOffset, referenceLength }) => {
+        const values = meshPositions[meshIndex];
+        return Math.hypot(
+          values[aOffset] - values[bOffset],
+          values[aOffset + 1] - values[bOffset + 1],
+          values[aOffset + 2] - values[bOffset + 2]
+        ) / referenceLength;
+      }).sort((a, b) => a - b);
+      const lowRatio = percentile(ratios, 0.01);
+      const highRatio = percentile(ratios, 0.99);
+      if (lowRatio < 1 / 3) reasons.push("mesh-collapsed");
+      if (highRatio > 6) reasons.push("mesh-expanded");
+    }
+    return reasons;
+  };
+
+  const clonePose = (pose) => pose.map((values) => new Float32Array(values));
 
   const clampSpatialOutliers = (meshPositions) => {
     const samples = [[], [], []];
@@ -297,11 +384,20 @@ if (config.runtime === "vat-v1") {
           meshPositions[index] *= unitScale;
         }
       }
-      clampSpatialOutliers(positions);
       positionFrames.push(positions);
       normalFrames.push(sampleSmoothNormals(spec.name, sampleTime));
+      frameQuality.push({
+        clip: spec.key,
+        frameOffset: frameIndex,
+        strictGeometry: Boolean(spec.action && !["idle", "run"].includes(spec.action)),
+        reasons: poseQualityReasons(
+          profilePose(positions),
+          positions,
+          Boolean(spec.action && !["idle", "run"].includes(spec.action))
+        )
+      });
     }
-      animationClips[spec.key] = {
+    animationClips[spec.key] = {
       source: spec.actualName,
       startFrame,
       frameCount: spec.frameCount,
@@ -309,6 +405,40 @@ if (config.runtime === "vat-v1") {
       loop: spec.loop
     };
   }
+
+  // Some exported Model Viewer clips contain a few root/bone samples that move
+  // most of the character tens of metres or collapse whole vertex islands. The
+  // arena owns world movement, so replace only those unusable in-place samples
+  // with their nearest valid authored neighbour. The runtime VAT blend keeps the
+  // transition smooth without baking a midpoint that can fold rotating limbs.
+  const repairedFrames = [];
+  const repairInvalidFrames = () => {
+    for (const clip of Object.values(animationClips)) {
+      const first = clip.startFrame;
+      const last = first + clip.frameCount - 1;
+      for (let frameIndex = first; frameIndex <= last; frameIndex += 1) {
+        const quality = frameQuality[frameIndex];
+        if (!quality.reasons.length) continue;
+        let before = frameIndex - 1;
+        while (before >= first && frameQuality[before].reasons.length) before -= 1;
+        let after = frameIndex + 1;
+        while (after <= last && frameQuality[after].reasons.length) after += 1;
+        const donor = before >= first && after <= last
+          ? frameIndex - before <= after - frameIndex ? before : after
+          : before >= first ? before : after <= last ? after : 0;
+        positionFrames[frameIndex] = clonePose(positionFrames[donor]);
+        normalFrames[frameIndex] = clonePose(normalFrames[donor]);
+        repairedFrames.push({
+          clip: quality.clip,
+          frameOffset: quality.frameOffset,
+          reasons: quality.reasons
+        });
+        quality.reasons = [];
+      }
+    }
+  };
+  repairInvalidFrames();
+  for (const frame of positionFrames) clampSpatialOutliers(frame);
 
   const vertexCount = meshes.reduce(
     (sum, mesh) => sum + mesh.geometry.attributes.position.count,
@@ -366,19 +496,50 @@ if (config.runtime === "vat-v1") {
   const positionRange = positionMax.map((maximum, axis) =>
     Math.max(1e-6, maximum - positionMin[axis])
   );
-  // Re-clamp every sample into the robust global box before quantization.
-  for (const frame of positionFrames) {
-    for (const meshPositions of frame) {
-      for (let index = 0; index < meshPositions.length; index += 3) {
+  const clampToPositionBounds = (meshPositions) => {
+    for (const values of meshPositions) {
+      for (let index = 0; index < values.length; index += 3) {
         for (let axis = 0; axis < 3; axis += 1) {
-          meshPositions[index + axis] = Math.max(
+          values[index + axis] = Math.max(
             positionMin[axis],
-            Math.min(positionMax[axis], meshPositions[index + axis]),
+            Math.min(positionMax[axis], values[index + axis]),
           );
         }
       }
     }
+  };
+  // The GPU only sees values after this global clamp and Uint16 packing. Re-run
+  // the gate on that exact spatial domain so a pose cannot pass in float space
+  // and then collapse into a boundary plane when encoded as VAT data.
+  for (let frameIndex = 0; frameIndex < positionFrames.length; frameIndex += 1) {
+    const clampedPose = clonePose(positionFrames[frameIndex]);
+    let saturatedComponents = 0;
+    let componentCount = 0;
+    for (const values of clampedPose) {
+      for (let index = 0; index < values.length; index += 3) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          if (values[index + axis] <= positionMin[axis] || values[index + axis] >= positionMax[axis]) {
+            saturatedComponents += 1;
+          }
+          componentCount += 1;
+        }
+      }
+    }
+    clampToPositionBounds(clampedPose);
+    const quality = frameQuality[frameIndex];
+    quality.reasons = poseQualityReasons(
+      profilePose(clampedPose),
+      clampedPose,
+      quality.strictGeometry
+    );
+    if (saturatedComponents / Math.max(1, componentCount) >= 0.05) {
+      quality.reasons.push("position-bounds-saturation");
+    }
+    quality.reasons = [...new Set(quality.reasons)];
   }
+  repairInvalidFrames();
+  // Re-clamp every sample into the robust global box before quantization.
+  for (const frame of positionFrames) clampToPositionBounds(frame);
 
   const frameCount = positionFrames.length;
   const quantizedPositions = new Uint16Array(frameCount * vertexCount * 4);
@@ -477,6 +638,13 @@ if (config.runtime === "vat-v1") {
       materials: meshes.map((mesh) => mesh.material?.name ?? "unknown"),
       skeletonBoneCount,
       animationDiagnostics,
+      poseQuality: {
+        centerLimit,
+        maximumSpanMultiplier: 4,
+        minimumSpanMultiplier: 0.12,
+        repairedFrameCount: repairedFrames.length,
+        repairedFrames
+      },
       animationActions: config.actions,
       animationClips
     }, null, 2))

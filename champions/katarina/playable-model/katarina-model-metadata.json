@@ -14,19 +14,19 @@
   ],
   "positionBounds": {
     "min": [
-      -1.7165929079055786,
-      -0.0000012705735343843116,
-      -23.29888916015625
+      -2.4044709138870237,
+      -0.7036851326674223,
+      -2.0657310121059416
     ],
     "max": [
-      15.429863929748535,
-      39.67647171020508,
-      2.5643084049224854
+      2.1689844958782194,
+      2.771009519577026,
+      2.95893644618988
     ],
     "range": [
-      17.146456837654114,
-      39.67647298077861,
-      25.863197565078735
+      4.573455409765243,
+      3.474694652244448,
+      5.024667458295822
     ]
   },
   "materials": [
@@ -211,6 +211,132 @@
       "coverage": 1
     }
   ],
+  "poseQuality": {
+    "centerLimit": 2.08,
+    "maximumSpanMultiplier": 4,
+    "minimumSpanMultiplier": 0.12,
+    "repairedFrameCount": 15,
+    "repairedFrames": [
+      {
+        "clip": "Death",
+        "frameOffset": 1,
+        "reasons": [
+          "axis-2-center-shift"
+        ]
+      },
+      {
+        "clip": "Death",
+        "frameOffset": 2,
+        "reasons": [
+          "axis-2-center-shift"
+        ]
+      },
+      {
+        "clip": "Death",
+        "frameOffset": 3,
+        "reasons": [
+          "axis-2-center-shift"
+        ]
+      },
+      {
+        "clip": "Spell1",
+        "frameOffset": 3,
+        "reasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ]
+      },
+      {
+        "clip": "Spell1",
+        "frameOffset": 4,
+        "reasons": [
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ]
+      },
+      {
+        "clip": "Spell1",
+        "frameOffset": 5,
+        "reasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ]
+      },
+      {
+        "clip": "Spell1",
+        "frameOffset": 6,
+        "reasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ]
+      },
+      {
+        "clip": "Spell2_Throw",
+        "frameOffset": 1,
+        "reasons": [
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ]
+      },
+      {
+        "clip": "Spell2_Throw",
+        "frameOffset": 2,
+        "reasons": [
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ]
+      },
+      {
+        "clip": "Spell3",
+        "frameOffset": 0,
+        "reasons": [
+          "mesh-collapsed",
+          "position-bounds-saturation"
+        ]
+      },
+      {
+        "clip": "Spell3",
+        "frameOffset": 1,
+        "reasons": [
+          "mesh-collapsed",
+          "position-bounds-saturation"
+        ]
+      },
+      {
+        "clip": "Spell3",
+        "frameOffset": 2,
+        "reasons": [
+          "mesh-collapsed",
+          "position-bounds-saturation"
+        ]
+      },
+      {
+        "clip": "Spell3",
+        "frameOffset": 3,
+        "reasons": [
+          "mesh-collapsed"
+        ]
+      },
+      {
+        "clip": "katarina_spell3.anm",
+        "frameOffset": 0,
+        "reasons": [
+          "position-bounds-saturation"
+        ]
+      },
+      {
+        "clip": "katarina_spell3.anm",
+        "frameOffset": 1,
+        "reasons": [
+          "position-bounds-saturation"
+        ]
+      }
+    ]
+  },
   "animationActions": {
     "idle": "Idle1",
     "run": "Run1",

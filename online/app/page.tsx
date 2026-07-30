@@ -58,7 +58,7 @@ function Icon({
 }
 
 function ModeIcon({ mode }: { mode: ClientMode }) {
-  if (mode === "online") {
+  if (mode === "quick" || mode === "online") {
     return (
       <Icon>
         <path d="m7 4 10 16M17 4 7 20M5 7l3-3 2 4M19 7l-3-3-2 4" />
@@ -151,6 +151,7 @@ function formatRuntimeStatus(runtime: RuntimeState) {
     return "Não foi possível concluir a conexão. Tente novamente.";
   }
   if (runtime.phase === "boot") return "Preparando a arena e os Champions…";
+  if (runtime.matchmaking) return "Buscando um oponente no Quick Match…";
   if (runtime.phase === "match") return "Partida em andamento";
   if (runtime.role === "host" && !runtime.connected) {
     return "Conectando ao servidor de São Paulo…";
@@ -189,13 +190,16 @@ function playerStateLabel(runtime: RuntimeState, side: "host" | "guest") {
 export default function Home() {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [runtime, setRuntime] = useState(INITIAL_RUNTIME_STATE);
-  const [activeMode, setActiveMode] = useState<ClientMode>("online");
+  const [activeMode, setActiveMode] = useState<ClientMode>("quick");
   const [champion, setChampion] = useState<ChampionId>("katarina");
   const [rivalChampion, setRivalChampion] = useState<ChampionId>("zed");
   const [arena, setArena] = useState<ArenaId>("lattice");
   const [roomCode, setRoomCode] = useState("");
   const [copyLabel, setCopyLabel] = useState("COPIAR");
   const [clientNotice, setClientNotice] = useState("");
+  const [presentationNotice, setPresentationNotice] = useState(
+    "No iPhone, desative o bloqueio de rotação e vire o aparelho. Para jogar sem bordas, adicione o Riftbomb à Tela de Início.",
+  );
   const search = useSyncExternalStore(subscribeToLocation, currentSearch, () => "");
   const legacy = new URLSearchParams(search).get("legacy") === "1";
 
@@ -232,9 +236,10 @@ export default function Home() {
       );
       setArena(next.arena);
       if (next.roomCode) setRoomCode(next.roomCode);
-      if (next.role === "guest") setActiveMode("join");
+      if (next.quickMatch) setActiveMode("quick");
+      else if (next.role === "guest") setActiveMode("join");
       if (next.role === "host") {
-        setActiveMode(next.inviteMode ? "challenge" : "online");
+        setActiveMode(next.quickMatch ? "quick" : next.inviteMode ? "challenge" : "online");
       }
     }
 
@@ -263,7 +268,7 @@ export default function Home() {
   const showRivalPicker = ["solo", "local", "challenge"].includes(activeMode);
   const primaryDisabled =
     !bridgeReady ||
-    runtime.busy ||
+    (runtime.busy && !runtime.matchmaking) ||
     (activeMode === "join" && !ROOM_CODE_PATTERN.test(roomCode)) ||
     (isGuest && !runtime.connected) ||
     (isHost && (!runtime.connected || !runtime.guestReady));
@@ -273,7 +278,7 @@ export default function Home() {
   } as CSSProperties;
 
   function chooseMode(mode: ClientMode) {
-    if (inLobby) return;
+    if (inLobby || runtime.matchmaking) return;
     setActiveMode(mode);
     setClientNotice("");
   }
@@ -304,22 +309,60 @@ export default function Home() {
   }
 
   async function enterFullscreen() {
+    let fullscreenUnavailable = false;
     try {
       if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen?.();
+        const requestFullscreen = document.documentElement.requestFullscreen;
+        if (requestFullscreen) {
+          await requestFullscreen.call(document.documentElement, {
+            navigationUI: "hide",
+          });
+        } else {
+          fullscreenUnavailable = true;
+        }
       }
-    } catch {}
+    } catch {
+      fullscreenUnavailable = true;
+    }
     try {
       const orientation = screen.orientation as ScreenOrientation & {
         lock?: (value: "landscape") => Promise<void>;
       };
       await orientation.lock?.("landscape");
-    } catch {}
+    } catch {
+      // Safari may expose the API while refusing the lock outside an installed app.
+    }
+
+    const stillPortrait = window.matchMedia("(orientation: portrait)").matches;
+    if (stillPortrait) {
+      setPresentationNotice(
+        fullscreenUnavailable
+          ? "O Safari não consegue girar nem ocupar toda a tela sozinho. Desative o bloqueio de rotação, vire o iPhone e use Compartilhar → Adicionar à Tela de Início para remover as bordas."
+          : "A tela cheia abriu, mas a rotação continua bloqueada. Desative o bloqueio de rotação do iPhone e vire o aparelho.",
+      );
+      return;
+    }
+
+    setPresentationNotice(
+      document.fullscreenElement
+        ? "Tela cheia horizontal ativada."
+        : "Horizontal ativado. Para remover as bordas do Safari, use Compartilhar → Adicionar à Tela de Início.",
+    );
+  }
+
+  function requestMobileMatchPresentation() {
+    const phoneLike = window.matchMedia("(pointer: coarse)").matches
+      || Math.min(window.innerWidth, window.innerHeight) <= 520;
+    if (phoneLike) void enterFullscreen();
   }
 
   function launchSelectedMode(event?: FormEvent) {
     event?.preventDefault();
     setClientNotice("");
+    if (runtime.matchmaking) {
+      sendCommand("cancel-quick-match");
+      return;
+    }
     if (!bridgeReady || runtime.busy) return;
 
     if (isGuest) {
@@ -327,7 +370,12 @@ export default function Home() {
       return;
     }
     if (isHost) {
+      requestMobileMatchPresentation();
       sendCommand("start-online");
+      return;
+    }
+    if (activeMode === "quick") {
+      sendCommand("quick-match", { champion, arena });
       return;
     }
     if (activeMode === "online") {
@@ -350,6 +398,7 @@ export default function Home() {
       sendCommand("join-room", { code: roomCode, champion });
       return;
     }
+    requestMobileMatchPresentation();
     sendCommand("start-offline", {
       mode: activeMode,
       champion,
@@ -358,11 +407,59 @@ export default function Home() {
     });
   }
 
-  function leaveLobby() {
+  const leaveLobby = useCallback(() => {
     sendCommand("leave-lobby");
     setRoomCode("");
     setClientNotice("");
-  }
+    setRuntime((current) => ({
+      ...current,
+      role: "offline",
+      phase: "setup",
+      roomCode: "",
+      connected: false,
+      rivalConnected: false,
+      guestReady: false,
+      inviteUrl: "",
+      busy: false,
+      status: "Left the online lobby.",
+      tone: "ok",
+    }));
+  }, [sendCommand]);
+
+  const leaveMatch = useCallback(() => {
+    sendCommand("leave-match");
+    setRoomCode("");
+    setClientNotice("");
+    setRuntime((current) => ({
+      ...current,
+      role: "offline",
+      phase: "setup",
+      roomCode: "",
+      connected: false,
+      rivalConnected: false,
+      guestReady: false,
+      inviteUrl: "",
+      busy: false,
+      status: "You left the match.",
+      tone: "ok",
+    }));
+  }, [sendCommand]);
+
+  // Escape: leave lobby or match instead of trapping the user.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (runtime.phase === "match") {
+        event.preventDefault();
+        leaveMatch();
+      } else if (runtime.role !== "offline" && runtime.phase === "lobby") {
+        event.preventDefault();
+        leaveLobby();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [leaveLobby, leaveMatch, runtime.phase, runtime.role]);
 
   async function copyInvite() {
     const value = runtime.inviteMode ? runtime.inviteUrl : runtime.roomCode;
@@ -382,6 +479,7 @@ export default function Home() {
 
   const primaryLabel = useMemo(() => {
     if (!bridgeReady) return "CARREGANDO ARENA";
+    if (runtime.matchmaking) return "CANCELAR BUSCA";
     if (runtime.busy) return "CONECTANDO";
     if (isGuest) return runtime.guestReady ? "CANCELAR PRONTO" : "ESTOU PRONTO";
     if (isHost) {
@@ -389,7 +487,8 @@ export default function Home() {
       if (!runtime.guestReady) return "OPONENTE ESCOLHENDO";
       return "INICIAR PARTIDA";
     }
-    if (activeMode === "online") return "CRIAR SALA";
+    if (activeMode === "quick") return "BUSCAR PARTIDA";
+    if (activeMode === "online") return "CRIAR SALA PRIVADA";
     if (activeMode === "challenge") return "CRIAR DESAFIO";
     if (activeMode === "join") return "ENTRAR NA SALA";
     if (activeMode === "local") return "INICIAR VERSUS LOCAL";
@@ -400,6 +499,7 @@ export default function Home() {
     isGuest,
     isHost,
     runtime.busy,
+    runtime.matchmaking,
     runtime.guestReady,
     runtime.rivalConnected,
   ]);
@@ -409,6 +509,18 @@ export default function Home() {
   return (
     <main className={`game-shell${inMatch ? " is-match-live" : ""}`}>
       <RuntimeFrame frameRef={frameRef} />
+
+      {inMatch ? (
+        <div className="match-chrome" role="toolbar" aria-label="Controles da partida">
+          <button
+            className="match-exit-button"
+            type="button"
+            onClick={leaveMatch}
+          >
+            SAIR DA PARTIDA
+          </button>
+        </div>
+      ) : null}
 
       <section
         className="client-shell"
@@ -474,7 +586,7 @@ export default function Home() {
                   className={`mode-item${activeMode === mode.id ? " is-selected" : ""}`}
                   type="button"
                   onClick={() => chooseMode(mode.id)}
-                  disabled={inLobby}
+                  disabled={inLobby || runtime.matchmaking}
                   aria-pressed={activeMode === mode.id}
                 >
                   <span className="mode-item__icon">
@@ -514,7 +626,8 @@ export default function Home() {
               <p>{selectedMode.description}</p>
               <span className="client-server-tag">
                 <i />
-                {activeMode === "online" ||
+                {activeMode === "quick" ||
+                activeMode === "online" ||
                 activeMode === "challenge" ||
                 activeMode === "join"
                   ? "SERVIDOR AUTORITATIVO · SÃO PAULO"
@@ -561,6 +674,23 @@ export default function Home() {
                   />
                   <small>Sem as letras I e O para evitar confusão.</small>
                 </label>
+              ) : null}
+
+              {inLobby ? (
+                <div className="room-identity room-identity--inline">
+                  <span>{runtime.inviteMode ? "LINK / CÓDIGO" : "CÓDIGO DA SALA"}</span>
+                  <strong>{runtime.roomCode || "------"}</strong>
+                  <button
+                    type="button"
+                    onClick={copyInvite}
+                    disabled={
+                      !runtime.connected ||
+                      (runtime.inviteMode && !runtime.inviteUrl)
+                    }
+                  >
+                    {copyLabel}
+                  </button>
+                </div>
               ) : null}
 
               <div className="config-section">
@@ -795,15 +925,51 @@ export default function Home() {
           </aside>
         </div>
 
-        <button className="rotate-gate" type="button" onClick={enterFullscreen}>
-          <Icon>
-            <rect x="3" y="7" width="18" height="10" rx="2" />
-            <path d="M8 4 6 2 4 4M16 20l2 2 2-2" />
-          </Icon>
-          <strong>GIRE PARA JOGAR</strong>
-          <span>Toque para abrir em tela cheia horizontal</span>
-        </button>
+        {/* Sticky CTA: always reachable on phone landscape / short viewports */}
+        <div className="client-sticky-cta" aria-label="Ação principal">
+          {inLobby || runtime.matchmaking ? (
+            <button
+              className="client-sticky-cta__secondary"
+              type="button"
+              onClick={runtime.matchmaking ? () => sendCommand("cancel-quick-match") : leaveLobby}
+            >
+              {runtime.matchmaking ? "CANCELAR BUSCA" : "SAIR DA SALA"}
+            </button>
+          ) : null}
+          <button
+            className="client-sticky-cta__primary"
+            type="button"
+            onClick={() => launchSelectedMode()}
+            disabled={primaryDisabled}
+          >
+            {primaryLabel}
+          </button>
+        </div>
       </section>
+
+      <div
+        className="rotate-gate"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rotate-gate-title"
+        aria-describedby="rotate-gate-copy"
+      >
+        <Icon>
+          <rect x="3" y="7" width="18" height="10" rx="2" />
+          <path d="M8 4 6 2 4 4M16 20l2 2 2-2" />
+        </Icon>
+        <strong id="rotate-gate-title">VIRE O CELULAR DE LADO</strong>
+        <span id="rotate-gate-copy" aria-live="polite">
+          {presentationNotice}
+        </span>
+        <button
+          className="rotate-gate__action"
+          type="button"
+          onClick={enterFullscreen}
+        >
+          TENTAR TELA CHEIA
+        </button>
+      </div>
     </main>
   );
 }

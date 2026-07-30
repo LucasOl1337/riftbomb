@@ -15,6 +15,7 @@ export type ArenaId =
   | "pit";
 
 export type ClientMode =
+  | "quick"
   | "online"
   | "solo"
   | "local"
@@ -34,6 +35,8 @@ export interface RuntimeState {
   inviteMode: boolean;
   inviteUrl: string;
   busy: boolean;
+  matchmaking: boolean;
+  quickMatch: boolean;
   hostChampion: ChampionId;
   guestChampion: ChampionId;
   arena: ArenaId;
@@ -148,11 +151,17 @@ export const MODES: ReadonlyArray<{
   badge?: string;
 }> = [
   {
-    id: "online",
-    eyebrow: "PVP AUTORITATIVO",
-    name: "Duelo online",
-    description: "Crie uma sala e enfrente um amigo no servidor de São Paulo.",
+    id: "quick",
+    eyebrow: "PAREAMENTO AUTOMÁTICO",
+    name: "Quick Match",
+    description: "Encontre outro jogador e entre direto em uma partida melhor de 3.",
     badge: "RECOMENDADO",
+  },
+  {
+    id: "online",
+    eyebrow: "SALA PRIVADA",
+    name: "Jogar com amigo",
+    description: "Crie uma sala e enfrente um amigo no servidor de São Paulo.",
   },
   {
     id: "solo",
@@ -190,6 +199,8 @@ export const INITIAL_RUNTIME_STATE: RuntimeState = {
   inviteMode: false,
   inviteUrl: "",
   busy: true,
+  matchmaking: false,
+  quickMatch: false,
   hostChampion: "katarina",
   guestChampion: "zed",
   arena: "lattice",
@@ -236,6 +247,8 @@ export function isRuntimeStateMessage(
     typeof state?.inviteMode === "boolean" &&
     typeof state?.inviteUrl === "string" &&
     typeof state?.busy === "boolean" &&
+    typeof state?.matchmaking === "boolean" &&
+    typeof state?.quickMatch === "boolean" &&
     Number.isFinite(state?.matchTarget) &&
     typeof state?.status === "string" &&
     ["", "ok", "error"].includes(state?.tone ?? "") &&

@@ -69,6 +69,7 @@
       .replace(
         "</body>",
         [
+          '<script src="/authoritative-audio.js"></script>',
           '<script src="/online-duel.js"></script>',
           "<script>",
           `document.documentElement.dataset.riftbombFetchMs = "${(fetchedAt - bootStartedAt).toFixed(1)}";`,

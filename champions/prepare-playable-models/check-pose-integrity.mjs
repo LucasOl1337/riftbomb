@@ -63,7 +63,50 @@ if (metadata.runtime === "vat-v1") {
 
   const percentile = (values, p) =>
     values[Math.min(values.length - 1, Math.floor(values.length * p))];
-  const evaluate = (label, frame) => {
+  const silhouette = (frame) => {
+    const axes = [[], [], []];
+    let saturatedComponents = 0;
+    for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+      const offset = (frame * vertexCount + vertex) * 4;
+      for (let axis = 0; axis < 3; axis += 1) {
+        const packed = frames[offset + axis];
+        if (packed === 0 || packed === 65535) saturatedComponents += 1;
+        axes[axis].push(
+          positionBounds.min[axis] + packed / 65535 * positionBounds.range[axis]
+        );
+      }
+    }
+    for (const values of axes) values.sort((a, b) => a - b);
+    const low = axes.map((values) => percentile(values, 0.01));
+    const center = axes.map((values) => percentile(values, 0.5));
+    const high = axes.map((values) => percentile(values, 0.99));
+    return {
+      low,
+      center,
+      high,
+      span: high.map((value, axis) => value - low[axis]),
+      saturationRate: saturatedComponents / (vertexCount * 3)
+    };
+  };
+  const referenceSilhouette = silhouette(0);
+  const referenceDegenerateRatio = (() => {
+    let degenerate = 0;
+    for (let index = 0; index < indices.length; index += 3) {
+      const a = positionAt(indices[index], 0);
+      const b = positionAt(indices[index + 1], 0);
+      const c = positionAt(indices[index + 2], 0);
+      const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      const cross = [
+        ab[1] * ac[2] - ab[2] * ac[1],
+        ab[2] * ac[0] - ab[0] * ac[2],
+        ab[0] * ac[1] - ab[1] * ac[0]
+      ];
+      if (Math.hypot(...cross) < 1e-8) degenerate += 1;
+    }
+    return degenerate / Math.max(1, indices.length / 3);
+  })();
+  const evaluate = (label, frame, action) => {
     const ratios = edges.map(({ a, b, referenceLength }) => {
       const pa = positionAt(a, frame);
       const pb = positionAt(b, frame);
@@ -72,32 +115,64 @@ if (metadata.runtime === "vat-v1") {
     const inverseRatios = ratios
       .map((ratio) => 1 / Math.max(ratio, 1e-9))
       .sort((a, b) => a - b);
+    const pose = silhouette(frame);
+    let degenerate = 0;
+    for (let index = 0; index < indices.length; index += 3) {
+      const a = positionAt(indices[index], frame);
+      const b = positionAt(indices[index + 1], frame);
+      const c = positionAt(indices[index + 2], frame);
+      const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      const cross = [
+        ab[1] * ac[2] - ab[2] * ac[1],
+        ab[2] * ac[0] - ab[0] * ac[2],
+        ab[0] * ac[1] - ab[1] * ac[0]
+      ];
+      if (Math.hypot(...cross) < 1e-8) degenerate += 1;
+    }
     return {
       label,
+      action,
       p01: percentile(ratios, 0.01),
       p99: percentile(ratios, 0.99),
       max: ratios.at(-1),
-      collapseP99: percentile(inverseRatios, 0.99)
+      collapseP99: percentile(inverseRatios, 0.99),
+      centerShift: Math.max(...pose.center.map(
+        (value, axis) => Math.abs(value - referenceSilhouette.center[axis])
+      )),
+      spanMultiple: Math.max(...pose.span.map(
+        (value, axis) => value / Math.max(1e-6, referenceSilhouette.span[axis])
+      )),
+      saturationRate: pose.saturationRate,
+      degenerateIncrease: degenerate / Math.max(1, indices.length / 3) - referenceDegenerateRatio
     };
   };
 
+  const actionBySource = new Map(Object.entries(metadata.animationActions ?? {}).map(
+    ([action, source]) => [source, action]
+  ));
   const sampleFrames = [];
   for (const [key, clip] of Object.entries(animationClips)) {
-    sampleFrames.push([`${key}:first`, clip.startFrame]);
-    sampleFrames.push([
-      `${key}:middle`,
-      clip.startFrame + Math.floor((clip.frameCount - 1) / 2)
-    ]);
-    sampleFrames.push([`${key}:last`, clip.startFrame + clip.frameCount - 1]);
+    const action = actionBySource.get(key) ?? null;
+    const offsets = action
+      ? Array.from({ length: clip.frameCount }, (_value, index) => index)
+      : [0, Math.floor((clip.frameCount - 1) / 2), clip.frameCount - 1];
+    for (const offset of new Set(offsets)) {
+      sampleFrames.push([`${key}:${offset}`, clip.startFrame + offset, action]);
+    }
   }
-  const reports = sampleFrames.map(([label, frame]) => evaluate(label, frame));
+  const reports = sampleFrames.map(([label, frame, action]) => evaluate(label, frame, action));
   if (!quiet) {
     console.table(reports.map((report) => ({
       pose: report.label,
       p01: report.p01.toFixed(3),
       p99: report.p99.toFixed(3),
       max: report.max.toFixed(2),
-      collapseP99: report.collapseP99.toFixed(3)
+      collapseP99: report.collapseP99.toFixed(3),
+      centerShift: report.centerShift.toFixed(2),
+      spanMultiple: report.spanMultiple.toFixed(2),
+      saturation: `${(report.saturationRate * 100).toFixed(2)}%`,
+      degenerateIncrease: `${(report.degenerateIncrease * 100).toFixed(2)}%`
     })));
   }
 
@@ -110,16 +185,19 @@ if (metadata.runtime === "vat-v1") {
       coverage: animation.coverage.toFixed(3)
     })));
   }
-  const actionSources = new Set(Object.values(metadata.animationActions ?? {}));
-  const geometryFailures = reports.filter((report) => metadata.completeClipCatalog
-    // Supplemental Model Viewer clips can intentionally scale or partially animate
-    // prop bones. Gameplay action clips retain the strict expansion gate.
-    ? actionSources.has(report.label.split(":")[0]) && report.p99 > 6
-    : report.p99 > 3 || report.collapseP99 > 3
+  const centerLimit = metadata.poseQuality?.centerLimit ??
+    Math.max(1, referenceSilhouette.span[1]);
+  const geometryFailures = reports.filter((report) => report.action
+    ? report.centerShift > centerLimit || report.spanMultiple > 4 ||
+      report.saturationRate >= 0.05 ||
+      (!["idle", "run"].includes(report.action) && (
+        report.p99 > 6 || report.collapseP99 > 3 || report.degenerateIncrease > 0.01
+      ))
+    : !metadata.completeClipCatalog && (report.p99 > 3 || report.collapseP99 > 3)
   );
   const coverageFailures = animationDiagnostics.filter((animation) =>
     animation.coverage < 0.9 &&
-    (!metadata.completeClipCatalog || actionSources.has(animation.actualName))
+    (!metadata.completeClipCatalog || actionBySource.has(animation.actualName))
   );
   if (geometryFailures.length || coverageFailures.length) {
     if (geometryFailures.length) {

@@ -146,8 +146,8 @@
 
       update(match) {
         this.matchTarget = match.matchTarget || 3;
-        const blue = match.players[0];
-        const red = match.players[1];
+        const blue = match.players?.find((player) => player.id === 1) || match.players?.[0];
+        const red = match.players?.find((player) => player.id === 2) || match.players?.[1];
         const localPlayerId = match.localPlayerId === 2 ? 2 : 1;
         const p1 = localPlayerId === 2 ? red : blue;
         const p2 = localPlayerId === 2 ? blue : red;

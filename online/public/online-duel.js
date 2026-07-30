@@ -30,6 +30,15 @@
   const CLIENT_BRIDGE_VERSION = 1;
   const CLIENT_SOURCE = "riftbomb-client";
   const RUNTIME_SOURCE = "riftbomb-runtime";
+  const SESSION_KEY = "riftbomb-online-session-v1";
+  const SESSION_MAX_AGE_MS = 25 * 60_000;
+  const authoritativeAudio = globalThis.RIFTBOMB_AUTHORITATIVE_AUDIO;
+  const browserGameplaySfx = game.sfx;
+  const authoritativePredictionSink = Object.freeze({
+    emitGameEvent() { return false; },
+    effect() {},
+    explosion() {}
+  });
   const SNAPSHOT_ARRAYS = [
     "bombs", "blasts", "ultimates", "pickups", "daggers", "projectiles",
     "skillTrails", "slashes", "zedShadows", "zedMarks", "vladimirMarks",
@@ -52,6 +61,8 @@
     hostToken: "",
     socket: null,
     connected: false,
+    matchmaking: false,
+    quickMatch: false,
     rivalConnected: false,
     guestReady: false,
     inviteMode: false,
@@ -59,6 +70,8 @@
     startInitiated: false,
     inviteAssetsReady: null,
     receivedSequence: 0,
+    lastPlayedSoundEventId: 0,
+    droppedSoundEventCount: 0,
     localInput: { up: false, down: false, left: false, right: false },
     remoteHostTarget: null,
     localPlayerTarget: null,
@@ -88,7 +101,7 @@
     <div class="online-panel__actions">
       <button type="button" class="online-action online-action--primary" id="online-create">
         <span class="online-action__index">01</span>
-        <span><strong>QUICK LOBBY</strong><small>Current champion + arena · first to 3</small></span>
+        <span><strong>QUICK MATCH</strong><small>Automatic opponent · current champion + arena · first to 3</small></span>
         <b aria-hidden="true">→</b>
       </button>
       <button type="button" class="online-action" id="online-show-invite" aria-expanded="false" aria-controls="online-invite-preset">
@@ -232,6 +245,8 @@
         showInviteButton.disabled ||
         showJoinButton.disabled
       ),
+      matchmaking: state.matchmaking,
+      quickMatch: state.quickMatch,
       hostChampion: state.hostChampion,
       guestChampion: state.guestChampion,
       arena: state.arena,
@@ -250,6 +265,118 @@
       reason,
       state: clientStateSnapshot()
     }, window.location.origin);
+    saveSession();
+  }
+
+  function clearSession() {
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+  }
+
+  function saveSession() {
+    try {
+      if (state.role === "offline" || !state.roomCode) {
+        clearSession();
+        return;
+      }
+      // Persist even while briefly disconnected so F5 can reattach.
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        role: state.role,
+        roomCode: state.roomCode,
+        hostChampion: state.hostChampion,
+        guestChampion: state.guestChampion,
+        arena: state.arena,
+        inviteMode: state.inviteMode,
+        quickMatch: state.quickMatch,
+        guestReady: state.guestReady,
+        matchTarget: state.matchTarget,
+        phase: clientPhase(),
+        savedAt: Date.now()
+      }));
+    } catch {}
+  }
+
+  function readSession() {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data?.roomCode || !data?.role) return null;
+      if (Date.now() - Number(data.savedAt || 0) > SESSION_MAX_AGE_MS) {
+        clearSession();
+        return null;
+      }
+      if (!/^[A-HJ-NP-Z2-9]{6}$/.test(String(data.roomCode))) return null;
+      if (data.role !== "host" && data.role !== "guest") return null;
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  function returnToIntroUi() {
+    try {
+      game.mode = "intro";
+      game.p2Human = false;
+      game.matchTarget = 3;
+      game.presentation.matchTarget = 3;
+      game.resetPlayers?.();
+      if (UI.end) UI.end.hidden = true;
+      if (UI.intro) UI.intro.classList.remove("is-gone");
+      if (UI.chrome) {
+        UI.chrome.classList.add("is-hidden");
+        UI.chrome.setAttribute("aria-hidden", "true");
+        UI.chrome.setAttribute("inert", "");
+      }
+      UI.start.disabled = false;
+      UI.start.textContent = `>>> DEPLOY ${game.player?.name?.toUpperCase?.() || "KATARINA"}`;
+    } catch (error) {
+      console.warn("Could not fully reset intro UI", error);
+    }
+  }
+
+  function leaveOnlineSession({ fromMatch = false } = {}) {
+    const wasPlaying = game.mode === "playing" || game.mode === "matchover";
+    try { state.socket?.close(); } catch {}
+    resetConnection();
+    setOnlineRole("offline");
+    setBusy(false);
+    clearSession();
+    closeSetupPanels();
+    connection.hidden = true;
+    connection.textContent = "";
+    game.selectedChampion2 = "zed";
+    game.matchTarget = 3;
+    game.presentation.matchTarget = 3;
+    game.p2Human = false;
+    if (wasPlaying || fromMatch) returnToIntroUi();
+    else if (game.mode === "intro") game.resetPlayers?.();
+    UI.start.disabled = false;
+    UI.start.textContent = `>>> DEPLOY ${game.player?.name?.toUpperCase?.() || "KATARINA"}`;
+    setStatus(
+      fromMatch
+        ? "You left the match. Create or join a lobby to play again."
+        : "Left the online lobby.",
+      "ok"
+    );
+    publishClientState(fromMatch ? "left-match" : "left-lobby");
+  }
+
+  function cancelQuickMatch() {
+    const socket = state.socket;
+    state.socket = null;
+    state.matchmaking = false;
+    state.quickMatch = false;
+    try {
+      if (socket?.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "cancel-quick-match" }));
+      }
+      socket?.close();
+    } catch {}
+    setOnlineRole("offline");
+    setBusy(false);
+    setStatus("Quick Match cancelado.", "ok");
+    connection.hidden = true;
+    publishClientState("quick-cancelled");
   }
 
   function setStatus(message, tone = "") {
@@ -331,6 +458,7 @@
 
   function setOnlineRole(role) {
     state.role = role;
+    game.sfx = role === "offline" ? browserGameplaySfx : authoritativePredictionSink;
     panel.dataset.mode = role;
     document.body.classList.toggle("is-online-match", role !== "offline");
     lobbyBox.hidden = role === "offline";
@@ -342,7 +470,11 @@
       ? "Choose your champion, then confirm READY."
       : "Admin chooses their champion and the arena.";
     game.localPlayerId = role === "guest" ? 2 : 1;
-    globalThis.configurePlayerView?.(game.localPlayerId, { shared: role === "offline" });
+    if (role === "offline") {
+      globalThis.configurePlayerView?.(1, { shared: true, localMultiplayer: Boolean(game.p2Human) });
+    } else {
+      bindLocalOnlineView();
+    }
     publishClientState("role");
   }
 
@@ -358,9 +490,11 @@
 
   async function beginConfiguredGame() {
     applyMatchConfig();
+    // Mark both seats human before beginGame so shared local-P2 paths stay off.
+    game.p2Human = true;
     await originalBeginGame();
     game.p2Human = true;
-    globalThis.configurePlayerView?.(state.role === "guest" ? 2 : 1);
+    bindLocalOnlineView();
   }
 
   async function signaling(method, data, query = "") {
@@ -379,33 +513,64 @@
     return body;
   }
 
-  function connectAuthoritative(role) {
+  function connectAuthoritative(role, { quickMatch = false } = {}) {
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(AUTHORITATIVE_SERVER_URL);
       state.socket = socket;
       let settled = false;
       const timeout = setTimeout(() => {
+        if (state.socket !== socket) return;
         if (!settled) reject(new Error("authoritative_server_timeout"));
         socket.close();
       }, 12_000);
       socket.addEventListener("open", () => {
-        socket.send(JSON.stringify({
-          type: "hello",
-          room: state.roomCode,
-          role,
-          ready: role === "guest" && state.guestReady,
-          preset: lobbyPayload()
-        }));
+        if (state.socket !== socket) return;
+        socket.send(JSON.stringify(quickMatch
+          ? { type: "quick-match", preset: lobbyPayload() }
+          : {
+              type: "hello",
+              room: state.roomCode,
+              role,
+              ready: role === "guest" && state.guestReady,
+              preset: lobbyPayload()
+            }));
       });
       socket.addEventListener("message", (event) => {
+        if (state.socket !== socket) return;
         let message;
         try { message = JSON.parse(event.data); } catch { return; }
         if (message.type === "error") {
           if (!settled) reject(new Error(message.error));
           return;
         }
-        if (message.type === "connected") {
+        if (message.type === "quick-queued") {
+          clearTimeout(timeout);
           settled = true;
+          state.matchmaking = true;
+          state.quickMatch = true;
+          setBusy(true);
+          setStatus("Buscando outro jogador no Quick Match…", "ok");
+          updateConnection("waiting", "QUICK MATCH · BUSCANDO OPONENTE");
+          publishClientState("quick-queued");
+          resolve();
+          return;
+        }
+        if (message.type === "connected") {
+          if (message.quickMatch) {
+            state.matchmaking = false;
+            state.quickMatch = true;
+            state.roomCode = message.room;
+            state.guestReady = true;
+            state.rivalConnected = true;
+            setOnlineRole(message.role);
+          }
+          settled = true;
+          if (Number.isSafeInteger(message.soundCursor) && message.soundCursor >= 0) {
+            state.lastPlayedSoundEventId = Math.max(
+              state.lastPlayedSoundEventId,
+              message.soundCursor
+            );
+          }
           clearTimeout(timeout);
           void onConnected();
           resolve();
@@ -433,10 +598,12 @@
       });
       socket.addEventListener("close", () => {
         clearTimeout(timeout);
+        if (state.socket !== socket) return;
         if (!settled) reject(new Error("authoritative_server_unavailable"));
         else handleDisconnect();
       });
       socket.addEventListener("error", () => {
+        if (state.socket !== socket) return;
         if (!settled) reject(new Error("authoritative_server_unavailable"));
       });
     });
@@ -446,6 +613,15 @@
     const transportOpen = state.socket?.readyState === WebSocket.OPEN;
     if (state.connected || !transportOpen) return;
     state.connected = true;
+    if (state.quickMatch) {
+      state.rivalConnected = true;
+      state.guestReady = true;
+      setBusy(false);
+      setStatus("Oponente encontrado. Preparando a partida…", "ok");
+      updateConnection("connected", `QUICK MATCH · ${state.roomCode} · OPONENTE ENCONTRADO`);
+      updateLobbyDisplay();
+      return;
+    }
     if (state.role === "guest") state.rivalConnected = true;
     setBusy(false);
     if (state.role === "host") {
@@ -569,6 +745,8 @@
       await beginConfiguredGame();
     }
     game.p2Human = true;
+    // Always re-bind seat/camera after start — beginGame may reset presentation to P1.
+    bindLocalOnlineView();
     UI.start.disabled = true;
     UI.start.textContent = "ONLINE MATCH IN PROGRESS";
     const side = state.role === "host"
@@ -588,10 +766,10 @@
     state.receivedSequence = Number(data.s) || state.receivedSequence + 1;
     const previousRound = state.guestRound;
     const previousMode = state.guestMode;
-    const localIndex = state.role === "guest" ? 1 : 0;
-    const remoteIndex = localIndex === 0 ? 1 : 0;
-    const previousLocal = game.players?.[localIndex];
-    const previousRemote = game.players?.[remoteIndex];
+    const localPlayerId = localOnlinePlayerId();
+    const remotePlayerId = localPlayerId === 1 ? 2 : 1;
+    const previousLocal = game.players?.find((player) => player.id === localPlayerId);
+    const previousRemote = game.players?.find((player) => player.id === remotePlayerId);
     for (const key of SNAPSHOT_SCALARS) {
       if (Object.prototype.hasOwnProperty.call(data, key)) game[key] = data[key];
     }
@@ -614,9 +792,11 @@
       });
       return true;
     });
-    game.players = data.players;
-    if (previousLocal && game.players[localIndex] && data.round === previousRound) {
-      const authoritativeLocal = game.players[localIndex];
+    // Prefer id-stable seats even if the array order ever changes.
+    game.players = [...data.players].sort((a, b) => (a?.id || 0) - (b?.id || 0));
+    const authoritativeLocal = game.players.find((player) => player.id === localPlayerId);
+    const authoritativeRemote = game.players.find((player) => player.id === remotePlayerId);
+    if (previousLocal && authoritativeLocal && data.round === previousRound) {
       const distance = Math.hypot(
         authoritativeLocal.x - previousLocal.x,
         authoritativeLocal.z - previousLocal.z
@@ -633,9 +813,11 @@
         state.localPlayerTarget = null;
       }
     }
-    if (previousRemote && game.players[remoteIndex] && data.round === previousRound) {
-      const authoritativeRemote = game.players[remoteIndex];
-      const distance = Math.hypot(authoritativeRemote.x - previousRemote.x, authoritativeRemote.z - previousRemote.z);
+    if (previousRemote && authoritativeRemote && data.round === previousRound) {
+      const distance = Math.hypot(
+        authoritativeRemote.x - previousRemote.x,
+        authoritativeRemote.z - previousRemote.z
+      );
       state.remoteHostTarget = {
         playerId: authoritativeRemote.id,
         x: authoritativeRemote.x, z: authoritativeRemote.z,
@@ -649,11 +831,42 @@
         state.remoteHostTarget = null;
       }
     }
-    game.player = game.players[0];
+    // Keep local seat identity after every snapshot — never pin to blue/P1 by default.
+    game.localPlayerId = localPlayerId;
+    game.player = authoritativeLocal || game.players[0];
+    game.p2Human = true;
+    if (data.sound?.v === 1 && authoritativeAudio?.consume) {
+      const result = authoritativeAudio.consume({
+        events: data.sound.events,
+        cursor: state.lastPlayedSoundEventId,
+        play(event) {
+          const x = event.x ?? 0;
+          const z = event.z ?? 0;
+          const options = {
+            sourceId: `remote:${event.id}`,
+            pan: game.audioPanAt(x, z)
+          };
+          if (Number.isInteger(event.chainDepth)) options.chainDepth = event.chainDepth;
+          browserGameplaySfx.effect(event.cue, event.strength, options);
+        }
+      });
+      state.lastPlayedSoundEventId = result.cursor;
+      if (result.gap) {
+        state.droppedSoundEventCount += result.gap.count;
+        console.warn("Authoritative audio gap", {
+          ...result.gap,
+          snapshotSequence: data.s,
+          droppedTotal: state.droppedSoundEventCount
+        });
+      }
+    }
     if (Array.isArray(data.grid)) game.grid = data.grid;
     game.particles = Array.isArray(data.particles) ? data.particles : [];
     game.pendingMatchWinner = game.players.find((player) => player.id === data.pendingWinnerId) || null;
-    if (game.round !== previousRound && game.mode === "playing") game.presentation.prepareRound();
+    if (game.round !== previousRound && game.mode === "playing") {
+      game.presentation.prepareRound();
+      bindLocalOnlineView();
+    }
     game.presentation.update(game);
     if (game.mode === "matchover" && previousMode !== "matchover") {
       const winner = game.players[game.roundWins[1] > game.roundWins[0] ? 1 : 0];
@@ -664,13 +877,14 @@
   }
 
   function predictLocalMovement(dt) {
-    const player = game.players[state.role === "guest" ? 1 : 0];
+    const player = localOnlinePlayer();
     if (!player?.alive || game.mode !== "playing" || game.roundLocked) return;
     const input = state.role === "guest" ? state.localInput : hostLocalInput();
     let dx = Number(input.right) - Number(input.left);
     let dz = Number(input.down) - Number(input.up);
     const length = Math.hypot(dx, dz);
     if (length > 0) {
+      if (player.ultChannel > 0) game.cancelKatarinaChannel?.(player, "movement");
       dx /= length; dz /= length;
       player.lastDx = dx; player.lastDz = dz; player.moving = true;
       game.moveEntity(player, dx, dz, player.speed, dt, 0.3);
@@ -802,6 +1016,28 @@
     setArenaButtons(state.arena);
   }
 
+  async function startQuickMatch(options = {}) {
+    resetConnection();
+    state.hostChampion = validChampion(options.champion) ? options.champion : "katarina";
+    state.guestChampion = "zed";
+    state.arena = validArena(options.arena) ? options.arena : ARENAS[0];
+    state.matchTarget = 3;
+    state.matchmaking = true;
+    state.quickMatch = true;
+    game.selectChampion(state.hostChampion);
+    game.selectArena(state.arena);
+    setChampionButtons(state.hostChampion);
+    setArenaButtons(state.arena);
+    setBusy(true);
+    setStatus("Entrando na fila do Quick Match…", "ok");
+    updateConnection("waiting", "QUICK MATCH · CONECTANDO À FILA");
+    try {
+      await connectAuthoritative("", { quickMatch: true });
+    } catch (error) {
+      if (state.matchmaking) failConnection(error);
+    }
+  }
+
   async function createRoom(options = {}) {
     resetConnection();
     if (options.inviteMode) applyInvitePreset(options);
@@ -888,8 +1124,11 @@
     Object.assign(state, {
       socket: null,
       connected: false, rivalConnected: false, guestReady: false, hostToken: "", roomCode: "",
+      matchmaking: false, quickMatch: false,
       inviteMode: false, inviteUrl: "", startInitiated: false, inviteAssetsReady: null, matchTarget: 3,
       receivedSequence: 0,
+      lastPlayedSoundEventId: 0,
+      droppedSoundEventCount: 0,
       localInput: { up: false, down: false, left: false, right: false },
       remoteHostTarget: null, localPlayerTarget: null,
       pendingGuestBombs: [], lastSentInput: -1
@@ -897,19 +1136,96 @@
   }
 
   function chooseOffline() {
+    try { state.socket?.close(); } catch {}
     resetConnection();
     setOnlineRole("offline");
     setBusy(false);
+    clearSession();
     closeSetupPanels();
     connection.hidden = true;
     connection.textContent = "";
     game.selectedChampion2 = "zed";
     game.matchTarget = 3;
     game.presentation.matchTarget = 3;
-    if (game.mode === "intro") game.resetPlayers();
+    game.p2Human = false;
+    if (game.mode === "playing" || game.mode === "matchover") returnToIntroUi();
+    else if (game.mode === "intro") game.resetPlayers();
     UI.start.disabled = false;
     UI.start.textContent = `>>> DEPLOY ${game.player.name.toUpperCase()}`;
     setStatus("Solo/local selected. Online lobby controls are disabled.", "ok");
+    publishClientState("offline");
+  }
+
+  async function tryResumeSession() {
+    const saved = readSession();
+    if (!saved || state.role !== "offline") return false;
+    setStatus(`Reconnecting to lobby ${saved.roomCode}…`, "ok");
+    try {
+      if (saved.role === "host") {
+        resetConnection();
+        setOnlineRole("host");
+        state.roomCode = saved.roomCode;
+        state.hostChampion = validChampion(saved.hostChampion) ? saved.hostChampion : "katarina";
+        state.guestChampion = validChampion(saved.guestChampion) ? saved.guestChampion : "zed";
+        state.arena = validArena(saved.arena) ? saved.arena : ARENAS[0];
+        state.inviteMode = Boolean(saved.inviteMode);
+        state.quickMatch = Boolean(saved.quickMatch);
+        state.matchTarget = saved.matchTarget === INVITE_MATCH_TARGET ? INVITE_MATCH_TARGET : 3;
+        game.selectedChampion = state.hostChampion;
+        game.selectedChampion2 = state.guestChampion;
+        game.matchTarget = state.matchTarget;
+        if (game.mode === "intro") {
+          game.selectArena(state.arena);
+          game.resetPlayers();
+        }
+        setChampionButtons(state.hostChampion);
+        setArenaButtons(state.arena);
+        roomLabel.textContent = state.inviteMode ? "CHALLENGE LINK · RESUME" : "LOBBY CODE · RESUME";
+        roomCode.textContent = state.roomCode;
+        setBusy(true);
+        updateLobbyDisplay();
+        await connectAuthoritative("host");
+        roomCode.textContent = state.roomCode;
+        if (state.inviteMode) state.inviteUrl = challengeUrl(state.roomCode);
+        setStatus(`Reconnected as host to lobby ${state.roomCode}.`, "ok");
+        updateConnection("connected", `ONLINE · LOBBY ${state.roomCode} · RECONNECTED`);
+        updateLobbyDisplay();
+        saveSession();
+        return true;
+      }
+      if (saved.quickMatch) {
+        resetConnection();
+        setOnlineRole("guest");
+        state.roomCode = saved.roomCode;
+        state.hostChampion = validChampion(saved.hostChampion) ? saved.hostChampion : "katarina";
+        state.guestChampion = validChampion(saved.guestChampion) ? saved.guestChampion : "zed";
+        state.arena = validArena(saved.arena) ? saved.arena : ARENAS[0];
+        state.matchTarget = 3;
+        state.quickMatch = true;
+        state.guestReady = true;
+        setBusy(true);
+        await connectAuthoritative("guest");
+        saveSession();
+        return true;
+      }
+      await joinRoom(saved.roomCode, {
+        guestChampion: validChampion(saved.guestChampion) ? saved.guestChampion : "zed",
+        inviteMode: Boolean(saved.inviteMode)
+      });
+      if (saved.guestReady && !state.inviteMode) {
+        state.guestReady = true;
+        sendGuestConfig();
+      }
+      saveSession();
+      return true;
+    } catch (error) {
+      console.warn("Session resume failed", error);
+      clearSession();
+      setBusy(false);
+      setOnlineRole("offline");
+      setStatus("Could not resume the previous lobby. Create or join again.", "error");
+      return false;
+    }
   }
 
   function inputMask() {
@@ -932,18 +1248,42 @@
 
   const offlinePlaceBomb = game.placeBomb.bind(game);
   const offlineCastAbility = game.castAbility.bind(game);
+  const offlineRequestDash = game.requestDash?.bind(game);
 
-  game.placeBomb = (player = game.player) => {
+  /** Local seat for this browser: host=1 (blue), guest=2 (red). Never trust game.player alone. */
+  function localOnlinePlayerId() {
+    return state.role === "guest" ? 2 : 1;
+  }
+
+  function localOnlinePlayer() {
+    const id = localOnlinePlayerId();
+    return game.players?.find((player) => player.id === id)
+      || game.players?.[id - 1]
+      || null;
+  }
+
+  function bindLocalOnlineView() {
+    if (state.role === "offline") return;
+    const id = localOnlinePlayerId();
+    game.localPlayerId = id;
+    game.player = localOnlinePlayer() || game.players?.[0] || game.player;
+    globalThis.configurePlayerView?.(id, { shared: false, localMultiplayer: false });
+  }
+
+  game.placeBomb = (player) => {
     if (state.role === "offline" || !state.connected || !state.socket) {
-      return offlinePlaceBomb(player);
+      return offlinePlaceBomb(player || game.player);
     }
-    const localPlayerId = state.role === "guest" ? 2 : 1;
-    if (player?.id !== localPlayerId) return false;
+    const local = localOnlinePlayer();
+    const actor = player?.id === local?.id ? player : local;
+    if (!actor) return false;
+    // Always tell the server; optimistic predict may fail client-side.
+    sendControl({ type: "action", kind: "bomb" });
     const bombIds = new Set(game.bombs.map((bomb) => bomb.id));
-    const placed = offlinePlaceBomb(player);
+    const placed = offlinePlaceBomb(actor);
     if (!placed) return false;
     const predictedBomb = game.bombs.find((bomb) =>
-      bomb.ownerId === localPlayerId && !bombIds.has(bomb.id)
+      bomb.ownerId === actor.id && !bombIds.has(bomb.id)
     );
     if (predictedBomb) {
       state.pendingGuestBombs.push({
@@ -951,27 +1291,43 @@
         bomb: { ...predictedBomb, passOwners: [...(predictedBomb.passOwners || [])] }
       });
     }
-    sendControl({ type: "action", kind: "bomb" });
     return true;
   };
 
-  game.castAbility = (slot, player = game.player) => {
+  game.castAbility = (slot, player) => {
     if (state.role === "offline" || !state.connected || !state.socket) {
-      return offlineCastAbility(slot, player);
+      return offlineCastAbility(slot, player || game.player);
     }
-    const localPlayerId = state.role === "guest" ? 2 : 1;
-    if (player?.id !== localPlayerId || !Number.isInteger(slot)) return false;
-    const cast = offlineCastAbility(slot, player);
-    if (cast !== false) sendControl({ type: "action", kind: "ability", slot });
-    return cast;
+    if (!Number.isInteger(slot)) return false;
+    const local = localOnlinePlayer();
+    const actor = player?.id === local?.id ? player : local;
+    if (!actor) return false;
+    sendControl({ type: "action", kind: "ability", slot });
+    // The server owns postponed-spell buffering. Keep immediate local
+    // prediction for legal casts, but never leave a client-only buffered cast
+    // that could survive a snapshot or execute twice.
+    return offlineCastAbility(slot, actor, { buffer: false });
   };
 
+  if (typeof offlineRequestDash === "function") {
+    game.requestDash = (player) => {
+      if (state.role === "offline" || !state.connected || !state.socket) {
+        return offlineRequestDash(player || game.player);
+      }
+      const local = localOnlinePlayer();
+      const actor = player?.id === local?.id ? player : local;
+      if (!actor) return false;
+      // Dash is ability slot 1 for several kits; keep local predict only.
+      return offlineRequestDash(actor);
+    };
+  }
+
   function guestAction(kind, slot = null) {
-    if (state.role === "guest" && state.connected && game.mode === "playing") {
-      const guest = game.players[1];
-      if (kind === "bomb") game.placeBomb(guest);
-      if (kind === "ability" && Number.isInteger(slot)) game.castAbility(slot, guest);
-    }
+    if (state.role !== "guest" || !state.connected || game.mode !== "playing") return;
+    const guest = localOnlinePlayer();
+    if (!guest) return;
+    if (kind === "bomb") game.placeBomb(guest);
+    if (kind === "ability" && Number.isInteger(slot)) game.castAbility(slot, guest);
   }
 
   const keyDirections = {
@@ -1149,7 +1505,7 @@
 
   createButton.addEventListener("click", () => {
     closeSetupPanels();
-    createRoom();
+    startQuickMatch({ champion: game.selectedChampion, arena: game.selectedArena });
   });
   showInviteButton.addEventListener("click", () => {
     const opening = invitePresetForm.hidden;
@@ -1313,6 +1669,14 @@
       await createRoom();
       return;
     }
+    if (action === "quick-match") {
+      await startQuickMatch({ champion: payload.champion, arena: payload.arena });
+      return;
+    }
+    if (action === "cancel-quick-match") {
+      cancelQuickMatch();
+      return;
+    }
     if (action === "create-challenge") {
       await createRoom({
         inviteMode: true,
@@ -1344,7 +1708,15 @@
       return;
     }
     if (action === "leave-lobby") {
-      chooseOffline();
+      leaveOnlineSession({ fromMatch: false });
+      return;
+    }
+    if (action === "leave-match") {
+      leaveOnlineSession({ fromMatch: true });
+      return;
+    }
+    if (action === "resume-session") {
+      await tryResumeSession();
     }
   }
 
@@ -1400,4 +1772,11 @@
     void renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
   });
   publishClientState("ready");
+  // F5 / reload: try to reattach to the last live lobby on this browser tab.
+  setTimeout(() => {
+    if (parentRoom) return;
+    void tryResumeSession().catch((error) => {
+      console.warn("Auto resume failed", error);
+    });
+  }, 120);
 })();

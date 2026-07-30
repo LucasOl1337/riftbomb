@@ -48,6 +48,31 @@ test("the readable combat layer preserves the canonical 100 HP rules", async () 
   assert.match(presentation, /combat-hp-readout/);
 });
 
+test("abilities share a bounded simulation-time buffer and interrupt Death Lotus", async () => {
+  const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
+  const online = await readFile(path.join(repositoryRoot, "online", "public", "online-duel.js"), "utf8");
+  const contract = await readFile(path.join(gameDirectory, "combat-system.md"), "utf8");
+
+  assert.match(rules, /const ABILITY_BUFFER_SECONDS = 0\.15/);
+  assert.match(rules, /const ABILITY_TIME_EPSILON = 0\.000001/);
+  assert.match(rules, /this\.abilityBuffer = new Map\(\)/);
+  assert.match(rules, /playerId: player\.id/);
+  assert.match(rules, /remaining: ABILITY_BUFFER_SECONDS/);
+  assert.match(rules, /processAbilityBuffer\(dt\)/);
+  assert.match(rules, /this\.updateGangplank\(dt\);\s*this\.processAbilityBuffer\(dt\);/);
+  assert.match(rules, /if \(this\.executeAbility\(command\.slot, player\)\)/);
+  assert.match(rules, /this\.cancelKatarinaChannel\(player, "movement"\)/);
+  assert.match(rules, /slash\.ownerId !== player\.id/);
+  assert.match(rules, /initialBlockers\.includes\("stun"\)/);
+  assert.match(rules, /abilityTargetAvailable\(player, slot\)/);
+  assert.match(rules, /this\.gangplankKegPlacement\(player\)/);
+  assert.match(online, /offlineCastAbility\(slot, actor, \{ buffer: false \}\)/);
+  assert.match(online, /player\.ultChannel > 0\) game\.cancelKatarinaChannel\?\.\(player, "movement"\)/);
+  assert.match(contract, /final \*\*150 ms\*\*/);
+  assert.match(contract, /cannot acquire a target, free landing or deployable capacity later/);
+  assert.match(contract, /Arena bombs remain immediate and outside the/);
+});
+
 test("the built game is one offline HTML artifact", async () => {
   const sourceDocument = await readFile(sourcePath, "utf8");
   const document = await readFile(releasePath, "utf8");
@@ -277,10 +302,23 @@ test("playable model bytes stay out of the renderer implementation", async () =>
   assert.ok(renderer.length < 1_000_000, "renderer should not carry packaged model bytes");
 });
 
-test("the full roster maps Model Viewer clips to CPU-streamed animation meshes", async () => {
+test("the full roster samples tiled VAT on the GPU with a bounded CPU fallback", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const startup = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
   const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
   const expectedClipCounts = { katarina: 25, zed: 40, renekton: 19, vladimir: 26, gangplank: 32 };
+  const layoutStart = renderer.indexOf("function planVatTextureLayout");
+  const layoutEnd = renderer.indexOf("    const modelReviewTarget", layoutStart);
+  assert.ok(layoutStart >= 0 && layoutEnd > layoutStart);
+  const layoutContext = vm.createContext({
+    clamp: (value, min, max) => Math.max(min, Math.min(max, value))
+  });
+  vm.runInContext(
+    `${renderer.slice(layoutStart, layoutEnd)};
+     globalThis.planVatTextureLayout = planVatTextureLayout;
+     globalThis.sampleVatAnimationClip = sampleVatAnimationClip;`,
+    layoutContext
+  );
   for (const [champion, expectedClipCount] of Object.entries(expectedClipCounts)) {
     const metadata = JSON.parse(await readFile(
       path.join(repositoryRoot, "champions", champion, "playable-model",
@@ -294,15 +332,253 @@ test("the full roster maps Model Viewer clips to CPU-streamed animation meshes",
     for (const actionSource of Object.values(metadata.animationActions)) {
       assert.ok(metadata.animationClips[actionSource], `${champion} action clip ${actionSource} exists`);
     }
+    for (const maxTextureSize of [2048, 16384]) {
+      const layout = layoutContext.planVatTextureLayout(
+        metadata.vertexCount,
+        metadata.frameCount,
+        maxTextureSize
+      );
+      assert.ok(layout.width <= maxTextureSize);
+      assert.ok(layout.height <= maxTextureSize);
+      assert.equal(layout.texelCount, metadata.vertexCount * metadata.frameCount);
+      assert.ok(
+        (layout.paddedTexelCount - layout.texelCount) / layout.texelCount <= 0.006,
+        `${champion} VAT padding stays below 0.6% at ${maxTextureSize}`
+      );
+      for (const frame of [0, Math.floor(metadata.frameCount / 2), metadata.frameCount - 1]) {
+        for (const vertex of [0, Math.floor(metadata.vertexCount / 2), metadata.vertexCount - 1]) {
+          const linear = frame * metadata.vertexCount + vertex;
+          const x = linear % layout.width;
+          const y = Math.floor(linear / layout.width);
+          assert.ok(x >= 0 && x < layout.width);
+          assert.ok(y >= 0 && y < layout.height);
+          assert.equal(y * layout.width + x, linear);
+        }
+      }
+    }
   }
-  assert.match(renderer, /createCpuAnimatedChampionModel/);
-  assert.match(renderer, /updateCpuAnimatedChampion/);
-  assert.match(renderer, /drawCpuAnimatedChampion/);
-  assert.match(renderer, /resolveChampionAnimation/);
+  assert.match(renderer, /return this\.createVatChampionModel\(/);
+  assert.match(renderer, /GPU VAT unavailable for \$\{champion\}; using CPU fallback/);
+  for (const champion of Object.keys(expectedClipCounts)) {
+    assert.match(
+      renderer,
+      new RegExp(`this\\.drawVatChampion\\(player, t, beat, "${champion}"`),
+      `${champion} must reach the VAT shader path`
+    );
+  }
+  const gpuHotPath = renderer.slice(
+    renderer.indexOf("      drawVatChampion(player"),
+    renderer.indexOf("      drawPackedChampion(player")
+  );
+  assert.doesNotMatch(gpuHotPath, /bufferSubData|dynamicVertices|for \(let vertex/);
+  assert.match(renderer, /int linear = frame \* uVertexCount \+ gl_VertexID/);
+  assert.match(renderer, /textureSize\(uPositionFrames, 0\)\.x/);
+  assert.match(renderer, /if \(!frame \|\| frame\.hidden\) return false/);
+  assert.match(renderer, /const invulnerable = options\.invulnerable \?\? \(player\.invulnerable > 0\)/);
+  assert.match(renderer, /if \(options\.grounding !== false\) \{/);
+  assert.match(renderer, /gl\.depthMask\(!options\.shadow\)/);
+  assert.doesNotMatch(gpuHotPath, /depthMask\(!options\.shadow && !options\.pool\)/);
+  assert.match(renderer, /frame\.key === "poolDown" \|\| frame\.key === "poolUp" \? 0/);
   assert.match(renderer, /Model Viewer glTF UVs are already in atlas orientation/);
+  assert.match(renderer, /gl\.pixelStorei\(gl\.UNPACK_FLIP_Y_WEBGL, false\)/);
+  assert.match(renderer, /assertVatOperation\("position texture upload"\)/);
+  assert.match(renderer, /assertVatOperation\("normal texture upload"\)/);
+  assert.match(renderer, /gl\.getError\(\)/);
+  assert.match(renderer, /using its fallback material/);
+  assert.match(renderer, /resolveChampionAnimation/);
   assert.match(renderer, /resolveVladimirAnimation/);
   assert.match(rules, /vladimirAttackAnim/);
   assert.match(rules, /vladimirQAnim/);
+  const validAnimation = {
+    frameCount: 20,
+    clips: {
+      loop: { startFrame: 10, frameCount: 4, loop: true },
+      once: { startFrame: 10, frameCount: 4, loop: false },
+      single: { startFrame: 4, frameCount: 1, loop: false }
+    }
+  };
+  assert.deepEqual(
+    { ...layoutContext.sampleVatAnimationClip(validAnimation, "loop", 1) },
+    { frameA: 10, frameB: 11, mix: 0 }
+  );
+  assert.deepEqual(
+    { ...layoutContext.sampleVatAnimationClip(validAnimation, "once", 1) },
+    { frameA: 13, frameB: 13, mix: 0 }
+  );
+  assert.deepEqual(
+    { ...layoutContext.sampleVatAnimationClip(validAnimation, "single", 0.5) },
+    { frameA: 4, frameB: 4, mix: 0 }
+  );
+  for (const invalid of [
+    [validAnimation, "loop", Number.NaN],
+    [validAnimation, "loop", Number.POSITIVE_INFINITY],
+    [{ frameCount: 20, clips: { bad: { startFrame: -1, frameCount: 4, loop: true } } }, "bad", 0],
+    [{ frameCount: 20, clips: { bad: { startFrame: 18, frameCount: 4, loop: true } } }, "bad", 0],
+    [{ frameCount: 20, clips: { bad: { startFrame: 1, frameCount: 1.5, loop: true } } }, "bad", 0]
+  ]) {
+    assert.equal(layoutContext.sampleVatAnimationClip(...invalid), null);
+  }
+  const constructorStart = renderer.indexOf("      constructor(canvas)");
+  const constructorEnd = renderer.indexOf("      setViewPlayer", constructorStart);
+  const constructorBody = renderer.slice(constructorStart, constructorEnd);
+  assert.doesNotMatch(
+    constructorBody,
+    /\b(?:initialise|ensure)ChampionModels?\s*\(/,
+    "renderer construction must not decode and upload the full VAT roster"
+  );
+  assert.match(startup, /game\.players\.map\(\(player\) => player\.champion\)/);
+  assert.match(startup, /\.\.\.game\.players\.map\(\(player\) => player\.champion\),\s*modelReviewTarget/);
+  assert.match(startup, /\.filter\(Boolean\)/);
+  assert.match(startup, /renderer\.ensureChampionModels\(embeddedModels\)/);
+});
+
+test("real VAT binaries preserve CPU fallback samples after tiled GPU packing", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const layoutStart = renderer.indexOf("function planVatTextureLayout");
+  const layoutEnd = renderer.indexOf("    function sampleVatAnimationClip", layoutStart);
+  const updateStart = renderer.indexOf("      updateCpuAnimatedChampion(key, frame)");
+  const updateEnd = renderer.indexOf("      drawCpuAnimatedChampion(", updateStart);
+  assert.ok(layoutStart >= 0 && layoutEnd > layoutStart);
+  assert.ok(updateStart >= 0 && updateEnd > updateStart);
+  const parityContext = vm.createContext({});
+  vm.runInContext(
+    `${renderer.slice(layoutStart, layoutEnd)};
+     globalThis.planVatTextureLayout = planVatTextureLayout;
+     globalThis.updateCpuAnimatedChampion = ({
+       ${renderer.slice(updateStart, updateEnd).trim()}
+     }).updateCpuAnimatedChampion;`,
+    parityContext
+  );
+
+  for (const champion of ["katarina", "zed", "renekton", "vladimir", "gangplank"]) {
+    const modelDirectory = path.join(repositoryRoot, "champions", champion, "playable-model");
+    const [metadata, frameBytes, normalBytes] = await Promise.all([
+      readFile(path.join(modelDirectory, `${champion}-model-metadata.json`), "utf8").then(JSON.parse),
+      readFile(path.join(modelDirectory, `${champion}-model-frames.bin`)),
+      readFile(path.join(modelDirectory, `${champion}-model-normals.bin`))
+    ]);
+    const vertexCount = metadata.vertexCount;
+    const frameCount = metadata.frameCount;
+    const layout = parityContext.planVatTextureLayout(vertexCount, frameCount, 2048);
+    assert.equal(frameBytes.byteLength, vertexCount * frameCount * 4 * Uint16Array.BYTES_PER_ELEMENT);
+    assert.equal(normalBytes.byteLength, vertexCount * frameCount * 4);
+
+    const sourcePositions = new Uint16Array(
+      frameBytes.buffer,
+      frameBytes.byteOffset,
+      frameBytes.byteLength / Uint16Array.BYTES_PER_ELEMENT
+    );
+    const tiledPositions = new Uint16Array(layout.paddedTexelCount * 4);
+    const tiledNormals = new Uint8Array(layout.paddedTexelCount * 4);
+    tiledPositions.set(sourcePositions);
+    tiledNormals.set(normalBytes);
+    assert.equal(
+      Buffer.compare(
+        Buffer.from(tiledPositions.buffer, 0, frameBytes.byteLength),
+        frameBytes
+      ),
+      0,
+      `${champion} position payload remains byte-exact after padding`
+    );
+    assert.equal(
+      Buffer.compare(
+        Buffer.from(tiledNormals.buffer, 0, normalBytes.byteLength),
+        normalBytes
+      ),
+      0,
+      `${champion} normal payload remains byte-exact after padding`
+    );
+    if (layout.paddedTexelCount > layout.texelCount) {
+      assert.equal(tiledPositions.at(-1), 0);
+      assert.equal(tiledNormals.at(-1), 0);
+    }
+
+    const lastLinear = layout.texelCount - 1;
+    for (const linear of [0, layout.width - 1, layout.width, layout.width + 1, lastLinear]) {
+      const x = linear % layout.width;
+      const y = Math.floor(linear / layout.width);
+      assert.equal(y * layout.width + x, linear, `${champion} preserves tiled address ${linear}`);
+      for (let axis = 0; axis < 4; axis += 1) {
+        assert.equal(tiledPositions[(y * layout.width + x) * 4 + axis], sourcePositions[linear * 4 + axis]);
+        assert.equal(tiledNormals[(y * layout.width + x) * 4 + axis], normalBytes[linear * 4 + axis]);
+      }
+    }
+
+    const animation = {
+      vertexCount,
+      frameCount,
+      positionMin: metadata.positionBounds.min,
+      positionRange: metadata.positionBounds.range
+    };
+    const dynamicVertices = new Float32Array(vertexCount * 26);
+    const cpuState = {
+      [`${champion}Animation`]: animation,
+      [`${champion}CpuAnimation`]: {
+        frameData: sourcePositions,
+        normalData: normalBytes,
+        dynamicVertices,
+        vertexCount
+      },
+      [`${champion}VertexBuffer`]: {},
+      gl: {
+        ARRAY_BUFFER: 0x8892,
+        bindBuffer() {},
+        bufferSubData() {}
+      }
+    };
+    const currentA = 0;
+    const currentB = Math.min(1, frameCount - 1);
+    const previousA = Math.floor(frameCount / 2);
+    const previousB = Math.min(previousA + 1, frameCount - 1);
+    const sampleVertices = [0, Math.min(2047, vertexCount - 1), Math.min(2048, vertexCount - 1),
+      Math.floor(vertexCount / 2), vertexCount - 1];
+    const packed = (data, frameIndex, vertex, axis) => {
+      const linear = frameIndex * vertexCount + vertex;
+      const x = linear % layout.width;
+      const y = Math.floor(linear / layout.width);
+      return data[(y * layout.width + x) * 4 + axis];
+    };
+    for (const transition of [0, 0.5, 1]) {
+      const frame = {
+        frameA: currentA,
+        frameB: currentB,
+        mix: 0.37,
+        previous: { frameA: previousA, frameB: previousB, mix: 0.61 },
+        transition
+      };
+      parityContext.updateCpuAnimatedChampion.call(cpuState, champion, frame);
+      for (const vertex of sampleVertices) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          const decodePosition = (frameIndex) => animation.positionMin[axis] +
+            packed(tiledPositions, frameIndex, vertex, axis) / 65535 * animation.positionRange[axis];
+          const currentPosition = decodePosition(currentA) +
+            (decodePosition(currentB) - decodePosition(currentA)) * frame.mix;
+          const previousPosition = decodePosition(previousA) +
+            (decodePosition(previousB) - decodePosition(previousA)) * frame.previous.mix;
+          const gpuPosition = previousPosition + (currentPosition - previousPosition) * transition;
+          assert.ok(
+            Math.abs(dynamicVertices[vertex * 26 + axis] - gpuPosition) <= 0.00002,
+            `${champion} position parity at vertex ${vertex}, axis ${axis}, transition ${transition}`
+          );
+
+          const decodeNormal = (frameIndex) =>
+            packed(tiledNormals, frameIndex, vertex, axis) / 255 * 2 - 1;
+          const currentNormal = decodeNormal(currentA) +
+            (decodeNormal(currentB) - decodeNormal(currentA)) * frame.mix;
+          const previousNormal = decodeNormal(previousA) +
+            (decodeNormal(previousB) - decodeNormal(previousA)) * frame.previous.mix;
+          const gpuNormal = previousNormal + (currentNormal - previousNormal) * transition;
+          assert.ok(
+            Math.abs(dynamicVertices[vertex * 26 + 18 + axis] - gpuNormal) <= 0.000002,
+            `${champion} normal parity at vertex ${vertex}, axis ${axis}, transition ${transition}`
+          );
+        }
+      }
+    }
+  }
+
+  assert.match(renderer, /mix\(previousPosition, currentPosition, uTransition\)/);
+  assert.match(renderer, /normalize\(mix\(previousNormal, currentNormal, uTransition\)\)/);
 });
 
 test("arena modular kit packs seventeen authored texture sources", async () => {

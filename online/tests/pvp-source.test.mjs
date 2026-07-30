@@ -5,6 +5,14 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
+function extractFunctionDeclaration(source, name, nextDeclaration) {
+  const start = source.indexOf(`function ${name}`);
+  const end = source.indexOf(nextDeclaration, start);
+  assert.notEqual(start, -1, `${name} declaration must exist`);
+  assert.notEqual(end, -1, `${name} declaration must have a stable boundary`);
+  return source.slice(start, end);
+}
+
 test("loads the online duel layer into the reconstructed game", async () => {
   const page = await readFile(new URL("public/riftbomb.html", root), "utf8");
   const loader = await readFile(
@@ -18,6 +26,7 @@ test("loads the online duel layer into the reconstructed game", async () => {
 
   assert.match(page, /src="\/riftbomb-loader\.js"/);
   assert.match(loader, /online-duel\.css/);
+  assert.match(loader, /authoritative-audio\.js/);
   assert.match(loader, /online-duel\.js/);
   assert.match(loader, /Promise\.all/);
   assert.match(loader, /manifest\.partCount/);
@@ -36,6 +45,151 @@ test("uses one authoritative WebSocket transport", async () => {
 
   assert.match(duel, /new WebSocket\(AUTHORITATIVE_SERVER_URL\)/);
   assert.doesNotMatch(duel, /RTCPeerConnection|iceGatheringState|state\.inputChannel|state\.snapshots/);
+});
+
+test("superseded sockets cannot mutate the active room or audio cursor", async () => {
+  const source = await readFile(new URL("public/online-duel.js", root), "utf8");
+  const declaration = extractFunctionDeclaration(
+    source,
+    "connectAuthoritative",
+    "  async function onConnected"
+  );
+  const sockets = [];
+  class FakeWebSocket {
+    static OPEN = 1;
+
+    constructor() {
+      this.readyState = FakeWebSocket.OPEN;
+      this.listeners = new Map();
+      this.sent = [];
+      sockets.push(this);
+    }
+
+    addEventListener(type, listener) {
+      this.listeners.set(type, listener);
+    }
+
+    emit(type, data) {
+      this.listeners.get(type)?.(data === undefined ? {} : { data: JSON.stringify(data) });
+    }
+
+    send(message) {
+      this.sent.push(JSON.parse(message));
+    }
+
+    close() {
+      this.readyState = 3;
+    }
+  }
+  const state = {
+    socket: null,
+    roomCode: "ROOM01",
+    guestReady: false,
+    lastPlayedSoundEventId: 0
+  };
+  const applied = [];
+  let connectedCalls = 0;
+  const connectAuthoritative = new Function(
+    "WebSocket",
+    "AUTHORITATIVE_SERVER_URL",
+    "state",
+    "setTimeout",
+    "clearTimeout",
+    "lobbyPayload",
+    "onConnected",
+    "applySnapshot",
+    `"use strict"; ${declaration}; return connectAuthoritative;`
+  )(
+    FakeWebSocket,
+    "ws://test.invalid/game-ws",
+    state,
+    () => 1,
+    () => {},
+    () => ({}),
+    () => { connectedCalls += 1; },
+    (snapshot) => applied.push(snapshot)
+  );
+
+  void connectAuthoritative("host");
+  const oldSocket = sockets[0];
+  const activePromise = connectAuthoritative("host");
+  const activeSocket = sockets[1];
+
+  oldSocket.emit("open");
+  oldSocket.emit("message", { type: "connected", soundCursor: 99 });
+  oldSocket.emit("message", { type: "snapshot", data: { s: 500, room: "old" } });
+  oldSocket.emit("error");
+  oldSocket.emit("close");
+  await Promise.resolve();
+
+  assert.equal(state.socket, activeSocket);
+  assert.equal(state.lastPlayedSoundEventId, 0);
+  assert.equal(oldSocket.sent.length, 0);
+  assert.deepEqual(applied, []);
+  assert.equal(connectedCalls, 0);
+
+  activeSocket.emit("open");
+  activeSocket.emit("message", { type: "connected", soundCursor: 2 });
+  activeSocket.emit("message", { type: "snapshot", data: { s: 1, room: "new" } });
+  await activePromise;
+
+  assert.equal(activeSocket.sent.length, 1);
+  assert.equal(state.lastPlayedSoundEventId, 2);
+  assert.deepEqual(applied, [{ s: 1, room: "new" }]);
+  assert.equal(connectedCalls, 1);
+});
+
+test("online one-shot audio is authoritative, ordered and locally panned", async () => {
+  const [duel, consumer] = await Promise.all([
+    readFile(new URL("public/online-duel.js", root), "utf8"),
+    readFile(new URL("public/authoritative-audio.js", root), "utf8")
+  ]);
+  assert.match(duel, /authoritativePredictionSink/);
+  assert.match(duel, /lastPlayedSoundEventId/);
+  assert.match(duel, /sourceId: `remote:\$\{event\.id\}`/);
+  assert.match(duel, /game\.audioPanAt\(x, z\)/);
+  assert.match(duel, /droppedSoundEventCount \+= result\.gap\.count/);
+  assert.match(duel, /console\.warn\("Authoritative audio gap"/);
+  assert.match(consumer, /event\.id <= nextCursor/);
+  assert.equal((duel.match(/authoritativeAudio\.consume/g) || []).length, 1);
+  assert.doesNotMatch(duel, /consumeAuthoritativeSound|receivedSoundEventId|predictedSounds/);
+  assert.doesNotMatch(duel, /\.\.\.event\.options/);
+});
+
+test("online client can leave match/lobby and resume a saved session after reload", async () => {
+  const duel = await readFile(new URL("public/online-duel.js", root), "utf8");
+  const page = await readFile(new URL("app/page.tsx", root), "utf8");
+  const styles = await readFile(new URL("app/globals.css", root), "utf8");
+
+  assert.match(duel, /SESSION_KEY/);
+  assert.match(duel, /tryResumeSession/);
+  assert.match(duel, /leaveOnlineSession/);
+  assert.match(duel, /leave-match/);
+  assert.match(duel, /sessionStorage/);
+  assert.match(page, /leaveMatch/);
+  assert.match(page, /match-exit-button/);
+  assert.match(page, /client-sticky-cta/);
+  assert.match(page, /SAIR DA PARTIDA/);
+  assert.match(styles, /\.client-sticky-cta/);
+  assert.match(styles, /\.match-exit-button/);
+});
+
+test("online seat binding always resolves host=1 guest=2 by player id", async () => {
+  const duel = await readFile(new URL("public/online-duel.js", root), "utf8");
+  const presentation = await readFile(
+    new URL("../game/present-champion-bomb-duel.js", root),
+    "utf8",
+  );
+
+  assert.match(duel, /function localOnlinePlayerId/);
+  assert.match(duel, /function localOnlinePlayer/);
+  assert.match(duel, /function bindLocalOnlineView/);
+  assert.match(duel, /state\.role === "guest" \? 2 : 1/);
+  assert.match(duel, /bindLocalOnlineView\(\)/);
+  assert.match(duel, /game\.players = \[\.\.\.data\.players\]\.sort/);
+  assert.match(duel, /player\.id === localPlayerId/);
+  assert.match(presentation, /players\?\.find\(\(player\) => player\.id === 1\)/);
+  assert.match(presentation, /players\?\.find\(\(player\) => player\.id === 2\)/);
 });
 
 test("packages every web part behind a self-consistent dynamic manifest", async () => {
@@ -205,10 +359,14 @@ test("ships server-authoritative room and snapshot behavior", async () => {
   assert.match(client, /state\.role === "guest"/);
   assert.match(client, /game\.p2Human = false/);
   assert.match(client, /ensureChampionModels\(\[state\.hostChampion, state\.guestChampion\]\)/);
-  assert.match(client, /configurePlayerView\?\.\(state\.role === "guest" \? 2 : 1/);
+  assert.match(client, /bindLocalOnlineView\(\)/);
+  assert.match(client, /localOnlinePlayerId\(\)/);
   assert.match(client, /const abilityKeys = \{ KeyQ: 0, KeyF: 1, KeyE: 2, KeyR: 3 \}/);
   assert.match(client, /guestAction\("ability", abilityKeys\[event\.code\]\)/);
   assert.match(client, /CREATE CHALLENGE LINK/);
+  assert.match(client, /type: "quick-match"/);
+  assert.match(client, /function startQuickMatch/);
+  assert.match(server, /quickMatchQueue/);
   assert.match(client, /INVITE_MATCH_TARGET = 10/);
   assert.match(client, /url\.searchParams\.set\("p1", state\.hostChampion\)/);
   assert.match(client, /url\.searchParams\.set\("p2", state\.guestChampion\)/);
@@ -220,15 +378,24 @@ test("ships server-authoritative room and snapshot behavior", async () => {
   assert.match(client, /function interpolateRemoteHost/);
   assert.match(client, /pendingGuestBombs\.push/);
   assert.match(client, /game\.placeBomb\(guest\)/);
+  assert.match(client, /authoritativeAudio\.consume/);
+  assert.match(client, /authoritativePredictionSink/);
+  assert.match(client, /browserGameplaySfx\.effect/);
+  assert.match(client, /game\.audioPanAt\(x, z\)/);
+  assert.match(client, /lastPlayedSoundEventId/);
+  assert.doesNotMatch(client, /consumeAuthoritativeSound|capturePredictedSounds|receivedSoundEventId/);
   assert.match(rooms, /TICK_RATE = 60/);
   assert.match(rooms, /SNAPSHOT_RATE = 30/);
   assert.match(rooms, /createAuthoritativeDuel/);
+  assert.match(rooms, /soundEventSequence/);
   assert.match(server, /x-riftbomb-proxy/);
   assert.match(server, /type: "ping"/);
   assert.match(client, /type: "pong"/);
   assert.match(worker, /url\.pathname === "\/game-ws"/);
   assert.match(worker, /GAME_SERVER_PROXY_SECRET/);
   assert.match(adapter, /run-champion-bomb-duel\.js/);
+  assert.match(adapter, /createAuthoritativeAudioRecorder/);
+  assert.match(adapter, /snapshot\.sound/);
 });
 
 test("declares persistent signaling storage", async () => {

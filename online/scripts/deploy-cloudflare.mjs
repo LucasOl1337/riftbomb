@@ -126,6 +126,7 @@ async function patchDistWrangler() {
 
 async function main() {
   const wantBuild = process.argv.includes("--build");
+  const dryRun = process.argv.includes("--dry-run");
   normalizeCloudflareEnvironment();
 
   if (wantBuild) {
@@ -139,17 +140,25 @@ async function main() {
 
   await patchDistWrangler();
 
-  console.log(`Deploying ${WORKER_NAME} → https://${DOMAIN} ...`);
+  console.log(`${dryRun ? "Validating" : "Deploying"} ${WORKER_NAME} → https://${DOMAIN} ...`);
   // Deploy from dist/server so relative asset paths and generated wrangler.json match.
   const wranglerBin = path.join(onlineRoot, "node_modules", "wrangler", "bin", "wrangler.js");
   run(
     process.execPath,
-    [wranglerBin, "deploy", "-c", "wrangler.json", "--name", WORKER_NAME],
+    [
+      wranglerBin,
+      "deploy",
+      "-c",
+      "wrangler.json",
+      "--name",
+      WORKER_NAME,
+      ...(dryRun ? ["--dry-run"] : []),
+    ],
     { cwd: distServer },
   );
 
   console.log("");
-  console.log("Deploy finished.");
+  console.log(dryRun ? "Deploy validation finished." : "Deploy finished.");
   console.log(`  Production: https://${DOMAIN}`);
   console.log(`  Workers.dev: https://${WORKER_NAME}.<subdomain>.workers.dev (see wrangler output)`);
   console.log(`  D1: ${D1_NAME} (${D1_ID})`);
