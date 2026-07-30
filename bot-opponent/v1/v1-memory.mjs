@@ -9,6 +9,8 @@
  * to the Match and arrive through the WorldView.
  */
 
+import { createRivalModel } from "./read-rival.mjs";
+
 export function createV1Memory() {
   return {
     objective: "press",     // "escape" | "pickup" | "press"
@@ -18,7 +20,14 @@ export function createV1Memory() {
     lastDecision: null,     // summary of the last decided intent
     stallTime: 0,           // seconds wanting to move without progress
     lastPosition: null,     // last observed self position { x, z }
-    unstickHold: 0          // seconds the unstick heading still owns the intent
+    unstickHold: 0,         // seconds the unstick heading still owns the intent
+    freezeTime: 0,          // seconds wanting to move with zero progress (wedge watch)
+    unwedgeLastPosition: null, // last position sampled by the wedge recovery
+    // Cross-round rival habits (B7). resetV1Memory deliberately does NOT
+    // clear this field: the model is the memory ABOUT the opponent and
+    // must survive the rounds of the same match; it is reborn only with
+    // the policy (a new match).
+    rivalModel: createRivalModel()
   };
 }
 
@@ -31,4 +40,6 @@ export function resetV1Memory(memory) {
   memory.stallTime = 0;
   memory.lastPosition = null;
   memory.unstickHold = 0;
+  memory.freezeTime = 0;
+  memory.unwedgeLastPosition = null;
 }

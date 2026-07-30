@@ -48,14 +48,56 @@
  * next tick with the right facing. Last call: when the cell's deadly
  * window starts in under ESCAPE_LAST_CALL seconds there is no next tick,
  * so a crooked dash beats dying.
+ *
+ * Landing check (cycle 13): an aligned facing is still not enough — the
+ * game's dash sweep only checks the body CENTER, so a corridor dash can
+ * land with the collision box overlapping a solid and freeze the bot
+ * until its own bomb kills it (the measured seed-42 regression). An
+ * aligned escape dash also demands a landing that leaves the body free
+ * (dashLandingFree, mirroring the game's sweep and collision); a wedged
+ * landing holds the cast like a misaligned facing. The blind "no known
+ * safe direction" dash stays ungated: a frozen landing outside the blast
+ * still beats standing inside it.
+ *
+ * Landing policy per branch (cycle 14 — the gate now covers every dash):
+ * - Escape: gated; the last-call exceptions (`closing` under
+ *   ESCAPE_LAST_CALL, and "none" — no known safe direction) still accept a
+ *   wedged landing, because the alternative is standing inside the blast.
+ * - Engage (`close-distance`): always gated, no last-call case. The engage
+ *   starts from a safe cell with no timer, so holding costs nothing — the
+ *   bot just walks to melee. Note the dash carries PAST the rival (the
+ *   rival never blocks the game's sweep), so the planned landing can sit
+ *   behind the target.
+ * - Offensive Dice (`dice-through`/`dice-finish`): the landing is always
+ *   gated, even with the window closing — `recastClosing` overrides the
+ *   facing only. An expired window leaves the bot on its safe cell; a
+ *   wedged landing may freeze it in the open next to the rival, so the
+ *   window is left to rot. The exit Dice (`dice-exit`) stays ungated: it
+ *   dashes back toward the cell the engage started from, a spot the bot
+ *   itself just occupied.
+ * The asymmetry is principled: a bad landing is only accepted when the
+ * alternative is worse than a possible freeze.
+ *
+ * Personality (cycle 11, B8): the optional `personality.aggression`
+ * weight scales ONLY the branch-6 engage reach (0.8x–1.2x of
+ * ENGAGE_REACH, exact at the neutral 0.5). Escape, survive and combo
+ * branches never read it.
+ *
+ * Conditioned engage (cycle 12): WITH a personality the branch-6 engage
+ * also demands a measured advantage (advantage.mjs) that clears the
+ * temperament threshold — blind aggression loses the mirror (cycle 11:
+ * 0.8 -> 2V x 8D). Without a personality the gate is open and the
+ * trigger is bit-identical to the pre-cycle-12 behavior.
  */
 
 import { cellFromWorld, dangerAt, worldFromCell } from "../../baseline-policy.mjs";
 import { dangerTimeline, escapePlan, safeWindowAfter } from "../danger-timeline.mjs";
+import { aggressionOf } from "../personality.mjs";
+import { advantageEngageAllowed } from "../advantage.mjs";
 import { createRenektonMemory, resetRenektonMemory } from "./renekton-memory.mjs";
 
 const MELEE_REACH = 1.6;    // tiles — Q/W want the rival adjacent
-const ENGAGE_REACH = 4.5;   // tiles — E engage window
+const ENGAGE_REACH = 4.5;   // tiles — E engage window at neutral aggression
 const EMPOWER_FURY = 50;    // Fury threshold for empowered casts
 const COMBO_W_REACH = 2.9;  // tiles — W locks the rival up to 3.05 (game)
 const COMBO_LEASH = 5.5;    // tiles — beyond this the engage is over
@@ -73,14 +115,23 @@ const DICE_LAST_CALL = 0.8; // window seconds where Dice fires even misaligned
 const ESCAPE_LAST_CALL = 0.4; // deadly-window seconds where a crooked dash beats dying
 const COMBO_HESITATION = 0.22; // base hesitation between steps of one combo
 const SLOT_INDEX = { q: 0, w: 1, e: 2, r: 3 };
+// Mirror of the dash/collision rules in game/run-champion-bomb-duel.js, so
+// the escape dash can foresee where it lands (castRenektonE sweep) and
+// whether the landing leaves the body able to move (moveEntity collision).
+const DASH_STEP = 0.24;        // sweep increment of castRenektonE
+const DASH_BOMB_STOP = 0.48;   // bomb proximity that ends the sweep
+const DASH_SLICE_TILES = 2.75; // Slice max reach in tiles
+const DASH_DICE_TILES = 3.15;  // Dice (recast) max reach in tiles
+const BODY_RADIUS = 0.3;       // movement collision radius (moveEntity)
+const BODY_BOMB_BLOCK = 0.55;  // bomb block factor in tiles (isBlocked)
 
-export function createRenektonPilot({ random = Math.random } = {}) {
+export function createRenektonPilot({ random = Math.random, personality = null } = {}) {
   const memory = createRenektonMemory();
   return {
     id: "renekton",
     memory,
     evaluateSkill(view) {
-      return evaluateRenektonSkill(view, memory, random);
+      return evaluateRenektonSkill(view, memory, random, personality);
     },
     reset() {
       resetRenektonMemory(memory);
@@ -88,7 +139,7 @@ export function createRenektonPilot({ random = Math.random } = {}) {
   };
 }
 
-export function evaluateRenektonSkill(view, memory, random = Math.random) {
+export function evaluateRenektonSkill(view, memory, random = Math.random, personality = null) {
   memory.skillHesitation = Math.max(0, memory.skillHesitation - (view.dt ?? 0));
   if (memory.skillHesitation > 0) return null;
   if (!view.self?.alive || !view.rival?.alive) {
@@ -108,6 +159,10 @@ export function evaluateRenektonSkill(view, memory, random = Math.random) {
   const recastOpen = (self.renektonDashRecast ?? 0) > 0;
   const recastClosing = recastOpen && self.renektonDashRecast < DICE_LAST_CALL;
   const dominusUp = (self.renektonDominus ?? 0) > 0;
+  // Aggression (B8) stretches only the E engage trigger (branch 6): 0.8x at
+  // 0, exactly ENGAGE_REACH at the neutral 0.5, 1.2x at 1. The defensive
+  // Dominus reach and every escape branch keep the base constants.
+  const engageReach = ENGAGE_REACH * (0.8 + 0.4 * aggressionOf(personality));
 
   // The WorldView is the source of truth about what actually happened: a
   // cast the game rejected must not advance the combo. Roll back the
@@ -170,11 +225,16 @@ export function evaluateRenektonSkill(view, memory, random = Math.random) {
   //    the recast window is open). The dash travels along the facing and
   //    the facing belongs to the PREVIOUS frame, so it must point at a
   //    known-safe direction before the cast fires — see the header rule.
+  //    The aligned facing alone is NOT enough: the dash must also land with
+  //    the body box free (dashLandingFree), otherwise the cast freezes the
+  //    bot against a solid and the bomb it escapes kills it — the hold path
+  //    below lets the temporal escape walk instead, exactly like a
+  //    misaligned facing.
   if (danger > 0 && skillReady(self, "e")) {
     const timeline = dangerTimeline(view);
     const closing = safeWindowAfter(timeline, cell.r, cell.c, 0) < ESCAPE_LAST_CALL;
     const aligned = escapeFacingAligned(view, cell, timeline);
-    if (closing || aligned !== false) {
+    if (closing || aligned === "none" || (aligned === true && dashLandingFree(view, recastOpen))) {
       const effects = snapshotCombo(memory);
       resetCombo(memory);
       memory.pendingDice = true;
@@ -247,6 +307,11 @@ export function evaluateRenektonSkill(view, memory, random = Math.random) {
       const held = recastClosing ? false : holdForFacing("e", AIM_DICE, rival.x, rival.z);
       if (held === true) return null; // walking one frame prepares the facing
       if (held !== "exhausted") {
+        // Landing gate (cycle 14): the closing exception covers the FACING
+        // only, never the landing. An expired window leaves the bot standing
+        // on its safe cell; a wedged Dice freezes it in the open next to the
+        // rival (the cycle-13 residual deaths). Let the window rot instead.
+        if (!dashLandingFree(view, true)) return null;
         const effects = snapshotCombo(memory);
         resetCombo(memory);
         return ask("e", killCloses ? "dice-finish" : "dice-through", effects);
@@ -279,13 +344,24 @@ export function evaluateRenektonSkill(view, memory, random = Math.random) {
   //    opens the combo. The temporal escape runs after this evaluation and
   //    would override the movement on danger frames, so an engage only ever
   //    starts from a safe cell (never a dash the escape is about to abort).
+  //    The reach scales with aggression (engageReach above), and WITH a
+  //    personality the measured advantage must clear the temperament
+  //    threshold (cycle 12 — the gate is evaluated last and skipped without
+  //    a personality, keeping the pre-cycle-12 trigger bit-identical).
   const aligned = cell.r === rivalCell.r || cell.c === rivalCell.c;
   if (
     !recastOpen && memory.comboStep === 0 && aligned && danger === 0
-    && distance <= ENGAGE_REACH && skillReady(self, "e")
+    && distance <= engageReach && skillReady(self, "e")
+    && advantageEngageAllowed(view, memory, personality)
   ) {
     const held = holdForFacing("e", AIM_ENGAGE, rival.x, rival.z);
     if (held !== false) return null; // held: walk a frame; exhausted: skip
+    // Landing gate (cycle 14): the dash carries PAST the rival — the rival
+    // never blocks the game's sweep — so the planned landing can sit behind
+    // the target, wedged against a solid. The engage has no clock (safe
+    // cell, no window to lose), so a wedged landing holds the cast like an
+    // aim miss: navigation simply walks to melee instead.
+    if (!dashLandingFree(view, false)) return null;
     const effects = snapshotCombo(memory);
     memory.comboStep = 1;
     memory.comboUntil = roundAge + COMBO_TIMEOUT;
@@ -350,6 +426,78 @@ function castConfirmed(self, slot) {
   if (slot === "r") return (self.renektonDominus ?? 0) > 0 || (self.rCooldown ?? 0) > 0;
   if (slot === "e") return (self.renektonDashRecast ?? 0) > 0 || (self.eCooldown ?? 0) > 0;
   return (self[`${slot}Cooldown`] ?? 0) > 0;
+}
+
+/**
+ * Escape-dash landing safety: the game's castRenektonE sweep only checks
+ * the body CENTER against cells, so a dash fired along a corridor stops one
+ * DASH_STEP short of a solid — with the collision box (BODY_RADIUS, checked
+ * by moveEntity on every later step) left overlapping that solid. Every
+ * candidate move from such a landing is still blocked: the bot freezes in
+ * place until the fuse ends (cycle-13 diagnosis: 96/96 seed-42 round losses
+ * were own open-route bombs killing the bot frozen right after the escape
+ * dash). The dash is only worth its facing when the landing leaves the body
+ * free; a wedged landing holds the cast and lets the temporal escape walk.
+ * Unknown facing (partial views, tests) never blocks, exactly like
+ * facingAligned.
+ */
+function dashLandingFree(view, recast) {
+  const landing = sliceDashLanding(view, recast);
+  if (!landing) return true;
+  return !dashBodyBlocked(view, landing.x, landing.z);
+}
+
+/**
+ * Where the dash would land: mirrors castRenektonE in
+ * game/run-champion-bomb-duel.js — the sweep advances DASH_STEP at a time
+ * along the facing, a solid cell or any live bomb (the game ignores
+ * passOwners here) ends it, crates break and let it through, and the
+ * landing is the last point reached. Null when the facing is unknown.
+ */
+export function sliceDashLanding(view, recast) {
+  const { cols, rows, tile } = view.meta;
+  const { self } = view;
+  const { lastDx, lastDz } = self;
+  if (typeof lastDx !== "number" || typeof lastDz !== "number") return null;
+  const length = Math.max(0.001, Math.hypot(lastDx, lastDz)); // game rule
+  const dirX = lastDx / length;
+  const dirZ = lastDz / length;
+  const maxDistance = tile * (recast ? DASH_DICE_TILES : DASH_SLICE_TILES);
+  let x = self.x;
+  let z = self.z;
+  for (let distance = DASH_STEP; distance <= maxDistance; distance += DASH_STEP) {
+    const nx = self.x + dirX * distance;
+    const nz = self.z + dirZ * distance;
+    const cell = cellFromWorld(nx, nz, cols, rows, tile);
+    if (view.grid[cell.r]?.[cell.c] === 1) break;
+    const bombBlocked = view.bombs.some((bomb) => !bomb.exploded
+      && Math.abs(nx - bomb.x) < DASH_BOMB_STOP
+      && Math.abs(nz - bomb.z) < DASH_BOMB_STOP);
+    if (bombBlocked) break;
+    x = nx;
+    z = nz;
+  }
+  return { x, z };
+}
+
+/**
+ * True when the body box at (x, z) collides: mirrors the game's isBlocked
+ * (moveEntity, radius BODY_RADIUS) — the four box corners must sit on open
+ * cells and no live bomb the self may not cross may overlap the box.
+ */
+export function dashBodyBlocked(view, x, z) {
+  const { cols, rows, tile } = view.meta;
+  for (const [px, pz] of [
+    [x - BODY_RADIUS, z - BODY_RADIUS], [x + BODY_RADIUS, z - BODY_RADIUS],
+    [x - BODY_RADIUS, z + BODY_RADIUS], [x + BODY_RADIUS, z + BODY_RADIUS]
+  ]) {
+    const cell = cellFromWorld(px, pz, cols, rows, tile);
+    if (view.grid[cell.r]?.[cell.c] !== 0) return true;
+  }
+  return view.bombs.some((bomb) => !bomb.exploded
+    && !bomb.passOwners?.includes(view.self.id)
+    && Math.abs(x - bomb.x) < tile * BODY_BOMB_BLOCK + BODY_RADIUS
+    && Math.abs(z - bomb.z) < tile * BODY_BOMB_BLOCK + BODY_RADIUS);
 }
 
 /**

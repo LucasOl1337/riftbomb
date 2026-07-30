@@ -14,6 +14,8 @@ intenção pelas mesmas regras do input humano.
 | [package-baseline-bot.mjs](./package-baseline-bot.mjs) | Empacota a política em `game/load-baseline-bot.js` (gerado, não versionado) |
 | [package-v1-bot.mjs](./package-v1-bot.mjs) | Empacota o V1 em `game/load-v1-bot.js` (gerado, não versionado), ampliando `RIFTBOMB_BOTS` com `createV1Policy` e `createRenektonPilot` |
 | [v1/create-v1-policy.mjs](./v1/create-v1-policy.mjs) | Bot V1: piloto com personalidade; cérebro de arena baseline + campeão plugável |
+| [v1/personality.mjs](./v1/personality.mjs) | V1: pesos de personalidade — eixo `aggression` (0..1; neutro 0,5 = comportamento pré-B8) |
+| [v1/advantage.mjs](./v1/advantage.mjs) | V1: score de vantagem (vida, fury, kit, cerco, relógio de bomba, Dominus) + threshold por agressão — gate condicionado do engage e da caça |
 | [v1/plan-arena-actions.mjs](./v1/plan-arena-actions.mjs) | V1: classifica objetivo (escapar/pickup/pressionar) e registra decisões |
 | [v1/v1-memory.mjs](./v1/v1-memory.mjs) | V1: memória comum entre frames (objetivo, rota, última decisão) |
 | [v1/renekton/renekton-skills.mjs](./v1/renekton/renekton-skills.mjs) | Renekton: avalia Q/W/E/R e emite intenções de skill (nunca executa) |

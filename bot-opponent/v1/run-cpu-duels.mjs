@@ -7,11 +7,18 @@
  * state a human produces (WASD in `match.keys`) and calls the same public
  * entrypoints the input layer uses (`placeBomb`, `castAbility`).
  *
+ * Self-play (cycle 11, B8): `--opponent v1` replaces the P1 baseline with
+ * a second V1 policy WITHOUT a champion module — the pure arena brain
+ * (navigation, open-route, temporal escape, unstick, veto), kitless like
+ * the baseline but mobile. It pilots P1's default champion (Katarina)
+ * through the same imitated-keyboard path, with its own RNG stream.
+ *
  * Determinism: every source of randomness comes from seeded mulberry32
  * streams — the Match's `this.random` (map crates, particles), the V1 policy
  * random and the P1 baseline random. Same seed => same report.
  *
  * Usage: node bot-opponent/v1/run-cpu-duels.mjs --matches 100 --seed 42
+ *        node bot-opponent/v1/run-cpu-duels.mjs --opponent v1 --aggression 0.8
  * Output: one JSON report on stdout (see REPORT_FIELDS below).
  */
 
@@ -42,15 +49,24 @@ function mulberry32(seed) {
 }
 
 function parseArgs(argv) {
-  const options = { matches: 100, seed: 42 };
+  const options = { matches: 100, seed: 42, opponent: "baseline", aggression: null };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--matches") options.matches = Number(argv[++i]);
     else if (argv[i] === "--seed") options.seed = Number(argv[++i]);
+    else if (argv[i] === "--opponent") options.opponent = argv[++i];
+    else if (argv[i] === "--aggression") options.aggression = Number(argv[++i]);
   }
   if (!Number.isInteger(options.matches) || options.matches < 1) {
     throw new Error("--matches must be a positive integer");
   }
   if (!Number.isFinite(options.seed)) throw new Error("--seed must be a number");
+  if (options.opponent !== "baseline" && options.opponent !== "v1") {
+    throw new Error("--opponent must be \"baseline\" or \"v1\"");
+  }
+  if (options.aggression !== null
+    && (!Number.isFinite(options.aggression) || options.aggression < 0 || options.aggression > 1)) {
+    throw new Error("--aggression must be a number within [0, 1]");
+  }
   return options;
 }
 
@@ -126,7 +142,7 @@ function createRoundStats() {
   };
 }
 
-function runMatch(context, matchIndex, seed) {
+function runMatch(context, matchIndex, seed, { opponent = "baseline", aggression = null } = {}) {
   const { renderer, sfx, presentation } = createStubs();
   const match = new context.Game(renderer, sfx, presentation);
 
@@ -138,12 +154,20 @@ function runMatch(context, matchIndex, seed) {
   match.random = gameRng;
 
   // V1/Renekton pilots P2 — the same champion the pilot expects to cast.
+  // The personality (B8) goes to the arena policy AND the champion pilot:
+  // the factories are independent and each reads its own copy.
+  const personality = aggression === null ? null : { aggression };
   match.selectChampion2("renekton");
   match.botPolicy = context.RIFTBOMB_BOTS.createV1Policy({
-    champion: context.RIFTBOMB_BOTS.createRenektonPilot({ random: v1Rng }),
-    random: v1Rng
+    champion: context.RIFTBOMB_BOTS.createRenektonPilot({ random: v1Rng, personality }),
+    random: v1Rng,
+    personality
   });
-  const p1Policy = context.RIFTBOMB_BOTS.createBaselinePolicy({ random: p1Rng });
+  // Self-play (B8): the P1 opponent is a second V1 without a champion
+  // module — the pure arena brain, kitless like the baseline but mobile.
+  const p1Policy = opponent === "v1"
+    ? context.RIFTBOMB_BOTS.createV1Policy({ random: p1Rng })
+    : context.RIFTBOMB_BOTS.createBaselinePolicy({ random: p1Rng });
 
   // Instrumentation wraps instance methods only — Match rules stay untouched.
   const skillsCast = { q: 0, w: 0, e: 0, r: 0 };
@@ -174,7 +198,7 @@ function runMatch(context, matchIndex, seed) {
   const rounds = [];
   let roundStats = createRoundStats();
   let prevRoundWins = [0, 0];
-  let prevRound = match.round;
+  let prevRound = 0; // overwritten after start(), before the first frame
   let pendingRoundWinner = null; // decided, waiting for the round to close
   let frames = 0;
   let timedOut = false;
@@ -191,6 +215,11 @@ function runMatch(context, matchIndex, seed) {
   };
 
   match.start();
+  // Round tracking starts AFTER start(): startRound() bumps the counter
+  // from 0 to 1, so initializing prevRound before start() closed a phantom
+  // zero-frame round per match — counted as a draw in every past report
+  // (cycle-15 diagnosis: 100 of the 111 "drawn" seed-42 rounds were this).
+  prevRound = match.round;
 
   while (match.mode === "playing") {
     if (frames >= MAX_FRAMES_PER_MATCH) {
@@ -249,11 +278,11 @@ function runMatch(context, matchIndex, seed) {
   return { winner, rounds, frames, timedOut, skillsCast };
 }
 
-export async function runCpuDuels({ matches = 100, seed = 42 } = {}) {
+export async function runCpuDuels({ matches = 100, seed = 42, opponent = "baseline", aggression = null } = {}) {
   const context = await loadGameClass();
   const perMatch = [];
   for (let i = 0; i < matches; i += 1) {
-    perMatch.push(runMatch(context, i, seed >>> 0));
+    perMatch.push(runMatch(context, i, seed >>> 0, { opponent, aggression }));
   }
   if (process.env.DUELS_DEBUG) { // TEMP cycle-9 diagnosis — revert after use
     console.error(JSON.stringify(perMatch.map((m, i) => ({
@@ -281,8 +310,8 @@ export async function runCpuDuels({ matches = 100, seed = 42 } = {}) {
   return {
     seed: seed >>> 0,
     matches,
-    v1: { champion: "renekton", player: 2 },
-    opponent: { policy: "baseline", player: 1, champion: "katarina" },
+    v1: { champion: "renekton", player: 2, aggression },
+    opponent: { policy: opponent, player: 1, champion: "katarina" },
     v1MatchWins,
     baselineMatchWins,
     drawnMatches,

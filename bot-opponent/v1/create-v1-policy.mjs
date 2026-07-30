@@ -8,25 +8,39 @@
  *
  * Intents still flow through the same entrypoints as human input —
  * game/ validates and applies; the bot never writes Match state.
+ *
+ * Personality (cycle 11, B8): the optional `personality` option carries
+ * temperament weights — today only `aggression` (0..1, default
+ * AGGRESSION_DEFAULT = 0.5, the exact pre-personality behavior). The
+ * arena side reads it in the navigation target priority; the champion
+ * pilot receives its OWN copy from the caller (the factories stay
+ * independent). The temporal escape never reads personality.
  */
 
 import { createBaselinePolicy } from "../baseline-policy.mjs";
 import { createV1Memory, resetV1Memory } from "./v1-memory.mjs";
-import { escapeTemporalDanger, navigateObjective, planArenaActions, unstickMovement, vetoBombWithoutEscape } from "./plan-arena-actions.mjs";
+import { observeRival } from "./read-rival.mjs";
+import { aggressionOf } from "./personality.mjs";
+import { escapeTemporalDanger, navigateObjective, planArenaActions, unstickMovement, unwedgeMovement, vetoBombWithoutEscape } from "./plan-arena-actions.mjs";
 
-export function createV1Policy({ champion = null, profile = "rift", random = Math.random } = {}) {
+export function createV1Policy({ champion = null, profile = "rift", random = Math.random, personality = null } = {}) {
   const arena = createBaselinePolicy({ profile, random });
   const memory = createV1Memory();
+  const temperament = { aggression: aggressionOf(personality) };
 
   return {
     profile,
     champion: champion?.id ?? null,
+    personality: temperament,
     memory,
     think(view, dt) {
       const intent = arena.think(view, dt);
       // buildWorldView returns null when the bot cannot think (dead, locked
       // round); the arena brain already answered with a neutral intent.
       if (!view) return intent;
+      // Rival observation runs once per think, before any planner reads
+      // the model, so interception and cut-escape plants use fresh habits.
+      observeRival(view, memory.rivalModel);
       const skill = champion?.evaluateSkill?.(view);
       if (skill) intent.skill = skill.slot;
       planArenaActions(view, intent, memory);
@@ -35,13 +49,18 @@ export function createV1Policy({ champion = null, profile = "rift", random = Mat
       // frame over the planned route. The temporal escape runs after the
       // route following (which clears the route memory on escape frames)
       // so its refuge plan is what the memory keeps.
-      navigateObjective(view, intent, memory, arena.memory);
+      navigateObjective(view, intent, memory, arena.memory, temperament);
       // The veto runs after every planner so a plant from the baseline OR
       // the route opener is dropped when the temporal escape cannot prove
       // a refuge; the escape step then owns the frame as usual.
       vetoBombWithoutEscape(view, intent, memory);
       escapeTemporalDanger(view, intent, memory, arena.memory);
       unstickMovement(view, intent, memory, arena.memory);
+      // Wedge recovery (cycle 15) runs last and only with a champion
+      // module: it fires the champion's mobility skill to unfreeze the
+      // collision box; the kitless arena brain (self-play P1) has nothing
+      // to recover with and keeps the baseline behavior.
+      if (champion) unwedgeMovement(view, intent, memory, arena.memory);
       return intent;
     },
     reset(roundInfo = {}) {
