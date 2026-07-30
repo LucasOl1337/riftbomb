@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { randomInt } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 import { applyPlayerAction } from "../../../game/create-authoritative-duel.mjs";
 import { AuthoritativeRooms, isChampion, validPreset } from "./authoritative-rooms.mjs";
@@ -11,7 +12,9 @@ const RECONNECT_GRACE_MS = 20_000;
 const MAX_ROOMS = Number(process.env.MAX_ROOMS || 256);
 const PROXY_SECRET = process.env.GAME_SERVER_PROXY_SECRET || "";
 const ROOM_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/;
+const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const rooms = new Map();
+const quickMatchQueue = [];
 
 function send(socket, message) {
   if (socket?.readyState === WebSocket.OPEN && socket.bufferedAmount < 256_000) {
@@ -25,8 +28,59 @@ function broadcast(room, message) {
 }
 const authoritativeRooms = new AuthoritativeRooms({ rooms, broadcast });
 
+function removeFromQuickMatchQueue(socket) {
+  const index = quickMatchQueue.findIndex((entry) => entry.socket === socket);
+  if (index >= 0) quickMatchQueue.splice(index, 1);
+  socket.quickMatchQueued = false;
+}
+
+function nextRoomCode() {
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    let code = "";
+    for (let index = 0; index < 6; index += 1) {
+      code += ROOM_ALPHABET[randomInt(ROOM_ALPHABET.length)];
+    }
+    if (!rooms.has(code)) return code;
+  }
+  return "";
+}
+
+function joinQuickMatch(socket, message) {
+  if (socket.quickMatchQueued) return;
+  if (rooms.size >= MAX_ROOMS) return send(socket, { type: "error", error: "server_full" });
+
+  while (quickMatchQueue.length) {
+    const waiting = quickMatchQueue.shift();
+    waiting.socket.quickMatchQueued = false;
+    if (waiting.socket.readyState !== WebSocket.OPEN || waiting.socket.riftbomb) continue;
+
+    const code = nextRoomCode();
+    if (!code) return send(socket, { type: "error", error: "server_full" });
+    const firstPreset = validPreset(waiting.preset);
+    const secondPreset = validPreset(message.preset);
+    const room = authoritativeRooms.create(code, {
+      hostChampion: firstPreset.hostChampion,
+      guestChampion: secondPreset.hostChampion,
+      arena: firstPreset.arena,
+      matchTarget: 3
+    });
+    attachPlayerToRoom(waiting.socket, { ready: true }, room, "host", { quickMatch: true });
+    attachPlayerToRoom(socket, { ready: true }, room, "guest", { quickMatch: true });
+    return;
+  }
+
+  socket.quickMatchQueued = true;
+  quickMatchQueue.push({ socket, preset: validPreset(message.preset) });
+  send(socket, { type: "quick-queued", position: quickMatchQueue.length });
+}
+
 function attachPlayer(socket, message) {
-  const code = String(message.room || "").toUpperCase();
+  if (message.type === "quick-match") return joinQuickMatch(socket, message);
+  if (message.type === "cancel-quick-match") {
+    removeFromQuickMatchQueue(socket);
+    return send(socket, { type: "quick-cancelled" });
+  }
+  const code = typeof message.room === "string" ? message.room.toUpperCase() : "";
   const role = message.role === "host" ? "host" : message.role === "guest" ? "guest" : "";
   if (!ROOM_PATTERN.test(code) || !role) return send(socket, { type: "error", error: "invalid_hello" });
 
@@ -39,7 +93,7 @@ function attachPlayer(socket, message) {
   attachPlayerToRoom(socket, message, room, role);
 }
 
-function attachPlayerToRoom(socket, message, room, role) {
+function attachPlayerToRoom(socket, message, room, role, { quickMatch = false } = {}) {
   const index = role === "host" ? 0 : 1;
   const current = room.players[index];
   if (current?.socket?.readyState === WebSocket.OPEN) {
@@ -48,20 +102,37 @@ function attachPlayerToRoom(socket, message, room, role) {
   room.players[index] = { socket, ready: role === "host" || Boolean(message.ready), disconnectedAt: 0 };
   socket.riftbomb = { room, index };
   room.lastActivity = Date.now();
-  send(socket, { type: "connected", role, playerId: index + 1, room: room.code });
+  send(socket, {
+    type: "connected",
+    role,
+    playerId: index + 1,
+    room: room.code,
+    quickMatch,
+    soundCursor: room.game?.authoritativeSound?.latest || room.soundEventSequence || 0
+  });
   broadcast(room, authoritativeRooms.lobbyMessage(room));
   void authoritativeRooms.start(room);
 }
 
-function handleMessage(socket, raw) {
+function parseClientMessage(raw) {
   let message;
-  try { message = JSON.parse(raw.toString()); } catch { return; }
+  try { message = JSON.parse(raw.toString()); } catch { return null; }
+  if (!message || typeof message !== "object" || Array.isArray(message) ||
+      typeof message.type !== "string" || !message.type || message.type.length > 32) return null;
+  return message;
+}
+
+function handleMessage(socket, raw) {
+  const message = parseClientMessage(raw);
+  if (!message) return;
   socket.lastSeen = Date.now();
+  if (message.type === "pong") return;
   if (!socket.riftbomb) return attachPlayer(socket, message);
   const { room, index } = socket.riftbomb;
   room.lastActivity = Date.now();
 
-  if (message.type === "input") room.inputs[index] = Number(message.mask) & 15;
+  if (message.type === "input" && Number.isInteger(message.mask) &&
+      message.mask >= 0 && message.mask <= 15) room.inputs[index] = message.mask;
   if (message.type === "action" && room.game) applyPlayerAction(room.game, index + 1, message);
   if (message.type === "guest-config" && index === 1 && !room.game) {
     room.players[1].ready = Boolean(message.ready);
@@ -105,7 +176,13 @@ const server = createServer((request, response) => {
   response.setHeader("cache-control", "no-store");
   if (request.url === "/health") {
     response.writeHead(200, { "content-type": "application/json" });
-    response.end(JSON.stringify({ ok: true, rooms: rooms.size, authority: "server", region: "sa-saopaulo-1" }));
+    response.end(JSON.stringify({
+      ok: true,
+      rooms: rooms.size,
+      quickMatchWaiting: quickMatchQueue.length,
+      authority: "server",
+      region: "sa-saopaulo-1"
+    }));
     return;
   }
   response.writeHead(404, { "content-type": "application/json" });
@@ -123,8 +200,12 @@ const webSockets = new WebSocketServer({
 });
 webSockets.on("connection", (socket) => {
   socket.lastSeen = Date.now();
+  // Protocol violations (including maxPayload) belong to the offending peer;
+  // ws closes that connection, while this listener keeps the server process alive.
+  socket.on("error", () => undefined);
   socket.on("message", (message) => handleMessage(socket, message));
   socket.on("close", () => {
+    removeFromQuickMatchQueue(socket);
     if (!socket.riftbomb) return;
     const { room, index } = socket.riftbomb;
     if (room.players[index]?.socket === socket) {
@@ -164,4 +245,4 @@ export function closeAuthoritativeServer() {
   server.close();
 }
 
-export { server, rooms };
+export { parseClientMessage, server, rooms };

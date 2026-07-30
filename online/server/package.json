@@ -8,10 +8,11 @@
   },
   "scripts": {
     "start": "node src/server.mjs",
-    "test": "npm run test:core && npm run test:transport && npm run test:rematch",
+    "test": "npm run test:core && npm run test:transport && npm run test:rematch && npm run test:matchmaking",
     "test:core": "node --test tests/authoritative-core.test.mjs",
     "test:transport": "node --test --test-name-pattern=websocket tests/authoritative-server.test.mjs",
-    "test:rematch": "node --test --test-name-pattern=rematch tests/authoritative-server.test.mjs"
+    "test:rematch": "node --test --test-name-pattern=rematch tests/authoritative-server.test.mjs",
+    "test:matchmaking": "node --test --test-name-pattern=\"quick match\" tests/authoritative-server.test.mjs"
   },
   "dependencies": {
     "ws": "8.21.1"

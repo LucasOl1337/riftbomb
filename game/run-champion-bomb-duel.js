@@ -220,6 +220,12 @@
       }
     ]);
 
+    // Bot skill intents ("q" | "w" | "e" | "r") map to the same slots the
+    // human input uses; unknown values never reach castAbility.
+    const BOT_SKILL_SLOTS = Object.freeze({ q: 0, w: 1, e: 2, r: 3 });
+    const ABILITY_BUFFER_SECONDS = 0.15;
+    const ABILITY_TIME_EPSILON = 0.000001;
+
     class Game {
       constructor(renderer, sfx, presentation) {
         this.renderer = renderer;
@@ -273,14 +279,48 @@
         this.touchDirs = new Set();
         // Analog stick for mobile (-1..1). Zero when released.
         this.touchStick = { x: 0, z: 0 };
+        // One authoritative postponed spell per player. Commands keep a player
+        // id rather than an object reference because online snapshots replace
+        // player objects in-place.
+        this.abilityBuffer = new Map();
+        this.abilityCommandSequence = 0;
+        this.abilityBufferStats = {
+          queued: 0,
+          executed: 0,
+          expired: 0,
+          replaced: 0,
+          canceled: 0,
+          channelsCanceled: 0
+        };
         this.statusTimer = 0;
         this.p2Human = false;
         this.generateMap();
         this.resetPlayers();
         this.botPolicy = typeof RIFTBOMB_BOTS === "undefined"
           ? null
-          : RIFTBOMB_BOTS.createBaselinePolicy({ random: () => 0 });
+          : this.createBotPolicy();
         this.resetBotPolicy();
+      }
+
+      createBotPolicy() {
+        const random = () => 0;
+        // V1 (Renekton pilot) ships in load-v1-bot.js; without that bundle
+        // the solo CPU falls back to the baseline policy as before.
+        if (typeof RIFTBOMB_BOTS.createV1Policy === "function") {
+          // The champion module must match the champion the CPU actually
+          // plays; without one the V1 runs its shared arena brain only.
+          const createPilot = this.selectedChampion2 === "renekton"
+            ? RIFTBOMB_BOTS.createRenektonPilot
+            : null;
+          if (typeof createPilot === "function") {
+            return RIFTBOMB_BOTS.createV1Policy({
+              champion: createPilot({ random }),
+              random
+            });
+          }
+          return RIFTBOMB_BOTS.createV1Policy({ random });
+        }
+        return RIFTBOMB_BOTS.createBaselinePolicy({ random });
       }
 
       random() {
@@ -384,6 +424,59 @@
         return [(c - (this.cols - 1) / 2) * this.tile, (r - (this.rows - 1) / 2) * this.tile];
       }
 
+      audioPanAt(x, z = 0) {
+        const numericX = Number(x);
+        const numericZ = Number(z);
+        if (!Number.isFinite(numericX) || !Number.isFinite(numericZ)) return 0;
+        const viewPlayerId = this.renderer?.viewPlayerId;
+        const focusPlayer = viewPlayerId
+          ? this.players?.find((player) => player.id === viewPlayerId)
+          : null;
+        const zoom = focusPlayer
+          ? clamp(Number(this.renderer?.viewZoom) || 0, 0, 1.35)
+          : 0;
+        const followZoom = clamp((zoom - 0.1) / 0.9, 0, 1);
+        const centerX = focusPlayer ? focusPlayer.x * followZoom : 0;
+        const centerZ = focusPlayer ? focusPlayer.z * followZoom : 0;
+        const [rawRightX, , rawRightZ] = Array.isArray(this.renderer?.cameraRight)
+          ? this.renderer.cameraRight
+          : [1, 0, 0];
+        const rightX = Number.isFinite(rawRightX) ? rawRightX : 1;
+        const rightZ = Number.isFinite(rawRightZ) ? rawRightZ : 0;
+        const rightLength = Math.max(0.0001, Math.hypot(rightX, rightZ));
+        const projected = ((numericX - centerX) * rightX + (numericZ - centerZ) * rightZ) / rightLength;
+        const halfArenaWidth = Math.max(this.tile, (this.cols - 2) * this.tile * 0.5);
+        const zoomMix = clamp(zoom, 0, 1);
+        const audibleHalfSpan = halfArenaWidth * (1 + (0.58 - 1) * zoomMix);
+        return clamp(projected / Math.max(this.tile, audibleHalfSpan), -0.75, 0.75);
+      }
+
+      playSfxAt(type, position, strength = 1, options = {}) {
+        const x = Number(position?.x);
+        const z = Number(position?.z);
+        if (typeof this.sfx?.emitGameEvent === "function") {
+          return this.sfx.emitGameEvent({ type, strength, x, z, options });
+        }
+        this.sfx.effect(type, strength, {
+          ...options,
+          ...(Number.isFinite(x) && Number.isFinite(z) ? { x, z } : {}),
+          pan: this.audioPanAt(x, z)
+        });
+      }
+
+      playExplosionAt(position, strength = 1, options = {}) {
+        const x = Number(position?.x);
+        const z = Number(position?.z);
+        if (typeof this.sfx?.emitGameEvent === "function") {
+          return this.sfx.emitGameEvent({ type: "explosion", strength, x, z, options });
+        }
+        this.sfx.explosion(strength, {
+          ...options,
+          ...(Number.isFinite(x) && Number.isFinite(z) ? { x, z } : {}),
+          pan: this.audioPanAt(x, z)
+        });
+      }
+
       cellFromWorld(x, z) {
         return {
           c: clamp(Math.round(x / this.tile + (this.cols - 1) / 2), 0, this.cols - 1),
@@ -465,6 +558,7 @@
       }
 
       resetPlayers() {
+        this.abilityBuffer?.clear();
         this.players = [this.createPlayer(1), this.createPlayer(2)];
         this.player = this.players[0];
         this.resetBotPolicy();
@@ -475,6 +569,9 @@
         if (!this.botPolicy) return;
         const bot = this.players[1];
         this.botPolicy.reset({ random: () => 0 });
+        // Baseline memory keeps the arena timers; the V1 policy wraps its own
+        // arena memory, so only sync when the fields exist.
+        if (!("think" in this.botPolicy.memory)) return;
         this.botPolicy.memory.think = bot?.aiThink ?? 0.15;
         this.botPolicy.memory.lastDx = bot?.aiDx ?? 0;
         this.botPolicy.memory.lastDz = bot?.aiDz ?? 1;
@@ -493,6 +590,11 @@
         this.selectedChampion2 = champion;
         void this.renderer.ensureChampionModel?.(champion);
         this.resetPlayers();
+        // The CPU pilot depends on the champion it actually plays.
+        if (typeof RIFTBOMB_BOTS !== "undefined") {
+          this.botPolicy = this.createBotPolicy();
+          this.resetBotPolicy();
+        }
         if (this.p2Human) this.presentation.announce(`Player 2 ready · ${this.players[1].name} is local`);
         this.presentation.update(this);
       }
@@ -505,6 +607,9 @@
         this.roundWins = [0, 0];
         this.elapsed = 0;
         this.bombId = 0;
+        this.abilityBuffer.clear();
+        this.abilityCommandSequence = 0;
+        for (const key of Object.keys(this.abilityBufferStats)) this.abilityBufferStats[key] = 0;
         this.pendingMatchWinner = null;
         this.particles = [];
         this.startRound();
@@ -630,7 +735,7 @@
         };
         this.bombs.push(bomb);
         if (player.champion === "vladimir") player.vladimirAttackAnim = 0.42;
-        this.sfx.effect("bomb");
+        this.playSfxAt("bomb", { x, z });
         this.spawnParticles(x, 0.45, z,
           player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 9, 0.6, 0.08);
         this.presentation.update(this);
@@ -647,7 +752,7 @@
         player.dashCooldown = 5;
         player.invulnerable = Math.max(player.invulnerable, 0.22);
         this.renderer.cameraShake = Math.max(this.renderer.cameraShake, 0.14);
-        this.sfx.effect("dash");
+        this.playSfxAt("dash", player);
         this.spawnParticles(player.x, 0.5, player.z,
           player.id === 1 ? Renderer.colors.rift : Renderer.colors.ember, 18, 0.48, 0.1);
       }
@@ -673,14 +778,189 @@
         return (kits[player.champion] || kits.katarina)[slot] || `Skill ${slot + 1}`;
       }
 
-      castAbility(slot, player = this.player) {
+      abilityCooldown(player, slot) {
+        if (player.champion === "zed" && slot === 1 && player.zedSwapWindow > 0) {
+          if (this.zedLivingShadow(player)) return 0;
+        }
+        if (player.champion === "renekton" && slot === 2 && player.renektonDashRecast > 0) return 0;
+        const cooldown = Number(player[["qCooldown", "wCooldown", "eCooldown", "rCooldown"][slot]]) || 0;
+        return cooldown > ABILITY_TIME_EPSILON ? cooldown : 0;
+      }
+
+      abilityBufferBlock(player, slot) {
+        const blockers = [];
+        // Remove Scurvy is the one explicit cleanse: it remains castable while
+        // Gangplank is stunned, just like the authored kit promises.
+        if (player.stunned > ABILITY_TIME_EPSILON &&
+            !(player.champion === "gangplank" && slot === 1)) {
+          blockers.push({ kind: "stun", remaining: player.stunned });
+        }
+        if (player.vladimirPool > ABILITY_TIME_EPSILON) {
+          blockers.push({ kind: "pool", remaining: player.vladimirPool });
+        }
+        const cooldown = this.abilityCooldown(player, slot);
+        if (cooldown > 0) blockers.push({ kind: "cooldown", remaining: cooldown });
+        return blockers.length ? {
+          kinds: blockers.map(({ kind }) => kind),
+          remaining: Math.max(...blockers.map(({ remaining }) => remaining))
+        } : null;
+      }
+
+      rivalInRange(player, range) {
+        return this.players.find((candidate) => candidate.id !== player.id && candidate.alive &&
+          Math.hypot(candidate.x - player.x, candidate.z - player.z) <= range);
+      }
+
+      katarinaShunpoTarget(player) {
+        const range = this.tile * 5.1;
+        const dagger = this.daggers
+          .filter((candidate) => candidate.age >= candidate.readyAt &&
+            Math.hypot(candidate.x - player.x, candidate.z - player.z) <= range)
+          .sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) -
+            Math.hypot(b.x - player.x, b.z - player.z))[0];
+        const rival = this.rivalInRange(player, range);
+        const pickup = this.pickups
+          .filter((candidate) => Math.hypot(candidate.x - player.x, candidate.z - player.z) <= range)
+          .sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) -
+            Math.hypot(b.x - player.x, b.z - player.z))[0];
+        return dagger || rival || pickup;
+      }
+
+      zedLivingShadow(player) {
+        return this.zedShadows.find((shadow) => shadow.ownerId === player.id &&
+          shadow.kind === "living" && shadow.swapAvailable && shadow.age < shadow.life);
+      }
+
+      zedShadowLanding(player) {
+        for (let steps = 3; steps >= 1; steps--) {
+          const cell = this.cellFromWorld(
+            player.x + player.lastDx * this.tile * steps,
+            player.z + player.lastDz * this.tile * steps
+          );
+          if (this.grid[cell.r]?.[cell.c] !== 0) continue;
+          const [x, z] = this.worldFromCell(cell.r, cell.c);
+          if (!this.isBlocked(x, z, 0.28) && Math.hypot(x - player.x, z - player.z) >= this.tile * 0.55) {
+            return { x, z, ...cell };
+          }
+        }
+        return null;
+      }
+
+      gangplankKegPlacement(player) {
+        if (this.gangplankBarrels.filter((barrel) =>
+          barrel.ownerId === player.id && !barrel.exploded).length >= 3) return null;
+        const length = Math.max(0.001, Math.hypot(player.lastDx, player.lastDz));
+        let cell = this.cellFromWorld(
+          player.x + player.lastDx / length * this.tile,
+          player.z + player.lastDz / length * this.tile
+        );
+        if (this.grid[cell.r]?.[cell.c] !== 0) cell = this.cellFromWorld(player.x, player.z);
+        if (this.grid[cell.r]?.[cell.c] !== 0 ||
+            this.gangplankBarrels.some((barrel) => !barrel.exploded && barrel.r === cell.r && barrel.c === cell.c) ||
+            this.bombs.some((bomb) => !bomb.exploded && bomb.r === cell.r && bomb.c === cell.c)) return null;
+        const [x, z] = this.worldFromCell(cell.r, cell.c);
+        return { cell, x, z };
+      }
+
+      abilityTargetAvailable(player, slot) {
+        if (player.champion === "katarina") {
+          if (slot === 2) return Boolean(this.katarinaShunpoTarget(player));
+          if (slot === 3) return Boolean(this.rivalInRange(player, this.tile * 3.35));
+        }
+        if (player.champion === "zed") {
+          if (slot === 1) return Boolean(
+            (player.zedSwapWindow > ABILITY_TIME_EPSILON && this.zedLivingShadow(player)) ||
+            this.zedShadowLanding(player)
+          );
+          if (slot === 3) return Boolean(this.rivalInRange(player, this.tile * 4.5));
+        }
+        if (player.champion === "vladimir" && slot === 0) {
+          const target = this.katTargetInFront(player, this.tile * 5);
+          return Boolean(target.player || (Number.isInteger(target.r) && Number.isInteger(target.c)));
+        }
+        if (player.champion === "gangplank" && slot === 2) {
+          return Boolean(this.gangplankKegPlacement(player));
+        }
+        return true;
+      }
+
+      abilityTargetFailure(player, slot) {
+        if (player.champion === "katarina" && slot === 2) return "Shunpo needs a dagger, pickup, or rival in range";
+        if (player.champion === "katarina" && slot === 3) return "Death Lotus needs the rival nearby";
+        if (player.champion === "zed" && slot === 1) return "Living Shadow needs a free arena cell";
+        if (player.champion === "zed" && slot === 3) return "Death Mark needs the rival in range";
+        if (player.champion === "vladimir" && slot === 0) return "Transfusion needs a rival or Hextech crate";
+        return "";
+      }
+
+      queueAbility(slot, player, block) {
+        this.abilityBuffer.set(player.id, {
+          sequence: ++this.abilityCommandSequence,
+          playerId: player.id,
+          slot,
+          remaining: ABILITY_BUFFER_SECONDS,
+          initialBlockers: block?.kinds || []
+        });
+        this.abilityBufferStats.queued += 1;
+        return true;
+      }
+
+      clearAbilityBuffer(playerId, reason = "canceled") {
+        if (!this.abilityBuffer.delete(playerId)) return false;
+        if (reason === "expired") this.abilityBufferStats.expired += 1;
+        else this.abilityBufferStats.canceled += 1;
+        return true;
+      }
+
+      cancelKatarinaChannel(player, reason = "") {
+        if (player?.champion !== "katarina" || player.ultChannel <= 0) return false;
+        player.ultChannel = 0;
+        player.ultTick = 0;
+        this.slashes = this.slashes.filter((slash) =>
+          !slash.lotus || slash.ownerId !== player.id
+        );
+        this.abilityBufferStats.channelsCanceled += 1;
+        if (reason && player.alive) {
+          this.presentation.announce(`Death Lotus canceled · ${reason}`);
+          this.presentation.update(this);
+        }
+        return true;
+      }
+
+      castAbility(slot, player = this.player, options = {}) {
         if (!player?.alive || this.mode !== "playing" || this.roundLocked) return false;
-        if (player.vladimirPool > 0) return false;
+        if (!Number.isInteger(slot) || slot < 0 || slot > 3) return false;
         this.dropOwnerId = player.id;
         if (!this.isSkillUnlocked(player, slot)) {
           this.presentation.announce(`${this.skillSlotLabel(player, slot)} locked · break crates`);
           return false;
         }
+        // A postponed command preserves the target eligibility observed when
+        // the player pressed the key; it cannot acquire a target later.
+        if (!this.abilityTargetAvailable(player, slot)) {
+          const failure = this.abilityTargetFailure(player, slot);
+          if (failure) this.presentation.announce(failure);
+          return false;
+        }
+        const block = this.abilityBufferBlock(player, slot);
+        if (block) {
+          if (options.buffer === false ||
+              block.remaining > ABILITY_BUFFER_SECONDS + ABILITY_TIME_EPSILON) return false;
+          if (this.abilityBuffer.has(player.id)) this.abilityBufferStats.replaced += 1;
+          if (player.ultChannel > 0) this.cancelKatarinaChannel(player, "new ability");
+          return this.queueAbility(slot, player, block);
+        }
+        if (player.ultChannel > 0) this.cancelKatarinaChannel(player, "new ability");
+        const executed = this.executeAbility(slot, player);
+        // A spatially invalid cast (for example Shunpo without a target) never
+        // erases an earlier, still-valid postponed spell.
+        if (executed && this.abilityBuffer.delete(player.id)) {
+          this.abilityBufferStats.replaced += 1;
+        }
+        return executed;
+      }
+
+      executeAbility(slot, player) {
         if (player.champion === "zed") {
           if (slot === 0) return this.castZedQ(player);
           if (slot === 1) return this.castZedW(player);
@@ -714,6 +994,36 @@
         if (slot === 2) return this.castKatarinaE(player);
         if (slot === 3) return this.castKatarinaR(player);
         return false;
+      }
+
+      processAbilityBuffer(dt) {
+        if (!this.abilityBuffer.size) return;
+        const orderedPlayers = [...this.players].sort((a, b) => a.id - b.id);
+        for (const player of orderedPlayers) {
+          const command = this.abilityBuffer.get(player.id);
+          if (!command) continue;
+          command.remaining = Math.max(0, command.remaining - dt);
+          if (command.remaining <= ABILITY_TIME_EPSILON) command.remaining = 0;
+          if (this.mode !== "playing" || this.roundLocked || !player.alive ||
+              !this.isSkillUnlocked(player, command.slot)) {
+            this.clearAbilityBuffer(player.id);
+            continue;
+          }
+          const block = this.abilityBufferBlock(player, command.slot);
+          // Crowd control applied after a cooldown-buffered command cancels it;
+          // a command deliberately entered during the final 150 ms of a stun
+          // remains eligible. This makes ordering explicit and replayable.
+          if (block?.kinds.includes("stun") && !command.initialBlockers.includes("stun")) {
+            this.clearAbilityBuffer(player.id);
+            continue;
+          }
+          if (block) {
+            if (command.remaining <= 0) this.clearAbilityBuffer(player.id, "expired");
+            continue;
+          }
+          this.abilityBuffer.delete(player.id);
+          if (this.executeAbility(command.slot, player)) this.abilityBufferStats.executed += 1;
+        }
       }
 
       katTargetInFront(player, maxDistance) {
@@ -771,7 +1081,7 @@
           age: 0,
           duration: clamp(distance / 12, 0.28, 0.52)
         });
-        this.sfx.effect("katQ");
+        this.playSfxAt("katQ", player);
         this.presentation.announce("Katarina · Bouncing Blade");
         this.presentation.update(this);
         return true;
@@ -784,7 +1094,7 @@
         player.speedBoost = 1.5;
         this.dropDagger(player.x, player.z, 0.48);
         this.spawnParticles(player.x, 0.72, player.z, Renderer.colors.katCrimson, 18, 0.75, 0.1);
-        this.sfx.effect("katW");
+        this.playSfxAt("katW", player);
         this.presentation.announce("Katarina · Preparation");
         this.presentation.update(this);
         return true;
@@ -792,20 +1102,12 @@
 
       castKatarinaE(player) {
         if (player.eCooldown > 0 || player.ultChannel > 0) return false;
-        const range = this.tile * 5.1;
-        const readyDaggers = this.daggers
-          .filter((dagger) => dagger.age >= dagger.readyAt && Math.hypot(dagger.x - player.x, dagger.z - player.z) <= range)
-          .sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(b.x - player.x, b.z - player.z));
-        const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive &&
-          Math.hypot(candidate.x - player.x, candidate.z - player.z) <= range);
-        const pickup = this.pickups
-          .filter((item) => Math.hypot(item.x - player.x, item.z - player.z) <= range)
-          .sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) - Math.hypot(b.x - player.x, b.z - player.z))[0];
-        const target = readyDaggers[0] || rival || pickup;
+        const target = this.katarinaShunpoTarget(player);
         if (!target) {
           this.presentation.announce("Shunpo needs a dagger, pickup, or rival in range");
           return false;
         }
+        const rival = this.rivalInRange(player, this.tile * 5.1);
         const fromX = player.x;
         const fromZ = player.z;
         const landing = this.findOpenLanding(target.x, target.z, player);
@@ -823,7 +1125,7 @@
         if (rival && Math.hypot(rival.x - player.x, rival.z - player.z) < 1.15) {
           this.hitSkill(rival, 0.18, player, "Shunpo");
         }
-        this.sfx.effect("shunpo");
+        this.playSfxAt("shunpo", player);
         this.presentation.announce("Katarina · Shunpo");
         this.presentation.update(this);
         return true;
@@ -831,16 +1133,24 @@
 
       castKatarinaR(player) {
         if (player.rCooldown > 0 || player.ultChannel > 0) return false;
-        const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
-        if (!rival || Math.hypot(rival.x - player.x, rival.z - player.z) > this.tile * 3.35) {
+        const rival = this.rivalInRange(player, this.tile * 3.35);
+        if (!rival) {
           this.presentation.announce("Death Lotus needs the rival nearby");
           return false;
         }
         player.rCooldown = 28;
         player.ultChannel = 1.65;
         player.ultTick = 0;
-        this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 2.75, age: 0, life: 1.65, lotus: true });
-        this.sfx.effect("deathLotus");
+        this.slashes.push({
+          ownerId: player.id,
+          x: player.x,
+          z: player.z,
+          radius: this.tile * 2.75,
+          age: 0,
+          life: 1.65,
+          lotus: true
+        });
+        this.playSfxAt("deathLotus", player);
         this.renderer.addShock(player.x, player.z, 0.8);
         this.presentation.announce("Katarina · Death Lotus");
         this.presentation.update(this);
@@ -910,16 +1220,14 @@
             resolved: false
           });
         }
-        this.sfx.effect("zedQ");
+        this.playSfxAt("zedQ", player);
         this.presentation.announce(`Zed · Razor Shuriken ×${origins.length}`);
         this.presentation.update(this);
         return true;
       }
 
       castZedW(player) {
-        const living = this.zedShadows.find((shadow) =>
-          shadow.ownerId === player.id && shadow.kind === "living" && shadow.swapAvailable && shadow.age < shadow.life
-        );
+        const living = this.zedLivingShadow(player);
         if (living && player.zedSwapWindow > 0) {
           const fromX = player.x;
           const fromZ = player.z;
@@ -939,25 +1247,14 @@
           this.renderer.addShock(player.x, player.z, 0.54);
           this.spawnParticles(fromX, 0.52, fromZ, Renderer.colors.zedCrimson, 24, 0.62, 0.1);
           this.spawnParticles(player.x, 0.52, player.z, Renderer.colors.zedShadow, 28, 0.66, 0.12);
-          this.sfx.effect("zedSwap");
+          this.playSfxAt("zedSwap", player);
           this.presentation.announce("Zed · Living Shadow exchange");
           return true;
         }
         if (player.wCooldown > 0) return false;
 
-        let landing = null;
-        for (let steps = 3; steps >= 1; steps--) {
-          const targetX = player.x + player.lastDx * this.tile * steps;
-          const targetZ = player.z + player.lastDz * this.tile * steps;
-          const cell = this.cellFromWorld(targetX, targetZ);
-          if (this.grid[cell.r]?.[cell.c] !== 0) continue;
-          const [x, z] = this.worldFromCell(cell.r, cell.c);
-          if (!this.isBlocked(x, z, 0.28)) {
-            landing = { x, z, ...cell };
-            break;
-          }
-        }
-        if (!landing || Math.hypot(landing.x - player.x, landing.z - player.z) < this.tile * 0.55) {
+        const landing = this.zedShadowLanding(player);
+        if (!landing) {
           this.presentation.announce("Living Shadow needs a free arena cell");
           return false;
         }
@@ -975,7 +1272,7 @@
         });
         this.spawnParticles(shadow.x, 0.48, shadow.z, Renderer.colors.zedCrimson, 28, 0.72, 0.11);
         this.renderer.addShock(shadow.x, shadow.z, 0.42);
-        this.sfx.effect("zedW");
+        this.playSfxAt("zedW", shadow);
         this.presentation.announce("Zed · Living Shadow · F again to exchange");
         this.presentation.update(this);
         return true;
@@ -1012,7 +1309,7 @@
         }
         if (hitRival) player.wCooldown = Math.max(0, player.wCooldown - 2.2);
         this.renderer.addShock(player.x, player.z, 0.5);
-        this.sfx.effect("zedE");
+        this.playSfxAt("zedE", player);
         this.presentation.announce(hitRival ? "Shadow Slash · Living Shadow cooldown reduced" : `Zed · Shadow Slash ×${origins.length}`);
         this.presentation.update(this);
         return true;
@@ -1020,8 +1317,8 @@
 
       castZedR(player) {
         if (player.rCooldown > 0) return false;
-        const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
-        if (!rival || Math.hypot(rival.x - player.x, rival.z - player.z) > this.tile * 4.5) {
+        const rival = this.rivalInRange(player, this.tile * 4.5);
+        if (!rival) {
           this.presentation.announce("Death Mark needs the rival in range");
           return false;
         }
@@ -1061,7 +1358,7 @@
         this.renderer.addShock(player.x, player.z, 0.76);
         this.spawnParticles(fromX, 0.58, fromZ, Renderer.colors.zedShadow, 34, 0.86, 0.13);
         this.spawnParticles(player.x, 0.58, player.z, Renderer.colors.zedCrimson, 34, 0.86, 0.13);
-        this.sfx.effect("deathMark");
+        this.playSfxAt("deathMark", rival);
         this.presentation.announce("Zed · Death Mark");
         this.presentation.update(this);
         return true;
@@ -1080,6 +1377,15 @@
             12, 0.52, 0.08);
         }
         return healed;
+      }
+
+      payVladimirHealthCost(player, ability) {
+        const config = ability === "sanguinePool"
+          ? { cap: 0.08, ratio: 0.12, floor: 0.06 }
+          : { cap: 0.065, ratio: 0.1, floor: 0.05 };
+        const cost = Math.min(config.cap, player.health * config.ratio);
+        player.health = Math.max(config.floor, player.health - cost);
+        return cost;
       }
 
       gainRenektonFury(player, amount) {
@@ -1116,7 +1422,7 @@
         this.renderer.addShock(player.x, player.z, empowered ? 0.72 : 0.5);
         this.spawnParticles(player.x, 0.56, player.z, Renderer.colors.renektonTeal,
           empowered ? 38 : 26, 0.82, 0.11);
-        this.sfx.effect(empowered ? "renektonQEmpowered" : "renektonQ");
+        this.playSfxAt(empowered ? "renektonQEmpowered" : "renektonQ", player);
         this.presentation.announce(`Renekton · ${empowered ? "Empowered " : ""}Cull the Meek${healing > 0 ? " · healed" : ""}`);
         this.presentation.update(this);
         return true;
@@ -1157,7 +1463,7 @@
         });
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 0.82, age: 0, life: 0.42, renekton: true });
         this.renderer.addShock(player.x, player.z, empowered ? 0.78 : 0.54);
-        this.sfx.effect(empowered ? "renektonWEmpowered" : "renektonW");
+        this.playSfxAt(empowered ? "renektonWEmpowered" : "renektonW", player);
         this.presentation.announce(`Renekton · ${empowered ? "Empowered " : ""}Ruthless Predator`);
         this.presentation.update(this);
         return true;
@@ -1225,7 +1531,7 @@
         });
         this.renderer.addShock(player.x, player.z, recast ? 0.58 : 0.42);
         this.spawnParticles(player.x, 0.42, player.z, Renderer.colors.renektonTeal, 24, 0.66, 0.1);
-        this.sfx.effect(recast ? "renektonDice" : "renektonE");
+        this.playSfxAt(recast ? "renektonDice" : "renektonE", player);
         this.presentation.announce(recast ? "Renekton · Dice" : `Renekton · Slice${hitUnit ? " · E again" : ""}`);
         this.presentation.update(this);
         return true;
@@ -1242,7 +1548,7 @@
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 2.05, age: 0, life: 1.1, renekton: true });
         this.renderer.addShock(player.x, player.z, 1.05);
         this.spawnParticles(player.x, 0.75, player.z, Renderer.colors.renektonTeal, 52, 1.15, 0.14);
-        this.sfx.effect("dominus");
+        this.playSfxAt("dominus", player);
         this.presentation.announce("Renekton · Dominus");
         this.presentation.update(this);
         return true;
@@ -1276,7 +1582,7 @@
         this.spawnParticles(target.x, 0.62, target.z, Renderer.colors.vladimirCrimson,
           empowered ? 34 : 22, 0.74, 0.1);
         this.renderer.addShock(target.x, target.z, empowered ? 0.62 : 0.38);
-        this.sfx.effect(empowered ? "vladimirQEmpowered" : "vladimirQ");
+        this.playSfxAt(empowered ? "vladimirQEmpowered" : "vladimirQ", target);
         this.presentation.announce(`Vladimir · ${empowered ? "Empowered " : ""}Transfusion`);
         this.presentation.update(this);
         return true;
@@ -1289,10 +1595,10 @@
         player.vladimirPoolTick = 0;
         player.invulnerable = Math.max(player.invulnerable, 1.48);
         player.speedBoost = Math.max(player.speedBoost, 1.45);
-        player.health = Math.max(0.06, player.health - Math.min(0.08, player.health * 0.12));
+        this.payVladimirHealthCost(player, "sanguinePool");
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 1.38, age: 0, life: 1.45, vladimir: true });
         this.renderer.addShock(player.x, player.z, 0.64);
-        this.sfx.effect("sanguinePool");
+        this.playSfxAt("sanguinePool", player);
         this.presentation.announce("Vladimir · Sanguine Pool");
         this.presentation.update(this);
         return true;
@@ -1305,7 +1611,7 @@
         player.vladimirEAnim = 0.62;
         player.castAnim = 0.58;
         player.castDuration = 0.58;
-        player.health = Math.max(0.05, player.health - Math.min(0.065, player.health * 0.1));
+        this.payVladimirHealthCost(player, "tidesOfBlood");
         let destroyed = 0;
         for (let r = 1; r < this.rows - 1; r++) {
           for (let c = 1; c < this.cols - 1; c++) {
@@ -1322,7 +1628,7 @@
         this.slashes.push({ x: player.x, z: player.z, radius, age: 0, life: 0.66, vladimir: true });
         this.spawnParticles(player.x, 0.68, player.z, Renderer.colors.vladimirCrimson, 42, 0.96, 0.12);
         this.renderer.addShock(player.x, player.z, 0.72);
-        this.sfx.effect("tidesOfBlood");
+        this.playSfxAt("tidesOfBlood", player);
         this.presentation.announce(`Vladimir · Tides of Blood${destroyed ? ` · ${destroyed} crates` : ""}`);
         this.presentation.update(this);
         return true;
@@ -1349,7 +1655,7 @@
         this.slashes.push({ x: landing.x, z: landing.z, radius, age: 0, life: 0.82, vladimir: true });
         this.renderer.addShock(landing.x, landing.z, 0.84);
         this.spawnParticles(landing.x, 0.58, landing.z, Renderer.colors.vladimirCrimson, 38, 0.92, 0.12);
-        this.sfx.effect("hemoplague");
+        this.playSfxAt("hemoplague", landing);
         this.presentation.announce("Vladimir · Hemoplague");
         this.presentation.update(this);
         return true;
@@ -1380,7 +1686,7 @@
           life: this.tile * 7.2 / 14.2,
           resolved: false
         });
-        this.sfx.effect("gangplankQ");
+        this.playSfxAt("gangplankQ", player);
         this.presentation.announce("Gangplank · Parrrley");
         this.presentation.update(this);
         return true;
@@ -1397,7 +1703,7 @@
         this.healChampion(player, 0.28);
         this.spawnParticles(player.x, 0.7, player.z, Renderer.colors.gangplankGold, 28, 0.7, 0.1);
         this.slashes.push({ x: player.x, z: player.z, radius: this.tile * 0.95, age: 0, life: 0.45, gangplank: true });
-        this.sfx.effect("removeScurvy");
+        this.playSfxAt("removeScurvy", player);
         this.presentation.announce("Gangplank · Remove Scurvy");
         this.presentation.update(this);
         return true;
@@ -1405,19 +1711,9 @@
 
       castGangplankE(player) {
         if (player.eCooldown > 0) return false;
-        const owned = this.gangplankBarrels.filter((b) => b.ownerId === player.id && !b.exploded).length;
-        if (owned >= 3) return false;
-        const dx = player.lastDx || Math.sin(player.facing);
-        const dz = player.lastDz || Math.cos(player.facing);
-        const length = Math.max(0.001, Math.hypot(dx, dz));
-        const preferX = player.x + (dx / length) * this.tile;
-        const preferZ = player.z + (dz / length) * this.tile;
-        let cell = this.cellFromWorld(preferX, preferZ);
-        if (this.grid[cell.r]?.[cell.c] !== 0) cell = this.cellFromWorld(player.x, player.z);
-        if (this.grid[cell.r]?.[cell.c] !== 0) return false;
-        if (this.gangplankBarrels.some((b) => !b.exploded && b.r === cell.r && b.c === cell.c)) return false;
-        if (this.bombs.some((b) => !b.exploded && b.r === cell.r && b.c === cell.c)) return false;
-        const [x, z] = this.worldFromCell(cell.r, cell.c);
+        const placement = this.gangplankKegPlacement(player);
+        if (!placement) return false;
+        const { cell, x, z } = placement;
         player.eCooldown = 7.5;
         player.castAnim = 0.36;
         player.castDuration = 0.36;
@@ -1433,7 +1729,7 @@
           exploded: false
         });
         this.spawnParticles(x, 0.4, z, Renderer.colors.gangplankOrange, 18, 0.5, 0.08);
-        this.sfx.effect("powderKeg");
+        this.playSfxAt("powderKeg", { x, z });
         this.presentation.announce("Gangplank · Powder Keg");
         this.presentation.update(this);
         return true;
@@ -1458,7 +1754,7 @@
         });
         this.slashes.push({ x: target.x, z: target.z, radius: this.tile * 2.35, age: 0, life: 2.5, gangplank: true });
         this.spawnParticles(target.x, 0.6, target.z, Renderer.colors.gangplankOrange, 36, 0.9, 0.12);
-        this.sfx.effect("cannonBarrage");
+        this.playSfxAt("cannonBarrage", target);
         this.presentation.announce("Gangplank · Cannon Barrage");
         this.presentation.update(this);
         return true;
@@ -1469,6 +1765,10 @@
         barrel.exploded = true;
         const owner = this.players.find((p) => p.id === barrel.ownerId);
         const radius = this.tile * (1.75 + Math.min(chainDepth, 2) * 0.12);
+        this.playSfxAt("barrelBoom", barrel, 1 + Math.min(chainDepth, 2) * 0.05, {
+          chainDepth,
+          sourceId: barrel.id
+        });
         let destroyed = 0;
         for (let r = 1; r < this.rows - 1; r++) {
           for (let c = 1; c < this.cols - 1; c++) {
@@ -1489,7 +1789,6 @@
         this.renderer.addShock(barrel.x, barrel.z, 0.85);
         this.slashes.push({ x: barrel.x, z: barrel.z, radius, age: 0, life: 0.55, gangplank: true });
         this.spawnParticles(barrel.x, 0.55, barrel.z, Renderer.colors.gangplankOrange, 42, 0.95, 0.13);
-        this.sfx.effect("barrelBoom");
         for (const other of this.gangplankBarrels) {
           if (other.exploded || other.id === barrel.id) continue;
           if (Math.hypot(other.x - barrel.x, other.z - barrel.z) <= this.tile * 1.85) {
@@ -1559,8 +1858,15 @@
           if (barrage.detonated) continue;
           if (barrage.age < barrage.fuse * 0.55) continue;
           barrage.tick -= dt;
+          let playedCannonImpact = false;
           while (barrage.tick <= 0 && barrage.age < barrage.fuse + 1.35) {
             barrage.tick += 0.28;
+            if (!playedCannonImpact) {
+              this.playSfxAt("cannonImpact", barrage, 0.72, {
+                sourceId: `${barrage.ownerId}:${Math.round(barrage.x * 100)}:${Math.round(barrage.z * 100)}`
+              });
+              playedCannonImpact = true;
+            }
             const owner = this.players.find((p) => p.id === barrage.ownerId);
             const rival = this.players.find((p) => p.id !== barrage.ownerId && p.alive);
             if (rival && Math.hypot(rival.x - barrage.x, rival.z - barrage.z) <= barrage.radius) {
@@ -1652,6 +1958,7 @@
       }
 
       updateContestant(player, dt) {
+        const wasStunned = player.stunned > 0;
         player.invulnerable = Math.max(0, player.invulnerable - dt);
         player.hurt = Math.max(0, player.hurt - dt);
         player.dashCooldown = Math.max(0, player.dashCooldown - dt);
@@ -1676,19 +1983,37 @@
         player.vladimirEAnim = Math.max(0, player.vladimirEAnim - dt);
         player.vladimirUltAnim = Math.max(0, player.vladimirUltAnim - dt);
         player.moving = false;
-        if (!player.alive) return;
+        if (!player.alive) {
+          this.clearAbilityBuffer(player.id);
+          this.cancelKatarinaChannel(player);
+          return;
+        }
+
+        if (wasStunned) {
+          this.cancelKatarinaChannel(player, "crowd control");
+          const buffered = this.abilityBuffer.get(player.id);
+          const gangplankCleanse = player.champion === "gangplank" && buffered?.slot === 1;
+          if (buffered && !gangplankCleanse && !buffered.initialBlockers.includes("stun")) {
+            this.clearAbilityBuffer(player.id);
+          }
+        }
 
         if (player.stunned > 0) {
           player.dashRequested = false;
           return;
         }
 
+        let movement = null;
         if (player.ultChannel > 0) {
-          player.dashRequested = false;
-          return;
+          movement = this.movementFor(player);
+          if (movement.dx === 0 && movement.dz === 0) {
+            player.dashRequested = false;
+            return;
+          }
+          this.cancelKatarinaChannel(player, "movement");
         }
 
-        let { dx, dz, analog } = this.movementFor(player);
+        let { dx, dz, analog } = movement || this.movementFor(player);
         const moving = dx !== 0 || dz !== 0;
         player.moving = moving;
         if (moving) {
@@ -1804,7 +2129,7 @@
         this.dropDagger(hitX + vx / length * 0.68, hitZ + vz / length * 0.68, 0.32, owner);
         this.slashes.push({ x: hitX, z: hitZ, radius: this.tile * 0.72, age: 0, life: 0.34 });
         this.spawnParticles(hitX, 0.7, hitZ, Renderer.colors.katBladeEdge, 18, 0.6, 0.09);
-        this.sfx.effect("daggerLand");
+        this.playSfxAt("daggerLand", { x: hitX, z: hitZ });
       }
 
       triggerVoracity(player, dagger) {
@@ -1813,7 +2138,7 @@
         const radius = this.tile * 1.42;
         this.slashes.push({ x: dagger.x, z: dagger.z, radius, age: 0, life: 0.55, voracity: true });
         this.renderer.addShock(dagger.x, dagger.z, 0.64);
-        this.sfx.effect("voracity");
+        this.playSfxAt("voracity", dagger);
         this.spawnParticles(dagger.x, 0.48, dagger.z, Renderer.colors.katCrimson, 34, 0.82, 0.12);
 
         const rival = this.players.find((candidate) => candidate.id !== player.id && candidate.alive);
@@ -1948,7 +2273,9 @@
             this.renderer.addShock(target.x, target.z, 0.92);
             this.slashes.push({ x: target.x, z: target.z, radius: this.tile * 1.08, age: 0, life: 0.68, zed: true });
             this.spawnParticles(target.x, 0.68, target.z, Renderer.colors.zedCrimson, 46, 0.94, 0.14);
-            this.sfx.effect("markPop");
+            this.playSfxAt("markPop", target, 1, {
+              sourceId: `${mark.ownerId}:${mark.targetId}`
+            });
             this.hitSkill(target, damage, owner, "Death Mark");
           }
         }
@@ -2012,6 +2339,9 @@
           }
           if (mark.age < mark.fuse || mark.detonated) continue;
           mark.detonated = true;
+          this.playSfxAt("hemoplaguePop", mark, 1, {
+            sourceId: `${mark.ownerId}:${Math.round(mark.x * 1000)}:${Math.round(mark.z * 1000)}`
+          });
           let destroyed = 0;
           for (let r = 1; r < this.rows - 1; r++) {
             for (let c = 1; c < this.cols - 1; c++) {
@@ -2029,7 +2359,6 @@
           this.slashes.push({ x: mark.x, z: mark.z, radius: mark.radius * 1.05, age: 0, life: 0.82, vladimir: true });
           this.spawnParticles(mark.x, 0.64, mark.z, Renderer.colors.vladimirCrimson, 58, 1.18, 0.15);
           this.renderer.addShock(mark.x, mark.z, 1.08);
-          this.sfx.effect("hemoplaguePop");
         }
         this.vladimirMarks = this.vladimirMarks.filter((mark) => !mark.detonated);
       }
@@ -2067,10 +2396,15 @@
         const intent = this.botPolicy.think(view, dt);
         bot.aiDx = intent.dx;
         bot.aiDz = intent.dz;
-        bot.aiCommit = this.botPolicy.memory.commit;
-        bot.aiThink = this.botPolicy.memory.think;
+        bot.aiCommit = this.botPolicy.memory.commit ?? 0;
+        bot.aiThink = this.botPolicy.memory.think ?? bot.aiThink;
+        // A skill intent enters through the same entrypoint as human input;
+        // castAbility validates alive/mode/lock/stun/unlock before casting.
+        if (intent.skill != null && Object.hasOwn(BOT_SKILL_SLOTS, intent.skill)) {
+          this.castAbility(BOT_SKILL_SLOTS[intent.skill], bot);
+        }
         if (intent.plantBomb && this.placeBomb(bot)) {
-          this.botPolicy.memory.commit = 0;
+          if ("commit" in this.botPolicy.memory) this.botPolicy.memory.commit = 0;
           bot.aiCommit = 0;
         }
       }
@@ -2122,7 +2456,9 @@
           }
         }
         this.renderer.addShock(bomb.x, bomb.z, 0.78 + bomb.range * 0.12);
-        this.sfx.explosion(clamp(0.7 + bomb.range * 0.08, 0.7, 1.12));
+        this.playExplosionAt(bomb, clamp(0.7 + bomb.range * 0.08, 0.7, 1.12), {
+          sourceId: bomb.id
+        });
         this.damageAtCells(cells, bomb);
       }
 
@@ -2144,7 +2480,7 @@
         if (player.shield > 0) {
           player.shield -= 1;
           player.invulnerable = 0.72;
-          this.sfx.effect("shield");
+          this.playSfxAt("shield", player);
           this.presentation.announce(`${player.name} shield shattered`);
           this.spawnParticles(player.x, 0.55, player.z, Renderer.colors.ice, 28, 0.8, 0.13);
           this.renderer.addShock(player.x, player.z, 0.45);
@@ -2152,9 +2488,11 @@
         }
         player.alive = false;
         player.health = 0;
+        this.clearAbilityBuffer(player.id);
+        this.cancelKatarinaChannel(player);
         this.renderer.hitPulse = player.id === 1 ? 1.25 : 0.75;
         this.renderer.cameraShake = 0.82;
-        this.sfx.effect("hit");
+        this.playSfxAt("hit", player);
         this.spawnParticles(player.x, 0.58, player.z,
           player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 54, 1.1, 0.15);
         const owner = this.players.find((candidate) => candidate.id === bomb.ownerId);
@@ -2163,15 +2501,15 @@
         this.presentation.update(this);
       }
 
-      hitSkill(player, damage, source, label, quiet = false) {
+      hitSkill(player, damage, source, label, quiet = false, shieldInvulnerability = 0.48) {
         if (!player.alive || player.invulnerable > 0 || player.dashing > 0 || this.mode !== "playing") return false;
         if (source?.champion === "vladimir" && this.vladimirMarks.some((mark) =>
           mark.ownerId === source.id && Math.hypot(player.x - mark.x, player.z - mark.z) <= mark.radius
         )) damage *= 1.12;
         if (player.shield > 0) {
           player.shield -= 1;
-          player.invulnerable = 0.48;
-          this.sfx.effect("shield");
+          player.invulnerable = shieldInvulnerability;
+          this.playSfxAt("shield", player);
           this.presentation.announce(`${player.name} blocked ${label}`);
           this.spawnParticles(player.x, 0.55, player.z, Renderer.colors.ice, 26, 0.75, 0.12);
           this.renderer.addShock(player.x, player.z, 0.4);
@@ -2193,14 +2531,17 @@
         this.spawnParticles(player.x, 0.58, player.z,
           player.id === 1 ? Renderer.colors.blueSide : impactColor,
           label === "Death Lotus" ? 9 : 20, 0.58, 0.09);
-        if (!quiet) this.sfx.effect("bladeHit", label === "Voracity" ? 1.12 : 0.9);
+        if (!quiet) this.playSfxAt("bladeHit", player, label === "Voracity" ? 1.12 : 0.9);
 
         if (player.health <= 0) {
           player.alive = false;
-          player.ultChannel = 0;
+          this.clearAbilityBuffer(player.id);
+          this.cancelKatarinaChannel(player);
           this.renderer.hitPulse = player.id === 1 ? 1.25 : 0.82;
           this.renderer.cameraShake = 0.86;
-          this.sfx.effect("kill");
+          this.playSfxAt("kill", player, 1, {
+            sourceId: `${source?.id ?? "world"}:${player.id}:${label}`
+          });
           this.spawnParticles(player.x, 0.62, player.z,
             player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 58, 1.12, 0.15);
           this.presentation.announce(`${source?.name || "Katarina"} eliminated ${player.name} with ${label}`);
@@ -2232,7 +2573,10 @@
           }
           if (this.roundDecisionTimer < 0) this.roundDecisionTimer = 0.16;
         } else if (!quiet) {
-          this.presentation.announce(`${label} · ${Math.ceil(player.health * 100)}% ${player.name} health`);
+          const healthPercent = player.maxHealth > 0
+            ? Math.ceil(player.health / player.maxHealth * 100)
+            : 0;
+          this.presentation.announce(`${label} · ${healthPercent}% ${player.name} health`);
         }
         this.presentation.update(this);
         return true;
@@ -2285,7 +2629,7 @@
             player.skillsUnlocked[item.slot] = true;
             const skillName = item.label || this.skillSlotLabel(player, item.slot);
             this.presentation.announce(`${player.name} unlocked ${skillName}`);
-            this.sfx.effect("pickup");
+            this.playSfxAt("pickup", player);
             this.spawnParticles(item.x, 0.5, item.z,
               player.id === 1 ? Renderer.colors.gold : Renderer.colors.ember, 28, 0.95, 0.12);
             this.pickups.splice(i, 1);
@@ -2303,7 +2647,7 @@
             shield: "spell shield acquired"
           };
           this.presentation.announce(`${player.name} · ${labels[item.type]}`);
-          this.sfx.effect("pickup");
+          this.playSfxAt("pickup", player);
           this.spawnParticles(item.x, 0.5, item.z,
             player.id === 1 ? Renderer.colors.ice : Renderer.colors.ember, 24, 0.85, 0.11);
           this.pickups.splice(i, 1);
@@ -2383,6 +2727,7 @@
         this.updateRenekton(dt);
         this.updateVladimir(dt);
         this.updateGangplank(dt);
+        this.processAbilityBuffer(dt);
         this.updateBombs(dt);
         this.collectPickups();
 

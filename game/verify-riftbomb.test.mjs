@@ -29,14 +29,23 @@ test("the editable page enters every game module through one named path", async 
 
 test("the readable combat layer preserves the canonical 100 HP rules", async () => {
   const document = await readFile(sourcePath, "utf8");
-  const combat = await readFile(path.join(gameDirectory, "apply-readable-combat.js"), "utf8");
+  const rules = await readFile(path.join(gameDirectory, "apply-combat-rules.js"), "utf8");
+  const presentation = await readFile(path.join(gameDirectory, "apply-readable-combat.js"), "utf8");
 
+  assert.match(document, /script src="\.\/apply-combat-rules\.js"/);
   assert.match(document, /script src="\.\/apply-readable-combat\.js"/);
-  assert.match(combat, /maxHealth: 100/);
-  assert.match(combat, /arenaBombDamage: 35/);
-  assert.match(combat, /globalThis\.RIFTBOMB_COMBAT = RIFTBOMB_COMBAT/);
-  assert.match(combat, /match\.hitContestant = function hitContestantWithDamage/);
-  assert.match(combat, /storedBefore \+ legacyDamage \* 0\.48/);
+  assert.ok(
+    document.indexOf("./apply-combat-rules.js") < document.indexOf("./apply-readable-combat.js"),
+    "pure combat rules must load before their browser presentation adapter"
+  );
+  assert.match(rules, /maxHealth: 100/);
+  assert.match(rules, /arenaBombDamage: 35/);
+  assert.match(rules, /globalThis\.RIFTBOMB_COMBAT = RIFTBOMB_COMBAT/);
+  assert.match(rules, /globalThis\.installRiftbombCombatRules = installRiftbombCombatRules/);
+  assert.match(rules, /match\.hitContestant = function hitContestantWithDamage/);
+  assert.match(rules, /storedBefore \+ legacyDamage \* 0\.48/);
+  assert.match(presentation, /installRiftbombCombatRules\(match\)/);
+  assert.match(presentation, /combat-hp-readout/);
 });
 
 test("the built game is one offline HTML artifact", async () => {
@@ -131,6 +140,7 @@ test("player two can select a full champion kit and receive four local skill inp
   match.castZedW = (player) => casts.push([player.id, 1]);
   match.castZedE = (player) => casts.push([player.id, 2]);
   match.castZedR = (player) => casts.push([player.id, 3]);
+  match.abilityTargetAvailable = () => true;
   for (let slot = 0; slot < 4; slot += 1) match.castAbility(slot, match.players[1]);
   assert.deepEqual(casts, [[2, 0], [2, 1], [2, 2], [2, 3]]);
 

@@ -1,32 +1,10 @@
 "use strict";
 
-/**
- * Canonical Riftbomb combat contract.
- *
- * Legacy champion kits encode full health as 1 and use fractional damage and
- * healing. This compatibility layer exposes a readable 0–100 HP scale while
- * those kits are migrated incrementally.
- *
- * See ./combat-system.md before changing these values.
- */
-const RIFTBOMB_COMBAT = Object.freeze({
-  maxHealth: 100,
-  arenaBombDamage: 35,
-  criticalHealth: 25,
-  legacyScale: 100,
-  vladimir: Object.freeze({
-    sanguinePoolCost: 8,
-    tidesOfBloodCost: 6.5,
-  }),
-});
-
-globalThis.RIFTBOMB_COMBAT = RIFTBOMB_COMBAT;
-
 (() => {
-  const toHpPoints = (value) => {
-    const numeric = Number(value) || 0;
-    return Math.abs(numeric) <= 1 ? numeric * RIFTBOMB_COMBAT.legacyScale : numeric;
-  };
+  const { RIFTBOMB_COMBAT, installRiftbombCombatRules } = globalThis;
+  if (!RIFTBOMB_COMBAT || typeof installRiftbombCombatRules !== "function") {
+    throw new Error("Canonical Riftbomb combat rules were not loaded");
+  }
 
   const formatHp = (player) =>
     `${Math.max(0, Math.ceil(player.health))} / ${Math.ceil(player.maxHealth)} HP`;
@@ -91,98 +69,9 @@ globalThis.RIFTBOMB_COMBAT = RIFTBOMB_COMBAT;
   }
 
   function install(match) {
-    if (!match || match.__combatHpInstalled) return;
-    match.__combatHpInstalled = true;
-
-    const originalCreatePlayer = match.createPlayer.bind(match);
-    match.createPlayer = function createPlayerWithReadableHp(id) {
-      const player = originalCreatePlayer(id);
-      player.health = RIFTBOMB_COMBAT.maxHealth;
-      player.maxHealth = RIFTBOMB_COMBAT.maxHealth;
-      return player;
-    };
-
-    for (const player of match.players || []) {
-      const ratio = player.maxHealth > 0 ? player.health / player.maxHealth : 1;
-      player.maxHealth = RIFTBOMB_COMBAT.maxHealth;
-      player.health = Math.round(RIFTBOMB_COMBAT.maxHealth * ratio);
-    }
-
-    const originalHealChampion = match.healChampion.bind(match);
-    match.healChampion = function healChampionInHp(player, amount) {
-      return originalHealChampion(player, toHpPoints(amount));
-    };
-
-    const originalHitSkill = match.hitSkill.bind(match);
-    match.hitSkill = function hitSkillInHp(player, damage, source, label, quiet = false) {
-      const numericDamage = Number(damage) || 0;
-      const legacyDamage = Math.abs(numericDamage) <= 1
-        ? numericDamage
-        : numericDamage / RIFTBOMB_COMBAT.legacyScale;
-      const appliedDamage = toHpPoints(damage);
-      const activeZedMark = source?.champion === "zed" && label !== "Death Mark"
-        ? this.zedMarks.find(
-          (candidate) =>
-            candidate.ownerId === source.id &&
-            candidate.targetId === player.id &&
-            !candidate.detonated,
-        )
-        : null;
-      const storedBefore = activeZedMark?.stored ?? 0;
-      const connected = originalHitSkill(player, appliedDamage, source, label, quiet);
-
-      // Death Mark stores fractional legacy damage. Restore that bookkeeping
-      // after applying integer HP so marked combos do not jump to the cap.
-      if (connected && activeZedMark && !activeZedMark.detonated) {
-        activeZedMark.stored = Math.min(0.3, storedBefore + legacyDamage * 0.48);
-      }
-
-      if (connected && player.alive && !quiet) {
-        this.presentation.announce(`${label} · ${formatHp(player)} remaining`);
-        this.presentation.update(this);
-      }
-      return connected;
-    };
-
-    match.hitContestant = function hitContestantWithDamage(player, bomb) {
-      const owner = this.players.find((candidate) => candidate.id === bomb.ownerId);
-      const label = owner?.id === player.id ? "Own Arena Bomb" : "Arena Bomb";
-      this.hitSkill(player, RIFTBOMB_COMBAT.arenaBombDamage, owner, label);
-    };
-
-    const originalVladimirW = match.castVladimirW?.bind(match);
-    if (originalVladimirW) {
-      match.castVladimirW = function castVladimirWWithHpCost(player) {
-        const before = player?.health ?? 0;
-        const cast = originalVladimirW(player);
-        if (cast && player?.alive) {
-          const cost = Math.min(
-            RIFTBOMB_COMBAT.vladimir.sanguinePoolCost,
-            before * 0.12,
-          );
-          player.health = Math.max(6, before - cost);
-          this.presentation.update(this);
-        }
-        return cast;
-      };
-    }
-
-    const originalVladimirE = match.castVladimirE?.bind(match);
-    if (originalVladimirE) {
-      match.castVladimirE = function castVladimirEWithHpCost(player) {
-        const before = player?.health ?? 0;
-        const cast = originalVladimirE(player);
-        if (cast && player?.alive) {
-          const cost = Math.min(
-            RIFTBOMB_COMBAT.vladimir.tidesOfBloodCost,
-            before * 0.1,
-          );
-          player.health = Math.max(5, before - cost);
-          this.presentation.update(this);
-        }
-        return cast;
-      };
-    }
+    if (!match || match.__combatPresentationInstalled) return;
+    installRiftbombCombatRules(match);
+    match.__combatPresentationInstalled = true;
 
     const originalPresentationUpdate = match.presentation.update.bind(match.presentation);
     match.presentation.update = function updateWithExactHp(currentMatch) {

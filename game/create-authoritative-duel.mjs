@@ -2,16 +2,79 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const gameSourceUrl = new URL("./run-champion-bomb-duel.js", import.meta.url);
+const combatRulesSourceUrl = new URL("./apply-combat-rules.js", import.meta.url);
 let GameConstructor;
+let installCombatRules;
 
 const noOpService = new Proxy({}, {
   get: () => () => undefined
 });
 
+const AUDIO_EVENT_LIMIT = 64;
+const AUDIO_SNAPSHOT_LIMIT = 32;
+const AUDIO_CUES = new Set([
+  "barrelBoom", "bladeHit", "bomb", "cannonBarrage", "cannonImpact",
+  "daggerLand", "deathLotus", "deathMark", "dominus", "explosion",
+  "gangplankQ", "hemoplague", "hemoplaguePop", "hit", "katQ", "katW",
+  "kill", "markPop", "pickup", "powderKeg", "removeScurvy", "renektonDice",
+  "renektonE", "renektonQ", "renektonQEmpowered", "renektonW",
+  "renektonWEmpowered", "sanguinePool", "shield", "shunpo", "tidesOfBlood",
+  "vladimirQ", "vladimirQEmpowered", "voracity", "zedE", "zedQ", "zedSwap",
+  "zedW"
+]);
+
+const finiteBetween = (value, min, max, fallback = null) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
+};
+
+export function createAuthoritativeAudioRecorder(startId = 0) {
+  const events = [];
+  let sequence = Number.isSafeInteger(startId) && startId >= 0 ? startId : 0;
+  const record = (candidate = {}) => {
+    const cue = String(candidate.type || "");
+    if (!AUDIO_CUES.has(cue)) return false;
+    const event = {
+      id: ++sequence,
+      cue,
+      strength: finiteBetween(candidate.strength, 0.5, 1.45, 1),
+      x: finiteBetween(candidate.x, -64, 64),
+      z: finiteBetween(candidate.z, -64, 64)
+    };
+    const chainDepth = finiteBetween(candidate.options?.chainDepth, 0, 4);
+    if (chainDepth !== null) event.chainDepth = Math.trunc(chainDepth);
+    events.push(event);
+    if (events.length > AUDIO_EVENT_LIMIT) events.splice(0, events.length - AUDIO_EVENT_LIMIT);
+    return event;
+  };
+  const recorder = {
+    events,
+    get latest() { return sequence; },
+    emitGameEvent: record,
+    snapshot(limit = AUDIO_SNAPSHOT_LIMIT) {
+      const bounded = Math.max(0, Math.min(AUDIO_EVENT_LIMIT, Math.trunc(limit) || 0));
+      return { v: 1, latest: sequence, events: events.slice(-bounded) };
+    },
+    service: {
+      emitGameEvent: record,
+      effect(type, strength, options) {
+        return record({ type, strength, x: options?.x, z: options?.z, options });
+      },
+      explosion(strength, options) {
+        return record({ type: "explosion", strength, x: options?.x, z: options?.z, options });
+      }
+    }
+  };
+  return recorder;
+}
+
 async function loadGameConstructor() {
   if (GameConstructor) return GameConstructor;
 
-  const source = await readFile(gameSourceUrl, "utf8");
+  const [source, combatRulesSource] = await Promise.all([
+    readFile(gameSourceUrl, "utf8"),
+    readFile(combatRulesSourceUrl, "utf8")
+  ]);
   const colors = new Proxy({}, { get: (_target, key) => String(key) });
   const context = vm.createContext({
     Array,
@@ -27,19 +90,31 @@ async function loadGameConstructor() {
     TAU: Math.PI * 2,
     Renderer: { colors },
     clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
+    lerp: (start, end, amount) => start + (end - start) * amount,
+    // Loot art is presentation-only; the authoritative simulation still
+    // creates the pickup, but never needs to resolve a browser asset URL.
+    skillArtUrl: () => "",
     innerWidth: 1920
   });
 
+  vm.runInContext(combatRulesSource, context, {
+    filename: combatRulesSourceUrl.pathname
+  });
   vm.runInContext(`${source}\n;globalThis.RiftbombGame = Game;`, context, {
     filename: gameSourceUrl.pathname
   });
   GameConstructor = context.RiftbombGame;
+  installCombatRules = context.installRiftbombCombatRules;
   return GameConstructor;
 }
 
 export async function createAuthoritativeDuel(config = {}) {
   const Game = await loadGameConstructor();
-  const game = new Game(noOpService, noOpService, noOpService);
+  const audio = createAuthoritativeAudioRecorder(config.soundEventStartId);
+  const game = new Game(noOpService, audio.service, noOpService);
+  game.authoritativeSound = audio;
+  game.audioEvents = audio.events;
+  installCombatRules(game);
   game.selectedChampion = config.hostChampion || "katarina";
   game.selectedChampion2 = config.guestChampion || "zed";
   game.selectedArena = config.arena || "lattice";
@@ -98,6 +173,9 @@ export function serializeAuthoritativeSnapshot(game, sequence, includeGrid = fal
   }
   if (includeGrid) snapshot.grid = game.grid;
   snapshot.particles = game.particles.slice(-72);
+  snapshot.sound = game.authoritativeSound?.snapshot(AUDIO_SNAPSHOT_LIMIT) || {
+    v: 1, latest: 0, events: []
+  };
   snapshot.pendingWinnerId = game.pendingMatchWinner?.id || 0;
   return snapshot;
 }

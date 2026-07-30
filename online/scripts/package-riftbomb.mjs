@@ -3,12 +3,14 @@ import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { transform } from "esbuild";
 
 const PART_SIZE = 4 * 1024 * 1024;
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const onlineRoot = path.resolve(scriptDirectory, "..");
 const repositoryRoot = path.resolve(onlineRoot, "..");
 const gameSource = path.join(repositoryRoot, "riftbomb.html");
+const matchRulesSource = path.join(repositoryRoot, "game", "run-champion-bomb-duel.js");
 const outputDirectory = path.join(onlineRoot, "public", "riftbomb-parts");
 const arenaTextureOutputDirectory = path.join(onlineRoot, "public", "arena-textures");
 const championModelOutputDirectory = path.join(onlineRoot, "public", "champion-models");
@@ -90,6 +92,23 @@ for (const [before, after] of replacements) {
   if (after.includes("selectChampion2(champion)") && onlineGame.includes("selectChampion2(champion)")) continue;
   if (onlineGame.includes(before)) onlineGame = replaceOnce(onlineGame, before, after);
 }
+
+// Keep the editable match rules readable while avoiding a raw-shell payload
+// penalty online. Whitespace-only minification preserves public identifiers
+// and syntax, limiting this optimization to one well-tested embedded module.
+const readableMatchRules = (await readFile(matchRulesSource, "utf8")).replace(/\r\n/g, "\n");
+const compactMatchRules = await transform(readableMatchRules, {
+  loader: "js",
+  minifyWhitespace: true,
+  minifyIdentifiers: false,
+  minifySyntax: false,
+  legalComments: "none",
+});
+onlineGame = replaceOnce(
+  onlineGame,
+  `  <script>\n${readableMatchRules.trimEnd()}\n  </script>`,
+  `  <script>\n${compactMatchRules.code.trimEnd()}\n  </script>`,
+);
 
 const embeddedArenaTextures = (await readFile(arenaTextureBundleSource, "utf8")).replace(/\r\n/g, "\n");
 const arenaTextureAliasesAt = embeddedArenaTextures.indexOf(

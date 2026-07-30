@@ -12,11 +12,12 @@ const ARENAS = new Set(["lattice", "clearing", "labyrinth", "forts", "pit"]);
 export const isChampion = (value) => CHAMPIONS.has(value);
 
 export function validPreset(value = {}) {
+  const preset = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   return {
-    hostChampion: isChampion(value.hostChampion) ? value.hostChampion : "katarina",
-    guestChampion: isChampion(value.guestChampion) ? value.guestChampion : "zed",
-    arena: ARENAS.has(value.arena) ? value.arena : "lattice",
-    matchTarget: value.matchTarget === 10 ? 10 : 3
+    hostChampion: isChampion(preset.hostChampion) ? preset.hostChampion : "katarina",
+    guestChampion: isChampion(preset.guestChampion) ? preset.guestChampion : "zed",
+    arena: ARENAS.has(preset.arena) ? preset.arena : "lattice",
+    matchTarget: preset.matchTarget === 10 ? 10 : 3
   };
 }
 
@@ -34,6 +35,7 @@ export class AuthoritativeRooms {
       players: [null, null],
       inputs: [0, 0],
       sequence: 0,
+      soundEventSequence: 0,
       tickTimer: null,
       snapshotTimer: null,
       createdAt: Date.now(),
@@ -58,10 +60,13 @@ export class AuthoritativeRooms {
   stopMatch(room) {
     clearInterval(room.tickTimer);
     clearInterval(room.snapshotTimer);
+    room.soundEventSequence = Math.max(
+      room.soundEventSequence || 0,
+      room.game?.authoritativeSound?.latest || 0
+    );
     room.tickTimer = null;
     room.snapshotTimer = null;
     room.game = null;
-    room.sequence = 0;
     room.inputs = [0, 0];
     room.gridSignature = "";
   }
@@ -72,8 +77,10 @@ export class AuthoritativeRooms {
     room.starting = true;
     try {
       if (rematch) this.stopMatch(room);
-      room.game = await createAuthoritativeDuel(room.preset);
-      room.sequence = 0;
+      room.game = await createAuthoritativeDuel({
+        ...room.preset,
+        soundEventStartId: room.soundEventSequence
+      });
       room.inputs = [0, 0];
       room.gridSignature = "";
 
@@ -94,9 +101,11 @@ export class AuthoritativeRooms {
         const gridSignature = JSON.stringify(room.game.grid);
         const includeGrid = gridSignature !== room.gridSignature || room.sequence % 60 === 0;
         room.gridSignature = gridSignature;
+        const snapshot = serializeAuthoritativeSnapshot(room.game, ++room.sequence, includeGrid);
+        room.soundEventSequence = Math.max(room.soundEventSequence, snapshot.sound.latest);
         this.broadcast(room, {
           type: "snapshot",
-          data: serializeAuthoritativeSnapshot(room.game, ++room.sequence, includeGrid)
+          data: snapshot
         });
       }, 1000 / SNAPSHOT_RATE);
       this.broadcast(room, { ...this.lobbyMessage(room), type: rematch ? "rematch" : "start" });

@@ -23,7 +23,11 @@ The original prototype represented full health as `1` and encoded damage as frac
 0.14 legacy healing -> 14 HP healing
 ```
 
-New combat code should use integer HP values directly. The compatibility conversion exists so the current champion implementations can be migrated incrementally without changing their effective balance.
+New combat code should use integer HP values directly, including `1` for one HP.
+Only non-integer values between `-1` and `1` are interpreted as legacy
+fractions. The compatibility conversion exists so the current champion
+implementations can be migrated incrementally without changing their effective
+balance.
 
 ## Current reference values
 
@@ -51,7 +55,10 @@ Vladimir's direct health costs are also expressed on the 100-point scale:
 - Sanguine Pool costs up to **8 HP**, respecting its percentage-based limit.
 - Tides of Blood costs up to **6.5 HP**, respecting its percentage-based limit.
 
-Healing values are converted at the same boundary as damage. Healing never raises HP above the contestant's maximum health.
+Health costs are applied before the rest of a cast resolves, never raise current
+HP and preserve healing earned by the cast. Healing values are converted at the
+same boundary as damage. Healing never raises HP above the contestant's maximum
+health.
 
 ## Player-facing clarity
 
@@ -68,11 +75,21 @@ The champion-selection screen also presents the four governing rules: 100 HP per
 
 ## Architecture
 
-The compatibility and presentation layer lives in:
+The pure compatibility rules live in:
+
+- `game/apply-combat-rules.js`
+
+That module has no DOM, renderer or audio dependency. Both the browser match and
+`game/create-authoritative-duel.mjs` install it before a round starts, so local
+and online play share the same health, damage, healing and shield semantics.
+
+The browser-only HUD and rule-card presentation live in:
 
 - `game/apply-readable-combat.js`
 
-That file is loaded before the game runtime. It installs the combat rules immediately after the `Game` instance is created and before the first rendered frame.
+Both files are loaded before the game runtime. The presentation adapter installs
+the pure rules immediately after the browser `Game` instance is created and
+before the first rendered frame.
 
 The layer wraps these runtime boundaries:
 
@@ -84,6 +101,30 @@ The layer wraps these runtime boundaries:
 - `BrowserMatchPresentation.update`
 
 The canonical constants are exposed as `globalThis.RIFTBOMB_COMBAT`. Future champion work should use integer HP values and read shared rules from that object rather than adding new fractional combat semantics.
+
+## Ability command buffer
+
+Q/W/E/R share one postponed-spell contract in `Game.castAbility`:
+
+- a valid spell pressed during the final **150 ms** of cooldown, stun or
+  Sanguine Pool is retained until the first legal simulation tick;
+- one command is retained per player and the most recent valid command replaces
+  the previous one;
+- commands expire from simulation time, never wall-clock time;
+- invalid slots, locked skills and target/range/placement failures are not
+  retried; spatial eligibility is captured when the input arrives, so a
+  command cannot acquire a target, free landing or deployable capacity later;
+- a command is executed at most once and is discarded on death, round reset,
+  unexpected crowd control or expiry;
+- Zed W and Renekton E recasts keep their authored recast windows, while
+  Gangplank W remains available as a stun cleanse;
+- the online client predicts only casts that are already legal. Postponed casts
+  remain server-owned and arrive through the authoritative snapshot.
+
+Death Lotus is an interruptible channel. A movement direction, crowd control,
+death or another legal ability cancels it before the next damage tick and
+removes its active Lotus VFX. Arena bombs remain immediate and outside the
+ability buffer in this iteration.
 
 ## Balance policy
 
@@ -104,5 +145,5 @@ For every combat change:
 4. Confirm two arena bombs do not eliminate a full-health player.
 5. Confirm the third arena bomb eliminates without healing.
 6. Confirm ability damage and healing match the exact HUD values.
-7. Confirm online snapshots preserve integer `health`, `maxHealth` and shield state.
+7. Confirm online JSON snapshots preserve numeric `health`, `maxHealth` and shield state.
 8. Confirm round resolution still occurs only after one or both contestants are eliminated.
