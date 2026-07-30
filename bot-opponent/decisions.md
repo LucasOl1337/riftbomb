@@ -83,9 +83,24 @@ Atualizar quando o playtest ou a implementação invalidar algo.
 
 **Default:** não. P1 é sempre humano neste produto.
 
+### D10 — Piloto primeiro, campeão dentro
+
+**Decisão:** bots com personalidade vivem em `bot-opponent/v1/`; cada campeão
+que o piloto controla é um módulo plugável em `bot-opponent/v1/<campeão>/`.
+**Motivo:** o V1 tem uma única maneira de perceber perigo, planejar bombas e
+navegar; só o módulo do campeão muda (skills, combos, memória tática).
+Campeão-primeiro (`renekton/v1/`) só faria sentido com gerações
+independentes por campeão, o que não é o caso.
+**Consequência:** `v1/` guarda personalidade, planejamento e memória comum;
+`v1/renekton/` guarda decisões de kit, combos e memória tática. Fury,
+cooldowns e vida **não** são memória do bot — vêm pelo WorldView (D9).
+Próximas pastas (`vladimir/`, `katarina/`…) só são criadas quando o campeão
+entrar; `v2/` só quando uma nova geração existir.
+
 ## Log de mudanças
 
 | Data | Mudança |
 |------|---------|
 | 2026-07-26 | Kickoff: pasta do bot, requisitos, plano, status quo, decisões D1–D6 |
 | 2026-07-26 | D7–D9 + `perception.md`: visão do mundo e sequência antes de output |
+| 2026-07-29 | D10 + esqueleto `v1/` e `v1/renekton/`: piloto V1 com campeão plugável |

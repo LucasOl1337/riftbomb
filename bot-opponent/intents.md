@@ -29,6 +29,9 @@ intenção passa pelos mesmos entrypoints do input humano e é validada pela
   neste tick".
 - O bot pode manter um `commit` de movimento por vários frames sem reenviar
   intenção; isso é memória da política, não campo do `WorldView`.
+- `game/` mapeia `"q" | "w" | "e" | "r"` para os slots 0–3 e chama
+  `castAbility(slot, bot)`; valores fora desse conjunto (`"recast-e"`,
+  `"swap-shadow"`) são ignorados até a Match aprender a executá-los.
 
 ## Extensões futuras
 

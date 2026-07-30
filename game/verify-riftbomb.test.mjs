@@ -116,6 +116,72 @@ test("the solo CPU enters through bot-opponent instead of being duplicated in ma
   assert.doesNotMatch(rules, /const choices = \[\s*\{ dx: 1, dz: 0 \}/);
 });
 
+test("bot skill intents reach castAbility through the human input entrypoint", async () => {
+  const sourceDocument = await readFile(sourcePath, "utf8");
+  const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
+  const release = await readFile(releasePath, "utf8");
+
+  // The V1 bundle loads after the baseline and is embedded in the build.
+  assert.match(sourceDocument, /load-baseline-bot\.js"><\/script>\s*<script src="\.\/load-v1-bot\.js/);
+  assert.match(release, /RIFTBOMB_BOTS\.createV1Policy = createV1Policy/);
+  assert.match(release, /RIFTBOMB_BOTS\.createRenektonPilot = createRenektonPilot/);
+
+  // The match forwards skill intents to the same entrypoint as human input.
+  assert.match(rules, /Object\.hasOwn\(BOT_SKILL_SLOTS, intent\.skill\)/);
+  assert.match(rules, /this\.castAbility\(BOT_SKILL_SLOTS\[intent\.skill\], bot\)/);
+
+  const presentation = {
+    selectChampion() {}, prepareRound() {}, announce() {}, update() {}, finish() {}
+  };
+
+  // With the V1 bundle the solo CPU takes the pilot of the champion it plays…
+  const v1Context = vm.createContext({ console });
+  v1Context.RIFTBOMB_BOTS = {
+    buildWorldView: () => ({}),
+    createRenektonPilot: () => ({ id: "renekton" }),
+    createV1Policy: ({ champion = null }) => ({
+      champion: champion?.id ?? null,
+      memory: {},
+      think: () => ({ dx: 0, dz: 1, plantBomb: false, skill: "q" }),
+      reset() {}
+    })
+  };
+  vm.runInContext(`${rules}\nglobalThis.Game = Game;`, v1Context);
+  const v1Match = new v1Context.Game({ ensureChampionModel() {} }, { effect() {} }, presentation);
+  // P2 defaults to Zed: no champion module yet, shared arena brain only…
+  assert.equal(v1Match.botPolicy.champion, null);
+  // …and picking Renekton for P2 swaps in the Renekton pilot.
+  v1Match.selectChampion2("renekton");
+  assert.equal(v1Match.botPolicy.champion, "renekton");
+
+  // castAbility rejects casts while stunned — same rule for human and CPU.
+  v1Match.mode = "playing";
+  v1Match.roundLocked = false;
+  v1Match.players[1].stunned = 1;
+  assert.equal(v1Match.castAbility(0, v1Match.players[1]), false);
+  v1Match.players[1].stunned = 0;
+
+  const casts = [];
+  v1Match.castAbility = (slot, player) => { casts.push([slot, player.id]); return true; };
+  v1Match.updateBot(0.1);
+  assert.deepEqual(casts, [[0, 2]]);
+
+  // …and without it the CPU falls back to the baseline policy.
+  const fallbackContext = vm.createContext({ console });
+  fallbackContext.RIFTBOMB_BOTS = {
+    buildWorldView: () => ({}),
+    createBaselinePolicy: () => ({
+      profile: "rift",
+      memory: { commit: 0, think: 0.15, lastDx: 0, lastDz: 1 },
+      think: () => ({ dx: 0, dz: 0, plantBomb: false, skill: null }),
+      reset() {}
+    })
+  };
+  vm.runInContext(`${rules}\nglobalThis.Game = Game;`, fallbackContext);
+  const fallbackMatch = new fallbackContext.Game({ ensureChampionModel() {} }, { effect() {} }, presentation);
+  assert.equal(fallbackMatch.botPolicy.profile, "rift");
+});
+
 test("match rules cross one presentation seam without requiring a DOM", async () => {
   const rulesPath = path.join(gameDirectory, "run-champion-bomb-duel.js");
   const rules = await readFile(rulesPath, "utf8");

@@ -2,6 +2,7 @@
 **/node_modules/
 game/load-playable-champion-models.js
 game/load-baseline-bot.js
+game/load-v1-bot.js
 tools/cdtb-env/
 tools/cdragon-data/
 
@@ -14,6 +15,9 @@ tools/cdragon-data/
 # Heavy hostile-UI capture dumps (keep curated breaks + docs in-repo)
 learning-records/hostile-ui/videos/
 learning-records/hostile-ui/videos-raw/
+
+# QA visual local (capturas podem conter estado de produção)
+artifacts/comparar-qa/
 
 # Operating-system files
 Thumbs.db

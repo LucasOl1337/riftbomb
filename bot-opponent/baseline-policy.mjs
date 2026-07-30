@@ -130,14 +130,14 @@ function canPlantBomb(self, bombs) {
   return activeBombs < self.maxBombs;
 }
 
-function cellFromWorld(x, z, cols, rows, tile) {
+export function cellFromWorld(x, z, cols, rows, tile) {
   return {
     c: clamp(Math.round(x / tile + (cols - 1) / 2), 0, cols - 1),
     r: clamp(Math.round(z / tile + (rows - 1) / 2), 0, rows - 1)
   };
 }
 
-function worldFromCell(r, c, cols, rows, tile) {
+export function worldFromCell(r, c, cols, rows, tile) {
   return [(c - (cols - 1) / 2) * tile, (r - (rows - 1) / 2) * tile];
 }
 
@@ -145,7 +145,7 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function isBlocked(x, z, grid, bombs, tile, radius = 0.31, ignoreIds = []) {
+export function isBlocked(x, z, grid, bombs, tile, radius = 0.31, ignoreIds = []) {
   const points = [
     [x - radius, z - radius],
     [x + radius, z - radius],
@@ -168,7 +168,7 @@ function isBlocked(x, z, grid, bombs, tile, radius = 0.31, ignoreIds = []) {
   return false;
 }
 
-function dangerAt(r, c, grid, bombs, blasts) {
+export function dangerAt(r, c, grid, bombs, blasts) {
   if (blasts.some((blast) => blast.r === r && blast.c === c)) return 4;
 
   for (const bomb of bombs) {

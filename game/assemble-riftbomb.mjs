@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { packagePlayableChampions } from "../champions/prepare-playable-models/package-playable-champions.mjs";
 import { packageBaselineBot } from "../bot-opponent/package-baseline-bot.mjs";
+import { packageV1Bot } from "../bot-opponent/package-v1-bot.mjs";
 
 const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.dirname(gameDirectory);
@@ -10,6 +11,7 @@ const sourcePath = path.join(gameDirectory, "play-riftbomb.html");
 const outputPath = path.join(repositoryRoot, "riftbomb.html");
 const playableChampionsPath = path.join(gameDirectory, "load-playable-champion-models.js");
 const baselineBotPath = path.join(gameDirectory, "load-baseline-bot.js");
+const v1BotPath = path.join(gameDirectory, "load-v1-bot.js");
 
 async function writeGeneratedArtifact(targetPath, contents) {
   const temporaryPath = path.join(
@@ -38,6 +40,7 @@ const localScripts = [...document.matchAll(/<script src="\.\/([^"]+)"><\/script>
 
 await writeFile(playableChampionsPath, await packagePlayableChampions(repositoryRoot));
 await writeFile(baselineBotPath, await packageBaselineBot());
+await writeFile(v1BotPath, await packageV1Bot());
 
 for (const stylesheet of localStylesheets) {
   const css = await readFile(path.join(gameDirectory, stylesheet), "utf8");

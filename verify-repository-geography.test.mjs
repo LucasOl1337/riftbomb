@@ -9,6 +9,8 @@ const trackedPaths = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" 
 
 const isContentPath = (trackedPath) =>
   trackedPath.startsWith("game/arena-appearance/")
+  // docs/ holds prose QA records, not product modules; ad-hoc shapes allowed
+  || trackedPath.startsWith("docs/")
   || /^champions\/(?!prepare-playable-models\/)[^/]+\//.test(trackedPath);
 
 const isIndependentProjectPath = (trackedPath) =>

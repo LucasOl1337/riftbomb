@@ -18,7 +18,9 @@ export async function packageBaselineBot() {
     '"use strict";',
     "const RIFTBOMB_BOTS = (() => {",
     ...modules.map(browserSource),
-    "return Object.freeze({ buildWorldView, createBaselinePolicy });",
+    // Not frozen: the V1 bundle (load-v1-bot.js) augments this object with
+    // createV1Policy / createRenektonPilot when it is loaded.
+    "return { buildWorldView, createBaselinePolicy };",
     "})();",
     ""
   ].join("\n");
