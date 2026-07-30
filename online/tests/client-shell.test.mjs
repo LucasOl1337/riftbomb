@@ -128,8 +128,14 @@ test("keeps the runtime authoritative behind a same-origin message bridge", asyn
   assert.match(runtime, /await startHostOnlineMatch/);
 });
 
-test("includes native Riftbomb arena and Champion artwork for the shell", async () => {
-  const arenaNames = ["lattice.webp", "clearing.webp", "labyrinth.webp"];
+test("includes one native Riftbomb artwork per playable arena", async () => {
+  const arenaNames = [
+    "lattice.webp",
+    "clearing.webp",
+    "labyrinth.webp",
+    "forts-key-art-v2.webp",
+    "pit-key-art-v2.webp",
+  ];
   const championNames = [
     "katarina.webp",
     "zed.webp",
@@ -144,6 +150,15 @@ test("includes native Riftbomb arena and Champion artwork for the shell", async 
     assert.equal(image.subarray(8, 12).toString("ascii"), "WEBP");
     assert.ok(image.byteLength > 100_000);
   }
+
+  const client = await readFile(new URL("app/riftbomb-client.ts", root), "utf8");
+  for (const name of arenaNames) {
+    assert.match(client, new RegExp(`hero: "/client/arenas/${name}"`));
+  }
+  assert.equal(
+    new Set(client.match(/hero: "\/client\/arenas\/[^\"]+"/g)).size,
+    arenaNames.length,
+  );
   for (const name of championNames) {
     const image = await readFile(
       new URL(`public/client/champions/${name}`, root),

@@ -132,14 +132,14 @@ export const ARENAS: ReadonlyArray<{
     name: "Aeolian Bastions",
     shortName: "Bastions",
     description: "Bolsões defensivos e ataques por flanco.",
-    hero: "/client/arenas/labyrinth.webp",
+    hero: "/client/arenas/forts-key-art-v2.webp",
   },
   {
     id: "pit",
     name: "Storm-Eye Basin",
     shortName: "Storm-Eye",
     description: "Centro perigoso e decisões de alto risco.",
-    hero: "/client/arenas/clearing.webp",
+    hero: "/client/arenas/pit-key-art-v2.webp",
   },
 ] as const;
 
