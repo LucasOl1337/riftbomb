@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 const bakedDirectory = process.argv[2] ?? "champions/katarina/playable-model";
 const quiet = process.argv.includes("--quiet");
@@ -199,7 +200,165 @@ if (metadata.runtime === "vat-v1") {
     animation.coverage < 0.9 &&
     (!metadata.completeClipCatalog || actionBySource.has(animation.actualName))
   );
-  if (geometryFailures.length || coverageFailures.length) {
+  const qualityMetadata = metadata.poseQuality ?? {};
+  const repairsByClip = new Map();
+  for (const repair of qualityMetadata.repairedFrames ?? []) {
+    if (!repairsByClip.has(repair.clip)) repairsByClip.set(repair.clip, new Set());
+    repairsByClip.get(repair.clip).add(repair.frameOffset);
+  }
+  const temporalReports = [];
+  const temporalFailures = [];
+  const perceptualMotionThreshold = 0.001;
+  const frameHash = (frame) => {
+    const xyz = new Uint16Array(vertexCount * 3);
+    for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+      const source = (frame * vertexCount + vertex) * 4;
+      const target = vertex * 3;
+      xyz[target] = frames[source];
+      xyz[target + 1] = frames[source + 1];
+      xyz[target + 2] = frames[source + 2];
+    }
+    return createHash("sha256").update(Buffer.from(xyz.buffer)).digest("hex");
+  };
+  for (const [action, source] of Object.entries(metadata.animationActions ?? {})) {
+    const clip = animationClips[source];
+    if (!clip) {
+      temporalFailures.push({ action, source, reason: "missing action clip" });
+      continue;
+    }
+    const hashes = Array.from({ length: clip.frameCount }, (_value, offset) =>
+      frameHash(clip.startFrame + offset)
+    );
+    let longestIdenticalRun = 1;
+    let currentRun = 1;
+    for (let offset = 1; offset < hashes.length; offset += 1) {
+      currentRun = hashes[offset] === hashes[offset - 1] ? currentRun + 1 : 1;
+      longestIdenticalRun = Math.max(longestIdenticalRun, currentRun);
+    }
+    const transitionRms = [];
+    let longestPerceptualHold = 1;
+    let currentPerceptualHold = 1;
+    for (let offset = 1; offset < clip.frameCount; offset += 1) {
+      const beforeFrame = clip.startFrame + offset - 1;
+      const afterFrame = clip.startFrame + offset;
+      let squaredDistance = 0;
+      for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+        const before = (beforeFrame * vertexCount + vertex) * 4;
+        const after = (afterFrame * vertexCount + vertex) * 4;
+        for (let axis = 0; axis < 3; axis += 1) {
+          const distance = (frames[after + axis] - frames[before + axis]) / 65535 *
+            positionBounds.range[axis];
+          squaredDistance += distance * distance;
+        }
+      }
+      const rms = Math.sqrt(squaredDistance / Math.max(1, vertexCount * 3));
+      transitionRms.push(rms);
+      currentPerceptualHold = rms < perceptualMotionThreshold
+        ? currentPerceptualHold + 1
+        : 1;
+      longestPerceptualHold = Math.max(longestPerceptualHold, currentPerceptualHold);
+    }
+
+    const pairCount = Math.min(512, Math.max(0, vertexCount - 1));
+    let varyingPairs = 0;
+    for (let pairIndex = 0; pairIndex < pairCount; pairIndex += 1) {
+      const a = Math.floor(pairIndex * vertexCount / pairCount);
+      let b = (Math.imul(pairIndex + 1, 2654435761) >>> 0) % vertexCount;
+      if (b === a) b = (b + Math.floor(vertexCount / 2) + 1) % vertexCount;
+      let minimumDistance = Infinity;
+      let maximumDistance = -Infinity;
+      for (let offset = 0; offset < clip.frameCount; offset += 1) {
+        const pa = positionAt(a, clip.startFrame + offset);
+        const pb = positionAt(b, clip.startFrame + offset);
+        const distance = Math.hypot(pa[0] - pb[0], pa[1] - pb[1], pa[2] - pb[2]);
+        minimumDistance = Math.min(minimumDistance, distance);
+        maximumDistance = Math.max(maximumDistance, distance);
+      }
+      if (maximumDistance - minimumDistance > 0.001) varyingPairs += 1;
+    }
+    const uniqueFrameCount = new Set(hashes).size;
+    const requiredUniqueFrameCount = Math.min(
+      clip.frameCount,
+      Math.ceil(clip.frameCount * 0.75)
+    );
+    const varyingPairRate = pairCount ? varyingPairs / pairCount : 0;
+    const maximumPerceptualHold = qualityMetadata.perceptualHoldLimits?.[action] ?? 2;
+    const repairedOffsets = repairsByClip.get(source) ?? new Set();
+    const repairedLowMotionTransitions = transitionRms
+      .map((rms, offset) => ({ from: offset, to: offset + 1, rms }))
+      .filter((transition) =>
+        transition.rms < perceptualMotionThreshold &&
+        (repairedOffsets.has(transition.from) || repairedOffsets.has(transition.to))
+      );
+    const report = {
+      action,
+      source,
+      uniqueFrameCount,
+      requiredUniqueFrameCount,
+      longestIdenticalRun,
+      transitionRms,
+      longestPerceptualHold,
+      maximumPerceptualHold,
+      repairedLowMotionTransitions,
+      varyingPairRate
+    };
+    temporalReports.push(report);
+    if (!["idle", "run"].includes(action) && (
+      uniqueFrameCount < requiredUniqueFrameCount ||
+      longestIdenticalRun > 2 ||
+      longestPerceptualHold > maximumPerceptualHold ||
+      repairedLowMotionTransitions.length > 0 ||
+      varyingPairRate < 0.05
+    )) temporalFailures.push(report);
+  }
+  if (!quiet) {
+    console.table(temporalReports.map((report) => ({
+      action: report.action,
+      source: report.source,
+      unique: `${report.uniqueFrameCount}/${report.requiredUniqueFrameCount}`,
+      exactHold: report.longestIdenticalRun,
+      perceptualHold: `${report.longestPerceptualHold}/${report.maximumPerceptualHold}`,
+      articulation: `${(report.varyingPairRate * 100).toFixed(1)}%`
+    })));
+  }
+
+  const metadataFailures = [];
+  if (qualityMetadata.algorithmVersion === "authored-temporal-v2") {
+    const repairs = qualityMetadata.repairedFrames ?? [];
+    const repairedTargets = new Set(repairs.map((repair) =>
+      `${repair.clip}:${repair.frameOffset}`
+    ));
+    if (repairedTargets.size !== repairs.length ||
+        qualityMetadata.uniqueRepairedFrameCount !== repairs.length ||
+        qualityMetadata.repairedFrameCount !== repairs.length) {
+      metadataFailures.push("repaired frame counts are not unique and consistent");
+    }
+    if (qualityMetadata.unresolvedFrameCount !== 0) {
+      metadataFailures.push("unresolvedFrameCount is not zero");
+    }
+    for (const report of temporalReports) {
+      const recorded = qualityMetadata.temporalActions?.[report.action];
+      if (!recorded || recorded.longestPerceptualHold !== report.longestPerceptualHold ||
+          recorded.maximumPerceptualHold !== report.maximumPerceptualHold ||
+          recorded.repairedLowMotionTransitions?.length !==
+            report.repairedLowMotionTransitions.length) {
+        metadataFailures.push(`${report.action} temporal metrics do not match published frames`);
+      }
+    }
+    for (const repair of repairs) {
+      for (const donor of repair.donors ?? []) {
+        if (donor.clip !== repair.clip || donor.repaired ||
+            repairedTargets.has(`${donor.clip}:${donor.frameOffset}`)) {
+          metadataFailures.push(`${repair.clip}:${repair.frameOffset} has an invalid donor`);
+        }
+      }
+      if (repair.strategy === "fallback-clip" && !repair.fallbackClip) {
+        metadataFailures.push(`${repair.clip}:${repair.frameOffset} omits its fallback clip`);
+      }
+    }
+  }
+  if (geometryFailures.length || coverageFailures.length ||
+      temporalFailures.length || metadataFailures.length) {
     if (geometryFailures.length) {
       console.error(
         `VAT geometry failed for: ${geometryFailures.map((report) => report.label).join(", ")}`
@@ -209,6 +368,16 @@ if (metadata.runtime === "vat-v1") {
       console.error(
         `Animation rig coverage failed for: ${coverageFailures.map((animation) => animation.actualName).join(", ")}`
       );
+    }
+    if (temporalFailures.length) {
+      console.error(
+        `VAT temporal quality failed for: ${temporalFailures.map((report) =>
+          `${report.action ?? "unknown"}:${report.source}`
+        ).join(", ")}`
+      );
+    }
+    if (metadataFailures.length) {
+      console.error(`VAT repair metadata failed: ${metadataFailures.join("; ")}`);
     }
     process.exit(1);
   }

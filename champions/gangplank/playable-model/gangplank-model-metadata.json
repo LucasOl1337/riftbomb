@@ -260,16 +260,203 @@
     }
   ],
   "poseQuality": {
+    "algorithmVersion": "authored-temporal-v2",
     "centerLimit": 2.12,
     "maximumSpanMultiplier": 4,
     "minimumSpanMultiplier": 0.12,
     "repairedFrameCount": 8,
+    "uniqueRepairedFrameCount": 8,
+    "repairOperationCount": 8,
+    "fullyInvalidClips": [
+      {
+        "clip": "Gangplank_Spell2.anm",
+        "action": "w",
+        "fallbackClip": "Spell2_Idle_TRA",
+        "stage": "source-float"
+      }
+    ],
+    "unresolvedFrameCount": 0,
+    "positionBoundsSources": [],
+    "perceptualHoldLimits": {},
+    "temporalActions": {
+      "idle": {
+        "clip": "Idle1",
+        "effectiveSource": "Idle1",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.042792023873943374,
+          0.03387285662120192,
+          0.03602313308986347,
+          0.04418687463311387,
+          0.029745959344534258,
+          0.0376764985010986,
+          0.03798386725061676
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.94140625,
+        "enforced": false
+      },
+      "run": {
+        "clip": "Run_Haste",
+        "effectiveSource": "Run_Haste",
+        "frameCount": 10,
+        "uniqueFrameCount": 10,
+        "requiredUniqueFrameCount": 8,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.06109703583334251,
+          0.07835141521021347,
+          0.18723549694845057,
+          0.18974139681499128,
+          0.13278153451871488,
+          0.056377818621622076,
+          0.04582352659109464,
+          0.10401666922842932,
+          0.20625361233495312
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.943359375,
+        "enforced": false
+      },
+      "attack": {
+        "clip": "Attack1",
+        "effectiveSource": "Attack1",
+        "frameCount": 6,
+        "uniqueFrameCount": 6,
+        "requiredUniqueFrameCount": 5,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.5576774120158323,
+          0.15629701776376845,
+          0.03702849311399028,
+          0.13834576095730047,
+          0.11056369853716647
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.923828125,
+        "enforced": true
+      },
+      "q": {
+        "clip": "Gangplank_spell1.anm",
+        "effectiveSource": "Gangplank_spell1.anm",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.36032910757681724,
+          0.1514989018945121,
+          0.15200262633741868,
+          0.04565184052479835,
+          0.1963985827953538,
+          0.1972711526281399,
+          0.1832980178195605
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.953125,
+        "enforced": true
+      },
+      "w": {
+        "clip": "Gangplank_Spell2.anm",
+        "effectiveSource": "Spell2_Idle_TRA",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.022433151578936158,
+          0.015958722184645866,
+          0.012388379367387337,
+          0.012087681504610532,
+          0.012847288805813697,
+          0.013361161207879193,
+          0.013648634774703797
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.943359375,
+        "enforced": true
+      },
+      "e": {
+        "clip": "Gangplank_spell3.anm",
+        "effectiveSource": "Gangplank_spell3.anm",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.08510326168542953,
+          0.4591343003556365,
+          0.5241893090510182,
+          0.23507999791457307,
+          0.1755913790362843,
+          0.08583732946572989,
+          0.024421437063620474
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.951171875,
+        "enforced": true
+      },
+      "r": {
+        "clip": "Gangplank_spell4.anm",
+        "effectiveSource": "Gangplank_spell4.anm",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.06290035579299505,
+          0.32680340168662947,
+          0.70826473538126,
+          0.14988548526512543,
+          0.04939791521613045,
+          0.019006803634316317,
+          0.014009674048349914
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.953125,
+        "enforced": true
+      }
+    },
     "repairedFrames": [
       {
         "clip": "Gangplank_Spell2.anm",
         "frameOffset": 0,
         "reasons": [
           "mesh-collapsed"
+        ],
+        "originalReasons": [
+          "mesh-collapsed"
+        ],
+        "strategy": "fallback-clip",
+        "donors": [],
+        "fallbackClip": "Spell2_Idle_TRA",
+        "fallbackPhase": 0.25,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -277,6 +464,16 @@
         "frameOffset": 1,
         "reasons": [
           "mesh-collapsed"
+        ],
+        "originalReasons": [
+          "mesh-collapsed"
+        ],
+        "strategy": "fallback-clip",
+        "donors": [],
+        "fallbackClip": "Spell2_Idle_TRA",
+        "fallbackPhase": 0.3214285714285714,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -284,6 +481,16 @@
         "frameOffset": 2,
         "reasons": [
           "mesh-collapsed"
+        ],
+        "originalReasons": [
+          "mesh-collapsed"
+        ],
+        "strategy": "fallback-clip",
+        "donors": [],
+        "fallbackClip": "Spell2_Idle_TRA",
+        "fallbackPhase": 0.39285714285714285,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -291,6 +498,16 @@
         "frameOffset": 3,
         "reasons": [
           "mesh-collapsed"
+        ],
+        "originalReasons": [
+          "mesh-collapsed"
+        ],
+        "strategy": "fallback-clip",
+        "donors": [],
+        "fallbackClip": "Spell2_Idle_TRA",
+        "fallbackPhase": 0.4642857142857143,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -298,6 +515,16 @@
         "frameOffset": 4,
         "reasons": [
           "mesh-collapsed"
+        ],
+        "originalReasons": [
+          "mesh-collapsed"
+        ],
+        "strategy": "fallback-clip",
+        "donors": [],
+        "fallbackClip": "Spell2_Idle_TRA",
+        "fallbackPhase": 0.5357142857142857,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -305,6 +532,16 @@
         "frameOffset": 5,
         "reasons": [
           "mesh-collapsed"
+        ],
+        "originalReasons": [
+          "mesh-collapsed"
+        ],
+        "strategy": "fallback-clip",
+        "donors": [],
+        "fallbackClip": "Spell2_Idle_TRA",
+        "fallbackPhase": 0.6071428571428572,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -312,6 +549,16 @@
         "frameOffset": 6,
         "reasons": [
           "mesh-collapsed"
+        ],
+        "originalReasons": [
+          "mesh-collapsed"
+        ],
+        "strategy": "fallback-clip",
+        "donors": [],
+        "fallbackClip": "Spell2_Idle_TRA",
+        "fallbackPhase": 0.6785714285714286,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -319,6 +566,16 @@
         "frameOffset": 7,
         "reasons": [
           "mesh-collapsed"
+        ],
+        "originalReasons": [
+          "mesh-collapsed"
+        ],
+        "strategy": "fallback-clip",
+        "donors": [],
+        "fallbackClip": "Spell2_Idle_TRA",
+        "fallbackPhase": 0.75,
+        "stages": [
+          "source-float"
         ]
       }
     ]
@@ -415,7 +672,12 @@
       "startFrame": 60,
       "frameCount": 8,
       "duration": 0.6666668057441711,
-      "loop": false
+      "loop": false,
+      "effectiveSource": "Spell2_Idle_TRA",
+      "fallbackSourceWindow": [
+        0.25,
+        0.75
+      ]
     },
     "Spell3_Upper": {
       "source": "Spell3_Upper",

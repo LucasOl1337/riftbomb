@@ -1,7 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { AnimationMixer, Vector3 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { planVatFrameRepairs } from "./plan-vat-frame-repairs.mjs";
 
 // Node bake has no DOM Image; stub enough for GLTFLoader to finish mesh/skin/anim parse.
 globalThis.self ??= globalThis;
@@ -32,7 +34,10 @@ const fixedConfigs = {
     actions: {
       idle: "Idle1", run: "Run1", attack: "Attack1",
       q: "Spell1", w: "Spell2", e: "Spell3", r: "Spell4"
-    }
+    },
+    // Shunpo's authored vertical anticipation is valid geometry but exceeds the
+    // idle-only VAT box. Preserve that motion instead of replacing four frames.
+    positionBoundsActions: ["e"]
   },
   zed: {
     displayName: "Zed",
@@ -66,7 +71,10 @@ const fixedConfigs = {
       idle: "Idle1", run: "Run", attack: "Attack1", q: "Spell1",
       pool: "Spell2", poolDown: "Spell2Down", poolUp: "Spell2Up",
       e: "Vladimir_spell3_cast.anm", r: "Spell4"
-    }
+    },
+    // PoolDown reaches its authored underground pose early and intentionally
+    // holds it while gameplay transitions into the hidden pool loop.
+    perceptualHoldLimits: { poolDown: 5 }
   },
   gangplank: {
     displayName: "Gangplank",
@@ -77,6 +85,16 @@ const fixedConfigs = {
       idle: "Idle1", run: "Run_Haste", attack: "Attack1",
       q: "Gangplank_spell1.anm", w: "Gangplank_Spell2.anm",
       e: "Gangplank_spell3.anm", r: "Gangplank_spell4.anm"
+    },
+    // The exported W clip collapses a whole vertex island. Its matching authored
+    // W-to-idle transition contains a clean recovery window and is explicit so
+    // an all-invalid clip can never fall through to an unrelated global frame.
+    repairFallbacks: {
+      "Gangplank_Spell2.anm": {
+        clip: "Spell2_Idle_TRA",
+        startPhase: 0.25,
+        endPhase: 0.75
+      }
     },
     // Do NOT invertUvV: upload already uses UNPACK_FLIP_Y (same as Katarina/Renekton).
     // invertUvV + flip double-samples the atlas and turns GP into a dark leather blob.
@@ -153,8 +171,7 @@ const applyPose = (requestedName, requestedTime) => {
   for (const mesh of meshes) mesh.skeleton.update();
 };
 
-const samplePose = (name, time) => {
-  applyPose(name, time);
+const readSkinnedPositions = () => {
   const positions = [];
   const allY = [];
   for (const mesh of meshes) {
@@ -190,9 +207,12 @@ const samplePose = (name, time) => {
   }
   return positions;
 };
-
-const sampleSmoothNormals = (name, time) => {
+const samplePose = (name, time) => {
   applyPose(name, time);
+  return readSkinnedPositions();
+};
+
+const readSkinnedNormals = () => {
   const normals = [];
   for (const mesh of meshes) {
     const sourcePosition = mesh.geometry.attributes.position;
@@ -217,6 +237,36 @@ const sampleSmoothNormals = (name, time) => {
     normals.push(values);
   }
   return normals;
+};
+const sampleSmoothNormals = (name, time) => {
+  applyPose(name, time);
+  return readSkinnedNormals();
+};
+
+const transformNodes = [];
+gltf.scene.traverse((node) => transformNodes.push(node));
+const snapshotLocalTransforms = () => transformNodes.map((node) => ({
+  position: node.position.clone(),
+  quaternion: node.quaternion.clone(),
+  scale: node.scale.clone()
+}));
+const sampleRigInterpolation = (name, beforeTime, afterTime, alpha) => {
+  applyPose(name, beforeTime);
+  const before = snapshotLocalTransforms();
+  applyPose(name, afterTime);
+  const after = snapshotLocalTransforms();
+  for (let index = 0; index < transformNodes.length; index += 1) {
+    const node = transformNodes[index];
+    node.position.lerpVectors(before[index].position, after[index].position, alpha);
+    node.quaternion.copy(before[index].quaternion).slerp(after[index].quaternion, alpha);
+    node.scale.lerpVectors(before[index].scale, after[index].scale, alpha);
+  }
+  gltf.scene.updateMatrixWorld(true);
+  for (const mesh of meshes) mesh.skeleton.update();
+  return {
+    positions: readSkinnedPositions(),
+    normals: readSkinnedNormals()
+  };
 };
 
 if (config.runtime === "vat-v1") {
@@ -406,38 +456,142 @@ if (config.runtime === "vat-v1") {
     };
   }
 
-  // Some exported Model Viewer clips contain a few root/bone samples that move
-  // most of the character tens of metres or collapse whole vertex islands. The
-  // arena owns world movement, so replace only those unusable in-place samples
-  // with their nearest valid authored neighbour. The runtime VAT blend keeps the
-  // transition smooth without baking a midpoint that can fold rotating limbs.
-  const repairedFrames = [];
-  const repairInvalidFrames = () => {
-    for (const clip of Object.values(animationClips)) {
-      const first = clip.startFrame;
-      const last = first + clip.frameCount - 1;
-      for (let frameIndex = first; frameIndex <= last; frameIndex += 1) {
-        const quality = frameQuality[frameIndex];
-        if (!quality.reasons.length) continue;
-        let before = frameIndex - 1;
-        while (before >= first && frameQuality[before].reasons.length) before -= 1;
-        let after = frameIndex + 1;
-        while (after <= last && frameQuality[after].reasons.length) after += 1;
-        const donor = before >= first && after <= last
-          ? frameIndex - before <= after - frameIndex ? before : after
-          : before >= first ? before : after <= last ? after : 0;
-        positionFrames[frameIndex] = clonePose(positionFrames[donor]);
-        normalFrames[frameIndex] = clonePose(normalFrames[donor]);
-        repairedFrames.push({
-          clip: quality.clip,
-          frameOffset: quality.frameOffset,
-          reasons: quality.reasons
+  // Some Model Viewer exports contain isolated bone samples that explode or
+  // collapse. Build the complete repair plan from an immutable validity snapshot
+  // before writing anything: a synthetic pose can never become another donor.
+  const scalePose = (pose) => {
+    for (const values of pose) {
+      for (let index = 0; index < values.length; index += 1) values[index] *= unitScale;
+    }
+    return pose;
+  };
+  const everRepaired = new Set();
+  const protectedAuthoredDonors = new Set();
+  const repairedFramesByIndex = new Map();
+  const fullyInvalidClips = [];
+  let repairOperationCount = 0;
+  const repairInvalidFrames = (stage) => {
+    for (const spec of animationSpecs) {
+      const clip = animationClips[spec.key];
+      const invalidFrameOffsets = [];
+      const previouslyRepairedFrameOffsets = [];
+      for (let offset = 0; offset < clip.frameCount; offset += 1) {
+        const frameIndex = clip.startFrame + offset;
+        if (frameQuality[frameIndex].reasons.length) invalidFrameOffsets.push(offset);
+        if (everRepaired.has(frameIndex)) previouslyRepairedFrameOffsets.push(offset);
+      }
+      if (!invalidFrameOffsets.length) continue;
+      const invalidProtectedDonor = invalidFrameOffsets.find((offset) =>
+        protectedAuthoredDonors.has(clip.startFrame + offset)
+      );
+      if (invalidProtectedDonor !== undefined) {
+        throw new Error(
+          `${spec.key}:${invalidProtectedDonor} became invalid after serving as an authored donor`
+        );
+      }
+
+      const fallback = config.repairFallbacks?.[spec.key] ?? null;
+      const plan = planVatFrameRepairs({
+        clip: spec.key,
+        frameCount: clip.frameCount,
+        invalidFrameOffsets,
+        previouslyRepairedFrameOffsets,
+        strictEdgeRuns: Boolean(spec.action && !["idle", "run"].includes(spec.action)),
+        fallback
+      });
+      if (invalidFrameOffsets.length === clip.frameCount) {
+        fullyInvalidClips.push({
+          clip: spec.key,
+          action: spec.action ?? null,
+          fallbackClip: fallback?.clip ?? null,
+          stage
         });
+      }
+
+      // Apply only after the planner has frozen every authored donor for this clip.
+      for (const repair of plan) {
+        const frameIndex = clip.startFrame + repair.frameOffset;
+        const quality = frameQuality[frameIndex];
+        let positions;
+        let normals;
+        if (repair.strategy === "blend-authored") {
+          const [beforeOffset, afterOffset] = repair.donors;
+          const denominator = spec.loop ? spec.frameCount : Math.max(1, spec.frameCount - 1);
+          const interpolated = sampleRigInterpolation(
+            spec.name,
+            spec.clip.duration * beforeOffset / denominator,
+            spec.clip.duration * afterOffset / denominator,
+            repair.alpha
+          );
+          positions = scalePose(interpolated.positions);
+          normals = interpolated.normals;
+        } else if (repair.strategy === "hold-authored") {
+          const donorIndex = clip.startFrame + repair.donors[0];
+          positions = clonePose(positionFrames[donorIndex]);
+          normals = clonePose(normalFrames[donorIndex]);
+        } else {
+          const fallbackClip = clips.get(repair.fallbackClip);
+          if (!fallbackClip) {
+            throw new Error(`${spec.key} fallback clip is missing: ${repair.fallbackClip}`);
+          }
+          const sampleTime = Math.min(
+            fallbackClip.duration - 1e-4,
+            fallbackClip.duration * repair.fallbackPhase
+          );
+          positions = scalePose(samplePose(repair.fallbackClip, sampleTime));
+          normals = sampleSmoothNormals(repair.fallbackClip, sampleTime);
+        }
+
+        const replacementReasons = poseQualityReasons(
+          profilePose(positions),
+          positions,
+          quality.strictGeometry
+        );
+        if (replacementReasons.length) {
+          throw new Error(
+            `${spec.key}:${repair.frameOffset} ${repair.strategy} failed ${stage}: ` +
+            replacementReasons.join(", ")
+          );
+        }
+        positionFrames[frameIndex] = positions;
+        normalFrames[frameIndex] = normals;
+        const originalReasons = [...quality.reasons];
         quality.reasons = [];
+        everRepaired.add(frameIndex);
+        for (const donorOffset of repair.donors) {
+          protectedAuthoredDonors.add(clip.startFrame + donorOffset);
+        }
+        repairOperationCount += 1;
+        repairedFramesByIndex.set(frameIndex, {
+          clip: spec.key,
+          frameOffset: repair.frameOffset,
+          reasons: originalReasons,
+          originalReasons,
+          strategy: repair.strategy,
+          ...(repair.strategy === "blend-authored" ? {
+            interpolation: "rig-trs-slerp"
+          } : {}),
+          donors: repair.donors.map((frameOffset) => ({
+            clip: spec.key,
+            frameOffset,
+            repaired: false
+          })),
+          ...(repair.alpha === undefined ? {} : { alpha: repair.alpha }),
+          ...(repair.fallbackClip ? {
+            fallbackClip: repair.fallbackClip,
+            fallbackPhase: repair.fallbackPhase
+          } : {}),
+          stages: [stage]
+        });
+      }
+
+      if (plan.some((repair) => repair.strategy === "fallback-clip")) {
+        clip.effectiveSource = fallback.clip;
+        clip.fallbackSourceWindow = [fallback.startPhase ?? 0, fallback.endPhase ?? 1];
       }
     }
   };
-  repairInvalidFrames();
+  repairInvalidFrames("source-float");
   for (const frame of positionFrames) clampSpatialOutliers(frame);
 
   const vertexCount = meshes.reduce(
@@ -487,12 +641,47 @@ if (config.runtime === "vat-v1") {
   positionMax[1] = Math.max(positionMax[1], percentile(axisSamples[1], 0.99) + height * 0.2);
   // Absolute safety cap relative to idle center (stops any residual runaway).
   const idleCenter = axisSamples.map((values) => percentile(values, 0.5));
-  positionMin[0] = Math.max(positionMin[0], idleCenter[0] - height * 1.6);
-  positionMax[0] = Math.min(positionMax[0], idleCenter[0] + height * 1.6);
-  positionMin[1] = Math.max(positionMin[1], idleCenter[1] - height * 1.2);
-  positionMax[1] = Math.min(positionMax[1], idleCenter[1] + height * 1.4);
-  positionMin[2] = Math.max(positionMin[2], idleCenter[2] - height * 1.6);
-  positionMax[2] = Math.min(positionMax[2], idleCenter[2] + height * 1.6);
+  const safetyMin = [
+    idleCenter[0] - height * 1.6,
+    idleCenter[1] - height * 1.2,
+    idleCenter[2] - height * 1.6
+  ];
+  const safetyMax = [
+    idleCenter[0] + height * 1.6,
+    idleCenter[1] + height * 1.4,
+    idleCenter[2] + height * 1.6
+  ];
+  for (let axis = 0; axis < 3; axis += 1) {
+    positionMin[axis] = Math.max(positionMin[axis], safetyMin[axis]);
+    positionMax[axis] = Math.min(positionMax[axis], safetyMax[axis]);
+  }
+
+  // A small allow-list can widen the idle-derived box for an authored action
+  // whose topology is already valid. This preserves motion such as Katarina's
+  // vertical Shunpo anticipation without admitting the exploded Q samples.
+  const positionBoundsSources = [];
+  for (const action of config.positionBoundsActions ?? []) {
+    const source = config.actions[action];
+    const clip = animationClips[source];
+    if (!clip) throw new Error(`Missing position-bounds source for ${action}: ${source}`);
+    positionBoundsSources.push({ action, clip: source });
+    for (let offset = 0; offset < clip.frameCount; offset += 1) {
+      const frameIndex = clip.startFrame + offset;
+      if (frameQuality[frameIndex].reasons.length || everRepaired.has(frameIndex)) continue;
+      const profile = profilePose(positionFrames[frameIndex]);
+      for (let axis = 0; axis < 3; axis += 1) {
+        const margin = height * 0.02;
+        positionMin[axis] = Math.max(
+          safetyMin[axis],
+          Math.min(positionMin[axis], profile.low[axis] - margin)
+        );
+        positionMax[axis] = Math.min(
+          safetyMax[axis],
+          Math.max(positionMax[axis], profile.high[axis] + margin)
+        );
+      }
+    }
+  }
   const positionRange = positionMax.map((maximum, axis) =>
     Math.max(1e-6, maximum - positionMin[axis])
   );
@@ -511,7 +700,7 @@ if (config.runtime === "vat-v1") {
   // The GPU only sees values after this global clamp and Uint16 packing. Re-run
   // the gate on that exact spatial domain so a pose cannot pass in float space
   // and then collapse into a boundary plane when encoded as VAT data.
-  for (let frameIndex = 0; frameIndex < positionFrames.length; frameIndex += 1) {
+  const boundedQualityReasons = (frameIndex) => {
     const clampedPose = clonePose(positionFrames[frameIndex]);
     let saturatedComponents = 0;
     let componentCount = 0;
@@ -527,17 +716,38 @@ if (config.runtime === "vat-v1") {
     }
     clampToPositionBounds(clampedPose);
     const quality = frameQuality[frameIndex];
-    quality.reasons = poseQualityReasons(
+    const reasons = poseQualityReasons(
       profilePose(clampedPose),
       clampedPose,
       quality.strictGeometry
     );
     if (saturatedComponents / Math.max(1, componentCount) >= 0.05) {
-      quality.reasons.push("position-bounds-saturation");
+      reasons.push("position-bounds-saturation");
     }
-    quality.reasons = [...new Set(quality.reasons)];
+    return [...new Set(reasons)];
+  };
+  for (let frameIndex = 0; frameIndex < positionFrames.length; frameIndex += 1) {
+    frameQuality[frameIndex].reasons = boundedQualityReasons(frameIndex);
   }
-  repairInvalidFrames();
+  repairInvalidFrames("vat-bounds");
+  const unresolvedFrames = [];
+  for (let frameIndex = 0; frameIndex < positionFrames.length; frameIndex += 1) {
+    const reasons = boundedQualityReasons(frameIndex);
+    frameQuality[frameIndex].reasons = reasons;
+    if (reasons.length) {
+      unresolvedFrames.push({
+        clip: frameQuality[frameIndex].clip,
+        frameOffset: frameQuality[frameIndex].frameOffset,
+        reasons
+      });
+    }
+  }
+  if (unresolvedFrames.length) {
+    throw new Error(
+      `VAT repair left ${unresolvedFrames.length} invalid frame(s): ` +
+      unresolvedFrames.map((frame) => `${frame.clip}:${frame.frameOffset}`).join(", ")
+    );
+  }
   // Re-clamp every sample into the robust global box before quantization.
   for (const frame of positionFrames) clampToPositionBounds(frame);
 
@@ -567,6 +777,124 @@ if (config.runtime === "vat-v1") {
         quantizedNormals[target + 3] = 255;
       }
       frameVertexOffset += meshVertexCount;
+    }
+  }
+
+  const packedFrameStride = vertexCount * 4;
+  const frameHash = (frameIndex) => createHash("sha256").update(Buffer.from(
+    quantizedPositions.buffer,
+    quantizedPositions.byteOffset + frameIndex * packedFrameStride * Uint16Array.BYTES_PER_ELEMENT,
+    packedFrameStride * Uint16Array.BYTES_PER_ELEMENT
+  )).digest("hex");
+  const decodedPosition = (frameIndex, vertexIndex) => {
+    const offset = (frameIndex * vertexCount + vertexIndex) * 4;
+    return [0, 1, 2].map((axis) =>
+      positionMin[axis] + quantizedPositions[offset + axis] / 65535 * positionRange[axis]
+    );
+  };
+  const temporalActions = {};
+  const perceptualMotionThreshold = 0.001;
+  for (const [action, source] of Object.entries(config.actions)) {
+    const clip = animationClips[source];
+    const hashes = Array.from({ length: clip.frameCount }, (_value, offset) =>
+      frameHash(clip.startFrame + offset)
+    );
+    let longestIdenticalRun = 1;
+    let currentRun = 1;
+    for (let offset = 1; offset < hashes.length; offset += 1) {
+      currentRun = hashes[offset] === hashes[offset - 1] ? currentRun + 1 : 1;
+      longestIdenticalRun = Math.max(longestIdenticalRun, currentRun);
+    }
+    const transitionRms = [];
+    let longestPerceptualHold = 1;
+    let currentPerceptualHold = 1;
+    for (let offset = 1; offset < clip.frameCount; offset += 1) {
+      const beforeFrame = clip.startFrame + offset - 1;
+      const afterFrame = clip.startFrame + offset;
+      let squaredDistance = 0;
+      for (let vertex = 0; vertex < vertexCount; vertex += 1) {
+        const before = (beforeFrame * vertexCount + vertex) * 4;
+        const after = (afterFrame * vertexCount + vertex) * 4;
+        for (let axis = 0; axis < 3; axis += 1) {
+          const distance = (quantizedPositions[after + axis] -
+            quantizedPositions[before + axis]) / 65535 * positionRange[axis];
+          squaredDistance += distance * distance;
+        }
+      }
+      const rms = Math.sqrt(squaredDistance / Math.max(1, vertexCount * 3));
+      transitionRms.push(rms);
+      currentPerceptualHold = rms < perceptualMotionThreshold
+        ? currentPerceptualHold + 1
+        : 1;
+      longestPerceptualHold = Math.max(longestPerceptualHold, currentPerceptualHold);
+    }
+
+    const pairCount = Math.min(512, Math.max(0, vertexCount - 1));
+    let varyingPairs = 0;
+    for (let pairIndex = 0; pairIndex < pairCount; pairIndex += 1) {
+      const a = Math.floor(pairIndex * vertexCount / pairCount);
+      let b = (Math.imul(pairIndex + 1, 2654435761) >>> 0) % vertexCount;
+      if (b === a) b = (b + Math.floor(vertexCount / 2) + 1) % vertexCount;
+      let minimumDistance = Infinity;
+      let maximumDistance = -Infinity;
+      for (let offset = 0; offset < clip.frameCount; offset += 1) {
+        const frameIndex = clip.startFrame + offset;
+        const pa = decodedPosition(frameIndex, a);
+        const pb = decodedPosition(frameIndex, b);
+        const distance = Math.hypot(pa[0] - pb[0], pa[1] - pb[1], pa[2] - pb[2]);
+        minimumDistance = Math.min(minimumDistance, distance);
+        maximumDistance = Math.max(maximumDistance, distance);
+      }
+      if (maximumDistance - minimumDistance > 0.001) varyingPairs += 1;
+    }
+    const uniqueFrameCount = new Set(hashes).size;
+    const requiredUniqueFrameCount = Math.min(
+      clip.frameCount,
+      Math.ceil(clip.frameCount * 0.75)
+    );
+    const varyingPairRate = pairCount ? varyingPairs / pairCount : 0;
+    const enforced = !["idle", "run"].includes(action);
+    const maximumPerceptualHold = config.perceptualHoldLimits?.[action] ?? 2;
+    const repairedOffsets = new Set(
+      Array.from({ length: clip.frameCount }, (_value, offset) => offset)
+        .filter((offset) => everRepaired.has(clip.startFrame + offset))
+    );
+    const repairedLowMotionTransitions = transitionRms
+      .map((rms, offset) => ({ from: offset, to: offset + 1, rms }))
+      .filter((transition) =>
+        transition.rms < perceptualMotionThreshold &&
+        (repairedOffsets.has(transition.from) || repairedOffsets.has(transition.to))
+      );
+    temporalActions[action] = {
+      clip: source,
+      effectiveSource: clip.effectiveSource ?? source,
+      frameCount: clip.frameCount,
+      uniqueFrameCount,
+      requiredUniqueFrameCount,
+      longestIdenticalRun,
+      perceptualMotionThreshold,
+      transitionRms,
+      longestPerceptualHold,
+      maximumPerceptualHold,
+      repairedLowMotionTransitions,
+      varyingPairRate,
+      enforced
+    };
+    if (enforced && (
+      uniqueFrameCount < requiredUniqueFrameCount ||
+      longestIdenticalRun > 2 ||
+      longestPerceptualHold > maximumPerceptualHold ||
+      repairedLowMotionTransitions.length > 0 ||
+      varyingPairRate < 0.05
+    )) {
+      throw new Error(
+        `${config.displayName} ${action} failed temporal VAT quality: ` +
+        `${uniqueFrameCount}/${requiredUniqueFrameCount} unique, ` +
+        `exact hold ${longestIdenticalRun}, perceptual hold ` +
+        `${longestPerceptualHold}/${maximumPerceptualHold}, ` +
+        `${repairedLowMotionTransitions.length} low-motion repaired transitions, ` +
+        `articulation ${(varyingPairRate * 100).toFixed(1)}%`
+      );
     }
   }
 
@@ -604,6 +932,9 @@ if (config.runtime === "vat-v1") {
   });
   const source = config.sourceLabel ||
     `Khada Model Viewer ${config.displayName} base GLB with all animation clips`;
+  const repairedFrames = [...repairedFramesByIndex.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([_frameIndex, repair]) => repair);
 
   await fs.mkdir(outputDirectory, { recursive: true });
   await Promise.all([
@@ -639,10 +970,18 @@ if (config.runtime === "vat-v1") {
       skeletonBoneCount,
       animationDiagnostics,
       poseQuality: {
+        algorithmVersion: "authored-temporal-v2",
         centerLimit,
         maximumSpanMultiplier: 4,
         minimumSpanMultiplier: 0.12,
         repairedFrameCount: repairedFrames.length,
+        uniqueRepairedFrameCount: repairedFrames.length,
+        repairOperationCount,
+        fullyInvalidClips,
+        unresolvedFrameCount: unresolvedFrames.length,
+        positionBoundsSources,
+        perceptualHoldLimits: config.perceptualHoldLimits ?? {},
+        temporalActions,
         repairedFrames
       },
       animationActions: config.actions,

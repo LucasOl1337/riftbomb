@@ -69,8 +69,13 @@
         mix: localFrame - Math.floor(localFrame)
       };
     }
-    const modelReviewTarget = new URLSearchParams(location.search).get("model") || "";
-    const modelReviewPose = new URLSearchParams(location.search).get("pose") || "idle";
+    const modelReviewQuery = typeof URLSearchParams === "function"
+      ? new URLSearchParams(location.search)
+      : { get: () => null };
+    const modelReviewTarget = modelReviewQuery.get("model") || "";
+    const modelReviewPose = modelReviewQuery.get("pose") || "idle";
+    const modelReviewAction = modelReviewQuery.get("action") || "";
+    const requestedModelReviewFrame = Number.parseInt(modelReviewQuery.get("frame") || "0", 10);
     const modelReviewMode = ["katarina", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron"].includes(modelReviewTarget);
 
     const UI = {
@@ -2206,6 +2211,27 @@ drawKatarinaFallback(player, t, beat) {
       resolveChampionAnimation(player, t, key) {
         const animation = this[`${key}Animation`];
         if (!animation?.clips || !animation?.actions) return null;
+        if (modelReviewMode && key === modelReviewTarget &&
+            modelReviewAction && animation.actions[modelReviewAction]) {
+          const clipKey = animation.actions[modelReviewAction];
+          const clip = animation.clips[clipKey];
+          if (clip?.frameCount > 0) {
+            const localFrame = clamp(
+              Number.isFinite(requestedModelReviewFrame) ? requestedModelReviewFrame : 0,
+              0,
+              clip.frameCount - 1
+            );
+            const denominator = clip.loop ? clip.frameCount : Math.max(1, clip.frameCount - 1);
+            const sample = this.sampleChampionAction(
+              animation,
+              modelReviewAction,
+              localFrame / denominator
+            );
+            if (sample) {
+              return { ...sample, previous: sample, transition: 1, hidden: false };
+            }
+          }
+        }
         const poolRemaining = player.vladimirPool || 0;
         let desired;
         const action = (name, remaining, duration) => this.sampleChampionAction(

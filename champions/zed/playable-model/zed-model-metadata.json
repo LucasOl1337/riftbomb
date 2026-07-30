@@ -316,16 +316,249 @@
     }
   ],
   "poseQuality": {
+    "algorithmVersion": "authored-temporal-v2",
     "centerLimit": 2.05,
     "maximumSpanMultiplier": 4,
     "minimumSpanMultiplier": 0.12,
     "repairedFrameCount": 7,
+    "uniqueRepairedFrameCount": 7,
+    "repairOperationCount": 7,
+    "fullyInvalidClips": [],
+    "unresolvedFrameCount": 0,
+    "positionBoundsSources": [],
+    "perceptualHoldLimits": {},
+    "temporalActions": {
+      "idle": {
+        "clip": "Zed_idle1.anm",
+        "effectiveSource": "Zed_idle1.anm",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.01729527087214948,
+          0.020264477094398447,
+          0.016522307875119536,
+          0.01898997993926215,
+          0.01873578634341614,
+          0.005617887437872134,
+          0.003777439230092311
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.935546875,
+        "enforced": false
+      },
+      "run": {
+        "clip": "Zed_run.anm",
+        "effectiveSource": "Zed_run.anm",
+        "frameCount": 10,
+        "uniqueFrameCount": 10,
+        "requiredUniqueFrameCount": 8,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.07041533381459797,
+          0.12245804854018637,
+          0.06602710409074278,
+          0.052392864651302565,
+          0.10809439948167203,
+          0.07433921468421727,
+          0.11218274499563273,
+          0.06669768348727165,
+          0.03865997417739146
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.935546875,
+        "enforced": false
+      },
+      "attack": {
+        "clip": "Zed_attack1.anm",
+        "effectiveSource": "Zed_attack1.anm",
+        "frameCount": 6,
+        "uniqueFrameCount": 6,
+        "requiredUniqueFrameCount": 5,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.6982088734522609,
+          0.2436069134167849,
+          0.15823208473282907,
+          0.38290157012051634,
+          0.19694585990816127
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.966796875,
+        "enforced": true
+      },
+      "q": {
+        "clip": "Zed_spell1.anm",
+        "effectiveSource": "Zed_spell1.anm",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.37198983068806046,
+          0.09072381793236561,
+          0.08871809755004552,
+          0.0926172366324946,
+          0.10028227108571663,
+          0.10858888349593424,
+          0.11479356587471166
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.98046875,
+        "enforced": true
+      },
+      "w": {
+        "clip": "Zed_spell2_cast.anm",
+        "effectiveSource": "Zed_spell2_cast.anm",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.15615851062367328,
+          0.3450096866228846,
+          0.2523071793260311,
+          0.09380881600545302,
+          0.10490840210062655,
+          0.08446164687732514,
+          0.09471671839739085
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.947265625,
+        "enforced": true
+      },
+      "e": {
+        "clip": "Zed_spell3.anm",
+        "effectiveSource": "Zed_spell3.anm",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.2806139125701376,
+          0.5535554362672895,
+          0.6787446322692052,
+          0.27367752741145845,
+          0.2286340573502074,
+          0.20576187390222897,
+          0.16155188922773836
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.978515625,
+        "enforced": true
+      },
+      "r": {
+        "clip": "Spell4",
+        "effectiveSource": "Spell4",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.4030568211254094,
+          0.3565168808994744,
+          0.031739208589395336,
+          0.01173457861839952,
+          0.014128056468580182,
+          0.012558962834993265,
+          0.0054861336769326365
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.95703125,
+        "enforced": true
+      },
+      "rStrike": {
+        "clip": "Spell4_Strike",
+        "effectiveSource": "Spell4_Strike",
+        "frameCount": 6,
+        "uniqueFrameCount": 6,
+        "requiredUniqueFrameCount": 5,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.12763514222820618,
+          0.7265895492202354,
+          0.286529630745368,
+          0.07779620118330799,
+          0.008224095542908096
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.978515625,
+        "enforced": true
+      }
+    },
     "repairedFrames": [
       {
         "clip": "Death",
         "frameOffset": 7,
         "reasons": [
           "axis-1-expanded"
+        ],
+        "originalReasons": [
+          "axis-1-expanded"
+        ],
+        "strategy": "hold-authored",
+        "donors": [
+          {
+            "clip": "Death",
+            "frameOffset": 6,
+            "repaired": false
+          }
+        ],
+        "stages": [
+          "source-float"
+        ]
+      },
+      {
+        "clip": "Zed_idle3.anm",
+        "frameOffset": 6,
+        "reasons": [
+          "position-bounds-saturation"
+        ],
+        "originalReasons": [
+          "position-bounds-saturation"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Zed_idle3.anm",
+            "frameOffset": 5,
+            "repaired": false
+          },
+          {
+            "clip": "Zed_idle3.anm",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.5,
+        "stages": [
+          "vat-bounds"
         ]
       },
       {
@@ -336,6 +569,30 @@
           "axis-1-center-shift",
           "axis-1-expanded",
           "axis-2-expanded"
+        ],
+        "originalReasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 1,
+            "repaired": false
+          },
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.16666666666666666,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -346,6 +603,30 @@
           "axis-1-center-shift",
           "axis-1-expanded",
           "axis-2-expanded"
+        ],
+        "originalReasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 1,
+            "repaired": false
+          },
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.3333333333333333,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -356,6 +637,30 @@
           "axis-1-center-shift",
           "axis-1-expanded",
           "axis-2-expanded"
+        ],
+        "originalReasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 1,
+            "repaired": false
+          },
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.5,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -366,6 +671,30 @@
           "axis-1-center-shift",
           "axis-1-expanded",
           "axis-2-expanded"
+        ],
+        "originalReasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 1,
+            "repaired": false
+          },
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.6666666666666666,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -376,13 +705,30 @@
           "axis-1-center-shift",
           "axis-1-expanded",
           "axis-2-expanded"
-        ]
-      },
-      {
-        "clip": "Zed_idle3.anm",
-        "frameOffset": 6,
-        "reasons": [
-          "position-bounds-saturation"
+        ],
+        "originalReasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 1,
+            "repaired": false
+          },
+          {
+            "clip": "Zed_spell1.anm",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.8333333333333334,
+        "stages": [
+          "source-float"
         ]
       }
     ]

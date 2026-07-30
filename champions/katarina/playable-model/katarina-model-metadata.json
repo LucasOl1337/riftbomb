@@ -20,12 +20,12 @@
     ],
     "max": [
       2.1689844958782194,
-      2.771009519577026,
+      3.735619079208374,
       2.95893644618988
     ],
     "range": [
       4.573455409765243,
-      3.474694652244448,
+      4.439304211875796,
       5.024667458295822
     ]
   },
@@ -212,16 +212,205 @@
     }
   ],
   "poseQuality": {
+    "algorithmVersion": "authored-temporal-v2",
     "centerLimit": 2.08,
     "maximumSpanMultiplier": 4,
     "minimumSpanMultiplier": 0.12,
-    "repairedFrameCount": 15,
+    "repairedFrameCount": 9,
+    "uniqueRepairedFrameCount": 9,
+    "repairOperationCount": 9,
+    "fullyInvalidClips": [],
+    "unresolvedFrameCount": 0,
+    "positionBoundsSources": [
+      {
+        "action": "e",
+        "clip": "Spell3"
+      }
+    ],
+    "perceptualHoldLimits": {},
+    "temporalActions": {
+      "idle": {
+        "clip": "Idle1",
+        "effectiveSource": "Idle1",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.015701227677879574,
+          0.014655845778872571,
+          0.018584749131834517,
+          0.019009567298943934,
+          0.017539698463006372,
+          0.013888084945291,
+          0.014268201420677425
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.884765625,
+        "enforced": false
+      },
+      "run": {
+        "clip": "Run1",
+        "effectiveSource": "Run1",
+        "frameCount": 10,
+        "uniqueFrameCount": 10,
+        "requiredUniqueFrameCount": 8,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.055208726144407416,
+          0.08537493624680209,
+          0.11977662391293686,
+          0.07559614803109636,
+          0.09358510019453566,
+          0.06859266111745359,
+          0.08188659322378021,
+          0.10875201218531703,
+          0.1128741486400895
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.9296875,
+        "enforced": false
+      },
+      "attack": {
+        "clip": "Attack1",
+        "effectiveSource": "Attack1",
+        "frameCount": 6,
+        "uniqueFrameCount": 6,
+        "requiredUniqueFrameCount": 5,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.46544018141125426,
+          0.4760710818903927,
+          0.2717404855492102,
+          0.3488639576244059,
+          0.17699569434051637
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.943359375,
+        "enforced": true
+      },
+      "q": {
+        "clip": "Spell1",
+        "effectiveSource": "Spell1",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.08946907789333049,
+          0.30220059889426343,
+          0.08271249479516272,
+          0.07998457697931496,
+          0.08033221725104714,
+          0.08459420501124396,
+          0.08939723706093422
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.927734375,
+        "enforced": true
+      },
+      "w": {
+        "clip": "Spell2",
+        "effectiveSource": "Spell2",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.2633610000848809,
+          0.23973865916009426,
+          0.19029760847539776,
+          0.21911992682957224,
+          0.31478126339020884,
+          0.3733608157224732,
+          0.15995323242227283
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.900390625,
+        "enforced": true
+      },
+      "e": {
+        "clip": "Spell3",
+        "effectiveSource": "Spell3",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.000002025528346346598,
+          0.05805278506456831,
+          0.20451911311342616,
+          0.7673195292100751,
+          0.19889263608962152,
+          0.19224888520246397,
+          0.03266088861114529
+        ],
+        "longestPerceptualHold": 2,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.931640625,
+        "enforced": true
+      },
+      "r": {
+        "clip": "Spell4",
+        "effectiveSource": "Spell4",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.37582670746027574,
+          0.21815094655541267,
+          0.18087967934064134,
+          0.253205980022456,
+          0.3497904016018141,
+          0.2670139966389327,
+          0.1943712487468542
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.779296875,
+        "enforced": true
+      }
+    },
     "repairedFrames": [
       {
         "clip": "Death",
         "frameOffset": 1,
         "reasons": [
           "axis-2-center-shift"
+        ],
+        "originalReasons": [
+          "axis-2-center-shift"
+        ],
+        "strategy": "hold-authored",
+        "donors": [
+          {
+            "clip": "Death",
+            "frameOffset": 0,
+            "repaired": false
+          }
+        ],
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -229,6 +418,20 @@
         "frameOffset": 2,
         "reasons": [
           "axis-2-center-shift"
+        ],
+        "originalReasons": [
+          "axis-2-center-shift"
+        ],
+        "strategy": "hold-authored",
+        "donors": [
+          {
+            "clip": "Death",
+            "frameOffset": 0,
+            "repaired": false
+          }
+        ],
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -236,6 +439,20 @@
         "frameOffset": 3,
         "reasons": [
           "axis-2-center-shift"
+        ],
+        "originalReasons": [
+          "axis-2-center-shift"
+        ],
+        "strategy": "hold-authored",
+        "donors": [
+          {
+            "clip": "Death",
+            "frameOffset": 0,
+            "repaired": false
+          }
+        ],
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -245,6 +462,29 @@
           "axis-0-expanded",
           "axis-1-center-shift",
           "axis-1-expanded"
+        ],
+        "originalReasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Spell1",
+            "frameOffset": 2,
+            "repaired": false
+          },
+          {
+            "clip": "Spell1",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.2,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -254,6 +494,29 @@
           "axis-1-center-shift",
           "axis-1-expanded",
           "axis-2-expanded"
+        ],
+        "originalReasons": [
+          "axis-1-center-shift",
+          "axis-1-expanded",
+          "axis-2-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Spell1",
+            "frameOffset": 2,
+            "repaired": false
+          },
+          {
+            "clip": "Spell1",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.4,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -263,6 +526,29 @@
           "axis-0-expanded",
           "axis-1-center-shift",
           "axis-1-expanded"
+        ],
+        "originalReasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Spell1",
+            "frameOffset": 2,
+            "repaired": false
+          },
+          {
+            "clip": "Spell1",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.6,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -272,6 +558,29 @@
           "axis-0-expanded",
           "axis-1-center-shift",
           "axis-1-expanded"
+        ],
+        "originalReasons": [
+          "axis-0-expanded",
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Spell1",
+            "frameOffset": 2,
+            "repaired": false
+          },
+          {
+            "clip": "Spell1",
+            "frameOffset": 7,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.8,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -280,6 +589,28 @@
         "reasons": [
           "axis-1-center-shift",
           "axis-1-expanded"
+        ],
+        "originalReasons": [
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Spell2_Throw",
+            "frameOffset": 0,
+            "repaired": false
+          },
+          {
+            "clip": "Spell2_Throw",
+            "frameOffset": 3,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.3333333333333333,
+        "stages": [
+          "source-float"
         ]
       },
       {
@@ -288,51 +619,28 @@
         "reasons": [
           "axis-1-center-shift",
           "axis-1-expanded"
-        ]
-      },
-      {
-        "clip": "Spell3",
-        "frameOffset": 0,
-        "reasons": [
-          "mesh-collapsed",
-          "position-bounds-saturation"
-        ]
-      },
-      {
-        "clip": "Spell3",
-        "frameOffset": 1,
-        "reasons": [
-          "mesh-collapsed",
-          "position-bounds-saturation"
-        ]
-      },
-      {
-        "clip": "Spell3",
-        "frameOffset": 2,
-        "reasons": [
-          "mesh-collapsed",
-          "position-bounds-saturation"
-        ]
-      },
-      {
-        "clip": "Spell3",
-        "frameOffset": 3,
-        "reasons": [
-          "mesh-collapsed"
-        ]
-      },
-      {
-        "clip": "katarina_spell3.anm",
-        "frameOffset": 0,
-        "reasons": [
-          "position-bounds-saturation"
-        ]
-      },
-      {
-        "clip": "katarina_spell3.anm",
-        "frameOffset": 1,
-        "reasons": [
-          "position-bounds-saturation"
+        ],
+        "originalReasons": [
+          "axis-1-center-shift",
+          "axis-1-expanded"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Spell2_Throw",
+            "frameOffset": 0,
+            "repaired": false
+          },
+          {
+            "clip": "Spell2_Throw",
+            "frameOffset": 3,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.6666666666666666,
+        "stages": [
+          "source-float"
         ]
       }
     ]

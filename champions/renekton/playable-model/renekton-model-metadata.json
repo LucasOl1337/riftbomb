@@ -169,16 +169,207 @@
     }
   ],
   "poseQuality": {
+    "algorithmVersion": "authored-temporal-v2",
     "centerLimit": 2.2,
     "maximumSpanMultiplier": 4,
     "minimumSpanMultiplier": 0.12,
     "repairedFrameCount": 1,
+    "uniqueRepairedFrameCount": 1,
+    "repairOperationCount": 1,
+    "fullyInvalidClips": [],
+    "unresolvedFrameCount": 0,
+    "positionBoundsSources": [],
+    "perceptualHoldLimits": {},
+    "temporalActions": {
+      "idle": {
+        "clip": "Idle1",
+        "effectiveSource": "Idle1",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.09739433842646357,
+          0.15845013353716814,
+          0.18819454665593294,
+          0.086028655138082,
+          0.24786150199879034,
+          0.4430607194197878,
+          0.527810109541106
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.94140625,
+        "enforced": false
+      },
+      "run": {
+        "clip": "Run",
+        "effectiveSource": "Run",
+        "frameCount": 10,
+        "uniqueFrameCount": 10,
+        "requiredUniqueFrameCount": 8,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.12049112632411485,
+          0.1048478804352266,
+          0.14261922579854475,
+          0.1589150913923387,
+          0.1763272977800796,
+          0.1485797311134477,
+          0.1318429147273301,
+          0.137307512679119,
+          0.16264271282988932
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.955078125,
+        "enforced": false
+      },
+      "attack": {
+        "clip": "Attack1",
+        "effectiveSource": "Attack1",
+        "frameCount": 6,
+        "uniqueFrameCount": 6,
+        "requiredUniqueFrameCount": 5,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.5385829968467104,
+          0.7501332387415318,
+          0.33712624517801704,
+          0.7410608977022639,
+          0.45477214450334413
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.955078125,
+        "enforced": true
+      },
+      "q": {
+        "clip": "Spell1",
+        "effectiveSource": "Spell1",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.8563971589363185,
+          1.0887989684228894,
+          1.1137560024079154,
+          1.0750886874075263,
+          0.7070475629080244,
+          0.6231125967628228,
+          0.1747205002296114
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.95703125,
+        "enforced": true
+      },
+      "w": {
+        "clip": "Spell2",
+        "effectiveSource": "Spell2",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.419231132900181,
+          0.673971076550601,
+          0.31653341508646393,
+          0.7146251862560044,
+          0.31237847444070105,
+          0.23075637706152383,
+          0.22829090994224502
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.951171875,
+        "enforced": true
+      },
+      "e": {
+        "clip": "Spell3",
+        "effectiveSource": "Spell3",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.7715457513844687,
+          0.5910556949777169,
+          0.6033321499882527,
+          0.49205319802001085,
+          0.19831429197487369,
+          0.43382363936430834,
+          0.49970212986233675
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.951171875,
+        "enforced": true
+      },
+      "r": {
+        "clip": "Spell4",
+        "effectiveSource": "Spell4",
+        "frameCount": 8,
+        "uniqueFrameCount": 8,
+        "requiredUniqueFrameCount": 6,
+        "longestIdenticalRun": 1,
+        "perceptualMotionThreshold": 0.001,
+        "transitionRms": [
+          0.5247381421472281,
+          0.5555347447149431,
+          0.14252395826587352,
+          0.1495577339351561,
+          0.1348459374877469,
+          0.3372556999470116,
+          0.48460165968724583
+        ],
+        "longestPerceptualHold": 1,
+        "maximumPerceptualHold": 2,
+        "repairedLowMotionTransitions": [],
+        "varyingPairRate": 0.955078125,
+        "enforced": true
+      }
+    },
     "repairedFrames": [
       {
         "clip": "Dance",
         "frameOffset": 5,
         "reasons": [
           "axis-2-center-shift"
+        ],
+        "originalReasons": [
+          "axis-2-center-shift"
+        ],
+        "strategy": "blend-authored",
+        "interpolation": "rig-trs-slerp",
+        "donors": [
+          {
+            "clip": "Dance",
+            "frameOffset": 4,
+            "repaired": false
+          },
+          {
+            "clip": "Dance",
+            "frameOffset": 6,
+            "repaired": false
+          }
+        ],
+        "alpha": 0.5,
+        "stages": [
+          "source-float"
         ]
       }
     ]
