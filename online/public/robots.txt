@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Disallow: /riftbomb.html
+Disallow: /riftbomb-parts/
 Sitemap: https://bombpvp.com/sitemap.xml
