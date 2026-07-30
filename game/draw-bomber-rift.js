@@ -76,7 +76,7 @@
     const modelReviewPose = modelReviewQuery.get("pose") || "idle";
     const modelReviewAction = modelReviewQuery.get("action") || "";
     const requestedModelReviewFrame = Number.parseInt(modelReviewQuery.get("frame") || "0", 10);
-    const modelReviewMode = ["katarina", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron", "bomb"].includes(modelReviewTarget);
+    const modelReviewMode = ["katarina", "dagger", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron", "bomb"].includes(modelReviewTarget);
 
     const UI = {
       app: $("#app"),
@@ -516,7 +516,7 @@
           "uVoracity", "uDash", "uShadow", "uStyle", "uAlpha", "uSkill"
         ]);
         this.postUniforms = this.uniforms(this.postProgram, [
-          "uScene", "uResolution", "uTime", "uBeat", "uEnergy", "uHit",
+          "uScene", "uArenaBackdrop", "uUseArenaBackdrop", "uResolution", "uTime", "uBeat", "uEnergy", "uHit",
           "uHealth", "uShock0", "uShock1", "uShock2", "uShock3", "uReduced"
         ]);
         this.meshes = {
@@ -529,20 +529,13 @@
           skillDisc: this.createMesh(buildSkillDisc(this.mobilePerf ? 24 : 56)),
           skillCoin: this.createMesh(buildSkillCoin(this.mobilePerf ? 20 : 48))
         };
-        if (globalThis.RIFTBOMB_NACRE_APPEARANCE?.buildGrowthMesh) {
+        if (typeof RIFTBOMB_NACRE_APPEARANCE !== "undefined"
+          && RIFTBOMB_NACRE_APPEARANCE?.buildGrowthMesh) {
           this.meshes.nacreGrowth = this.createMesh(
-            globalThis.RIFTBOMB_NACRE_APPEARANCE.buildGrowthMesh(this.mobilePerf)
+            RIFTBOMB_NACRE_APPEARANCE.buildGrowthMesh(this.mobilePerf)
           );
         }
-        const katarinaDaggerSource = PLAYABLE_CHAMPIONS?.katarina?.dagger;
-        if (katarinaDaggerSource) {
-          const binary = atob(katarinaDaggerSource);
-          const bytes = new Uint8Array(binary.length);
-          for (let index = 0; index < binary.length; index += 1) {
-            bytes[index] = binary.charCodeAt(index);
-          }
-          this.meshes.katarinaDagger = this.createMesh(new Float32Array(bytes.buffer));
-        }
+        this.initialiseKatarinaDagger(PLAYABLE_CHAMPIONS?.katarina);
         this.championModelInitialised = new Set();
         this.championModelLoadPromises = {};
         this.championAnimationStates = new Map();
@@ -593,12 +586,52 @@
         return this.viewZoom;
       }
 
+      initialiseKatarinaDagger(packed) {
+        const packagedDaggerPresentation = packed?.daggerPresentation || {};
+        this.katarinaDaggerPresentation = Object.freeze({
+          readyScale: Number.isFinite(packagedDaggerPresentation.readyScale)
+            ? packagedDaggerPresentation.readyScale : 1.35,
+          readyPitch: Number.isFinite(packagedDaggerPresentation.readyPitch)
+            ? packagedDaggerPresentation.readyPitch : Math.PI * 0.4,
+          readyHeading: Number.isFinite(packagedDaggerPresentation.readyHeading)
+            ? packagedDaggerPresentation.readyHeading : Math.PI * (2 / 3),
+          readyHeadingSwing: Number.isFinite(packagedDaggerPresentation.readyHeadingSwing)
+            ? packagedDaggerPresentation.readyHeadingSwing : 0.12,
+          readyHeight: Number.isFinite(packagedDaggerPresentation.readyHeight)
+            ? packagedDaggerPresentation.readyHeight : 0.24,
+          readyHover: Number.isFinite(packagedDaggerPresentation.readyHover)
+            ? packagedDaggerPresentation.readyHover : 0.04
+        });
+        if (!packed?.dagger || this.meshes.katarinaDagger) return;
+
+        const binary = atob(packed.dagger);
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+          bytes[index] = binary.charCodeAt(index);
+        }
+        const daggerVertices = new Float32Array(bytes.buffer);
+        this.meshes.katarinaDagger = this.createMesh(daggerVertices);
+        const partNames = ["pommel", "grip", "guard", "blade"];
+        if (partNames.every((name) => {
+          const part = packed.daggerParts?.[name];
+          return Number.isInteger(part?.first) && Number.isInteger(part?.count) &&
+            part.first >= 0 && part.count > 0 &&
+            (part.first + part.count) * 6 <= daggerVertices.length;
+        })) {
+          this.meshes.katarinaDaggerParts = Object.fromEntries(partNames.map((name) => {
+            const { first, count } = packed.daggerParts[name];
+            return [name, this.createMesh(daggerVertices.subarray(first * 6, (first + count) * 6))];
+          }));
+        }
+      }
+
       initialiseChampionModel(champion) {
         if (this.championModelInitialised.has(champion)) {
           return this[`${champion}ModelReadyPromise`] || Promise.resolve(Boolean(this[`${champion}Ready`]));
         }
         const packed = PLAYABLE_CHAMPIONS[champion];
         if (!packed) return Promise.resolve(false);
+        if (champion === "katarina") this.initialiseKatarinaDagger(packed);
         // Register the in-flight promise BEFORE any await so concurrent
         // ensureChampionModel calls share the same load instead of resolving false.
         let settleReady;
@@ -1419,6 +1452,7 @@
           floorLattice: ["floorLattice"],
           floorClearing: ["floorClearing"],
           nacreGrowth: ["nacreGrowth"],
+          nacreScene: ["nacreScene"],
           floorLabyrinth: ["floorLabyrinth"],
           floorForts: ["floorForts"],
           floorPit: ["floorPit"],
@@ -1440,6 +1474,7 @@
           floorLattice: [138, 90, 58, 255],
           floorClearing: [40, 90, 96, 255],
           nacreGrowth: [108, 94, 88, 255],
+          nacreScene: [32, 44, 46, 255],
           floorLabyrinth: [28, 40, 52, 255],
           floorForts: [52, 110, 48, 255],
           floorPit: [28, 36, 58, 255],
@@ -1467,6 +1502,7 @@
         // Aliases used by draw path
         this.arenaTextures.wall = this.arenaTextures.wallLattice;
         this.arenaTextures.wallTop = this.arenaTextures.wallTopLattice;
+        this.arenaBackdropTexture = null;
         // mapId 1 = floor plate. mapId 2 = crate multi-face. mapId 3 = wall multi-face.
         // mapId 4 = skill icon plate (face UV, single albedo — bound per draw).
         this.arenaMapTextures = [
@@ -1501,6 +1537,9 @@
         this.arenaMapTextures[1] = floor;
         this.arenaMapTextures[3] = wall;
         this.arenaMapTextures[5] = this.arenaTextures[theme.soft] || this.arenaTextures.nacreGrowth;
+        this.arenaBackdropTexture = theme.soft === "nacreGrowth"
+          ? this.arenaTextures.nacreScene
+          : null;
         this.arenaTextures.wall = wall;
         this.arenaTextures.wallTop = wallTop;
         this.arenaFloorProfile = floorKey === "floorLattice" || floorKey === "floorPit"
@@ -1776,6 +1815,54 @@
         gl.uniform1i(this.mainUniforms.uAlbedoTop, 2);
         gl.bindVertexArray(mesh.vao);
         gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+      }
+
+      drawKatarinaDagger(position, scale, heading, pitch, emissive, energized = false, alpha = 1) {
+        const C = Renderer.colors;
+        const scaleVector = [scale, scale, scale];
+        const parts = this.meshes.katarinaDaggerParts;
+        if (parts) {
+          const materials = {
+            pommel: [C.katCrimsonDark, 2, 0.08 + emissive * 0.12],
+            grip: [C.katHilt, 0, 0.03 + emissive * 0.05],
+            guard: [energized ? C.katCrimson : C.katSteel, 2, 0.12 + emissive * 0.14],
+            blade: [C.zedSteel, 2, 0.04 + emissive * 0.025]
+          };
+          for (const name of ["pommel", "grip", "guard", "blade"]) {
+            const [color, material, partEmissive] = materials[name];
+            this.drawMesh(parts[name], position, scaleVector, color, material,
+              partEmissive, heading, alpha, 0, pitch);
+          }
+          return true;
+        }
+        if (!this.meshes.katarinaDagger) return false;
+        this.drawMesh(this.meshes.katarinaDagger, position, scaleVector,
+          energized ? C.katBladeEdge : C.katBlade, 3, emissive,
+          heading, alpha, 0, pitch);
+        return true;
+      }
+
+      drawReadyKatarinaDagger(dagger, t, beat) {
+        const C = Renderer.colors;
+        const katarinaDaggerPresentation = this.katarinaDaggerPresentation;
+        const pulse = 0.9 + Math.sin(t * 7 + dagger.id) * 0.08;
+        const showcasePhase = t * 1.35 + dagger.id * 0.73;
+        const heading = katarinaDaggerPresentation.readyHeading +
+          Math.sin(showcasePhase) * katarinaDaggerPresentation.readyHeadingSwing;
+        const y = katarinaDaggerPresentation.readyHeight +
+          Math.sin(t * 2.1 + dagger.id) * katarinaDaggerPresentation.readyHover;
+        this.draw("sphere", [dagger.x, 0.066, dagger.z], [0.42, 0.026, 0.42],
+          C.katCrimsonDark, 0, 0.16, 0, 0.84);
+        this.draw("torus", [dagger.x, 0.07, dagger.z], [0.54 * pulse, 0.055, 0.54 * pulse],
+          C.katCrimson, 4, 1.45 + beat * 0.24, t * 1.4,
+          0.64, 0, Math.PI * 0.5);
+        if (!this.drawKatarinaDagger([dagger.x, y, dagger.z], katarinaDaggerPresentation.readyScale,
+          heading, katarinaDaggerPresentation.readyPitch, 1.9 + beat * 0.25, true)) {
+          this.draw("crystal", [dagger.x, y, dagger.z], [0.11, 0.55, 0.08],
+            C.katBlade, 3, 2 + beat, heading, 1, 0, katarinaDaggerPresentation.readyPitch);
+          this.draw("cylinder", [dagger.x, y, dagger.z], [0.065, 0.16, 0.065],
+            C.katHilt, 0, 0.2, heading, 1, 0, katarinaDaggerPresentation.readyPitch);
+        }
       }
 
       /**
@@ -3086,7 +3173,13 @@ drawKatarinaFallback(player, t, beat) {
         const shakeX = Math.sin(t * 61) * essentialShake * 0.2;
         const shakeZ = Math.cos(t * 47) * essentialShake * 0.16;
         const orbit = prefersReducedMotion || this.mobilePerf ? 0 : Math.sin(t * 0.16) * 0.32;
-        const reviewCamera = modelReviewTarget === "bomb"
+        const reviewCamera = modelReviewTarget === "dagger"
+          ? {
+              eye: compact ? [0, 19.5, 15.5] : [0, 14.6, 13.4],
+              target: [0, 0.2, compact ? 0.05 : 0.12],
+              fov: compact ? 0.84 : 0.74
+            }
+          : modelReviewTarget === "bomb"
           ? { eye: [0, 2.15, 4.0], target: [0, 0.72, 0], fov: 0.54 }
           : modelReviewTarget === "baron"
           ? { eye: [0, 3.75, 7.2], target: [0, 1.2, 0], fov: 0.68 }
@@ -3157,10 +3250,10 @@ drawKatarinaFallback(player, t, beat) {
           ? RIFTBOMB_NACRE_APPEARANCE
           : null;
         this.bindArenaTheme(theme);
-        // Opaque tactical void from arena theme. Never transparent (was bleeding page grey).
-        // Never "punch" dark clears toward mid-grey — CRT cockpit wants deep ink.
+        // Nacre uses its approved scene art as the actual match plate. Dynamic
+        // contestants and combat effects render into a transparent scene above it.
         const clear = this.themeColor(theme, "clear", [0.05, 0.08, 0.07]);
-        gl.clearColor(clear[0], clear[1], clear[2], 1);
+        gl.clearColor(clear[0], clear[1], clear[2], nacreAppearance ? 0 : 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.useProgram(this.mainProgram);
         gl.uniformMatrix4fv(this.mainUniforms.uViewProjection, false, vp);
@@ -3175,6 +3268,7 @@ drawKatarinaFallback(player, t, beat) {
         // Clean stage in deep tactical void (no outer tile mud)
         const halfW = (game.cols * game.tile) * 0.5;
         const halfD = (game.rows * game.tile) * 0.5;
+        if (!nacreAppearance) {
         // Hard stage plinth in tactical void — no soft cyan bloom disc
         const plinth = [
           clear[0] * 0.35 + 0.02,
@@ -3286,6 +3380,7 @@ drawKatarinaFallback(player, t, beat) {
             }
           }
         }
+        }
 
         for (const ultimate of game.ultimates) {
           const progress = clamp(ultimate.age / ultimate.fuse, 0, 1);
@@ -3360,22 +3455,26 @@ drawKatarinaFallback(player, t, beat) {
 
         for (const dagger of game.daggers || []) {
           const ready = dagger.age >= dagger.readyAt;
-          const fall = ready ? 0 : clamp(1 - dagger.age / Math.max(0.01, dagger.readyAt), 0, 1);
-          const y = ready ? 0.12 : 0.45 + Math.sin((1 - fall) * Math.PI) * 1.5;
-          const pulse = 0.9 + Math.sin(t * 7 + dagger.id) * 0.08;
+          if (ready) {
+            this.drawReadyKatarinaDagger(dagger, t, beat);
+            continue;
+          }
+          const fall = clamp(1 - dagger.age / Math.max(0.01, dagger.readyAt), 0, 1);
           const spin = t * 4 + dagger.id;
-          this.draw("torus", [dagger.x, 0.07, dagger.z], [0.48 * pulse, 0.055, 0.48 * pulse],
-            C.katCrimson, 4, ready ? 2.2 + beat : 0.6, t * 1.4,
-            ready ? 0.64 : 0.22, 0, Math.PI * 0.5);
-          if (this.meshes.katarinaDagger) {
-            this.drawMesh(this.meshes.katarinaDagger, [dagger.x, y, dagger.z],
-              [0.82, 0.82, 0.82], ready ? C.katBlade : C.katCrimson,
-              3, ready ? 1.35 + beat : 0.7, spin, 1, 0, ready ? Math.PI * 0.42 : 0.18);
-          } else {
-            this.draw("crystal", [dagger.x, y, dagger.z], [0.085, 0.42, 0.06],
-              ready ? C.katBlade : C.katCrimson, 3, ready ? 2 + beat : 1, spin, 1, 1.08);
-            this.draw("cylinder", [dagger.x, y + 0.29, dagger.z], [0.055, 0.13, 0.055],
-              C.katHilt, 0, 0.2, spin);
+          const heading = spin;
+          const pitch = 0.18;
+          const y = 0.45 + Math.sin((1 - fall) * Math.PI) * 1.5;
+          this.draw("sphere", [dagger.x, 0.066, dagger.z], [0.42, 0.026, 0.42],
+            C.katCrimsonDark, 0, 0.04, 0, 0.4);
+          this.draw("torus", [dagger.x, 0.07, dagger.z], [0.49, 0.055, 0.49],
+            C.katCrimson, 4, 0.6, t * 1.4, 0.22, 0, Math.PI * 0.5);
+          if (!this.drawKatarinaDagger([dagger.x, y, dagger.z], 0.9,
+            heading, pitch, 0.8, false)) {
+            this.draw("crystal", [dagger.x, y, dagger.z], [0.11, 0.55, 0.08],
+              C.katCrimson, 3, 1,
+              heading, 1, 0, pitch);
+            this.draw("cylinder", [dagger.x, y, dagger.z], [0.065, 0.16, 0.065],
+              C.katHilt, 0, 0.2, heading, 1, 0, pitch);
           }
         }
 
@@ -3399,11 +3498,10 @@ drawKatarinaFallback(player, t, beat) {
               C.gangplankOrange, 3, 2.8 + beat, angle, 0.9, 0, Math.PI * 0.5);
           } else {
             const angle = Math.atan2(projectile.dx, projectile.dz);
-            if (this.meshes.katarinaDagger) {
-              this.drawMesh(this.meshes.katarinaDagger,
-                [projectile.x, projectile.y, projectile.z], [0.72, 0.72, 0.72],
-                C.katBladeEdge, 3, 2.8 + beat, angle, 1, t * 11, Math.PI * 0.5);
-            } else {
+            if (!this.drawKatarinaDagger(
+              [projectile.x, projectile.y, projectile.z], 0.88,
+              angle, Math.PI * 0.5, 2.8 + beat, true
+            )) {
               this.draw("crystal", [projectile.x, projectile.y, projectile.z], [0.075, 0.38, 0.055],
                 C.katBladeEdge, 3, 3.2 + beat, t * 11, 1, 1.12);
             }
@@ -3514,6 +3612,10 @@ drawKatarinaFallback(player, t, beat) {
             fuse: 2.35,
             ownerId: 1
           }, t, beat, { review: true });
+        } else if (modelReviewMode && modelReviewTarget === "dagger") {
+          // Bottom-left spawn-safe cell keeps the gameplay-scale silhouette in
+          // the real arena camera without a random crate obscuring the blade.
+          this.drawReadyKatarinaDagger({ id: 0, x: -5.28, z: 5.28 }, t, beat);
         } else if (modelReviewMode && modelReviewTarget === "katarina" && player) {
           this.drawKatarina({
             ...player,
@@ -3617,6 +3719,10 @@ drawKatarinaFallback(player, t, beat) {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.sceneTexture);
         gl.uniform1i(this.postUniforms.uScene, 0);
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, this.arenaBackdropTexture || this.arenaWhiteTexture);
+        gl.uniform1i(this.postUniforms.uArenaBackdrop, 3);
+        gl.uniform1f(this.postUniforms.uUseArenaBackdrop, nacreAppearance ? 1 : 0);
         gl.uniform2f(this.postUniforms.uResolution, this.width, this.height);
         gl.uniform1f(this.postUniforms.uTime, t);
         gl.uniform1f(this.postUniforms.uBeat, beat);
@@ -4447,6 +4553,8 @@ drawKatarinaFallback(player, t, beat) {
       precision highp float;
       in vec2 vUv;
       uniform sampler2D uScene;
+      uniform sampler2D uArenaBackdrop;
+      uniform float uUseArenaBackdrop;
       uniform vec2 uResolution;
       uniform float uTime;
       uniform float uBeat;
@@ -4475,13 +4583,31 @@ drawKatarinaFallback(player, t, beat) {
         return uv - dir * wave * 0.01 * (1.0 - uReduced);
       }
 
+      vec2 backdropUv(vec2 uv) {
+        float viewportAspect = uResolution.x / max(uResolution.y, 1.0);
+        float imageAspect = 16.0 / 9.0;
+        if (viewportAspect > imageAspect) {
+          uv.y = (uv.y - 0.5) * (viewportAspect / imageAspect) + 0.5;
+        } else {
+          uv.x = (uv.x - 0.5) * (imageAspect / viewportAspect) + 0.5;
+        }
+        return uv;
+      }
+
+      vec4 compositeScene(vec2 uv) {
+        vec4 scene = texture(uScene, uv);
+        if (uUseArenaBackdrop < 0.5) return scene;
+        vec3 backdrop = texture(uArenaBackdrop, clamp(backdropUv(uv), 0.0, 1.0)).rgb;
+        return vec4(mix(backdrop, scene.rgb, scene.a), 1.0);
+      }
+
       vec3 sampleScene(vec2 uv) {
         vec2 px = 1.0 / uResolution;
         // Aberration only on hit — not constant wash
         float aberr = (uHit * 1.1 + uEnergy * 0.18) * px.x * (1.0 - uReduced);
-        float r = texture(uScene, uv + vec2(aberr, 0.0)).r;
-        float g = texture(uScene, uv).g;
-        float b = texture(uScene, uv - vec2(aberr, 0.0)).b;
+        float r = compositeScene(uv + vec2(aberr, 0.0)).r;
+        float g = compositeScene(uv).g;
+        float b = compositeScene(uv - vec2(aberr, 0.0)).b;
         return vec3(r, g, b);
       }
 
@@ -4495,7 +4621,7 @@ drawKatarinaFallback(player, t, beat) {
         uv = shockWarp(uv, uShock2, ring);
         uv = shockWarp(uv, uShock3, ring);
 
-        vec4 baseTex = texture(uScene, uv);
+        vec4 baseTex = compositeScene(uv);
         vec3 color = sampleScene(uv);
         vec2 px = 1.0 / uResolution;
         float safeBeat = uBeat * (1.0 - uReduced);
@@ -4508,7 +4634,7 @@ drawKatarinaFallback(player, t, beat) {
           vec2 dir = vec2(cos(a), sin(a));
           for (int j = 1; j <= 2; j++) {
             float fj = float(j);
-            vec3 s = texture(uScene, uv + dir * px * fj * (1.6 + uEnergy * 1.4)).rgb;
+            vec3 s = compositeScene(uv + dir * px * fj * (1.6 + uEnergy * 1.4)).rgb;
             float lum = dot(s, vec3(0.2126, 0.7152, 0.0722));
             bloom += s * smoothstep(0.78, 1.05, lum);
             weights += 1.0;

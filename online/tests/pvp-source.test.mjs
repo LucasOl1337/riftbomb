@@ -536,6 +536,7 @@ test("keeps arena WebP files out of the initial online payload", async () => {
   assert.match(game, /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp/);
   assert.match(game, /\/arena-textures\/floor-clearing-v3\.webp/);
   assert.match(game, /\/arena-textures\/nacre-growth-albedo\.webp/);
+  assert.match(game, /\/arena-textures\/nacre-hollow-scene\.webp/);
   assert.match(game, /\/arena-textures\/floor-storm-eye-combat-field-99509f91\.webp/);
   assert.doesNotMatch(game, /\/arena-textures\/floor-clearing\.webp/);
   assert.doesNotMatch(game, /\/arena-textures\/floor-lattice\.webp/);
@@ -550,6 +551,7 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     ],
     ["game/arena-appearance/textures/ground/floor-clearing-v3.webp", "floor-clearing-v3.webp"],
     ["game/arena-appearance/textures/props/nacre-growth-albedo.webp", "nacre-growth-albedo.webp"],
+    ["game/arena-appearance/textures/background/nacre-hollow-scene.webp", "nacre-hollow-scene.webp"],
     ["game/arena-appearance/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
     ["game/arena-appearance/textures/ground/floor-forts.webp", "floor-forts.webp"],
     [
@@ -601,6 +603,16 @@ test("loads only the playable champion models selected in the lobby", async () =
   assert.doesNotMatch(game, /const PLAYABLE_CHAMPIONS = Object\.freeze\(\{/);
   assert.match(game, /window\.RIFTBOMB_PLAYABLE_CHAMPIONS = Object\.create\(null\)/);
   assert.match(game, /ensureChampionModels/);
+  assert.match(game, /initialiseKatarinaDagger\(packed\)/);
+  const katarinaInitialisation = game.slice(
+    game.indexOf("initialiseChampionModel(champion)"),
+    game.indexOf("ensureChampionModel(champion)")
+  );
+  assert.ok(
+    katarinaInitialisation.indexOf('if (champion === "katarina") this.initialiseKatarinaDagger(packed)') <
+      katarinaInitialisation.indexOf('if (packed.animation?.runtime === "vat-v1")'),
+    "the asynchronously loaded Katarina payload must initialise her authored dagger before model setup"
+  );
   assert.equal(
     (game.match(/\/champion-models\/[^"]+\.js/g) || []).length,
     champions.length,
@@ -654,8 +666,22 @@ test("loads only the playable champion models selected in the lobby", async () =
       const width = bounds[1][0] - bounds[0][0];
       const depth = bounds[1][2] - bounds[0][2];
       assert.ok(width > depth * 1.5, "online dagger must retain its broad curved face");
+      assert.deepEqual(
+        Object.keys(payload.daggerParts),
+        ["pommel", "grip", "guard", "blade"],
+      );
+      assert.equal(payload.daggerParts.pommel.first, 0);
+      assert.equal(
+        Object.values(payload.daggerParts).reduce((count, part) => count + part.count, 0),
+        dagger.length / 6,
+      );
+      assert.ok(payload.daggerPresentation.readyScale >= 1.3);
+      assert.ok(payload.daggerPresentation.readyHeadingSwing <= 0.15);
+      assert.ok(payload.daggerPresentation.readyHeight >= 0.2);
     } else {
       assert.equal(payload.dagger, undefined);
+      assert.equal(payload.daggerParts, undefined);
+      assert.equal(payload.daggerPresentation, undefined);
     }
     if (metadata.runtime === "vat-v1") {
       const frames = await readFile(

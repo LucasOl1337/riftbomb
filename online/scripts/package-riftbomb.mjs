@@ -4,6 +4,10 @@ import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { transform } from "esbuild";
+import {
+  katarinaDaggerPresentation,
+  packageKatarinaDagger,
+} from "../../champions/prepare-playable-models/package-playable-champions.mjs";
 
 const PART_SIZE = 4 * 1024 * 1024;
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -51,6 +55,7 @@ const arenaTextureFiles = Object.freeze({
   ],
   floorClearing: ["ground/floor-clearing-v3.webp", "floor-clearing-v3.webp"],
   nacreGrowth: ["props/nacre-growth-albedo.webp", "nacre-growth-albedo.webp"],
+  nacreScene: ["background/nacre-hollow-scene.webp", "nacre-hollow-scene.webp"],
   floorLabyrinth: ["ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
   floorForts: ["ground/floor-forts.webp", "floor-forts.webp"],
   floorPit: [
@@ -180,15 +185,7 @@ onlineGame = replaceOnce(
 // shipped as separate .bin assets so base64 JS never blows past that limit.
 const WORKERS_ASSET_MAX_BYTES = 25 * 1024 * 1024;
 const embeddedChampionModels = (await readFile(championModelBundleSource, "utf8")).replace(/\r\n/g, "\n");
-const katarinaModelStart = embeddedChampionModels.indexOf("  katarina: Object.freeze(");
-const katarinaModelEnd = embeddedChampionModels.indexOf("\n  zed:", katarinaModelStart);
-const katarinaDaggerMatch = embeddedChampionModels
-  .slice(katarinaModelStart, katarinaModelEnd)
-  .match(/"dagger":"([A-Za-z0-9+/=]+)"/);
-if (katarinaModelStart < 0 || katarinaModelEnd < 0 || !katarinaDaggerMatch) {
-  throw new Error("Packaged Katarina dagger is missing from the playable model catalog");
-}
-const katarinaDagger = katarinaDaggerMatch[1];
+const katarinaDagger = await packageKatarinaDagger(repositoryRoot);
 
 function compactConstantAlpha(buffer, componentBytes, label) {
   const sourcePixelBytes = componentBytes * 4;
@@ -228,7 +225,11 @@ async function playableChampionPayload(champion) {
     indices: indices.toString("base64"),
     texture: `data:image/webp;base64,${texture.toString("base64")}`,
   };
-  if (champion === "katarina") payload.dagger = katarinaDagger;
+  if (champion === "katarina") {
+    payload.dagger = katarinaDagger.geometry;
+    payload.daggerParts = katarinaDagger.parts;
+    payload.daggerPresentation = katarinaDaggerPresentation;
+  }
   const binaryAssets = [];
   if (metadata.runtime === "vat-v1") {
     const [rgbaFrames, rgbaNormals] = await Promise.all([

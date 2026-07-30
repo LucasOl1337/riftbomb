@@ -154,7 +154,7 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   };
   assert.deepEqual(
     [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(theme)],
-    ["nacreGrowth", "floorClearing", "wallClearing", "wallTopClearing"]
+    ["nacreScene"]
   );
   assert.deepEqual(
     [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(null)],
@@ -192,6 +192,7 @@ test("arena textures load only for the selected or explored arena", async (t) =>
       return path.join("ground", "floor-clearing-v3.webp");
     }
     if (key === "nacreGrowth") return path.join("props", "nacre-growth-albedo.webp");
+    if (key === "nacreScene") return path.join("background", "nacre-hollow-scene.webp");
     const directory = key.startsWith("floor") ? "ground" : "walls";
     const fileName = key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
     return path.join(directory, `${fileName}.webp`);
@@ -1347,7 +1348,7 @@ test("real VAT binaries preserve CPU fallback samples after tiled GPU packing", 
   assert.match(renderer, /normalize\(mix\(previousNormal, currentNormal, uTransition\)\)/);
 });
 
-test("arena modular kit packs eighteen authored texture sources", async () => {
+test("arena modular kit packs nineteen authored texture sources", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
   const packedTextures = await readFile(
     path.join(gameDirectory, "arena-appearance", "load-arena-appearance.js"),
@@ -1362,8 +1363,8 @@ test("arena modular kit packs eighteen authored texture sources", async () => {
   assert.match(renderer, /wallPit:\s*\["wallPit"\]/);
   assert.equal(
     [...packedTextures.matchAll(/data:image\/webp;base64,/g)].length,
-    18,
-    "the offline build must embed each modular kit source once, including Nacre growth"
+    19,
+    "the offline build must embed each modular kit source once, including the Nacre match plate"
   );
 });
 
@@ -1381,8 +1382,13 @@ test("Nacre Hollow renders its authored shell kit instead of generic crates", as
   assert.match(nacre, /theme\?\.floor === "floorClearing"/);
   assert.match(nacre, /buildGrowthMesh/);
   assert.match(renderer, /this\.meshes\.nacreGrowth/);
+  assert.match(renderer, /typeof RIFTBOMB_NACRE_APPEARANCE !== "undefined"/);
+  assert.doesNotMatch(renderer, /globalThis\.RIFTBOMB_NACRE_APPEARANCE/);
   assert.match(renderer, /nacreGrowth:\s*\["nacreGrowth"\]/);
   assert.match(renderer, /uMapId > 4\.5 && uMapId < 5\.5/);
+  assert.match(renderer, /uUseArenaBackdrop/);
+  assert.match(renderer, /if \(!nacreAppearance\)/);
+  assert.match(renderer, /mix\(backdrop, scene\.rgb, scene\.a\)/);
   assert.match(nacre, /drawFloorOrnaments/);
   assert.match(nacre, /drawBreakableTile/);
 });
