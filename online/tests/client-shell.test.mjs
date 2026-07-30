@@ -52,6 +52,19 @@ test("makes the default Quick Match call to action immediate and specific", asyn
   assert.doesNotMatch(page, /if \(activeMode === "quick"\) return "BUSCAR PARTIDA"/);
 });
 
+test("gives the primary call to action tactile and keyboard feedback", async () => {
+  const styles = await readFile(new URL("app/globals.css", root), "utf8");
+
+  assert.match(
+    styles,
+    /\.config-submit:focus-visible,\s*\.client-sticky-cta__primary:focus-visible\s*\{[\s\S]*?outline: 3px solid #fff;[\s\S]*?outline-offset: -6px;/,
+  );
+  assert.match(
+    styles,
+    /\.config-submit:active:not\(:disabled\),\s*\.client-sticky-cta__primary:active:not\(:disabled\)\s*\{[\s\S]*?transform: translateY\(1px\) scale\(0\.97\);/,
+  );
+});
+
 test("keeps the runtime authoritative behind a same-origin message bridge", async () => {
   const [page, runtime] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),

@@ -934,6 +934,27 @@ button:disabled {
     0 8px 28px rgb(75 214 224 / 24%);
 }
 
+.config-submit,
+.client-sticky-cta__primary {
+  transform: translateY(0) scale(1);
+  transition:
+    transform 140ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.config-submit:focus-visible,
+.client-sticky-cta__primary:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: -6px;
+}
+
+.config-submit:active:not(:disabled),
+.client-sticky-cta__primary:active:not(:disabled) {
+  transform: translateY(1px) scale(0.97);
+}
+
 .config-submit:disabled {
   border-color: rgb(118 142 147 / 22%);
   color: #66787e;
