@@ -28,8 +28,8 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | Aprovadas | 0 |
 | Mudança necessária | 0 |
 | Corrigidas localmente | 6 |
-| Verificadas ao vivo | 11 |
-| Em andamento | 1 |
+| Verificadas ao vivo | 12 |
+| Em andamento | 0 |
 | Reauditoria necessária | 0 |
 | Bloqueadas | 1 |
 | Não testadas | 0 |
@@ -56,7 +56,7 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | 016 | Qualidade LoL · rodada 11 · retomada autenticada após F5 | verified_live | Codex `/root` | 2026-07-30T02:20:13-03:00 | `c9da842` + Worker `e0597eb4` | `a21c49f` · Oracle `a21c49f` · Worker `be838e1a` | ✅ antes 1936×1048/1440×900 e depois 1280×720, dois clientes visíveis, F5 e teclado real | — | — | ✅ bearer de 256 bits por assento, digest no servidor, substituição atômica, grace exato de 20 s, ACK preservado, boot coalescido e presença false→true | ✅ 140/140 + 63/63 + servidor 54/54; dry-run; P0=0/P1=0 bloqueadores | `artifacts/comparar-qa/2026-07-30/lol-quality-round-11/` | Netcode 66→72. O cliente voltou à mesma rodada após F5 em 3.523 ms, o rival confirmou reconexão em 3.598 ms e novo input `D` foi aceito. Bearer estável sem rotação e ACK de ações one-shot permanecem pendentes. |
 | 017 | Qualidade LoL · rodada 12 · material original do piso da arena | verified_live | Codex `/root` | 2026-07-30T04:08:04-03:00 | `3cb5a11` + Worker `be838e1a` | `80503b1` · Worker `53cabbe1` | ✅ antes 1440×900; depois local/live no mesmo enquadramento | ✅ antes/local/live 844×390 emulado, controles touch visíveis | ✅ bloqueio correto 390×844 e gameplay 844×390 emulados | ✅ colisão e regras intactas; perfil Salt Lens isolado, 5 taps e mesmo draw | ✅ 141/141 + 63/63 + servidor 54/54; WebGL2 visível limpo; P0/P1/P2=0 | `artifacts/comparar-qa/2026-07-30/lol-quality-round-12/` | Gráficos 63→68. Piso autoral fingerprinted publicado e verificado byte a byte; casts, sombras e as outras quatro arenas continuam como gargalos explícitos. |
 | 018 | Qualidade LoL · rodada 13 · ACK/replay exatamente-uma-vez de ações | verified_live | Codex `/root` | 2026-07-30T05:13:38-03:00 | `afc4e78` + Worker `53cabbe1` | `669d745` · Oracle `e9fdc93` · Worker `dbb42e55` | ✅ baseline, partida e F5, 1440×900 | ⚠️ 844×390 emulado; físico pendente | ✅ 844×390 + gate 390×844 emulados | ✅ bomba/habilidade sob gap, drop, duplicação, atraso, rejeição e F5; soak 10 min com 2.299/2.299 ACKs | ✅ 141/141 + 75/75 + servidor 55/55; skipped 0/0; reauditoria P0/P1/P2=0 | `artifacts/comparar-qa/2026-07-30/lol-quality-round-13/` | Netcode 72→78. Stream confiável separado, FIFO persistida, ACK cumulativo e replay idempotente publicados. Rotação do bearer, reconciliação adaptativa e dispositivos/redes físicas continuam pendentes. |
-| 019 | Qualidade LoL · rodada 14 · piso competitivo da Storm‑Eye | in_progress | Codex `/root` | 2026-07-30T06:41:28-03:00 | `bb696e8` + Worker `dbb42e55` | — | baseline Storm‑Eye pendente | — | baseline mobile pendente | validar leitura de personagens, bombas e telegraphs sem alterar colisão ou custo de draw | auditoria adversarial pendente | `artifacts/comparar-qa/2026-07-30/lol-quality-round-14/` | Uma melhoria: substituir somente o albedo ruidoso da Storm‑Eye por material autoral de baixo ruído e hierarquia macro controlada. |
+| 019 | Qualidade LoL · rodada 14 · piso competitivo da Storm‑Eye | verified_live | Codex `/root` | 2026-07-30T06:41:28-03:00 | `bb696e8` + Worker `dbb42e55` | `6f34f00` · Worker `7641f165` | ✅ antes/local/live no viewport solicitado 1440×900; bitmap visível 1440×780 | ⚠️ físico não reexecutado | ✅ antes/local/live 844×390 + gate 390×844 emulados; bitmaps limitados pelo host registrados | ✅ colisão e regras intactas; perfil Storm‑Eye isolado, 2 taps de albedo + 3 de bump e zero sampler/passe/draw adicional | ✅ 142/142 + 75/75 + servidor 55/55; WebGL2 visível limpo; P0/P1/P2=0 | `artifacts/comparar-qa/2026-07-30/lol-quality-round-14/` | Gráficos 68→72. Piso autoral fingerprinted reduziu ruído global em 68,01% e contraste macro em 79,37%; casts, sombras e as outras três arenas permanecem gargalos. |
 
 ## Placar de qualidade — baseline do programa
 
@@ -65,7 +65,7 @@ meta de 90% vale para cada aspecto do vertical slice, nunca para a média.
 
 | Aspecto | Nota atual | Maior gargalo comprovado |
 |---|---:|---|
-| Gráficos | 68/100 | casts ainda têm silhuetas/deformações inferiores à referência, faltam sombras suaves e as outras quatro arenas ainda usam materiais anteriores |
+| Gráficos | 72/100 | casts ainda têm silhuetas/deformações inferiores à referência, faltam sombras suaves e as outras três arenas ainda usam materiais anteriores |
 | Som | 74/100 | faltam teste auditivo, mix medido, material original mais rico e feedback local reconciliado |
 | Mecânicas | 62/100 | faltam cast lock, resolução simultânea neutra e fidelidade fina dos kits |
 | Netcode | 78/100 | o bearer de retomada ainda não rotaciona; faltam reconciliação/clock sync adaptativos e soak em dispositivos e redes físicas sob perda severa |
@@ -447,21 +447,63 @@ workflow GitHub continua inválido (Cloudflare 9106); a publicação final foi
 feita pela sessão OAuth válida do proprietário e esse P2 operacional não
 afeta o artefato em produção. O ganho conservador é somente Netcode 72→78.
 
+### Rodada 14 — piso competitivo da Storm‑Eye publicado
+
+O albedo anterior da Storm‑Eye usava um vórtice magenta de alto contraste que
+ocupava quase todo o campo e competia com personagens, bombas e telegráficos.
+A melhoria única desta rodada substitui somente esse piso por basalto/vidro de
+tempestade autoral em azul-marinho, com variação macro contida e sem anéis,
+runas, portais ou emissivos semânticos. A direção preserva a leitura top-down
+competitiva; colisão, layout, regras e conteúdo de campeão não mudaram.
+
+O PNG fonte foi criado com ImageGen e promovido com prompt, proveniência,
+hashes, base de direitos e `thirdPartyInputs: []`. O runtime usa
+`floor-storm-eye-combat-field-99509f91.webp`, 1024×1024 RGB, sem alpha,
+156.720 bytes e SHA-256
+`99509f91a6208a6c843dc5d8ce25c6287e28d6066cd5a4f6b50e6798783e0717`.
+O `floor-pit.webp` anterior permanece byte a byte no repositório como rollback,
+mas não entra no pacote online novo.
+
+Contra o rollback, o WebP novo reduziu o tamanho em 29,31%, o desvio global de
+luminância em 68,01%, o contraste macro em blocos 64×64 em 79,37% e a diferença
+do centro em 78,21%. A incidência medida de acentos magenta e ciano caiu a zero.
+O perfil da Storm‑Eye compartilha o caminho de baixo ruído já auditado: dois
+taps de albedo e três de bump, total exato de cinco, sem sampler, passe ou draw
+call adicional.
+
+A comparação no navegador visível repetiu SOLO/LOCAL, Katarina contra Zed CPU,
+Storm‑Eye e rodada 01 antes, no preview e na produção final. Há capturas desktop,
+landscape, gate portrait e bomba ativa; WebGL2 permaneceu em 100% e o console
+terminou sem warning/error. O host visível limitou os bitmaps abaixo do viewport
+CSS solicitado em uma dimensão; tamanhos e hashes reais estão registrados em
+`after-visible-qa.json`, portanto a cena fica `verified_live`, não recebe alegação
+de comparação pixel a pixel nem de dispositivo físico.
+
+O Worker `7641f165-344a-42b5-93b8-8ab1468dedd4` publicou o commit `6f34f00`.
+Homepage, manifesto, parte e WebP responderam 200; a textura pública tem os
+mesmos 156.720 bytes e SHA-256 local, cache imutável, a parte contém somente a
+URL fingerprinted nova e não contém o rollback. As reauditorias terminaram com
+P0/P1/P2=0. O ganho conservador é somente Gráficos 68→72; casts, sombras suaves
+e os materiais das outras três arenas continuam fora do escopo.
+
 ## Validações automatizadas
 
-- raiz da árvore exata da release: 141/141 testes passaram;
+- raiz da árvore exata da release: 142/142 testes passaram;
 - `online/`: build Vinext validado, 75/75 testes passaram e lint terminou com
   zero erros e quatro warnings preexistentes de `<img>`;
 - `online/server/`: 55/55 testes passaram, incluindo sequência/ACK de duas
   cadeiras, rejeição mecânica, resume monotônico, rematch, leave e expiração;
-- o dry-run Cloudflare passou com 93 assets, upload total de 4.949,63 KiB e
+- o dry-run Cloudflare passou com 93 assets, upload total de 4.949,66 KiB e
   3.020,07 KiB gzip;
-- produção: homepage 200, API smoke controlado 400/`unknown_action`, hash HTTP
-  exato do cliente e protocolo v1 comprovado em dois WebSockets;
+- produção: homepage 200; o piso Storm‑Eye respondeu 200, 156.720 bytes, cache
+  imutável e SHA-256 exato; manifesto/parte de 712.667 bytes apontam somente
+  para a URL fingerprinted nova; o smoke 400/`unknown_action`, hash do cliente
+  e protocolo v1 dos dois WebSockets da rodada anterior permanecem válidos;
 - soak live de 10 min: 2.299/2.299 ACKs, 179 drops, 260 duplicatas, 15 F5,
   skipped tick/snapshot 0/0 e limpeza completa;
-- navegador visível: desktop 1440×900, landscape 844×390 com controles touch,
-  portrait 390×844 com gate de orientação e restauração após F5;
+- navegador visível: antes/local/live no viewport desktop solicitado 1440×900,
+  landscape 844×390, portrait 390×844 com gate e bomba ativa; WebGL2 100%,
+  console sem warning/error e dimensões reais dos bitmaps registradas;
 - nenhum Playwright headless ou `headless_shell` foi iniciado.
 
 ## Rodadas
@@ -483,3 +525,4 @@ afeta o artefato em produção. O ganho conservador é somente Netcode 72→78.
 | 2026-07-30 | Codex `/root` | 016 | 1 `verified_live` | `a21c49f`; Oracle `a21c49f`; Worker `be838e1a-652c-48c3-8390-52e7245ae521` | Rodada 11: bearer autenticado por assento, substituição atômica, grace de 20 s, fencing e presença restaurada após F5; 140/140 + 63/63 + servidor 54/54, hash público exato e prova com dois clientes/input real. Netcode 66→72. |
 | 2026-07-30 | Codex `/root` | 017 | 1 `verified_live` | `80503b1`; Worker `53cabbe1-06e8-4b7f-bbc0-75772f70749a` | Rodada 12: piso Salt Lens autoral, fingerprinted e isolado, com hierarquia macro/micro, mesmo custo de draw e hash HTTP exato; 141/141 + 63/63 + servidor 54/54, WebGL2 visível e revisão sem P0–P2. Gráficos 63→68. |
 | 2026-07-30 | Codex `/root` | 018 | 1 `verified_live` | `669d745`; Oracle `e9fdc93`; Worker `dbb42e55-17ed-483a-8ff5-59293e97d919` | Rodada 13: bombas e habilidades ganharam sequência, ACK causal, FIFO persistida e replay idempotente; 141/141 + 75/75 + servidor 55/55, trace público, hash exato e soak de 2.299 ações sob drop/duplicação/F5. Netcode 72→78. |
+| 2026-07-30 | Codex `/root` | 019 | 1 `verified_live` | `6f34f00`; Worker `7641f165-344a-42b5-93b8-8ab1468dedd4` | Rodada 14: piso Storm‑Eye autoral, fingerprinted e isolado reduziu ruído global em 68,01% e contraste macro em 79,37%, preservando cinco taps e custo de draw; 142/142 + 75/75 + servidor 55/55, hash público exato, QA visível antes/local/live e P0/P1/P2=0. Gráficos 68→72. |
