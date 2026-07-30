@@ -1494,7 +1494,9 @@
         this.arenaMapTextures[3] = wall;
         this.arenaTextures.wall = wall;
         this.arenaTextures.wallTop = wallTop;
-        this.arenaFloorProfile = floorKey === "floorLattice" ? 1 : 0;
+        this.arenaFloorProfile = floorKey === "floorLattice" || floorKey === "floorPit"
+          ? 1
+          : 0;
       }
 
       themeColor(theme, key, fallback) {
@@ -3789,7 +3791,7 @@ drawKatarinaFallback(player, t, beat) {
         return mix(base, over, detailMix);
       }
 
-      // Salt Lens profile: preserve its authored macro values while rotating and
+      // Low-noise floor profile: preserve authored macro values while rotating and
       // mirroring the quiet micro layer so repeated stones never align as a grid.
       vec3 sampleCombatBandDetail(sampler2D map, vec2 uv, float detailScale, float detailMix) {
         vec3 base = texture(map, uv).rgb;
@@ -3873,7 +3875,7 @@ drawKatarinaFallback(player, t, beat) {
             N = normalize(mix(N, Nb, 0.3));
           } else {
             if (uFloorProfile > 0.5) {
-              // Salt Lens: one arena-scale combat-band material with restrained
+              // Authored low-noise floors use one arena-scale material with restrained
               // microdetail. UVs remain independent from the 99 floor cells.
               uv = fract(vWorld.xz * 0.066 + 0.5);
               mapUv = uv;

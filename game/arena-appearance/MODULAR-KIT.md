@@ -20,7 +20,7 @@ Camera, scale, and language this kit is built for:
 | `floorClearing` | `textures/ground/floor-clearing.webp` | Nacre / turquoise mineral — Nacre Hollow |
 | `floorLabyrinth` | `textures/ground/floor-labyrinth.webp` | Frosted steel — Cinderfrost Works |
 | `floorForts` | `textures/ground/floor-forts.webp` | **Green** moss/grass turf — Aeolian Bastions |
-| `floorPit` | `textures/ground/floor-pit.webp` | Navy storm plate — Storm-Eye Basin |
+| `floorPit` | `textures/ground/floor-storm-eye-combat-field-99509f91.webp` | Low-noise navy basalt/stormglass field — Storm-Eye Basin |
 
 ### Walls (per-block face UV)
 

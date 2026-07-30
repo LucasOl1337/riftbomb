@@ -4,7 +4,8 @@
   "maps": {
     "saltLens": "textures/ground/floor-salt-lens-combat-band-6ffb0854.webp",
     "nacreHollow": "textures/ground/floor-clearing.webp",
-    "cinderfrost": "textures/ground/floor-labyrinth.webp"
+    "cinderfrost": "textures/ground/floor-labyrinth.webp",
+    "stormEye": "textures/ground/floor-storm-eye-combat-field-99509f91.webp"
   },
   "tint": [0.12, 0.08, 0.05],
   "metallic": 0.08,
@@ -17,5 +18,19 @@
   "assetDimensions": [1024, 1024],
   "generator": "OpenAI imagegen built-in (original generation plus one edit pass)",
   "generatedAt": "2026-07-30",
-  "notes": "Salt Lens uses an original low-noise combat-band albedo: a calm lighter center, cooler worn margins and restrained microdetail. World-continuous UVs match tileScale; mirrored rotated detail avoids grid-like repetition while gameplay cells and collision remain unchanged."
+  "notes": "Salt Lens uses an original low-noise combat-band albedo: a calm lighter center, cooler worn margins and restrained microdetail. World-continuous UVs match tileScale; mirrored rotated detail avoids grid-like repetition while gameplay cells and collision remain unchanged.",
+  "provenance": {
+    "stormEye": {
+      "source": "raw-imagine/25-floor-storm-eye-combat-field-imagegen-v3.png",
+      "sourceSha256": "0bb25f43c6bce82734ca9c9a2fc01055f6f1752e93fc3cc98397dfd4f0b3d1e8",
+      "assetSha256": "99509f91a6208a6c843dc5d8ce25c6287e28d6066cd5a4f6b50e6798783e0717",
+      "assetByteLength": 156720,
+      "assetDimensions": [1024, 1024],
+      "generator": "OpenAI imagegen built-in (original generation plus two exposure edit passes)",
+      "generatedAt": "2026-07-30",
+      "encoder": "ImageMagick 7.1.2 Q16-HDRI, Lanczos 1024x1024, WebP quality 85 / method 6",
+      "thirdPartyInputs": [],
+      "notes": "Original slate-navy basalt and stormglass albedo with a calm center, restrained micro-wear and no semantic rings, portals, runes or emissive accents. The legacy floor-pit.webp remains available as rollback."
+    }
+  }
 }

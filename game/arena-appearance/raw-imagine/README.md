@@ -23,6 +23,8 @@ See **`../ART-QUALITY.md`**. Reference level:
 | `10-ground-cracked-dirt-image2.jpg` | Superseded lattice floor (warm cracked dirt) |
 | `24-floor-salt-lens-combat-band-imagegen-v2.png` | **Active** — original low-noise Salt Lens combat-band source |
 | `24-floor-salt-lens-combat-band-prompt.md` | Prompt and promotion provenance for the active Salt Lens source |
+| `25-floor-storm-eye-combat-field-imagegen-v3.png` | **Active** — original low-noise Storm-Eye combat-field source |
+| `25-floor-storm-eye-combat-field-prompt.md` | Prompt, rejected exposure passes and promotion provenance for Storm-Eye |
 | `12-floor-nacre-clearing.jpg` | **Active** — clearing floor (nacre mineral) |
 | `13-floor-cinderfrost-labyrinth.jpg` | **Active** — labyrinth floor (frost steel) |
 | `14-wall-nacre-clearing-side.jpg` | **Active** — clearing wall side |

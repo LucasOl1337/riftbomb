@@ -497,6 +497,10 @@ test("caches only fingerprinted game artifacts as immutable", async () => {
     headers,
     /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp\s+Cache-Control: public, max-age=31556952, immutable/,
   );
+  assert.match(
+    headers,
+    /\/arena-textures\/floor-storm-eye-combat-field-99509f91\.webp\s+Cache-Control: public, max-age=31556952, immutable/,
+  );
   assert.match(loader, /manifest\.partsPath !== `\/riftbomb-parts\/\$\{manifest\.sha256\}`/);
   assert.match(loader, /fetch\(`\$\{manifest\.partsPath\}\/part-\$\{name\}/);
   assert.doesNotMatch(headers, /^\/riftbomb\.html|^\/riftbomb-loader\.js/m);
@@ -515,7 +519,9 @@ test("keeps arena WebP files out of the initial online payload", async () => {
   );
   assert.match(game, /\/arena-textures\/crate\.webp/);
   assert.match(game, /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp/);
+  assert.match(game, /\/arena-textures\/floor-storm-eye-combat-field-99509f91\.webp/);
   assert.doesNotMatch(game, /\/arena-textures\/floor-lattice\.webp/);
+  assert.doesNotMatch(game, /\/arena-textures\/floor-pit\.webp/);
 
   const textures = [
     ["game/arena-appearance/textures/crates/crate-albedo.webp", "crate.webp"],
@@ -527,7 +533,10 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     ["game/arena-appearance/textures/ground/floor-clearing.webp", "floor-clearing.webp"],
     ["game/arena-appearance/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
     ["game/arena-appearance/textures/ground/floor-forts.webp", "floor-forts.webp"],
-    ["game/arena-appearance/textures/ground/floor-pit.webp", "floor-pit.webp"],
+    [
+      "game/arena-appearance/textures/ground/floor-storm-eye-combat-field-99509f91.webp",
+      "floor-storm-eye-combat-field-99509f91.webp",
+    ],
     ["game/arena-appearance/textures/walls/wall-lattice.webp", "wall-lattice.webp"],
     ["game/arena-appearance/textures/walls/wall-clearing.webp", "wall-clearing.webp"],
     ["game/arena-appearance/textures/walls/wall-labyrinth.webp", "wall-labyrinth.webp"],
@@ -539,10 +548,9 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     ["game/arena-appearance/textures/walls/wall-top-forts.webp", "wall-top-forts.webp"],
     ["game/arena-appearance/textures/walls/wall-top-pit.webp", "wall-top-pit.webp"],
   ];
-  assert.equal(
-    (game.match(/\/arena-textures\/[^"]+\.webp/g) || []).length,
-    textures.length,
-  );
+  const arenaUrls = game.match(/\/arena-textures\/[^"]+\.webp/g) || [];
+  assert.equal(arenaUrls.length, textures.length);
+  assert.equal(new Set(arenaUrls).size, textures.length, "every arena slot must own one URL");
   for (const [sourceName, outputName] of textures) {
     const source = await readFile(new URL(`../${sourceName}`, root));
     const output = await readFile(

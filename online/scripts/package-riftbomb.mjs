@@ -51,7 +51,10 @@ const arenaTextureFiles = Object.freeze({
   floorClearing: ["ground/floor-clearing.webp", "floor-clearing.webp"],
   floorLabyrinth: ["ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
   floorForts: ["ground/floor-forts.webp", "floor-forts.webp"],
-  floorPit: ["ground/floor-pit.webp", "floor-pit.webp"],
+  floorPit: [
+    "ground/floor-storm-eye-combat-field-99509f91.webp",
+    "floor-storm-eye-combat-field-99509f91.webp",
+  ],
   wallLattice: ["walls/wall-lattice.webp", "wall-lattice.webp"],
   wallClearing: ["walls/wall-clearing.webp", "wall-clearing.webp"],
   wallLabyrinth: ["walls/wall-labyrinth.webp", "wall-labyrinth.webp"],

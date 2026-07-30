@@ -171,6 +171,9 @@ test("arena textures load only for the selected or explored arena", async (t) =>
     if (key === "floorLattice") {
       return path.join("ground", "floor-salt-lens-combat-band-6ffb0854.webp");
     }
+    if (key === "floorPit") {
+      return path.join("ground", "floor-storm-eye-combat-field-99509f91.webp");
+    }
     const directory = key.startsWith("floor") ? "ground" : "walls";
     const fileName = key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
     return path.join(directory, `${fileName}.webp`);
@@ -231,7 +234,10 @@ test("Salt Lens floor preserves original provenance, budget, scale and packed by
   assert.ok(packedFloor, "offline arena pack must include floorLattice");
   assert.deepEqual(Buffer.from(packedFloor[1], "base64"), floor);
 
-  assert.match(renderer, /this\.arenaFloorProfile = floorKey === "floorLattice" \? 1 : 0/);
+  assert.match(
+    renderer,
+    /this\.arenaFloorProfile = floorKey === "floorLattice" \|\| floorKey === "floorPit"\s*\? 1\s*: 0/
+  );
   assert.match(renderer, /useMap === 1 \? \(this\.arenaFloorProfile \|\| 0\) : 0/);
   assert.match(renderer, /if \(uFloorProfile > 0\.5\)/);
   assert.match(renderer, /uv = fract\(vWorld\.xz \* 0\.066 \+ 0\.5\)/);
@@ -242,6 +248,102 @@ test("Salt Lens floor preserves original provenance, budget, scale and packed by
   assert.match(renderer, /bumpFromAlbedo\(uAlbedo, uv, N, 0\.8\)/);
   assert.match(renderer, /sampleAlbedoDetail\(uAlbedo, uv, 5\.5, 0\.28\)/);
   assert.match(renderer, /bumpFromAlbedo\(uAlbedo, uv, N, 1\.15\)/);
+});
+
+test("Storm-Eye floor preserves original provenance, rollback, budget and packed bytes", async () => {
+  const appearanceDirectory = path.join(gameDirectory, "arena-appearance");
+  const metadata = JSON.parse(await readFile(
+    path.join(appearanceDirectory, "materials", "ground.json"),
+    "utf8"
+  ));
+  const provenance = metadata.provenance.stormEye;
+  const floorPath = path.join(appearanceDirectory, metadata.maps.stormEye);
+  const sourceFile = path.join(appearanceDirectory, provenance.source);
+  const legacyPath = path.join(appearanceDirectory, "textures", "ground", "floor-pit.webp");
+  const [floor, source, legacy, packedTextures, renderer] = await Promise.all([
+    readFile(floorPath),
+    readFile(sourceFile),
+    readFile(legacyPath),
+    readFile(path.join(appearanceDirectory, "load-arena-appearance.js"), "utf8"),
+    readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8")
+  ]);
+
+  assert.equal(
+    path.basename(floorPath),
+    "floor-storm-eye-combat-field-99509f91.webp"
+  );
+  assert.deepEqual(webpDimensions(floor), { width: 1024, height: 1024 });
+  const sourceSize = pngDimensions(source);
+  assert.ok(sourceSize.width >= 1024 && sourceSize.height >= 1024);
+  assert.equal(source[25], 2, "the native PNG must be RGB truecolor without alpha");
+  assert.equal(floor.indexOf(Buffer.from("ALPH")), -1, "the runtime WebP must not carry alpha");
+  assert.ok(floor.length <= 200_000, `Storm-Eye floor is ${floor.length} B; ceiling is 200000 B`);
+  assert.ok(floor.length < legacy.length, "the promoted floor must remain smaller than its rollback");
+  assert.equal(floor.length, provenance.assetByteLength);
+  assert.deepEqual(provenance.assetDimensions, [1024, 1024]);
+  assert.deepEqual(provenance.thirdPartyInputs, []);
+  assert.equal(sha256(source), provenance.sourceSha256);
+  assert.equal(sha256(floor), provenance.assetSha256);
+  assert.equal(provenance.assetSha256.slice(0, 8), "99509f91");
+  assert.equal(
+    sha256(legacy),
+    "031e0e828a198761da3807240615fd87e7f68c6dc769e5ad8c5d77edb1ccc6ce",
+    "the legacy floor must remain byte-identical for rollback"
+  );
+
+  const packedFloor = packedTextures.match(
+    /"floorPit":"data:image\/webp;base64,([^"]+)"/
+  );
+  assert.ok(packedFloor, "offline arena pack must include the promoted floorPit");
+  assert.deepEqual(Buffer.from(packedFloor[1], "base64"), floor);
+  assert.match(
+    renderer,
+    /this\.arenaFloorProfile = floorKey === "floorLattice" \|\| floorKey === "floorPit"\s*\? 1\s*: 0/
+  );
+
+  const bindStart = renderer.indexOf("      bindArenaTheme(theme) {");
+  const bindEnd = renderer.indexOf("\n      themeColor(", bindStart);
+  assert.ok(bindStart >= 0 && bindEnd > bindStart);
+  const bindArenaTheme = new Function(
+    `"use strict"; return ({ ${renderer.slice(bindStart, bindEnd).trim()} }).bindArenaTheme;`
+  )();
+  const textureKeys = [
+    "floorLattice", "floorClearing", "floorLabyrinth", "floorForts", "floorPit",
+    "wallLattice", "wallTopLattice"
+  ];
+  const subject = {
+    arenaTextures: Object.fromEntries(textureKeys.map((key) => [key, { key }])),
+    arenaMapTextures: Object.create(null)
+  };
+  for (const [floorKey, expectedProfile] of [
+    ["floorLattice", 1],
+    ["floorPit", 1],
+    ["floorClearing", 0],
+    ["floorLabyrinth", 0],
+    ["floorForts", 0]
+  ]) {
+    bindArenaTheme.call(subject, {
+      floor: floorKey,
+      wall: "wallLattice",
+      wallTop: "wallTopLattice"
+    });
+    assert.equal(subject.arenaFloorProfile, expectedProfile, `${floorKey} profile`);
+  }
+
+  const detailStart = renderer.indexOf("vec3 sampleCombatBandDetail");
+  const detailEnd = renderer.indexOf("\n      }", detailStart);
+  const bumpStart = renderer.indexOf("vec3 bumpFromAlbedo");
+  const bumpEnd = renderer.indexOf("\n      }", bumpStart);
+  assert.ok(detailStart >= 0 && detailEnd > detailStart);
+  assert.ok(bumpStart >= 0 && bumpEnd > bumpStart);
+  assert.equal((renderer.slice(detailStart, detailEnd).match(/texture\(/g) || []).length, 2);
+  assert.equal((renderer.slice(bumpStart, bumpEnd).match(/texture\(/g) || []).length, 3);
+  const profileStart = renderer.indexOf("if (uFloorProfile > 0.5)");
+  const profileEnd = renderer.indexOf("\n            } else {", profileStart);
+  assert.ok(profileStart >= 0 && profileEnd > profileStart);
+  const profileBranch = renderer.slice(profileStart, profileEnd);
+  assert.equal((profileBranch.match(/sampleCombatBandDetail\(/g) || []).length, 1);
+  assert.equal((profileBranch.match(/bumpFromAlbedo\(/g) || []).length, 1);
 });
 
 test("the readable combat layer preserves the canonical 100 HP rules", async () => {
