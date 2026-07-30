@@ -44,7 +44,10 @@ const arenaTextureSourceDirectory = path.join(
 const arenaTextureFiles = Object.freeze({
   crateSide: ["crates/crate-albedo.webp", "crate.webp"],
   crateTop: ["crates/crate-top-albedo.webp", "crate-top.webp"],
-  floorLattice: ["ground/floor-lattice.webp", "floor-lattice.webp"],
+  floorLattice: [
+    "ground/floor-salt-lens-combat-band-6ffb0854.webp",
+    "floor-salt-lens-combat-band-6ffb0854.webp",
+  ],
   floorClearing: ["ground/floor-clearing.webp", "floor-clearing.webp"],
   floorLabyrinth: ["ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
   floorForts: ["ground/floor-forts.webp", "floor-forts.webp"],

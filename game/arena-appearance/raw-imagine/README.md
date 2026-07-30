@@ -20,7 +20,9 @@ See **`../ART-QUALITY.md`**. Reference level:
 | `02-crate-D-face-x.jpg` | Superseded by E (too uniform / washed) |
 | `02-crate-D-planks-seamless.jpg` | Variant seamless |
 | `01-ground-A.jpg` | Ground fill A — superseded |
-| `10-ground-cracked-dirt-image2.jpg` | **Active** — lattice floor (warm cracked dirt) |
+| `10-ground-cracked-dirt-image2.jpg` | Superseded lattice floor (warm cracked dirt) |
+| `24-floor-salt-lens-combat-band-imagegen-v2.png` | **Active** — original low-noise Salt Lens combat-band source |
+| `24-floor-salt-lens-combat-band-prompt.md` | Prompt and promotion provenance for the active Salt Lens source |
 | `12-floor-nacre-clearing.jpg` | **Active** — clearing floor (nacre mineral) |
 | `13-floor-cinderfrost-labyrinth.jpg` | **Active** — labyrinth floor (frost steel) |
 | `14-wall-nacre-clearing-side.jpg` | **Active** — clearing wall side |
@@ -28,7 +30,7 @@ See **`../ART-QUALITY.md`**. Reference level:
 | `16-wall-nacre-clearing-top.jpg` | **Active** — clearing wall top |
 | `17-wall-cinderfrost-labyrinth-top.jpg` | **Active** — labyrinth wall top |
 | `proof-01-salt-lens.jpg` / `02` / `03` | Modular kit proof keyframes |
-| `theme-floor-lattice.jpg` | **Active** — same dirt plate as `textures/ground/floor-lattice.webp` |
+| `theme-floor-lattice.jpg` | Superseded visual proof for the former dirt plate |
 | `02-crate-C.jpg` | Older — superseded |
 | `03-wall-side-rift-stone.jpg` | **Active** — fixed block sides (from wall-side_01) |
 | `03-wall-top-stone-cap.jpg` | **Active** — fixed block top (from wall-top_01) |

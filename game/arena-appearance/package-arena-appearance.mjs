@@ -10,7 +10,7 @@ const outputPath = path.join(arenaAppearanceDirectory, "load-arena-appearance.js
 const sources = {
   crateSide: "crates/crate-albedo.webp",
   crateTop: "crates/crate-top-albedo.webp",
-  floorLattice: "ground/floor-lattice.webp",
+  floorLattice: "ground/floor-salt-lens-combat-band-6ffb0854.webp",
   floorClearing: "ground/floor-clearing.webp",
   floorLabyrinth: "ground/floor-labyrinth.webp",
   floorForts: "ground/floor-forts.webp",

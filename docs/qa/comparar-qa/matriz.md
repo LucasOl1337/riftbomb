@@ -24,12 +24,12 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 
 | Métrica | Quantidade |
 |---|---:|
-| Total inventariado | 16 |
+| Total inventariado | 17 |
 | Aprovadas | 0 |
 | Mudança necessária | 0 |
 | Corrigidas localmente | 6 |
 | Verificadas ao vivo | 9 |
-| Em andamento | 0 |
+| Em andamento | 1 |
 | Reauditoria necessária | 0 |
 | Bloqueadas | 1 |
 | Não testadas | 0 |
@@ -54,6 +54,7 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | 014 | Qualidade LoL · rodada 09 · roteamento semântico Q/W/E/R | verified_live | Codex `/root` | 2026-07-30T01:12:41-03:00 | `4747568` + produção anterior | `ba77212` · release `84eabbf` · Worker `0fa64580` | ✅ antes/local/live, input real e framebuffer WebGL 1280×720 | — | — | ✅ 20/20 casts reais selecionam a ação VAT autoral; atores derivados, buffer, rejeição, cancelamento e transições sem flashback | ✅ 140/140 + 39/39 + 32/32; 17/17 assets live; console live limpo; P0=0, P1=0 | `artifacts/comparar-qa/2026-07-29/lol-quality-round-09/` | Mecânicas 58→62 e Fluidez 60→63. O fluxo publicado de Katarina E passou de `Q/Spell1` incorreto para `E/Spell3`; cinco rotas erradas e flickers de timers antigos foram eliminados. Assets físicos e dispositivos móveis permanecem fora do escopo desta rodada. |
 | 015 | Qualidade LoL · rodada 10 · ACK causal e replay de movimento | verified_live | Codex `/root` | 2026-07-30T02:09:04-03:00 | Worker `0fa64580` + Oracle anterior | `d114a11` · Oracle `d114a11` · Worker `e0597eb4` | ✅ antes/live, dois clientes e input real, 1936×1048 | — | — | ✅ epoch por partida, sequência exata, ACK pós-tick e replay; rolling deploy nos dois sentidos | ✅ 140/140 + 46/46 + 33/33; console live limpo; 0 ciclos pulados; P0=0, P1=0 no escopo | `artifacts/comparar-qa/2026-07-30/lol-quality-round-10/` | Netcode 60→66. Uma `seq=2` adiantada permaneceu sem ACK; replay `seq=1→2` avançou ACK `0→1→2`. Ações one-shot e retomada autenticada por assento continuam pendentes. |
 | 016 | Qualidade LoL · rodada 11 · retomada autenticada após F5 | verified_live | Codex `/root` | 2026-07-30T02:20:13-03:00 | `c9da842` + Worker `e0597eb4` | `a21c49f` · Oracle `a21c49f` · Worker `be838e1a` | ✅ antes 1936×1048/1440×900 e depois 1280×720, dois clientes visíveis, F5 e teclado real | — | — | ✅ bearer de 256 bits por assento, digest no servidor, substituição atômica, grace exato de 20 s, ACK preservado, boot coalescido e presença false→true | ✅ 140/140 + 63/63 + servidor 54/54; dry-run; P0=0/P1=0 bloqueadores | `artifacts/comparar-qa/2026-07-30/lol-quality-round-11/` | Netcode 66→72. O cliente voltou à mesma rodada após F5 em 3.523 ms, o rival confirmou reconexão em 3.598 ms e novo input `D` foi aceito. Bearer estável sem rotação e ACK de ações one-shot permanecem pendentes. |
+| 017 | Qualidade LoL · rodada 12 · material original do piso da arena | in_progress | Codex `/root` | 2026-07-30T04:08:04-03:00 | `3cb5a11` + Worker `be838e1a` | — | captura de referência pendente | captura mobile pendente | captura mobile pendente | validar leitura de jogadores, bombas, obstáculos e rotas sem alterar colisão | auditorias independentes pendentes | `artifacts/comparar-qa/2026-07-30/lol-quality-round-12/` | Uma melhoria: substituir o piso visual plano por material autoral tileable com hierarquia macro/micro, preservando silhuetas, contraste competitivo e desempenho. |
 
 ## Placar de qualidade — baseline do programa
 

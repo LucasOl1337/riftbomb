@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -10,6 +11,40 @@ const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.dirname(gameDirectory);
 const sourcePath = path.join(gameDirectory, "play-riftbomb.html");
 const releasePath = path.join(repositoryRoot, "riftbomb.html");
+
+const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
+
+function webpDimensions(buffer) {
+  assert.equal(buffer.subarray(0, 4).toString("ascii"), "RIFF");
+  assert.equal(buffer.subarray(8, 12).toString("ascii"), "WEBP");
+  const chunk = buffer.subarray(12, 16).toString("ascii");
+  if (chunk === "VP8 ") {
+    assert.equal(buffer.subarray(23, 26).toString("hex"), "9d012a");
+    return {
+      width: buffer.readUInt16LE(26) & 0x3fff,
+      height: buffer.readUInt16LE(28) & 0x3fff
+    };
+  }
+  if (chunk === "VP8L") {
+    assert.equal(buffer[20], 0x2f);
+    const bits = buffer.readUInt32LE(21);
+    return {
+      width: (bits & 0x3fff) + 1,
+      height: ((bits >>> 14) & 0x3fff) + 1
+    };
+  }
+  if (chunk === "VP8X") {
+    const uint24 = (offset) => buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16);
+    return { width: uint24(24) + 1, height: uint24(27) + 1 };
+  }
+  assert.fail(`unsupported WebP chunk ${JSON.stringify(chunk)}`);
+}
+
+function pngDimensions(buffer) {
+  assert.equal(buffer.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(buffer.subarray(12, 16).toString("ascii"), "IHDR");
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
 
 const localEntrypoints = (document) => [
   ...document.matchAll(/<(?:link rel="stylesheet" href|script src)="\.\/([^"]+)"(?:><\/script>)?/g)
@@ -133,6 +168,9 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   const texturePathForKey = (key) => {
     if (key === "crate") return path.join("crates", "crate-albedo.webp");
     if (key === "crateTop") return path.join("crates", "crate-top-albedo.webp");
+    if (key === "floorLattice") {
+      return path.join("ground", "floor-salt-lens-combat-band-6ffb0854.webp");
+    }
     const directory = key.startsWith("floor") ? "ground" : "walls";
     const fileName = key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
     return path.join(directory, `${fileName}.webp`);
@@ -156,6 +194,54 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   t.diagnostic(
     `arena texture budget: ${themes.length} themes, max ${largestTheme.keys.length} requests / ${largestTheme.bytes} B`
   );
+});
+
+test("Salt Lens floor preserves original provenance, budget, scale and packed bytes", async () => {
+  const appearanceDirectory = path.join(gameDirectory, "arena-appearance");
+  const metadata = JSON.parse(await readFile(
+    path.join(appearanceDirectory, "materials", "ground.json"),
+    "utf8"
+  ));
+  const floorPath = path.join(appearanceDirectory, metadata.maps.saltLens);
+  const sourceFile = path.join(appearanceDirectory, metadata.source);
+  const [floor, source, packedTextures, renderer] = await Promise.all([
+    readFile(floorPath),
+    readFile(sourceFile),
+    readFile(path.join(appearanceDirectory, "load-arena-appearance.js"), "utf8"),
+    readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8")
+  ]);
+
+  assert.deepEqual(webpDimensions(floor), { width: 1024, height: 1024 });
+  const sourceSize = pngDimensions(source);
+  assert.ok(sourceSize.width >= 1024 && sourceSize.height >= 1024);
+  assert.ok(floor.length <= 249_056, `Salt Lens floor is ${floor.length} B; ceiling is 249056 B`);
+  assert.equal(floor.length, metadata.assetByteLength);
+  assert.deepEqual(metadata.assetDimensions, [1024, 1024]);
+  assert.equal(sha256(source), metadata.sourceSha256);
+  assert.equal(sha256(floor), metadata.assetSha256);
+  assert.notEqual(
+    metadata.assetSha256,
+    "a1b41d7c797aa9fe473be8116d32655c077b353af05b377bb75e9aa5eb09e0d9",
+    "the homogeneous legacy floor must not be repromoted"
+  );
+
+  const packedFloor = packedTextures.match(
+    /"floorLattice":"data:image\/webp;base64,([^"]+)"/
+  );
+  assert.ok(packedFloor, "offline arena pack must include floorLattice");
+  assert.deepEqual(Buffer.from(packedFloor[1], "base64"), floor);
+
+  assert.match(renderer, /this\.arenaFloorProfile = floorKey === "floorLattice" \? 1 : 0/);
+  assert.match(renderer, /useMap === 1 \? \(this\.arenaFloorProfile \|\| 0\) : 0/);
+  assert.match(renderer, /if \(uFloorProfile > 0\.5\)/);
+  assert.match(renderer, /uv = fract\(vWorld\.xz \* 0\.066 \+ 0\.5\)/);
+  assert.match(renderer, /detailRotation \* \(\(uv - 0\.5\) \* detailScale\)/);
+  assert.match(renderer, /texture\(map, mirroredTile\(detailCoord\)\)/);
+  assert.match(renderer, /halfTexel = vec2\(0\.5 \/ 1024\.0\)/);
+  assert.match(renderer, /sampleCombatBandDetail\(uAlbedo, uv, 5\.25, 0\.16\)/);
+  assert.match(renderer, /bumpFromAlbedo\(uAlbedo, uv, N, 0\.8\)/);
+  assert.match(renderer, /sampleAlbedoDetail\(uAlbedo, uv, 5\.5, 0\.28\)/);
+  assert.match(renderer, /bumpFromAlbedo\(uAlbedo, uv, N, 1\.15\)/);
 });
 
 test("the readable combat layer preserves the canonical 100 HP rules", async () => {

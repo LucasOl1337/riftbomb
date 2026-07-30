@@ -2,7 +2,7 @@
   "id": "ground",
   "displayName": "Arena floor",
   "maps": {
-    "saltLens": "textures/ground/floor-lattice.webp",
+    "saltLens": "textures/ground/floor-salt-lens-combat-band-6ffb0854.webp",
     "nacreHollow": "textures/ground/floor-clearing.webp",
     "cinderfrost": "textures/ground/floor-labyrinth.webp"
   },
@@ -10,6 +10,12 @@
   "metallic": 0.08,
   "roughness": 0.82,
   "tileScale": 0.066,
-  "source": "raw-imagine/10-ground-cracked-dirt-image2.jpg",
-  "notes": "Default lattice floor is warm cracked packed dirt (image-2 visual target). Other arenas keep authored theme albedos. World-continuous UVs + multi-scale detail; gameplay cells stay geometric."
+  "source": "raw-imagine/24-floor-salt-lens-combat-band-imagegen-v2.png",
+  "sourceSha256": "63ff1917910249b174d800929399d7653b811b4f80dfe3e14e4899538e366f77",
+  "assetSha256": "6ffb0854daa7df93f7b8c1c0c6f82f116e548ae5419e6dc4e9b8579fca9951e6",
+  "assetByteLength": 208558,
+  "assetDimensions": [1024, 1024],
+  "generator": "OpenAI imagegen built-in (original generation plus one edit pass)",
+  "generatedAt": "2026-07-30",
+  "notes": "Salt Lens uses an original low-noise combat-band albedo: a calm lighter center, cooler worn margins and restrained microdetail. World-continuous UVs match tileScale; mirrored rotated detail avoids grid-like repetition while gameplay cells and collision remain unchanged."
 }

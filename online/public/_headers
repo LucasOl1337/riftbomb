@@ -3,3 +3,6 @@
 
 /riftbomb-parts/manifest.json
   Cache-Control: no-store
+
+/arena-textures/floor-salt-lens-combat-band-6ffb0854.webp
+  Cache-Control: public, max-age=31556952, immutable

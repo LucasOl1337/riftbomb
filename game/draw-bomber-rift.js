@@ -502,7 +502,8 @@
         this.postProgram = this.createProgram(Renderer.postVertex, Renderer.postFragment);
         this.mainUniforms = this.uniforms(this.mainProgram, [
           "uModel", "uViewProjection", "uColor", "uCamera", "uTime", "uBeat",
-          "uEmissive", "uMaterial", "uAlpha", "uAlbedo", "uAlbedoTop", "uMapId"
+          "uEmissive", "uMaterial", "uAlpha", "uAlbedo", "uAlbedoTop", "uMapId",
+          "uFloorProfile"
         ]);
         this.arenaFxUniforms = this.uniforms(this.arenaFxProgram, [
           "uModel", "uViewProjection", "uTime", "uBeat", "uPrimary", "uSecondary",
@@ -1483,7 +1484,8 @@
       /** Bind floor/wall albedos for the active arena theme (layout + look). */
       bindArenaTheme(theme) {
         if (!theme || !this.arenaTextures) return;
-        const floor = this.arenaTextures[theme.floor] || this.arenaTextures.floorLattice;
+        const floorKey = this.arenaTextures[theme.floor] ? theme.floor : "floorLattice";
+        const floor = this.arenaTextures[floorKey];
         const wall = this.arenaTextures[theme.wall] || this.arenaTextures.wallLattice;
         const wallTop = this.arenaTextures[theme.wallTop]
           || this.arenaTextures.wallTopLattice
@@ -1492,6 +1494,7 @@
         this.arenaMapTextures[3] = wall;
         this.arenaTextures.wall = wall;
         this.arenaTextures.wallTop = wallTop;
+        this.arenaFloorProfile = floorKey === "floorLattice" ? 1 : 0;
       }
 
       themeColor(theme, key, fallback) {
@@ -1696,6 +1699,10 @@
           ? 4
           : (mapId > 0 && this.arenaMapTextures?.[mapId] ? mapId : 0);
         gl.uniform1f(this.mainUniforms.uMapId, useMap);
+        gl.uniform1f(
+          this.mainUniforms.uFloorProfile,
+          useMap === 1 ? (this.arenaFloorProfile || 0) : 0
+        );
         const white = this.arenaWhiteTexture;
         let side = white;
         let top = white;
@@ -1731,6 +1738,10 @@
           ? 4
           : (mapId > 0 && this.arenaMapTextures?.[mapId] ? mapId : 0);
         gl.uniform1f(this.mainUniforms.uMapId, useMap);
+        gl.uniform1f(
+          this.mainUniforms.uFloorProfile,
+          useMap === 1 ? (this.arenaFloorProfile || 0) : 0
+        );
         const white = this.arenaWhiteTexture;
         let side = white;
         let top = white;
@@ -3743,6 +3754,7 @@ drawKatarinaFallback(player, t, beat) {
       uniform sampler2D uAlbedo;
       uniform sampler2D uAlbedoTop;
       uniform float uMapId;
+      uniform float uFloorProfile;
       out vec4 outColor;
 
       float hash21(vec2 p) {
@@ -3762,10 +3774,28 @@ drawKatarinaFallback(player, t, beat) {
         return local.xy * 0.5 + 0.5;
       }
 
-      // Multi-scale albedo: base map + high-freq self-detail (breaks 512/1024 "sticker" look).
+      vec2 mirroredTile(vec2 uv) {
+        vec2 doubled = fract(uv * 0.5) * 2.0;
+        vec2 mirrored = 1.0 - abs(doubled - 1.0);
+        vec2 halfTexel = vec2(0.5 / 1024.0);
+        return mix(halfTexel, vec2(1.0) - halfTexel, mirrored);
+      }
+
+      // Legacy multi-scale path retained byte-for-byte in behavior for the other arenas.
       vec3 sampleAlbedoDetail(sampler2D map, vec2 uv, float detailScale, float detailMix) {
         vec3 base = texture(map, uv).rgb;
         vec3 detail = texture(map, uv * detailScale).rgb;
+        vec3 over = mix(2.0 * base * detail, 1.0 - 2.0 * (1.0 - base) * (1.0 - detail), step(0.5, lum(base)));
+        return mix(base, over, detailMix);
+      }
+
+      // Salt Lens profile: preserve its authored macro values while rotating and
+      // mirroring the quiet micro layer so repeated stones never align as a grid.
+      vec3 sampleCombatBandDetail(sampler2D map, vec2 uv, float detailScale, float detailMix) {
+        vec3 base = texture(map, uv).rgb;
+        mat2 detailRotation = mat2(0.8, -0.6, 0.6, 0.8);
+        vec2 detailCoord = detailRotation * ((uv - 0.5) * detailScale) + vec2(0.37, 0.61);
+        vec3 detail = texture(map, mirroredTile(detailCoord)).rgb;
         // Overlay blend keeps grain without washing midtones
         vec3 over = mix(2.0 * base * detail, 1.0 - 2.0 * (1.0 - base) * (1.0 - detail), step(0.5, lum(base)));
         return mix(base, over, detailMix);
@@ -3842,13 +3872,22 @@ drawKatarinaFallback(player, t, beat) {
             vec3 Nb = mix(NbSide, NbTop, topFace);
             N = normalize(mix(N, Nb, 0.3));
           } else {
-            // FLOOR: continuous board field + multi-scale detail so 1024 albedo
-            // reads at crate/wall clarity from gameplay distance.
-            uv = clamp(vWorld.xz * 0.072 + 0.5, 0.0, 1.0);
-            mapUv = uv;
-            albedo = sampleAlbedoDetail(uAlbedo, uv, 5.5, 0.28);
-            vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 1.15);
-            N = normalize(mix(N, Nb, 0.32));
+            if (uFloorProfile > 0.5) {
+              // Salt Lens: one arena-scale combat-band material with restrained
+              // microdetail. UVs remain independent from the 99 floor cells.
+              uv = fract(vWorld.xz * 0.066 + 0.5);
+              mapUv = uv;
+              albedo = sampleCombatBandDetail(uAlbedo, uv, 5.25, 0.16);
+              vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 0.8);
+              N = normalize(mix(N, Nb, 0.22));
+            } else {
+              // Preserve the established material response of the other four arenas.
+              uv = clamp(vWorld.xz * 0.072 + 0.5, 0.0, 1.0);
+              mapUv = uv;
+              albedo = sampleAlbedoDetail(uAlbedo, uv, 5.5, 0.28);
+              vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 1.15);
+              N = normalize(mix(N, Nb, 0.32));
+            }
           }
           mapped = 1.0;
           // Recompute lighting terms after bump

@@ -16,7 +16,7 @@ Camera, scale, and language this kit is built for:
 
 | Piece | File | Identity |
 | --- | --- | --- |
-| `floorLattice` | `textures/ground/floor-lattice.webp` | Warm cracked dirt — Salt Lens Array |
+| `floorLattice` | `textures/ground/floor-salt-lens-combat-band-6ffb0854.webp` | Low-noise sandstone combat bands — Salt Lens Array |
 | `floorClearing` | `textures/ground/floor-clearing.webp` | Nacre / turquoise mineral — Nacre Hollow |
 | `floorLabyrinth` | `textures/ground/floor-labyrinth.webp` | Frosted steel — Cinderfrost Works |
 | `floorForts` | `textures/ground/floor-forts.webp` | **Green** moss/grass turf — Aeolian Bastions |

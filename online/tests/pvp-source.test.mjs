@@ -448,7 +448,7 @@ test("packages every web part behind a self-consistent dynamic manifest", async 
   );
 });
 
-test("caches only fingerprinted game parts as immutable", async () => {
+test("caches only fingerprinted game artifacts as immutable", async () => {
   const headers = await readFile(new URL("public/_headers", root), "utf8");
   const loader = await readFile(new URL("public/riftbomb-loader.js", root), "utf8");
 
@@ -459,6 +459,10 @@ test("caches only fingerprinted game parts as immutable", async () => {
   assert.match(
     headers,
     /\/riftbomb-parts\/manifest\.json\s+Cache-Control: no-store/,
+  );
+  assert.match(
+    headers,
+    /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp\s+Cache-Control: public, max-age=31556952, immutable/,
   );
   assert.match(loader, /manifest\.partsPath !== `\/riftbomb-parts\/\$\{manifest\.sha256\}`/);
   assert.match(loader, /fetch\(`\$\{manifest\.partsPath\}\/part-\$\{name\}/);
@@ -477,11 +481,16 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     /ARENA_TEXTURE_SOURCE\s*=\s*Object\.freeze\(\{"crateSide":"data:image\/webp;base64/,
   );
   assert.match(game, /\/arena-textures\/crate\.webp/);
+  assert.match(game, /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp/);
+  assert.doesNotMatch(game, /\/arena-textures\/floor-lattice\.webp/);
 
   const textures = [
     ["game/arena-appearance/textures/crates/crate-albedo.webp", "crate.webp"],
     ["game/arena-appearance/textures/crates/crate-top-albedo.webp", "crate-top.webp"],
-    ["game/arena-appearance/textures/ground/floor-lattice.webp", "floor-lattice.webp"],
+    [
+      "game/arena-appearance/textures/ground/floor-salt-lens-combat-band-6ffb0854.webp",
+      "floor-salt-lens-combat-band-6ffb0854.webp",
+    ],
     ["game/arena-appearance/textures/ground/floor-clearing.webp", "floor-clearing.webp"],
     ["game/arena-appearance/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
     ["game/arena-appearance/textures/ground/floor-forts.webp", "floor-forts.webp"],
