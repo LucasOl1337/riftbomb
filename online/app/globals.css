@@ -1841,13 +1841,68 @@ button:disabled {
     white-space: nowrap;
   }
 
-  .mode-item b,
-  .client-hero-copy {
+  .mode-item b {
     display: none;
   }
 
-  .match-config {
+  .client-hero-copy {
     top: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.15rem 0.7rem;
+    width: auto;
+    min-height: 5.4rem;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid rgb(160 202 210 / 22%);
+    background:
+      linear-gradient(110deg, rgb(8 24 32 / 95%), rgb(3 12 18 / 82%));
+    box-shadow:
+      0 1rem 2.5rem rgb(0 0 0 / 36%),
+      inset 0 1px rgb(255 255 255 / 4%);
+    text-shadow: 0 2px 18px rgb(0 0 0 / 90%);
+    backdrop-filter: blur(12px);
+  }
+
+  .client-hero-copy .client-eyebrow {
+    grid-column: 1;
+    align-self: end;
+    font-size: 0.43rem;
+  }
+
+  .client-hero-copy h2 {
+    grid-column: 1;
+    margin-top: 0;
+    font-size: clamp(1.25rem, 6.5vw, 1.65rem);
+    line-height: 1;
+    text-wrap: balance;
+  }
+
+  .client-hero-copy p {
+    grid-column: 1 / -1;
+    display: block;
+    max-width: 48ch;
+    margin: 0.3rem 0 0;
+    font-size: 0.62rem;
+    line-height: 1.35;
+    text-wrap: pretty;
+  }
+
+  .client-server-tag {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: inline-flex;
+    align-self: center;
+    max-width: 8.75rem;
+    margin: 0;
+    padding: 0.5rem 0.55rem;
+    font-size: 0.43rem;
+    line-height: 1.35;
+  }
+
+  .match-config {
+    top: 6.4rem;
     right: 0.5rem;
     bottom: 0.5rem;
     left: 0.5rem;

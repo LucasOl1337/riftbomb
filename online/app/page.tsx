@@ -630,8 +630,8 @@ export default function Home() {
                 activeMode === "online" ||
                 activeMode === "challenge" ||
                 activeMode === "join"
-                  ? "SERVIDOR AUTORITATIVO · SÃO PAULO"
-                  : "SESSÃO LOCAL · SEM FILA"}
+                  ? "PVP EM TEMPO REAL · SÃO PAULO · SEM DOWNLOAD"
+                  : "SESSÃO LOCAL · DIRETO NO NAVEGADOR · SEM FILA"}
               </span>
             </div>
 

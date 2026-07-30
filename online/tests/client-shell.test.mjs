@@ -27,6 +27,23 @@ test("ships a real client shell while keeping the classic runtime reversible", a
   assert.match(styles, /\.rotate-gate/);
 });
 
+test("keeps the selected mode promise visible on portrait phones", async () => {
+  const [page, styles] = await Promise.all([
+    readFile(new URL("app/page.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+
+  assert.match(page, /PVP EM TEMPO REAL · SÃO PAULO · SEM DOWNLOAD/);
+  assert.match(
+    styles,
+    /@media \(max-width: 780px\) and \(orientation: portrait\)[\s\S]*?\.client-hero-copy \{[\s\S]*?display: grid;[\s\S]*?\.client-server-tag \{[\s\S]*?display: inline-flex;/,
+  );
+  assert.match(
+    styles,
+    /@media \(max-width: 780px\) and \(orientation: portrait\)[\s\S]*?\.match-config \{[\s\S]*?top: 6\.4rem;/,
+  );
+});
+
 test("keeps the runtime authoritative behind a same-origin message bridge", async () => {
   const [page, runtime] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),
