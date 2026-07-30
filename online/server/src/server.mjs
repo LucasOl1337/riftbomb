@@ -68,13 +68,21 @@ function joinQuickMatch(socket, message) {
       arena: firstPreset.arena,
       matchTarget: 3
     });
-    attachPlayerToRoom(waiting.socket, { ready: true }, room, "host", { quickMatch: true });
-    attachPlayerToRoom(socket, { ready: true }, room, "guest", { quickMatch: true });
+    attachPlayerToRoom(waiting.socket, {
+      ready: true, inputProtocol: waiting.inputProtocol
+    }, room, "host", { quickMatch: true });
+    attachPlayerToRoom(socket, {
+      ready: true, inputProtocol: message.inputProtocol
+    }, room, "guest", { quickMatch: true });
     return;
   }
 
   socket.quickMatchQueued = true;
-  quickMatchQueue.push({ socket, preset: validPreset(message.preset) });
+  quickMatchQueue.push({
+    socket,
+    preset: validPreset(message.preset),
+    inputProtocol: message.inputProtocol === 1 ? 1 : 0
+  });
   send(socket, { type: "quick-queued", position: quickMatchQueue.length });
 }
 
@@ -103,16 +111,26 @@ function attachPlayerToRoom(socket, message, room, role, { quickMatch = false } 
   if (current?.socket?.readyState === WebSocket.OPEN) {
     return send(socket, { type: "error", error: "role_taken" });
   }
-  room.players[index] = { socket, ready: role === "host" || Boolean(message.ready), disconnectedAt: 0 };
+  room.players[index] = {
+    socket,
+    ready: role === "host" || Boolean(message.ready),
+    disconnectedAt: 0,
+    inputProtocol: message.inputProtocol === 1 ? 1 : 0
+  };
   socket.riftbomb = { room, index };
   room.lastActivity = Date.now();
+  if (room.game) {
+    room.inputReliable[index] = message.inputProtocol === 1;
+    room.gridCache = null;
+  }
   send(socket, {
     type: "connected",
     role,
     playerId: index + 1,
     room: room.code,
     quickMatch,
-    soundCursor: room.game?.authoritativeSound?.latest || room.soundEventSequence || 0
+    soundCursor: room.game?.authoritativeSound?.latest || room.soundEventSequence || 0,
+    input: authoritativeRooms.inputProtocol(room)
   });
   broadcast(room, authoritativeRooms.lobbyMessage(room));
   void authoritativeRooms.start(room);
@@ -134,10 +152,10 @@ function handleMessage(socket, raw) {
   if (message.type === "pong") return;
   if (!socket.riftbomb) return attachPlayer(socket, message);
   const { room, index } = socket.riftbomb;
+  if (room.players[index]?.socket !== socket) return;
   room.lastActivity = Date.now();
 
-  if (message.type === "input" && Number.isInteger(message.mask) &&
-      message.mask >= 0 && message.mask <= 15) room.inputs[index] = message.mask;
+  if (message.type === "input") authoritativeRooms.acceptInput(room, index, message);
   if (message.type === "action" && room.game) {
     authoritativeRooms.applyPlayerAction(room, index + 1, message);
   }
@@ -152,7 +170,10 @@ function handleMessage(socket, raw) {
     broadcast(room, authoritativeRooms.lobbyMessage(room));
   }
   // Host-only rematch after matchover (or if sim still exists and both are connected).
-  if (message.type === "rematch" && index === 0) {
+  const validRematchEpoch = message.inputEpoch === room.inputEpoch ||
+    (room.players[0]?.inputProtocol !== 1 && message.inputEpoch === undefined);
+  if (message.type === "rematch" && index === 0 && room.game?.mode === "matchover" &&
+      validRematchEpoch) {
     room.preset = validPreset({
       ...room.preset,
       hostChampion: message.hostChampion,

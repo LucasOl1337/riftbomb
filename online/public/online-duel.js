@@ -32,6 +32,10 @@
   const RUNTIME_SOURCE = "riftbomb-runtime";
   const SESSION_KEY = "riftbomb-online-session-v1";
   const SESSION_MAX_AGE_MS = 25 * 60_000;
+  const INPUT_PROTOCOL_VERSION = 1;
+  const INPUT_RETRY_MS = 120;
+  const INPUT_OUTBOX_LIMIT = 64;
+  const MAX_INPUT_SEQUENCE = 0x7fffffff;
   const authoritativeAudio = globalThis.RIFTBOMB_AUTHORITATIVE_AUDIO;
   const browserGameplaySfx = game.sfx;
   const authoritativePredictionSink = Object.freeze({
@@ -53,6 +57,111 @@
 
   function championNameSafe(value) {
     return CHAMPION_NAMES[value] || "Katarina";
+  }
+
+  function createReliableInputStream({
+    send,
+    now = () => performance.now(),
+    retryMs = INPUT_RETRY_MS,
+    outboxLimit = INPUT_OUTBOX_LIMIT
+  } = {}) {
+    if (typeof send !== "function") throw new TypeError("reliable input requires send");
+    let epoch = 0;
+    let nextSequence = 1;
+    let acceptedSequence = 0;
+    let acknowledgedSequence = 0;
+    let lastMask = -1;
+    let replayCount = 0;
+    let outbox = [];
+
+    const seatCursor = (protocol, seatIndex) => {
+      if (!protocol || protocol.v !== INPUT_PROTOCOL_VERSION ||
+          !Number.isSafeInteger(protocol.epoch) || protocol.epoch < 0 ||
+          !Array.isArray(protocol.accepted) || !Array.isArray(protocol.ack) ||
+          !Number.isInteger(seatIndex) || seatIndex < 0) return null;
+      const accepted = protocol.accepted[seatIndex];
+      const ack = protocol.ack[seatIndex];
+      if (!Number.isSafeInteger(accepted) || accepted < 0 ||
+          accepted > MAX_INPUT_SEQUENCE || !Number.isSafeInteger(ack) || ack < 0 ||
+          ack > accepted || ack > MAX_INPUT_SEQUENCE) return null;
+      return { epoch: protocol.epoch, accepted, ack };
+    };
+
+    const transmit = (entry, replay = false) => {
+      entry.sentAt = now();
+      const delivered = send(entry.message) === true;
+      if (delivered && replay) replayCount += 1;
+      return delivered;
+    };
+
+    const synchronize = (protocol, seatIndex) => {
+      const cursor = seatCursor(protocol, seatIndex);
+      if (!cursor) return false;
+      if (cursor.epoch < epoch) return false;
+      if (cursor.epoch > epoch) {
+        epoch = cursor.epoch;
+        nextSequence = Math.min(MAX_INPUT_SEQUENCE + 1, cursor.accepted + 1);
+        acceptedSequence = cursor.accepted;
+        acknowledgedSequence = cursor.ack;
+        lastMask = -1;
+        outbox = [];
+        return true;
+      }
+      if (cursor.accepted < acceptedSequence || cursor.ack < acknowledgedSequence ||
+          cursor.accepted >= nextSequence) return false;
+      acceptedSequence = cursor.accepted;
+      acknowledgedSequence = cursor.ack;
+      nextSequence = Math.max(nextSequence, Math.min(MAX_INPUT_SEQUENCE + 1, cursor.accepted + 1));
+      outbox = outbox.filter(({ message }) => message.inputSeq > acknowledgedSequence);
+      return true;
+    };
+
+    const queue = (mask) => {
+      if (!Number.isInteger(mask) || mask < 0 || mask > 15 || epoch <= 0 ||
+          mask === lastMask || outbox.length >= outboxLimit ||
+          nextSequence > MAX_INPUT_SEQUENCE) return false;
+      const message = {
+        type: "input",
+        mask,
+        inputEpoch: epoch,
+        inputSeq: nextSequence++
+      };
+      const entry = { message, sentAt: Number.NEGATIVE_INFINITY };
+      outbox.push(entry);
+      lastMask = mask;
+      transmit(entry);
+      return true;
+    };
+
+    const replay = () => {
+      if (!outbox.length || now() - outbox[0].sentAt < retryMs) return false;
+      transmit(outbox[0], true);
+      return true;
+    };
+
+    const reset = () => {
+      epoch = 0;
+      nextSequence = 1;
+      acceptedSequence = 0;
+      acknowledgedSequence = 0;
+      lastMask = -1;
+      replayCount = 0;
+      outbox = [];
+    };
+
+    const snapshot = () => ({
+      version: INPUT_PROTOCOL_VERSION,
+      epoch,
+      nextSequence,
+      acceptedSequence,
+      acknowledgedSequence,
+      pendingSequences: outbox.map(({ message }) => message.inputSeq),
+      pendingMasks: outbox.map(({ message }) => message.mask),
+      replayCount
+    });
+    const currentEpoch = () => epoch;
+
+    return Object.freeze({ currentEpoch, queue, replay, reset, snapshot, synchronize });
   }
 
   const state = {
@@ -82,8 +191,14 @@
     matchTarget: 3,
     guestRound: 0,
     guestMode: "intro",
-    lastSentInput: -1
+    lastLegacyInput: -1
   };
+
+  const reliableInput = createReliableInputStream({ send: sendControl });
+  const reliableInputRetryTimer = setInterval(() => {
+    if (state.connected) reliableInput.replay();
+  }, INPUT_RETRY_MS);
+  addEventListener("pagehide", () => clearInterval(reliableInputRetryTimer), { once: true });
 
   const panel = document.createElement("section");
   panel.className = "online-panel";
@@ -251,6 +366,7 @@
       guestChampion: state.guestChampion,
       arena: state.arena,
       matchTarget: state.matchTarget,
+      inputDelivery: reliableInput.snapshot(),
       status: status.textContent || "",
       tone: status.dataset.tone || ""
     };
@@ -526,9 +642,14 @@
       socket.addEventListener("open", () => {
         if (state.socket !== socket) return;
         socket.send(JSON.stringify(quickMatch
-          ? { type: "quick-match", preset: lobbyPayload() }
+          ? {
+              type: "quick-match",
+              inputProtocol: INPUT_PROTOCOL_VERSION,
+              preset: lobbyPayload()
+            }
           : {
               type: "hello",
+              inputProtocol: INPUT_PROTOCOL_VERSION,
               room: state.roomCode,
               role,
               ready: role === "guest" && state.guestReady,
@@ -564,6 +685,7 @@
             state.rivalConnected = true;
             setOnlineRole(message.role);
           }
+          reliableInput.synchronize(message.input, localOnlinePlayerId() - 1);
           settled = true;
           if (Number.isSafeInteger(message.soundCursor) && message.soundCursor >= 0) {
             state.lastPlayedSoundEventId = Math.max(
@@ -665,6 +787,8 @@
   function handleControl(message) {
     if (!message || typeof message !== "object") return;
     if (message.type === "start" || message.type === "rematch") {
+      reliableInput.synchronize(message.input, localOnlinePlayerId() - 1);
+      if (reliableInput.currentEpoch() <= 0) state.lastLegacyInput = -1;
       void startOnlineMatch(message);
       return;
     }
@@ -688,7 +812,13 @@
   }
 
   function sendControl(message) {
-    if (state.socket?.readyState === WebSocket.OPEN) state.socket.send(JSON.stringify(message));
+    if (state.socket?.readyState !== WebSocket.OPEN) return false;
+    try {
+      state.socket.send(JSON.stringify(message));
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function lobbyPayload(type = "lobby") {
@@ -733,6 +863,9 @@
     applyLobby(message);
     const isRematch = message.type === "rematch" || game.mode === "matchover";
     if (isRematch) {
+      if (state.role === "guest") {
+        state.localInput = { up: false, down: false, left: false, right: false };
+      }
       UI.end.hidden = true;
       UI.chrome.classList.remove("is-hidden");
       UI.chrome.setAttribute("aria-hidden", "false");
@@ -763,6 +896,7 @@
   function applySnapshot(data) {
     if (!data || ![2, 3].includes(data.v) || !Array.isArray(data.players)) return;
     if (Number.isFinite(data.s) && data.s <= state.receivedSequence) return;
+    reliableInput.synchronize(data.input, localOnlinePlayerId() - 1);
     state.receivedSequence = Number(data.s) || state.receivedSequence + 1;
     const previousRound = state.guestRound;
     const previousMode = state.guestMode;
@@ -931,12 +1065,21 @@
     };
   }
 
+  function sendMovementInput(mask) {
+    if (reliableInput.currentEpoch() <= 0) {
+      if (mask === state.lastLegacyInput) return false;
+      const sent = sendControl({ type: "input", mask });
+      if (sent) state.lastLegacyInput = mask;
+      return sent;
+    }
+    state.lastLegacyInput = -1;
+    if (!reliableInput.queue(mask)) reliableInput.replay();
+    return true;
+  }
+
   function sendCurrentInput() {
     if (state.role === "host") state.localInput = hostLocalInput();
-    const mask = inputMask();
-    if (mask === state.lastSentInput) return;
-    state.lastSentInput = mask;
-    sendControl({ type: "input", mask });
+    sendMovementInput(inputMask());
   }
 
   const originalUpdate = game.update.bind(game);
@@ -1131,8 +1274,9 @@
       droppedSoundEventCount: 0,
       localInput: { up: false, down: false, left: false, right: false },
       remoteHostTarget: null, localPlayerTarget: null,
-      pendingGuestBombs: [], lastSentInput: -1
+      pendingGuestBombs: [], lastLegacyInput: -1
     });
+    reliableInput.reset();
   }
 
   function chooseOffline() {
@@ -1236,8 +1380,7 @@
   }
 
   function sendInput() {
-    const mask = inputMask();
-    sendControl({ type: "input", mask });
+    sendMovementInput(inputMask());
   }
 
   function setGuestDirection(direction, active) {
@@ -1366,12 +1509,15 @@
   }, true);
 
   addEventListener("keyup", (event) => {
-    if (state.role !== "guest" || game.mode !== "playing") return;
+    if (state.role !== "guest") return;
     const direction = keyDirections[event.code];
     if (!direction) return;
+    const wasActive = state.localInput[direction];
+    state.localInput[direction] = false;
+    if (game.mode !== "playing" || !state.connected || !wasActive) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    setGuestDirection(direction, false);
+    sendInput();
   }, true);
 
   addEventListener("blur", () => {
@@ -1435,6 +1581,7 @@
       // Server rebuilds the duel and broadcasts type "rematch".
       sendControl({
         type: "rematch",
+        inputEpoch: reliableInput.snapshot().epoch,
         hostChampion: state.hostChampion,
         guestChampion: state.guestChampion,
         arena: state.arena,

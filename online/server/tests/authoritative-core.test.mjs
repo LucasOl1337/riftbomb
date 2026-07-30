@@ -27,6 +27,49 @@ test("tracks exact grid changes without transient serialization", () => {
   assert.deepEqual(room.gridCache, grid);
 });
 
+test("movement input accepts only the next sequence in the active match epoch", () => {
+  const rooms = new Map();
+  const manager = new AuthoritativeRooms({ rooms, broadcast() {} });
+  const room = manager.create("INPUT1", {});
+  room.game = {};
+  room.inputEpoch = 9;
+
+  assert.equal(manager.acceptInput(room, 0, { type: "input", mask: 4 }), true,
+    "an old client must keep moving while the server rolls out first");
+  assert.deepEqual(manager.inputProtocol(room), {
+    v: 1, epoch: 9, accepted: [0, 0], ack: [0, 0]
+  });
+
+  assert.equal(manager.acceptInput(room, 0, {
+    type: "input", mask: 8, inputEpoch: 9, inputSeq: 2
+  }), false, "a gap must wait for replay of the first missing transition");
+  assert.equal(manager.acceptInput(room, 0, {
+    type: "input", mask: 8, inputEpoch: 9, inputSeq: 1
+  }), true);
+  assert.equal(manager.acceptInput(room, 0, { type: "input", mask: 4 }), false,
+    "legacy input must be disabled irreversibly after the first v1 envelope");
+  assert.equal(manager.acceptInput(room, 0, {
+    type: "input", mask: 4, inputEpoch: 9, inputSeq: 1
+  }), false, "the first payload for a sequence must win");
+  assert.equal(manager.acceptInput(room, 0, {
+    type: "input", mask: 0, inputEpoch: 8, inputSeq: 2
+  }), false, "an earlier match cannot mutate the current mask");
+  assert.equal(manager.acceptInput(room, 0, {
+    type: "input", mask: 0, inputEpoch: 9, inputSeq: 2
+  }), true);
+  assert.deepEqual(room.inputs, [0, 0]);
+  assert.deepEqual(manager.inputProtocol(room), {
+    v: 1, epoch: 9, accepted: [2, 0], ack: [0, 0]
+  });
+
+  for (const inputSeq of [0, -1, 2.5, "3", Number.MAX_SAFE_INTEGER + 1]) {
+    assert.equal(manager.acceptInput(room, 0, {
+      type: "input", mask: 1, inputEpoch: 9, inputSeq
+    }), false);
+  }
+  assert.deepEqual(manager.inputProtocol(room).accepted, [2, 0]);
+});
+
 const unlockKit = (player) => {
   player.skillsUnlocked = [true, true, true, true];
   return player;
@@ -514,11 +557,23 @@ test("shares one tick and snapshot clock across active rooms", async () => {
   assert.equal(timers.size, 2);
   assert.deepEqual([...timers.values()].map(({ delay }) => Math.round(delay)), [17, 33]);
   const [tickClock, snapshotClock] = [...timers.values()];
+  const inputRoom = rooms.get("ROOM01");
+  assert.equal(inputRoom.inputEpoch, 1);
+  assert.equal(manager.acceptInput(inputRoom, 0, {
+    type: "input", mask: 8, inputEpoch: 1, inputSeq: 1
+  }), true);
+  assert.deepEqual(manager.inputProtocol(inputRoom).ack, [0, 0],
+    "receipt must not be acknowledged before the authoritative tick consumes it");
   now += 1000 / 60;
   tickClock.callback();
   snapshotClock.callback();
   assert.deepEqual([...rooms.values()].map(({ sequence }) => sequence), [1, 1]);
   assert.equal(broadcasts.filter(({ message }) => message.type === "snapshot" && message.data.grid).length, 2);
+  assert.deepEqual(
+    broadcasts.find(({ room, message }) => room === inputRoom && message.type === "snapshot")
+      .message.data.input,
+    { v: 1, epoch: 1, accepted: [1, 0], ack: [1, 0] }
+  );
   assert.deepEqual(manager.performanceSnapshot(), {
     activeMatches: 2,
     tickClockActive: true,

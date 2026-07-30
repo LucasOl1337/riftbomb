@@ -147,6 +147,54 @@ test("uses one authoritative WebSocket transport", async () => {
   assert.doesNotMatch(duel, /RTCPeerConnection|iceGatheringState|state\.inputChannel|state\.snapshots/);
 });
 
+test("movement uses bounded sequence, causal ACK and replay without repeating actions", async () => {
+  const [client, server, rooms] = await Promise.all([
+    readFile(new URL("public/online-duel.js", root), "utf8"),
+    readFile(new URL("server/src/server.mjs", root), "utf8"),
+    readFile(new URL("server/src/authoritative-rooms.mjs", root), "utf8")
+  ]);
+
+  assert.match(client, /function createReliableInputStream/);
+  assert.match(client, /INPUT_OUTBOX_LIMIT = 64/);
+  assert.match(client, /inputProtocol: INPUT_PROTOCOL_VERSION/);
+  assert.match(client, /reliableInputRetryTimer = setInterval/);
+  assert.match(client, /function sendMovementInput/);
+  assert.match(client, /reliableInput\.currentEpoch\(\) <= 0/);
+  assert.match(client, /inputEpoch: epoch/);
+  assert.match(client, /inputSeq: nextSequence\+\+/);
+  assert.match(client, /if \(cursor\.epoch < epoch\) return false/);
+  assert.match(client, /transmit\(outbox\[0\], true\)/);
+  assert.match(client, /reliableInput\.synchronize\(data\.input/);
+  const matchControl = client.slice(
+    client.indexOf("function handleControl"),
+    client.indexOf("function sendControl")
+  );
+  assert.match(matchControl,
+    /reliableInput\.currentEpoch\(\) <= 0\) state\.lastLegacyInput = -1/,
+    "legacy movement dedupe must re-arm at every old-server match boundary");
+  assert.match(client, /if \(!reliableInput\.queue\(mask\)\) reliableInput\.replay\(\)/);
+  const keyup = client.slice(
+    client.indexOf('addEventListener("keyup"'),
+    client.indexOf('addEventListener("blur"')
+  );
+  assert.ok(keyup.indexOf("state.localInput[direction] = false") <
+    keyup.indexOf('game.mode !== "playing"'),
+  "guest key release must clear local state even between matches");
+  assert.equal((client.match(/sendControl\(\{ type: "action"/g) || []).length, 2,
+    "bomb and ability remain one-shot and outside movement replay");
+  assert.doesNotMatch(client, /reliableInput\.queue\([^)]*(?:bomb|ability)/);
+
+  assert.match(server, /room\.players\[index\]\?\.socket !== socket/);
+  assert.match(server, /inputProtocol: message\.inputProtocol === 1 \? 1 : 0/);
+  assert.match(server, /authoritativeRooms\.acceptInput\(room, index, message\)/);
+  assert.match(server, /room\.game\?\.mode === "matchover"/);
+  assert.match(server, /message\.inputEpoch === room\.inputEpoch/);
+  assert.match(rooms, /message\.inputSeq !== room\.inputAccepted\[playerIndex\] \+ 1/);
+  assert.match(rooms, /room\.game\.update\(dt\);\s*room\.inputApplied\[0\] =/);
+  assert.match(rooms, /snapshot\.input = this\.inputProtocol\(room\)/);
+  assert.match(rooms, /inputEpoch: 0/);
+});
+
 test("superseded sockets cannot mutate the active room or audio cursor", async () => {
   const source = await readFile(new URL("public/online-duel.js", root), "utf8");
   const declaration = extractFunctionDeclaration(
@@ -192,22 +240,28 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
   const connectAuthoritative = new Function(
     "WebSocket",
     "AUTHORITATIVE_SERVER_URL",
+    "INPUT_PROTOCOL_VERSION",
     "state",
     "setTimeout",
     "clearTimeout",
     "lobbyPayload",
     "onConnected",
     "applySnapshot",
+    "reliableInput",
+    "localOnlinePlayerId",
     `"use strict"; ${declaration}; return connectAuthoritative;`
   )(
     FakeWebSocket,
     "ws://test.invalid/game-ws",
+    1,
     state,
     () => 1,
     () => {},
     () => ({}),
     () => { connectedCalls += 1; },
-    (snapshot) => applied.push(snapshot)
+    (snapshot) => applied.push(snapshot),
+    { synchronize() { return true; } },
+    () => 1
   );
 
   void connectAuthoritative("host");

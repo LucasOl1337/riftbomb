@@ -1,6 +1,8 @@
 const TICK_RATE = 60;
 const SNAPSHOT_RATE = 30;
 const ROOMS_PER_TURN = 8;
+const INPUT_PROTOCOL_VERSION = 1;
+const MAX_INPUT_SEQUENCE = 0x7fffffff;
 const loadDefaultDuelRuntime = () => import("../../../game/create-authoritative-duel.mjs");
 const CHAMPIONS = new Set(["katarina", "zed", "renekton", "vladimir", "gangplank"]);
 const ARENAS = new Set(["lattice", "clearing", "labyrinth", "forts", "pit"]);
@@ -85,6 +87,10 @@ export class AuthoritativeRooms {
       game: null,
       players: [null, null],
       inputs: [0, 0],
+      inputEpoch: 0,
+      inputAccepted: [0, 0],
+      inputApplied: [0, 0],
+      inputReliable: [false, false],
       sequence: 0,
       soundEventSequence: 0,
       lastTick: 0,
@@ -105,6 +111,34 @@ export class AuthoritativeRooms {
       inviteMode: room.preset.matchTarget === 10,
       serverAuthoritative: true
     };
+  }
+
+  inputProtocol(room) {
+    return {
+      v: INPUT_PROTOCOL_VERSION,
+      epoch: room.inputEpoch,
+      accepted: room.inputAccepted.slice(),
+      ack: room.inputApplied.slice()
+    };
+  }
+
+  acceptInput(room, playerIndex, message) {
+    if (!room.game || !Number.isInteger(playerIndex) || playerIndex < 0 || playerIndex > 1 ||
+        !Number.isInteger(message?.mask) || message.mask < 0 || message.mask > 15) return false;
+    const hasReliableEnvelope = message.inputEpoch !== undefined || message.inputSeq !== undefined;
+    if (!hasReliableEnvelope) {
+      if (room.inputReliable[playerIndex]) return false;
+      room.inputs[playerIndex] = message.mask;
+      return true;
+    }
+    if (!Number.isSafeInteger(message.inputEpoch) || message.inputEpoch !== room.inputEpoch ||
+        !Number.isSafeInteger(message.inputSeq) || message.inputSeq <= 0 ||
+        message.inputSeq > MAX_INPUT_SEQUENCE ||
+        message.inputSeq !== room.inputAccepted[playerIndex] + 1) return false;
+    room.inputs[playerIndex] = message.mask;
+    room.inputAccepted[playerIndex] = message.inputSeq;
+    room.inputReliable[playerIndex] = true;
+    return true;
   }
 
   stopMatch(room) {
@@ -130,6 +164,8 @@ export class AuthoritativeRooms {
           this.duelRuntime.applyInputMask(room.game, 1, room.inputs[0]);
           this.duelRuntime.applyInputMask(room.game, 2, room.inputs[1]);
           room.game.update(dt);
+          room.inputApplied[0] = room.inputAccepted[0];
+          room.inputApplied[1] = room.inputAccepted[1];
           room.lastActivity = Date.now();
         });
       }, 1000 / TICK_RATE);
@@ -144,6 +180,7 @@ export class AuthoritativeRooms {
             ++room.sequence,
             includeGrid
           );
+          snapshot.input = this.inputProtocol(room);
           room.soundEventSequence = Math.max(room.soundEventSequence, snapshot.sound.latest);
           this.broadcast(room, { type: "snapshot", data: snapshot });
           this.performanceCounters.snapshotsProduced += 1;
@@ -209,11 +246,19 @@ export class AuthoritativeRooms {
         ...room.preset,
         soundEventStartId: room.soundEventSequence
       });
+      room.inputEpoch = room.inputEpoch >= MAX_INPUT_SEQUENCE ? 1 : room.inputEpoch + 1;
       room.inputs = [0, 0];
+      room.inputAccepted = [0, 0];
+      room.inputApplied = [0, 0];
+      room.inputReliable = room.players.map((player) => player?.inputProtocol === 1);
       room.gridCache = null;
       room.lastTick = this.now();
       this.startClock();
-      this.broadcast(room, { ...this.lobbyMessage(room), type: rematch ? "rematch" : "start" });
+      this.broadcast(room, {
+        ...this.lobbyMessage(room),
+        type: rematch ? "rematch" : "start",
+        input: this.inputProtocol(room)
+      });
     } catch (error) {
       console.error("startMatch failed", room.code, error);
       this.stopMatch(room);

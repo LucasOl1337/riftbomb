@@ -42,12 +42,16 @@ test("websocket rejects malformed payloads without losing valid traffic", async 
   for (const payload of ["null", "[]", "false", '"input"', '{"type":null}']) socket.send(payload);
   const deepValue = "[".repeat(12_000) + "0" + "]".repeat(12_000);
   socket.send(`{"type":"input","mask":${deepValue}}`);
-  socket.send(JSON.stringify({ type: "input", mask: 8 }));
+  socket.send(JSON.stringify({
+    type: "lobby", hostChampion: "zed", guestChampion: "katarina",
+    arena: "clearing", matchTarget: 3
+  }));
   const deadline = Date.now() + 1000;
-  while (rooms.get("SAFE24")?.inputs[0] !== 8 && Date.now() < deadline) {
+  while (rooms.get("SAFE24")?.preset.hostChampion !== "zed" && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  assert.equal(rooms.get("SAFE24")?.inputs[0], 8);
+  assert.equal(rooms.get("SAFE24")?.preset.hostChampion, "zed");
+  assert.deepEqual(rooms.get("SAFE24")?.inputs, [0, 0]);
   assert.equal(socket.readyState, WebSocket.OPEN);
   assert.ok(messages.some(({ type }) => type === "connected"));
 
@@ -142,8 +146,14 @@ test("websocket room starts only after both players are ready", async (t) => {
     });
     socket.on("error", reject);
   });
-  const host = await open({ type: "hello", room: "ABC234", role: "host", preset: { matchTarget: 10 } });
-  const guest = await open({ type: "hello", room: "ABC234", role: "guest", ready: true });
+  const host = await open({
+    type: "hello", room: "ABC234", role: "host", inputProtocol: 1,
+    preset: { matchTarget: 10 }
+  });
+  const guest = await open({
+    type: "hello", room: "ABC234", role: "guest", ready: true, inputProtocol: 1
+  });
+  const room = rooms.get("ABC234");
   let reconnectedGuest = null;
   assert.equal(host.messages.find(({ type }) => type === "connected")?.soundCursor, 0);
   assert.equal(guest.messages.find(({ type }) => type === "connected")?.soundCursor, 0);
@@ -165,11 +175,50 @@ test("websocket room starts only after both players are ready", async (t) => {
         assert.equal(message.data.sound.v, 1);
         assert.equal(message.data.sound.latest, 0);
         assert.deepEqual(message.data.sound.events, []);
+        assert.deepEqual(message.data.input, {
+          v: 1, epoch: 1, accepted: [0, 0], ack: [0, 0]
+        });
         resolve();
       }
     };
     guest.socket.on("message", onSnapshot);
   });
+
+  const waitForInputAck = (expected) => new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`input ACK ${expected} timed out`)), 1500);
+    const inspect = (data) => {
+      const message = JSON.parse(data);
+      if (message.type !== "snapshot" || message.data.input?.ack?.[0] !== expected) return;
+      clearTimeout(timeout);
+      host.socket.off("message", inspect);
+      resolve(message.data.input);
+    };
+    host.socket.on("message", inspect);
+  });
+  const epoch = room.inputEpoch;
+  host.socket.send(JSON.stringify({
+    type: "input", mask: 0, inputEpoch: epoch, inputSeq: 2
+  }));
+  const firstAck = waitForInputAck(1);
+  host.socket.send(JSON.stringify({
+    type: "input", mask: 8, inputEpoch: epoch, inputSeq: 1
+  }));
+  assert.deepEqual(await firstAck, {
+    v: 1, epoch, accepted: [1, 0], ack: [1, 0]
+  });
+  assert.equal(room.inputs[0], 8);
+
+  const releaseAck = waitForInputAck(2);
+  host.socket.send(JSON.stringify({
+    type: "input", mask: 4, inputEpoch: epoch, inputSeq: 1
+  }));
+  host.socket.send(JSON.stringify({
+    type: "input", mask: 0, inputEpoch: epoch, inputSeq: 2
+  }));
+  assert.deepEqual(await releaseAck, {
+    v: 1, epoch, accepted: [2, 0], ack: [2, 0]
+  });
+  assert.equal(room.inputs[0], 0, "stale conflicting input must not revive movement");
 
   const waitForSound = (client) => new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("sound snapshot timeout")), 1500);
@@ -195,7 +244,6 @@ test("websocket room starts only after both players are ready", async (t) => {
   assert.equal("sourceId" in hostAudio.event, false);
 
   guest.socket.terminate();
-  const room = rooms.get("ABC234");
   const disconnectedBefore = Date.now() + 1000;
   while (room.players[1]?.socket && Date.now() < disconnectedBefore) {
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -205,6 +253,26 @@ test("websocket room starts only after both players are ready", async (t) => {
     reconnectedGuest.messages.find(({ type }) => type === "connected")?.soundCursor,
     1
   );
+  assert.deepEqual(
+    reconnectedGuest.messages.find(({ type }) => type === "connected")?.input,
+    { v: 1, epoch, accepted: [2, 0], ack: [2, 0] }
+  );
+  const resumedGrid = await new Promise((resolve, reject) => {
+    const existing = reconnectedGuest.messages.find((message) =>
+      message.type === "snapshot" && Array.isArray(message.data?.grid)
+    );
+    if (existing) return resolve(existing.data.grid);
+    const timeout = setTimeout(() => reject(new Error("reconnect full grid timed out")), 1000);
+    const inspect = (data) => {
+      const message = JSON.parse(data);
+      if (message.type !== "snapshot" || !Array.isArray(message.data?.grid)) return;
+      clearTimeout(timeout);
+      reconnectedGuest.socket.off("message", inspect);
+      resolve(message.data.grid);
+    };
+    reconnectedGuest.socket.on("message", inspect);
+  });
+  assert.deepEqual(resumedGrid, room.game.grid);
 
   const healthResponse = await fetch(`http://127.0.0.1:${port}/health`);
   const health = await healthResponse.json();
@@ -257,21 +325,33 @@ test("host rematch rebuilds the authoritative duel", async (t) => {
 
   const host = await open({
     type: "hello", room: "REMCH2", role: "host",
+    inputProtocol: 1,
     preset: { hostChampion: "zed", guestChampion: "katarina", matchTarget: 3 }
   });
-  const guest = await open({ type: "hello", room: "REMCH2", role: "guest", ready: true });
+  const guest = await open({
+    type: "hello", room: "REMCH2", role: "guest", ready: true, inputProtocol: 1
+  });
   t.after(() => {
     host.socket.terminate();
     guest.socket.terminate();
     closeAuthoritativeServer();
   });
 
-  await waitFor(guest, "start");
+  const start = await waitFor(guest, "start");
+  assert.deepEqual(start.input, { v: 1, epoch: 1, accepted: [0, 0], ack: [0, 0] });
   const room = rooms.get("REMCH2");
   assert.ok(room?.game);
   const firstGame = room.game;
   const firstSnapshot = await waitFor(guest, "snapshot");
   const firstSnapshotSequence = firstSnapshot.data.s;
+  host.socket.send(JSON.stringify({
+    type: "input", mask: 8, inputEpoch: 1, inputSeq: 1
+  }));
+  const inputDeadline = Date.now() + 1000;
+  while (room.inputApplied[0] !== 1 && Date.now() < inputDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  assert.deepEqual(room.inputApplied, [1, 0]);
   assert.equal(firstGame.placeBomb(firstGame.players[0]), true);
   assert.equal(firstGame.authoritativeSound.latest, 1);
   firstGame.mode = "matchover";
@@ -279,6 +359,7 @@ test("host rematch rebuilds the authoritative duel", async (t) => {
   const rematchWait = waitFor(guest, "rematch");
   host.socket.send(JSON.stringify({
     type: "rematch",
+    inputEpoch: room.inputEpoch,
     hostChampion: "zed",
     guestChampion: "katarina",
     arena: "lattice",
@@ -288,10 +369,16 @@ test("host rematch rebuilds the authoritative duel", async (t) => {
   const rematch = await rematchWait;
   assert.equal(rematch.type, "rematch");
   assert.equal(rematch.hostChampion, "zed");
+  assert.deepEqual(rematch.input, { v: 1, epoch: 2, accepted: [0, 0], ack: [0, 0] });
   assert.notEqual(room.game, firstGame);
   assert.equal(room.game.mode, "playing");
   assert.equal(room.game.matchTarget, 3);
   assert.ok(room.sequence >= firstSnapshotSequence);
+  host.socket.send(JSON.stringify({
+    type: "input", mask: 8, inputEpoch: 1, inputSeq: 2
+  }));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.deepEqual(room.inputs, [0, 0], "the previous match epoch must stay inert");
   assert.equal(room.game.authoritativeSound.latest, 1);
   assert.equal(room.game.placeBomb(room.game.players[0]), true);
   assert.equal(room.game.authoritativeSound.latest, 2);
