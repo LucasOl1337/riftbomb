@@ -236,17 +236,24 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
     lastPlayedSoundEventId: 0
   };
   const applied = [];
+  const controls = [];
   let connectedCalls = 0;
   const connectAuthoritative = new Function(
     "WebSocket",
     "AUTHORITATIVE_SERVER_URL",
     "INPUT_PROTOCOL_VERSION",
+    "RESUME_PROTOCOL_VERSION",
     "state",
+    "pendingConnectCancel",
     "setTimeout",
     "clearTimeout",
     "lobbyPayload",
+    "ensureResumeToken",
     "onConnected",
-    "applySnapshot",
+    "receiveSnapshot",
+    "handleControl",
+    "saveSession",
+    "clearPendingResume",
     "reliableInput",
     "localOnlinePlayerId",
     `"use strict"; ${declaration}; return connectAuthoritative;`
@@ -254,20 +261,28 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
     FakeWebSocket,
     "ws://test.invalid/game-ws",
     1,
+    1,
     state,
+    null,
     () => 1,
     () => {},
     () => ({}),
+    () => "11".repeat(32),
     () => { connectedCalls += 1; },
     (snapshot) => applied.push(snapshot),
+    (message) => controls.push(message),
+    () => {},
+    () => {},
     { synchronize() { return true; } },
     () => 1
   );
 
-  void connectAuthoritative("host");
+  const superseded = connectAuthoritative("host");
   const oldSocket = sockets[0];
   const activePromise = connectAuthoritative("host");
   const activeSocket = sockets[1];
+  await assert.rejects(superseded, /resume_cancelled/,
+    "superseding a pending connect must settle its promise");
 
   oldSocket.emit("open");
   oldSocket.emit("message", { type: "connected", soundCursor: 99 });
@@ -288,9 +303,75 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
   await activePromise;
 
   assert.equal(activeSocket.sent.length, 1);
+  assert.equal(activeSocket.sent[0].resumeProtocol, 1);
+  assert.equal(activeSocket.sent[0].resumeToken, "11".repeat(32));
   assert.equal(state.lastPlayedSoundEventId, 2);
   assert.deepEqual(applied, [{ s: 1, room: "new" }]);
   assert.equal(connectedCalls, 1);
+
+  let resumeResolved = false;
+  const resumed = connectAuthoritative("guest", { resume: true, resumePhase: "match" })
+    .then(() => { resumeResolved = true; });
+  const resumedSocket = sockets[2];
+  resumedSocket.emit("open");
+  resumedSocket.emit("message", {
+    type: "connected",
+    resume: { v: 1, protected: true, resumed: true },
+    input: { v: 1, epoch: 4, accepted: [0, 7], ack: [0, 7] }
+  });
+  await Promise.resolve();
+  assert.equal(resumeResolved, false, "authenticated resume waits for its explicit control frame");
+  resumedSocket.emit("message", { type: "resume", activeMatch: true });
+  await resumed;
+  assert.equal(resumeResolved, true);
+  assert.equal(controls.at(-1).type, "resume");
+
+  const rejected = connectAuthoritative("guest");
+  const rejectedSocket = sockets[3];
+  rejectedSocket.emit("open");
+  rejectedSocket.emit("message", { type: "error", error: "role_taken" });
+  await assert.rejects(rejected, /role_taken/);
+  assert.equal(rejectedSocket.readyState, 3, "pre-connected errors must close their socket");
+
+  state.sessionConfirmed = false;
+  const freshLobby = connectAuthoritative("guest", { resume: true, resumePhase: "lobby" });
+  const freshLobbySocket = sockets[4];
+  freshLobbySocket.emit("open");
+  assert.equal(freshLobbySocket.sent[0].resumeOnly, false);
+  freshLobbySocket.emit("message", {
+    type: "connected",
+    resume: { v: 1, protected: true, resumed: false },
+    input: { v: 1, epoch: 0, accepted: [0, 0], ack: [0, 0] }
+  });
+  await freshLobby;
+  assert.equal(controls.at(-1).type, "resume");
+  assert.equal(controls.at(-1).activeMatch, false,
+    "a persisted pre-hello lobby claim must complete instead of orphaning its bearer");
+  assert.equal(state.sessionConfirmed, true);
+
+  const confirmedLobby = connectAuthoritative("guest", { resume: true, resumePhase: "lobby" });
+  const confirmedLobbySocket = sockets[5];
+  confirmedLobbySocket.emit("open");
+  assert.equal(confirmedLobbySocket.sent[0].resumeOnly, true,
+    "an established lobby may only recover its existing protected seat");
+  confirmedLobbySocket.emit("message", {
+    type: "connected",
+    resume: { v: 1, protected: true, resumed: true },
+    input: { v: 1, epoch: 0, accepted: [0, 0], ack: [0, 0] }
+  });
+  confirmedLobbySocket.emit("message", { type: "resume", activeMatch: false });
+  await confirmedLobby;
+
+  const missingMatch = connectAuthoritative("guest", { resume: true, resumePhase: "match" });
+  const missingMatchSocket = sockets[6];
+  missingMatchSocket.emit("open");
+  assert.equal(missingMatchSocket.sent[0].resumeOnly, true);
+  missingMatchSocket.emit("message", {
+    type: "connected",
+    resume: { v: 1, protected: true, resumed: false }
+  });
+  await assert.rejects(missingMatch, /resume_denied/);
+  assert.equal(missingMatchSocket.readyState, 3);
 });
 
 test("online one-shot audio is authoritative, ordered and locally panned", async () => {

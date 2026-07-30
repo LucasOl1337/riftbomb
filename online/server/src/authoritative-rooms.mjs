@@ -235,17 +235,43 @@ export class AuthoritativeRooms {
     this.snapshotTimer = null;
   }
 
+  startClaimIsCurrent(room, players) {
+    return this.rooms.get(room.code) === room &&
+      room.players.every((player, index) => {
+        const claim = players[index];
+        return player === claim.player &&
+          player?.socket === claim.socket &&
+          (player?.connectionGeneration || 0) === claim.connectionGeneration;
+      }) &&
+      Boolean(room.players[0]?.socket && room.players[1]?.socket && room.players[1]?.ready);
+  }
+
   async start(room, { rematch = false } = {}) {
     if (!room.players[0]?.socket || !room.players[1]?.socket) return;
     if (!room.players[1].ready || (room.game && !rematch) || room.starting) return;
+    const players = room.players.map((player) => ({
+      player,
+      socket: player?.socket,
+      connectionGeneration: player?.connectionGeneration || 0
+    }));
+    let retryWithCurrentPlayers = false;
     room.starting = true;
     try {
       if (rematch) this.stopMatch(room);
       const duelRuntime = await this.getDuelRuntime();
-      room.game = await duelRuntime.createAuthoritativeDuel({
+      if (!this.startClaimIsCurrent(room, players)) {
+        retryWithCurrentPlayers = this.rooms.get(room.code) === room;
+        return;
+      }
+      const game = await duelRuntime.createAuthoritativeDuel({
         ...room.preset,
         soundEventStartId: room.soundEventSequence
       });
+      if (!this.startClaimIsCurrent(room, players)) {
+        retryWithCurrentPlayers = this.rooms.get(room.code) === room;
+        return;
+      }
+      room.game = game;
       room.inputEpoch = room.inputEpoch >= MAX_INPUT_SEQUENCE ? 1 : room.inputEpoch + 1;
       room.inputs = [0, 0];
       room.inputAccepted = [0, 0];
@@ -264,6 +290,9 @@ export class AuthoritativeRooms {
       this.stopMatch(room);
     } finally {
       room.starting = false;
+      if (retryWithCurrentPlayers && this.rooms.get(room.code) === room) {
+        void this.start(room, { rematch });
+      }
     }
   }
 

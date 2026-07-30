@@ -31,7 +31,14 @@
   const CLIENT_SOURCE = "riftbomb-client";
   const RUNTIME_SOURCE = "riftbomb-runtime";
   const SESSION_KEY = "riftbomb-online-session-v1";
-  const SESSION_MAX_AGE_MS = 25 * 60_000;
+  const PENDING_RESUME_KEY = "riftbomb-online-resume-pending-v1";
+  const RESUME_PROTOCOL_VERSION = 1;
+  const RESUME_TOKEN_BYTES = 32;
+  // Covers the legacy server's worst-case 45 s dead-socket heartbeat during a
+  // rolling deploy. Authenticated v1 replacement still completes immediately.
+  const RESUME_ROLE_RETRY_DELAYS_MS = Object.freeze([
+    100, 250, 500, 1_000, 2_000, 4_000, 8_000, 12_000, 16_000, 16_000
+  ]);
   const INPUT_PROTOCOL_VERSION = 1;
   const INPUT_RETRY_MS = 120;
   const INPUT_OUTBOX_LIMIT = 64;
@@ -57,6 +64,68 @@
 
   function championNameSafe(value) {
     return CHAMPION_NAMES[value] || "Katarina";
+  }
+
+  function createResumeToken(fillRandom = (bytes) => globalThis.crypto.getRandomValues(bytes)) {
+    const bytes = new Uint8Array(RESUME_TOKEN_BYTES);
+    fillRandom(bytes);
+    return [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
+  }
+
+  function validResumeToken(value) {
+    return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+  }
+
+  function definitiveResumeFailure(error) {
+    return new Set([
+      "resume_denied", "resume_expired", "room_not_found", "invalid_resume", "invalid_hello"
+    ]).has(error?.message);
+  }
+
+  function definitiveInitialConnectionFailure(error) {
+    return definitiveResumeFailure(error) ||
+      ["role_taken", "room_full"].includes(error?.message);
+  }
+
+  async function retryRoleTaken(
+    connect,
+    {
+      delays = RESUME_ROLE_RETRY_DELAYS_MS,
+      wait = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
+      active = () => true
+    } = {}
+  ) {
+    for (let attempt = 0; ; attempt += 1) {
+      if (!active()) throw new Error("resume_cancelled");
+      try {
+        return await connect();
+      } catch (error) {
+        if (error?.message !== "role_taken" || attempt >= delays.length || !active()) throw error;
+        await wait(delays[attempt]);
+      }
+    }
+  }
+
+  function createLatestSnapshotBuffer() {
+    let latest = null;
+    const push = (snapshot) => {
+      if (!snapshot || !Number.isFinite(snapshot.s) || snapshot.s <= 0 ||
+          (latest && snapshot.s <= latest.s)) return false;
+      // The server deliberately sends a full grid first after reattach. Preserve
+      // it while coalescing later state-only snapshots during asynchronous boot.
+      latest = !Array.isArray(snapshot.grid) && Array.isArray(latest?.grid)
+        ? { ...snapshot, grid: latest.grid }
+        : snapshot;
+      return true;
+    };
+    const take = () => {
+      const snapshot = latest;
+      latest = null;
+      return snapshot;
+    };
+    const reset = () => { latest = null; };
+    const peek = () => latest;
+    return Object.freeze({ peek, push, reset, take });
   }
 
   function createReliableInputStream({
@@ -168,6 +237,10 @@
     role: "offline",
     roomCode: "",
     hostToken: "",
+    resumeToken: "",
+    resuming: false,
+    resumePhase: "",
+    sessionConfirmed: false,
     socket: null,
     connected: false,
     matchmaking: false,
@@ -193,6 +266,13 @@
     guestMode: "intro",
     lastLegacyInput: -1
   };
+
+  const bufferedSnapshots = createLatestSnapshotBuffer();
+  let lifecycleGeneration = 0;
+  let matchRuntimeEpoch = 0;
+  let runtimeBootRecord = null;
+  let runtimeBootTail = Promise.resolve();
+  let pendingConnectCancel = null;
 
   const reliableInput = createReliableInputStream({ send: sendControl });
   const reliableInputRetryTimer = setInterval(() => {
@@ -341,6 +421,7 @@
   const championName = championNameSafe;
 
   function clientPhase() {
+    if (state.resuming || runtimeBootRecord) return "boot";
     if (game.mode === "playing" || game.mode === "matchover") return "match";
     return state.role === "offline" ? "setup" : "lobby";
   }
@@ -381,23 +462,38 @@
       reason,
       state: clientStateSnapshot()
     }, window.location.origin);
-    saveSession();
+    // During iframe boot the saved session is the only source for the automatic
+    // F5 resume scheduled below. Do not erase it while the runtime still has its
+    // initial offline role; explicit offline/leave flows already clear it.
+    if (reason !== "ready") saveSession();
   }
 
   function clearSession() {
+    clearSavedSession();
+    clearPendingResume();
+  }
+
+  function clearSavedSession() {
     try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+  }
+
+  function clearPendingResume() {
+    try { sessionStorage.removeItem(PENDING_RESUME_KEY); } catch {}
   }
 
   function saveSession() {
     try {
       if (state.role === "offline" || !state.roomCode) {
-        clearSession();
+        // Startup status publications happen before auto-resume while the
+        // iframe still reports its initial offline role. Only explicit
+        // cancel/leave/failure flows are allowed to erase a saved credential.
         return;
       }
       // Persist even while briefly disconnected so F5 can reattach.
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({
         role: state.role,
         roomCode: state.roomCode,
+        resumeToken: state.resumeToken,
         hostChampion: state.hostChampion,
         guestChampion: state.guestChampion,
         arena: state.arena,
@@ -405,7 +501,10 @@
         quickMatch: state.quickMatch,
         guestReady: state.guestReady,
         matchTarget: state.matchTarget,
-        phase: clientPhase(),
+        phase: ["lobby", "match"].includes(state.resumePhase)
+          ? state.resumePhase
+          : clientPhase(),
+        confirmed: Boolean(state.sessionConfirmed),
         savedAt: Date.now()
       }));
     } catch {}
@@ -417,16 +516,57 @@
       if (!raw) return null;
       const data = JSON.parse(raw);
       if (!data?.roomCode || !data?.role) return null;
-      if (Date.now() - Number(data.savedAt || 0) > SESSION_MAX_AGE_MS) {
-        clearSession();
-        return null;
-      }
       if (!/^[A-HJ-NP-Z2-9]{6}$/.test(String(data.roomCode))) return null;
       if (data.role !== "host" && data.role !== "guest") return null;
+      if (data.resumeToken !== undefined && data.resumeToken !== "" &&
+          !validResumeToken(data.resumeToken)) return null;
       return data;
     } catch {
       return null;
     }
+  }
+
+  function sessionMatchesRoom(session, room) {
+    return Boolean(session && typeof room === "string" &&
+      session.roomCode === room.toUpperCase());
+  }
+
+  function savePendingResume() {
+    if (!validResumeToken(state.resumeToken) || !state.quickMatch || state.roomCode) return;
+    try {
+      sessionStorage.setItem(PENDING_RESUME_KEY, JSON.stringify({
+        resumeToken: state.resumeToken,
+        quickMatch: true,
+        hostChampion: state.hostChampion,
+        arena: state.arena,
+        savedAt: Date.now()
+      }));
+    } catch {}
+  }
+
+  function readPendingResume() {
+    try {
+      const data = JSON.parse(sessionStorage.getItem(PENDING_RESUME_KEY) || "null");
+      if (!data?.quickMatch || !validResumeToken(data.resumeToken)) {
+        clearPendingResume();
+        return null;
+      }
+      return data;
+    } catch {
+      clearPendingResume();
+      return null;
+    }
+  }
+
+  function ensureResumeToken() {
+    if (!validResumeToken(state.resumeToken)) {
+      state.resumeToken = readPendingResume()?.resumeToken || createResumeToken();
+    }
+    // Persist before opening the socket. A lost `connected` frame must not lock
+    // this browser out of the seat it just protected.
+    if (state.roomCode) saveSession();
+    else savePendingResume();
+    return state.resumeToken;
   }
 
   function returnToIntroUi() {
@@ -452,6 +592,7 @@
 
   function leaveOnlineSession({ fromMatch = false } = {}) {
     const wasPlaying = game.mode === "playing" || game.mode === "matchover";
+    releaseCurrentSeat();
     try { state.socket?.close(); } catch {}
     resetConnection();
     setOnlineRole("offline");
@@ -478,10 +619,13 @@
   }
 
   function cancelQuickMatch() {
+    pendingConnectCancel?.();
+    pendingConnectCancel = null;
     const socket = state.socket;
     state.socket = null;
     state.matchmaking = false;
     state.quickMatch = false;
+    clearSession();
     try {
       if (socket?.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "cancel-quick-match" }));
@@ -613,6 +757,42 @@
     bindLocalOnlineView();
   }
 
+  function messageInputEpoch(message) {
+    const epoch = message?.input?.epoch;
+    if (Number.isSafeInteger(epoch) && epoch > 0) return epoch;
+    if (message?.type === "rematch") {
+      if (game.mode !== "matchover" && matchRuntimeEpoch > 0) return matchRuntimeEpoch;
+      return Math.max(1, matchRuntimeEpoch + 1);
+    }
+    return Math.max(1, matchRuntimeEpoch);
+  }
+
+  async function ensureOnlineMatchRuntime(message, generation) {
+    const epoch = messageInputEpoch(message);
+    if (matchRuntimeEpoch === epoch && game.mode !== "intro") return true;
+    if (runtimeBootRecord?.generation === generation && runtimeBootRecord.epoch === epoch) {
+      return runtimeBootRecord.promise;
+    }
+
+    const promise = runtimeBootTail.catch(() => undefined).then(async () => {
+      if (generation !== lifecycleGeneration || state.role === "offline") return false;
+      await beginConfiguredGame();
+      if (generation !== lifecycleGeneration || state.role === "offline") {
+        returnToIntroUi();
+        return false;
+      }
+      matchRuntimeEpoch = epoch;
+      return true;
+    });
+    runtimeBootRecord = { epoch, generation, promise };
+    runtimeBootTail = promise.catch(() => undefined);
+    try {
+      return await promise;
+    } finally {
+      if (runtimeBootRecord?.promise === promise) runtimeBootRecord = null;
+    }
+  }
+
   async function signaling(method, data, query = "") {
     const response = await fetch(`${SIGNALING_URL}${query}`, {
       method,
@@ -629,15 +809,45 @@
     return body;
   }
 
-  function connectAuthoritative(role, { quickMatch = false } = {}) {
+  function connectAuthoritative(role, {
+    quickMatch = false,
+    resume = false,
+    resumePhase = ""
+  } = {}) {
+    pendingConnectCancel?.();
+    pendingConnectCancel = null;
+    const resumeToken = ensureResumeToken();
     return new Promise((resolve, reject) => {
       const socket = new WebSocket(AUTHORITATIVE_SERVER_URL);
       state.socket = socket;
       let settled = false;
-      const timeout = setTimeout(() => {
+      let connectedReceived = false;
+      let timeout = 0;
+      let cancelPending = null;
+      const clearPendingCancel = () => {
+        if (pendingConnectCancel === cancelPending) pendingConnectCancel = null;
+      };
+      const failBeforeSettled = (reason) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        clearPendingCancel();
+        if (connectedReceived) state.connected = false;
+        try { socket.close(); } catch {}
+        reject(new Error(reason));
+      };
+      const succeed = (message) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        clearPendingCancel();
+        resolve(message);
+      };
+      cancelPending = () => failBeforeSettled("resume_cancelled");
+      pendingConnectCancel = cancelPending;
+      timeout = setTimeout(() => {
         if (state.socket !== socket) return;
-        if (!settled) reject(new Error("authoritative_server_timeout"));
-        socket.close();
+        failBeforeSettled("authoritative_server_timeout");
       }, 12_000);
       socket.addEventListener("open", () => {
         if (state.socket !== socket) return;
@@ -645,11 +855,18 @@
           ? {
               type: "quick-match",
               inputProtocol: INPUT_PROTOCOL_VERSION,
+              resumeProtocol: RESUME_PROTOCOL_VERSION,
+              resumeToken,
               preset: lobbyPayload()
             }
           : {
               type: "hello",
               inputProtocol: INPUT_PROTOCOL_VERSION,
+              resumeProtocol: RESUME_PROTOCOL_VERSION,
+              resumeToken,
+              resumeOnly: resume && (
+                resumePhase === "match" || state.sessionConfirmed
+              ),
               room: state.roomCode,
               role,
               ready: role === "guest" && state.guestReady,
@@ -661,7 +878,7 @@
         let message;
         try { message = JSON.parse(event.data); } catch { return; }
         if (message.type === "error") {
-          if (!settled) reject(new Error(message.error));
+          failBeforeSettled(message.error || "authoritative_server_error");
           return;
         }
         if (message.type === "quick-queued") {
@@ -677,6 +894,8 @@
           return;
         }
         if (message.type === "connected") {
+          const wasConfirmed = state.sessionConfirmed;
+          state.sessionConfirmed = true;
           if (message.quickMatch) {
             state.matchmaking = false;
             state.quickMatch = true;
@@ -684,22 +903,56 @@
             state.guestReady = true;
             state.rivalConnected = true;
             setOnlineRole(message.role);
+            saveSession();
+            clearPendingResume();
           }
           reliableInput.synchronize(message.input, localOnlinePlayerId() - 1);
-          settled = true;
+          connectedReceived = true;
+          const freshLobbyClaim = resume && resumePhase === "lobby" && !wasConfirmed &&
+            message.resume?.v === RESUME_PROTOCOL_VERSION &&
+            message.resume.resumed === false;
+          if (resume && message.resume?.v === RESUME_PROTOCOL_VERSION &&
+              message.resume.resumed !== true && !freshLobbyClaim) {
+            failBeforeSettled("resume_denied");
+            return;
+          }
           if (Number.isSafeInteger(message.soundCursor) && message.soundCursor >= 0) {
             state.lastPlayedSoundEventId = Math.max(
               state.lastPlayedSoundEventId,
               message.soundCursor
             );
           }
-          clearTimeout(timeout);
-          void onConnected();
-          resolve();
+          void onConnected({ resuming: resume });
+          if (freshLobbyClaim) {
+            // The page may have reloaded after persisting its bearer but before
+            // the first hello reached the server. The protected lobby claim is
+            // valid even though there was no prior seat to replace.
+            handleControl({
+              ...lobbyPayload(),
+              type: "resume",
+              activeMatch: false,
+              input: message.input
+            });
+            succeed(message);
+            return;
+          }
+          if (resume && message.resume?.v !== RESUME_PROTOCOL_VERSION) {
+            // Rolling compatibility with an older authoritative server. New
+            // servers always follow with an explicit authenticated `resume`.
+            handleControl({
+              ...lobbyPayload(),
+              type: "resume",
+              activeMatch: resumePhase === "match",
+              input: message.input
+            });
+          }
+          if (!resume || message.resume?.v !== RESUME_PROTOCOL_VERSION) {
+            succeed(message);
+          }
           return;
         }
         if (message.type === "snapshot") {
-          try { applySnapshot(message.data); }
+          try { receiveSnapshot(message.data); }
           catch (error) { console.warn("Ignored invalid authoritative snapshot", error); }
           return;
         }
@@ -717,24 +970,33 @@
           return;
         }
         handleControl(message);
+        if (resume && message.type === "resume" && !settled) {
+          succeed(message);
+        }
       });
       socket.addEventListener("close", () => {
         clearTimeout(timeout);
         if (state.socket !== socket) return;
-        if (!settled) reject(new Error("authoritative_server_unavailable"));
+        if (!settled) failBeforeSettled("authoritative_server_unavailable");
         else handleDisconnect();
       });
       socket.addEventListener("error", () => {
         if (state.socket !== socket) return;
-        if (!settled) reject(new Error("authoritative_server_unavailable"));
+        if (!settled) failBeforeSettled("authoritative_server_unavailable");
       });
     });
   }
 
-  async function onConnected() {
+  async function onConnected({ resuming = false } = {}) {
     const transportOpen = state.socket?.readyState === WebSocket.OPEN;
     if (state.connected || !transportOpen) return;
     state.connected = true;
+    if (resuming) {
+      setBusy(true);
+      setStatus(`Restoring ${state.resumePhase === "match" ? "match" : "lobby"} ${state.roomCode}…`, "ok");
+      updateConnection("waiting", `ONLINE · LOBBY ${state.roomCode} · RESTORING SESSION`);
+      return;
+    }
     if (state.quickMatch) {
       state.rivalConnected = true;
       state.guestReady = true;
@@ -786,7 +1048,17 @@
 
   function handleControl(message) {
     if (!message || typeof message !== "object") return;
-    if (message.type === "start" || message.type === "rematch") {
+    if (message.type === "room-closed") {
+      const wasPlaying = game.mode === "playing" || game.mode === "matchover";
+      resetConnection();
+      clearSession();
+      setBusy(false);
+      setOnlineRole("offline");
+      if (wasPlaying) returnToIntroUi();
+      setStatus("The host closed this lobby. Create or join another one.", "error");
+      return;
+    }
+    if (message.type === "start" || message.type === "rematch" || message.type === "resume") {
       reliableInput.synchronize(message.input, localOnlinePlayerId() - 1);
       if (reliableInput.currentEpoch() <= 0) state.lastLegacyInput = -1;
       void startOnlineMatch(message);
@@ -845,7 +1117,11 @@
     state.inviteMode = Boolean(message.inviteMode);
     state.matchTarget = message.matchTarget === INVITE_MATCH_TARGET ? INVITE_MATCH_TARGET : 3;
     state.guestReady = Boolean(message.guestReady);
-    state.rivalConnected = state.role === "guest" || Boolean(message.guestConnected);
+    state.rivalConnected = state.role === "guest"
+      ? Object.prototype.hasOwnProperty.call(message, "hostConnected")
+        ? Boolean(message.hostConnected)
+        : true
+      : Boolean(message.guestConnected);
     void renderer.ensureChampionModels([state.hostChampion, state.guestChampion]);
     if (game.mode === "intro") {
       game.selectedChampion = state.hostChampion;
@@ -860,8 +1136,25 @@
   }
 
   async function startOnlineMatch(message) {
+    const isResume = message.type === "resume";
+    const activeMatch = !isResume || message.activeMatch === true;
+    if (activeMatch) state.resuming = true;
     applyLobby(message);
-    const isRematch = message.type === "rematch" || game.mode === "matchover";
+    if (isResume && message.activeMatch !== true) {
+      state.resuming = false;
+      state.resumePhase = "lobby";
+      setBusy(false);
+      setStatus(`Lobby ${state.roomCode} restored.`, "ok");
+      updateConnection(
+        state.rivalConnected ? "connected" : "waiting",
+        `ONLINE · LOBBY ${state.roomCode} · ${state.rivalConnected ? "SESSION RESTORED" : "WAITING FOR RIVAL"}`
+      );
+      updateLobbyDisplay();
+      return;
+    }
+
+    const generation = lifecycleGeneration;
+    const isRematch = message.type === "rematch";
     if (isRematch) {
       if (state.role === "guest") {
         state.localInput = { up: false, down: false, left: false, right: false };
@@ -872,14 +1165,30 @@
       UI.chrome.removeAttribute("inert");
       state.startInitiated = false;
     }
-    // Authoritative matches begin only on server start/rematch — never local-only.
-    if (game.mode !== "playing" || isRematch) {
-      state.startInitiated = true;
-      await beginConfiguredGame();
+    if (isResume && state.role === "guest") {
+      state.localInput = { up: false, down: false, left: false, right: false };
+    }
+    // A start/resume may be repeated while champion assets are still loading.
+    // Serialize boot and make it idempotent for the authoritative input epoch.
+    state.startInitiated = true;
+    try {
+      if (!await ensureOnlineMatchRuntime(message, generation)) return;
+    } catch (error) {
+      if (generation !== lifecycleGeneration) return;
+      console.warn("Could not initialize authoritative match runtime", error);
+      state.resuming = false;
+      setBusy(false);
+      setStatus("Could not restore the online match runtime.", "error");
+      return;
     }
     game.p2Human = true;
     // Always re-bind seat/camera after start — beginGame may reset presentation to P1.
     bindLocalOnlineView();
+    const bufferedSnapshot = bufferedSnapshots.take();
+    if (bufferedSnapshot) applySnapshot(bufferedSnapshot);
+    state.resuming = false;
+    state.resumePhase = "match";
+    setBusy(false);
     UI.start.disabled = true;
     UI.start.textContent = "ONLINE MATCH IN PROGRESS";
     const side = state.role === "host"
@@ -888,9 +1197,32 @@
     updateConnection("connected",
       `ONLINE · LOBBY ${state.roomCode} · YOU ARE ${side} · FIRST TO ${state.matchTarget}`);
     setStatus(
-      isRematch ? "Rematch started on the São Paulo server." : "Match started on the São Paulo server.",
+      isResume
+        ? "Online match restored from the São Paulo server."
+        : isRematch
+          ? "Rematch started on the São Paulo server."
+          : "Match started on the São Paulo server.",
       "ok"
     );
+  }
+
+  function releaseCurrentSeat() {
+    if (state.role === "offline") return false;
+    return sendControl({ type: "leave" });
+  }
+
+  function receiveSnapshot(data) {
+    if (!data || ![2, 3].includes(data.v) || !Array.isArray(data.players)) return;
+    if (Number.isFinite(data.s) && data.s <= state.receivedSequence) return;
+    // ACK/outbox state is current even while rendering waits for model/runtime boot.
+    reliableInput.synchronize(data.input, localOnlinePlayerId() - 1);
+    const runtimeUnavailable = state.resuming || runtimeBootRecord ||
+      (state.role !== "offline" && game.mode === "intro" && reliableInput.currentEpoch() > 0);
+    if (runtimeUnavailable) {
+      bufferedSnapshots.push(data);
+      return;
+    }
+    applySnapshot(data);
   }
 
   function applySnapshot(data) {
@@ -1160,7 +1492,14 @@
   }
 
   async function startQuickMatch(options = {}) {
+    const pendingToken = validResumeToken(options.resumeToken) ? options.resumeToken : "";
+    releaseCurrentSeat();
     resetConnection();
+    // A new Quick Match is an explicit replacement for any older saved room.
+    // Keep the pending key separate so a stale session can never win on reload.
+    clearSavedSession();
+    clearPendingResume();
+    state.resumeToken = pendingToken;
     state.hostChampion = validChampion(options.champion) ? options.champion : "katarina";
     state.guestChampion = "zed";
     state.arena = validArena(options.arena) ? options.arena : ARENAS[0];
@@ -1182,7 +1521,9 @@
   }
 
   async function createRoom(options = {}) {
+    releaseCurrentSeat();
     resetConnection();
+    clearPendingResume();
     if (options.inviteMode) applyInvitePreset(options);
     setOnlineRole("host");
     if (!state.inviteMode) {
@@ -1221,7 +1562,9 @@
   }
 
   async function joinRoom(code, options = {}) {
+    releaseCurrentSeat();
     resetConnection();
+    clearPendingResume();
     if (options.inviteMode) applyInvitePreset(options);
     setOnlineRole("guest");
     state.roomCode = code;
@@ -1247,6 +1590,10 @@
 
   function failConnection(error) {
     console.warn("Online PvP connection failed", error);
+    // A timeout can happen after the server protected the seat but before this
+    // browser received `connected`. Keep the pre-persisted bearer unless the
+    // server definitively rejected the claim.
+    if (definitiveInitialConnectionFailure(error)) clearSession();
     setBusy(false);
     setOnlineRole("offline");
     const message = error?.message === "room_not_found"
@@ -1263,10 +1610,17 @@
   }
 
   function resetConnection() {
+    pendingConnectCancel?.();
+    pendingConnectCancel = null;
     try { state.socket?.close(); } catch {}
+    lifecycleGeneration += 1;
+    matchRuntimeEpoch = 0;
+    runtimeBootRecord = null;
+    bufferedSnapshots.reset();
     Object.assign(state, {
       socket: null,
-      connected: false, rivalConnected: false, guestReady: false, hostToken: "", roomCode: "",
+      connected: false, rivalConnected: false, guestReady: false, hostToken: "", resumeToken: "",
+      resuming: false, resumePhase: "", sessionConfirmed: false, roomCode: "",
       matchmaking: false, quickMatch: false,
       inviteMode: false, inviteUrl: "", startInitiated: false, inviteAssetsReady: null, matchTarget: 3,
       receivedSequence: 0,
@@ -1280,6 +1634,7 @@
   }
 
   function chooseOffline() {
+    releaseCurrentSeat();
     try { state.socket?.close(); } catch {}
     resetConnection();
     setOnlineRole("offline");
@@ -1302,72 +1657,74 @@
 
   async function tryResumeSession() {
     const saved = readSession();
-    if (!saved || state.role !== "offline") return false;
-    setStatus(`Reconnecting to lobby ${saved.roomCode}…`, "ok");
-    try {
-      if (saved.role === "host") {
-        resetConnection();
-        setOnlineRole("host");
-        state.roomCode = saved.roomCode;
-        state.hostChampion = validChampion(saved.hostChampion) ? saved.hostChampion : "katarina";
-        state.guestChampion = validChampion(saved.guestChampion) ? saved.guestChampion : "zed";
-        state.arena = validArena(saved.arena) ? saved.arena : ARENAS[0];
-        state.inviteMode = Boolean(saved.inviteMode);
-        state.quickMatch = Boolean(saved.quickMatch);
-        state.matchTarget = saved.matchTarget === INVITE_MATCH_TARGET ? INVITE_MATCH_TARGET : 3;
-        game.selectedChampion = state.hostChampion;
-        game.selectedChampion2 = state.guestChampion;
-        game.matchTarget = state.matchTarget;
-        if (game.mode === "intro") {
-          game.selectArena(state.arena);
-          game.resetPlayers();
-        }
-        setChampionButtons(state.hostChampion);
-        setArenaButtons(state.arena);
-        roomLabel.textContent = state.inviteMode ? "CHALLENGE LINK · RESUME" : "LOBBY CODE · RESUME";
-        roomCode.textContent = state.roomCode;
-        setBusy(true);
-        updateLobbyDisplay();
-        await connectAuthoritative("host");
-        roomCode.textContent = state.roomCode;
-        if (state.inviteMode) state.inviteUrl = challengeUrl(state.roomCode);
-        setStatus(`Reconnected as host to lobby ${state.roomCode}.`, "ok");
-        updateConnection("connected", `ONLINE · LOBBY ${state.roomCode} · RECONNECTED`);
-        updateLobbyDisplay();
-        saveSession();
-        return true;
-      }
-      if (saved.quickMatch) {
-        resetConnection();
-        setOnlineRole("guest");
-        state.roomCode = saved.roomCode;
-        state.hostChampion = validChampion(saved.hostChampion) ? saved.hostChampion : "katarina";
-        state.guestChampion = validChampion(saved.guestChampion) ? saved.guestChampion : "zed";
-        state.arena = validArena(saved.arena) ? saved.arena : ARENAS[0];
-        state.matchTarget = 3;
-        state.quickMatch = true;
-        state.guestReady = true;
-        setBusy(true);
-        await connectAuthoritative("guest");
-        saveSession();
-        return true;
-      }
-      await joinRoom(saved.roomCode, {
-        guestChampion: validChampion(saved.guestChampion) ? saved.guestChampion : "zed",
-        inviteMode: Boolean(saved.inviteMode)
+    if (state.role !== "offline") return false;
+    if (!saved) {
+      const pending = readPendingResume();
+      if (!pending) return false;
+      await startQuickMatch({
+        champion: validChampion(pending.hostChampion) ? pending.hostChampion : "katarina",
+        arena: validArena(pending.arena) ? pending.arena : ARENAS[0],
+        resumeToken: pending.resumeToken
       });
-      if (saved.guestReady && !state.inviteMode) {
-        state.guestReady = true;
-        sendGuestConfig();
-      }
-      saveSession();
+      return true;
+    }
+
+    resetConnection();
+    state.roomCode = saved.roomCode;
+    state.resumeToken = validResumeToken(saved.resumeToken) ? saved.resumeToken : createResumeToken();
+    state.resuming = true;
+    state.resumePhase = saved.phase === "match" ? "match" : "lobby";
+    state.sessionConfirmed = saved.confirmed === true;
+    state.hostChampion = validChampion(saved.hostChampion) ? saved.hostChampion : "katarina";
+    state.guestChampion = validChampion(saved.guestChampion) ? saved.guestChampion : "zed";
+    state.arena = validArena(saved.arena) ? saved.arena : ARENAS[0];
+    state.inviteMode = Boolean(saved.inviteMode);
+    state.quickMatch = Boolean(saved.quickMatch);
+    state.guestReady = Boolean(saved.guestReady) || state.quickMatch;
+    state.matchTarget = saved.matchTarget === INVITE_MATCH_TARGET ? INVITE_MATCH_TARGET : 3;
+    game.selectedChampion = state.hostChampion;
+    game.selectedChampion2 = state.guestChampion;
+    game.matchTarget = state.matchTarget;
+    if (game.mode === "intro") {
+      game.selectArena(state.arena);
+      game.resetPlayers();
+    }
+    setOnlineRole(saved.role);
+    setChampionButtons(saved.role === "guest" ? state.guestChampion : state.hostChampion);
+    setArenaButtons(state.arena);
+    roomLabel.textContent = state.inviteMode ? "CHALLENGE LINK · RESUME" : "LOBBY CODE · RESUME";
+    roomCode.textContent = state.roomCode;
+    if (saved.role === "host" && state.inviteMode) state.inviteUrl = challengeUrl(state.roomCode);
+    setBusy(true);
+    setStatus(`Reconnecting to ${state.resumePhase} ${saved.roomCode}…`, "ok");
+    updateLobbyDisplay();
+    saveSession();
+    const resumeGeneration = lifecycleGeneration;
+    try {
+      await retryRoleTaken(() => connectAuthoritative(saved.role, {
+        resume: true,
+        resumePhase: state.resumePhase
+      }), {
+        active: () => lifecycleGeneration === resumeGeneration &&
+          state.resuming && state.role === saved.role
+      });
       return true;
     } catch (error) {
+      if (error?.message === "resume_cancelled" || lifecycleGeneration !== resumeGeneration) {
+        return false;
+      }
       console.warn("Session resume failed", error);
-      clearSession();
+      const credentialRejected = definitiveResumeFailure(error);
+      resetConnection();
+      if (credentialRejected) clearSession();
       setBusy(false);
       setOnlineRole("offline");
-      setStatus("Could not resume the previous lobby. Create or join again.", "error");
+      setStatus(
+        credentialRejected
+          ? "The previous lobby no longer accepts this session. Create or join again."
+          : "The server is temporarily unavailable. Your session was kept for another retry.",
+        "error"
+      );
       return false;
     }
   }
@@ -1894,9 +2251,13 @@
   const directInvite = parentParams.get("invite") === "1" &&
     validChampion(parentParams.get("p1")) && validChampion(parentParams.get("p2")) &&
     validArena(parentParams.get("arena")) && Number(parentParams.get("target")) === INVITE_MATCH_TARGET;
+  const startupSession = readSession();
+  const resumeParentSession = sessionMatchesRoom(startupSession, parentRoom);
   if (parentRoom && /^[A-HJ-NP-Z2-9]{6}$/i.test(parentRoom)) {
     codeInput.value = parentRoom.toUpperCase();
-    if (directInvite) {
+    if (resumeParentSession) {
+      setStatus("Previous session detected. Restoring this lobby…", "ok");
+    } else if (directInvite) {
       setStatus("Direct challenge detected. Connecting automatically…", "ok");
       setTimeout(() => joinRoom(parentRoom.toUpperCase(), {
         inviteMode: true,
@@ -1921,7 +2282,7 @@
   publishClientState("ready");
   // F5 / reload: try to reattach to the last live lobby on this browser tab.
   setTimeout(() => {
-    if (parentRoom) return;
+    if (parentRoom && !resumeParentSession) return;
     void tryResumeSession().catch((error) => {
       console.warn("Auto resume failed", error);
     });
