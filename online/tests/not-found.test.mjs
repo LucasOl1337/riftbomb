@@ -18,4 +18,5 @@ test("recovers invalid landing routes with a playable CTA", async () => {
   assert.match(styles, /clearing\.webp/);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.match(styles, /focus-visible/);
+  assert.match(styles, /\.cta:active\s*\{[^}]*scale\(0\.96\)/s);
 });
