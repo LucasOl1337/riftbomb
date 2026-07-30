@@ -28,8 +28,8 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | Aprovadas | 0 |
 | Mudança necessária | 0 |
 | Corrigidas localmente | 6 |
-| Verificadas ao vivo | 9 |
-| Em andamento | 1 |
+| Verificadas ao vivo | 10 |
+| Em andamento | 0 |
 | Reauditoria necessária | 0 |
 | Bloqueadas | 1 |
 | Não testadas | 0 |
@@ -54,7 +54,7 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | 014 | Qualidade LoL · rodada 09 · roteamento semântico Q/W/E/R | verified_live | Codex `/root` | 2026-07-30T01:12:41-03:00 | `4747568` + produção anterior | `ba77212` · release `84eabbf` · Worker `0fa64580` | ✅ antes/local/live, input real e framebuffer WebGL 1280×720 | — | — | ✅ 20/20 casts reais selecionam a ação VAT autoral; atores derivados, buffer, rejeição, cancelamento e transições sem flashback | ✅ 140/140 + 39/39 + 32/32; 17/17 assets live; console live limpo; P0=0, P1=0 | `artifacts/comparar-qa/2026-07-29/lol-quality-round-09/` | Mecânicas 58→62 e Fluidez 60→63. O fluxo publicado de Katarina E passou de `Q/Spell1` incorreto para `E/Spell3`; cinco rotas erradas e flickers de timers antigos foram eliminados. Assets físicos e dispositivos móveis permanecem fora do escopo desta rodada. |
 | 015 | Qualidade LoL · rodada 10 · ACK causal e replay de movimento | verified_live | Codex `/root` | 2026-07-30T02:09:04-03:00 | Worker `0fa64580` + Oracle anterior | `d114a11` · Oracle `d114a11` · Worker `e0597eb4` | ✅ antes/live, dois clientes e input real, 1936×1048 | — | — | ✅ epoch por partida, sequência exata, ACK pós-tick e replay; rolling deploy nos dois sentidos | ✅ 140/140 + 46/46 + 33/33; console live limpo; 0 ciclos pulados; P0=0, P1=0 no escopo | `artifacts/comparar-qa/2026-07-30/lol-quality-round-10/` | Netcode 60→66. Uma `seq=2` adiantada permaneceu sem ACK; replay `seq=1→2` avançou ACK `0→1→2`. Ações one-shot e retomada autenticada por assento continuam pendentes. |
 | 016 | Qualidade LoL · rodada 11 · retomada autenticada após F5 | verified_live | Codex `/root` | 2026-07-30T02:20:13-03:00 | `c9da842` + Worker `e0597eb4` | `a21c49f` · Oracle `a21c49f` · Worker `be838e1a` | ✅ antes 1936×1048/1440×900 e depois 1280×720, dois clientes visíveis, F5 e teclado real | — | — | ✅ bearer de 256 bits por assento, digest no servidor, substituição atômica, grace exato de 20 s, ACK preservado, boot coalescido e presença false→true | ✅ 140/140 + 63/63 + servidor 54/54; dry-run; P0=0/P1=0 bloqueadores | `artifacts/comparar-qa/2026-07-30/lol-quality-round-11/` | Netcode 66→72. O cliente voltou à mesma rodada após F5 em 3.523 ms, o rival confirmou reconexão em 3.598 ms e novo input `D` foi aceito. Bearer estável sem rotação e ACK de ações one-shot permanecem pendentes. |
-| 017 | Qualidade LoL · rodada 12 · material original do piso da arena | in_progress | Codex `/root` | 2026-07-30T04:08:04-03:00 | `3cb5a11` + Worker `be838e1a` | — | captura de referência pendente | captura mobile pendente | captura mobile pendente | validar leitura de jogadores, bombas, obstáculos e rotas sem alterar colisão | auditorias independentes pendentes | `artifacts/comparar-qa/2026-07-30/lol-quality-round-12/` | Uma melhoria: substituir o piso visual plano por material autoral tileable com hierarquia macro/micro, preservando silhuetas, contraste competitivo e desempenho. |
+| 017 | Qualidade LoL · rodada 12 · material original do piso da arena | verified_live | Codex `/root` | 2026-07-30T04:08:04-03:00 | `3cb5a11` + Worker `be838e1a` | `80503b1` · Worker `53cabbe1` | ✅ antes 1440×900; depois local/live no mesmo enquadramento | ✅ antes/local/live 844×390 emulado, controles touch visíveis | ✅ bloqueio correto 390×844 e gameplay 844×390 emulados | ✅ colisão e regras intactas; perfil Salt Lens isolado, 5 taps e mesmo draw | ✅ 141/141 + 63/63 + servidor 54/54; WebGL2 visível limpo; P0/P1/P2=0 | `artifacts/comparar-qa/2026-07-30/lol-quality-round-12/` | Gráficos 63→68. Piso autoral fingerprinted publicado e verificado byte a byte; casts, sombras e as outras quatro arenas continuam como gargalos explícitos. |
 
 ## Placar de qualidade — baseline do programa
 
@@ -63,7 +63,7 @@ meta de 90% vale para cada aspecto do vertical slice, nunca para a média.
 
 | Aspecto | Nota atual | Maior gargalo comprovado |
 |---|---:|---|
-| Gráficos | 63/100 | casts ainda têm silhuetas/deformações inferiores à referência e o cenário não projeta sombras suaves |
+| Gráficos | 68/100 | casts ainda têm silhuetas/deformações inferiores à referência, faltam sombras suaves e as outras quatro arenas ainda usam materiais anteriores |
 | Som | 74/100 | faltam teste auditivo, mix medido, material original mais rico e feedback local reconciliado |
 | Mecânicas | 62/100 | faltam cast lock, resolução simultânea neutra e fidelidade fina dos kits |
 | Netcode | 72/100 | bombas/habilidades ainda são one-shot sem ACK; o bearer de retomada ainda não rotaciona e faltam soak/reconexão sob perda severa |
@@ -360,20 +360,58 @@ socket legítimo, portanto rotação segura continua como finding futuro. Bombas
 e habilidades também continuam sem ACK exatamente-uma-vez. O ganho conservador
 é somente Netcode 66→72; nenhum outro aspecto recebe pontos nesta rodada.
 
+### Rodada 12 — material original de piso da Salt Lens publicado
+
+O piso anterior era dominado por ruído miúdo alaranjado e repetição uniforme,
+o que aproximava personagens, bombas e obstáculos do mesmo plano visual. A
+melhoria única desta rodada substitui apenas o material visual da arena padrão
+Salt Lens por uma superfície mineral autoral com bandas macro largas, centro de
+combate discretamente mais claro e detalhe micro restrito. A direção seguiu os
+princípios públicos de clareza competitiva e separação de leitura descritos por
+[Riot Games](https://www.leagueoflegends.com/en-us/news/dev/clarity-in-league/),
+sem copiar ou incorporar texturas, modelos, sons ou marcas da Riot.
+
+O PNG fonte foi criado com ImageGen e promovido junto de prompt, hashes, base
+de direitos, `thirdPartyInputs: []` e versão do encoder. O runtime usa o sibling
+fingerprinted `floor-salt-lens-combat-band-6ffb0854.webp`, 1024×1024 RGB, sem
+alpha, 208.558 bytes e SHA-256
+`6ffb0854daa7df93f7b8c1c0c6f82f116e548ae5419e6dc4e9b8579fca9951e6`.
+O asset anterior foi preservado como rollback. Somente essa URL recebe cache
+`public, max-age=31556952, immutable`.
+
+O perfil de amostragem novo é ativado exclusivamente quando o pacote resolve o
+piso `floorLattice`; as outras quatro arenas preservam o caminho legado. O
+shader continua usando cinco taps, o mesmo sampler, passe e draw call. Um inset
+de meio texel protege o espelhamento das bordas sob `GL_REPEAT`, e a inspeção do
+mosaico 2×2 não encontrou costura perceptível. Não houve alteração em colisão,
+movimento, hitboxes, temporização ou regras.
+
+As métricas determinísticas registraram desvio macro de 0,024214 contra
+0,0076 no piso anterior, high-pass de 0,027157, faixa p05–p95 de
+0,324737–0,445158 e razão de costura/p95 de 0,898 no eixo X e 0,878 no Y. A
+compressão WebP Q88 obteve SSIM estimado de 0,945 e PSNR de 39,38 dB. Capturas
+antes/depois no mesmo estado foram feitas em 1440×900 e 844×390, além do gate
+390×844; todas as sessões WebGL2 visíveis terminaram sem warnings ou erros.
+
+O Worker `53cabbe1-06e8-4b7f-bbc0-75772f70749a` publicou exatamente o asset e
+manifesto validados. Homepage e textura responderam 200; o conteúdo HTTP tem o
+mesmo tamanho e SHA-256 local. A revisão adversarial final não encontrou
+P0/P1/P2 bloqueador. O ganho conservador é somente Gráficos 63→68: casts,
+sombras suaves e materiais das demais arenas permanecem fora do escopo e sem
+pontuação nesta rodada.
+
 ## Validações automatizadas
 
-- raiz da árvore exata da release funcional: 140/140 testes passaram;
+- raiz da árvore exata da release gráfica: 141/141 testes passaram;
 - `online/`: build Vinext validado e 63/63 testes passaram;
 - `online/server/`: core 20/20, runtime/fencing 5/5, serialização 3/3,
   rate limit 3/3, transporte 12/12, rematch 1/1, matchmaking 1/1 e resume 9/9;
-- `npm run validate:artifact` e `npm run deploy -- --dry-run` passaram antes da
-  publicação do mesmo código;
-- produção: homepage 200, `/game-ws` 426 sem upgrade, API inválida 400,
-  `online-duel.js` idêntico por hash e Worker final com 100% do tráfego;
-- Oracle: serviço ativo, zero salas/sockets/partidas, zero ciclos pulados e
-  nenhum journal de prioridade warning desde o deploy;
-- navegador visível: F5 retomou a mesma rodada, presença voltou a `true` nos
-  dois lados e input real pós-retomada manteve a partida ativa;
+- `npm run deploy -- --dry-run` passou com upload total de 4.949,63 KiB e
+  3.020,06 KiB gzip antes da publicação do mesmo pacote;
+- produção: homepage 200, WebP fingerprinted 200/208.558 bytes com SHA-256
+  local exato e manifesto remoto idêntico ao pacote local;
+- navegador visível: desktop 1440×900, landscape 844×390 com controles touch e
+  portrait 390×844 com gate de orientação; WebGL2 e consoles limpos;
 - nenhum Playwright headless ou `headless_shell` foi iniciado.
 
 ## Rodadas
@@ -393,3 +431,4 @@ e habilidades também continuam sem ACK exatamente-uma-vez. O ganho conservador
 | 2026-07-30 | Codex `/root` | 014 | 1 `verified_live` | `ba77212`; release `84eabbf`; Worker `0fa64580-d3c8-4930-9c2b-bba0baade1df` | Rodada 09: o gameplay passou a publicar a identidade Q/W/E/R aceita e o renderer deixou de inferir pelo timer genérico; 15/20→20/20 rotas, 140/140 + 39/39 + 32/32 gates, 17/17 assets públicos e prova antes/live por input real. Mecânicas 58→62; Fluidez 60→63. |
 | 2026-07-30 | Codex `/root` | 015 | 1 `verified_live` | `d114a11`; Oracle `d114a11`; Worker `e0597eb4-69eb-44e4-9d8a-c3475ff682d6` | Rodada 10: movimento ganhou epoch, sequência exata, ACK pós-tick e replay HOL limitado; rolling deploy servidor→cliente passou, 140/140 + 46/46 + 33/33 gates, hash HTTP exato, dois clientes visíveis e trace live `0→1→2`. Netcode 60→66. |
 | 2026-07-30 | Codex `/root` | 016 | 1 `verified_live` | `a21c49f`; Oracle `a21c49f`; Worker `be838e1a-652c-48c3-8390-52e7245ae521` | Rodada 11: bearer autenticado por assento, substituição atômica, grace de 20 s, fencing e presença restaurada após F5; 140/140 + 63/63 + servidor 54/54, hash público exato e prova com dois clientes/input real. Netcode 66→72. |
+| 2026-07-30 | Codex `/root` | 017 | 1 `verified_live` | `80503b1`; Worker `53cabbe1-06e8-4b7f-bbc0-75772f70749a` | Rodada 12: piso Salt Lens autoral, fingerprinted e isolado, com hierarquia macro/micro, mesmo custo de draw e hash HTTP exato; 141/141 + 63/63 + servidor 54/54, WebGL2 visível e revisão sem P0–P2. Gráficos 63→68. |
