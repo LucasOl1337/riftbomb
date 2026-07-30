@@ -387,6 +387,7 @@ test("loads only the playable champion models selected in the lobby", async () =
 
   assert.equal(names.length, 1);
   assert.ok(Buffer.byteLength(game) < 750_000);
+  assert.doesNotMatch(game, /RIFTBOMB_BOTS\.createV1Policy/);
   assert.doesNotMatch(game, /const PLAYABLE_CHAMPIONS = Object\.freeze\(\{/);
   assert.match(game, /window\.RIFTBOMB_PLAYABLE_CHAMPIONS = Object\.create\(null\)/);
   assert.match(game, /ensureChampionModels/);

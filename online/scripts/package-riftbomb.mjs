@@ -27,7 +27,6 @@ const championModelBundleSource = path.join(
   "game",
   "load-playable-champion-models.js",
 );
-const v1BotBundleSource = path.join(repositoryRoot, "game", "load-v1-bot.js");
 const championSourceDirectory = path.join(repositoryRoot, "champions");
 const playableChampions = Object.freeze([
   "katarina",
@@ -103,11 +102,48 @@ for (const [before, after] of replacements) {
   if (onlineGame.includes(before)) onlineGame = replaceOnce(onlineGame, before, after);
 }
 
+// The online duel is PvP; the V1 pilot bundle only serves the solo CPU.
+// Dropping it keeps the payload under the 750 KB budget — if a solo match
+// ever runs online, the CPU falls back to the baseline policy bundle.
+const v1PolicyMarker = "RIFTBOMB_BOTS.createV1Policy = createV1Policy;";
+const v1PolicyIndex = onlineGame.indexOf(v1PolicyMarker);
+const v1ScriptStart = onlineGame.lastIndexOf("  <script>\n", v1PolicyIndex);
+const v1ScriptClosing = "  </script>\n";
+const v1ScriptEnd = onlineGame.indexOf(v1ScriptClosing, v1PolicyIndex);
+if (v1PolicyIndex < 0 || v1ScriptStart < 0 || v1ScriptEnd < 0) {
+  throw new Error("Unable to locate the embedded V1 bot bundle");
+}
+onlineGame =
+  onlineGame.slice(0, v1ScriptStart) +
+  onlineGame.slice(v1ScriptEnd + v1ScriptClosing.length);
+
 // Keep the editable match rules readable while avoiding a raw-shell payload
 // penalty online. Whitespace-only minification preserves public identifiers
 // and syntax, limiting this optimization to one well-tested embedded module.
 const readableMatchRules = (await readFile(matchRulesSource, "utf8")).replace(/\r\n/g, "\n");
-const compactMatchRules = await transform(readableMatchRules, {
+// The online rules never meet the V1 bundle: createBotPolicy collapses
+// to the baseline policy so the payload carries no V1 reference at all.
+const v1PolicyBranch = [
+  "        // V1 (Renekton pilot) ships in load-v1-bot.js; without that bundle",
+  "        // the solo CPU falls back to the baseline policy as before.",
+  "        if (typeof RIFTBOMB_BOTS.createV1Policy === \"function\") {",
+  "          // The champion module must match the champion the CPU actually",
+  "          // plays; without one the V1 runs its shared arena brain only.",
+  "          const createPilot = this.selectedChampion2 === \"renekton\"",
+  "            ? RIFTBOMB_BOTS.createRenektonPilot",
+  "            : null;",
+  "          if (typeof createPilot === \"function\") {",
+  "            return RIFTBOMB_BOTS.createV1Policy({",
+  "              champion: createPilot({ random }),",
+  "              random",
+  "            });",
+  "          }",
+  "          return RIFTBOMB_BOTS.createV1Policy({ random });",
+  "        }",
+  "",
+].join("\n");
+const rulesWithoutV1 = replaceOnce(readableMatchRules, v1PolicyBranch, "");
+const compactMatchRules = await transform(rulesWithoutV1, {
   loader: "js",
   minifyWhitespace: true,
   minifyIdentifiers: false,

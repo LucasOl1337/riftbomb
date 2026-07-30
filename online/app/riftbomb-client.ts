@@ -274,6 +274,8 @@ export function runtimeStateEquals(
       left.inviteMode === right.inviteMode &&
       left.inviteUrl === right.inviteUrl &&
       left.busy === right.busy &&
+      left.matchmaking === right.matchmaking &&
+      left.quickMatch === right.quickMatch &&
       left.hostChampion === right.hostChampion &&
       left.guestChampion === right.guestChampion &&
       left.arena === right.arena &&

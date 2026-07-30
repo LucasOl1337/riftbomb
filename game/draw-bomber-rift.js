@@ -2396,16 +2396,17 @@ drawKatarinaFallback(player, t, beat) {
       updateCpuAnimatedChampion(key, frame) {
         const animation = this[`${key}Animation`];
         const cpu = this[`${key}CpuAnimation`];
+        const componentsPerTexel = cpu.componentsPerTexel || 4;
         const min = animation.positionMin;
         const range = animation.positionRange;
         const sample = (frameIndex, vertexIndex, axis) => {
           const offset = (frameIndex * cpu.vertexCount + vertexIndex) *
-            cpu.componentsPerTexel + axis;
+            componentsPerTexel + axis;
           return min[axis] + cpu.frameData[offset] / 65535 * range[axis];
         };
         const normal = (frameIndex, vertexIndex, axis) => {
           const offset = (frameIndex * cpu.vertexCount + vertexIndex) *
-            cpu.componentsPerTexel + axis;
+            componentsPerTexel + axis;
           return cpu.normalData[offset] / 255 * 2 - 1;
         };
         for (let vertex = 0; vertex < cpu.vertexCount; vertex += 1) {
