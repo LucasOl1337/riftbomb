@@ -178,6 +178,16 @@ onlineGame = replaceOnce(
 // Workers static assets hard-cap at 25 MiB per file. VAT frames/normals are
 // shipped as separate .bin assets so base64 JS never blows past that limit.
 const WORKERS_ASSET_MAX_BYTES = 25 * 1024 * 1024;
+const embeddedChampionModels = (await readFile(championModelBundleSource, "utf8")).replace(/\r\n/g, "\n");
+const katarinaModelStart = embeddedChampionModels.indexOf("  katarina: Object.freeze(");
+const katarinaModelEnd = embeddedChampionModels.indexOf("\n  zed:", katarinaModelStart);
+const katarinaDaggerMatch = embeddedChampionModels
+  .slice(katarinaModelStart, katarinaModelEnd)
+  .match(/"dagger":"([A-Za-z0-9+/=]+)"/);
+if (katarinaModelStart < 0 || katarinaModelEnd < 0 || !katarinaDaggerMatch) {
+  throw new Error("Packaged Katarina dagger is missing from the playable model catalog");
+}
+const katarinaDagger = katarinaDaggerMatch[1];
 
 function compactConstantAlpha(buffer, componentBytes, label) {
   const sourcePixelBytes = componentBytes * 4;
@@ -217,6 +227,7 @@ async function playableChampionPayload(champion) {
     indices: indices.toString("base64"),
     texture: `data:image/webp;base64,${texture.toString("base64")}`,
   };
+  if (champion === "katarina") payload.dagger = katarinaDagger;
   const binaryAssets = [];
   if (metadata.runtime === "vat-v1") {
     const [rgbaFrames, rgbaNormals] = await Promise.all([
@@ -270,7 +281,6 @@ const championModelBundles = Object.fromEntries(
     ]),
   ),
 );
-const embeddedChampionModels = (await readFile(championModelBundleSource, "utf8")).replace(/\r\n/g, "\n");
 const onlineChampionModelSources = Object.fromEntries(
   playableChampions.map((champion) => [
     champion,
