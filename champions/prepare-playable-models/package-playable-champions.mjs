@@ -76,9 +76,9 @@ async function packageKatarinaDagger(repositoryRoot) {
   const centreX = (min[0] + max[0]) * 0.5;
   const centreY = (min[1] + max[1]) * 0.5;
   const transform = ([x, y, z]) => [
-    (x - centreX) / length,
+    (y - centreY) / length,
     (z - min[2]) / length,
-    (y - centreY) / length
+    (x - centreX) / length
   ];
 
   const packed = [];

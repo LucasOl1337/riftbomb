@@ -23,6 +23,23 @@ test("the packaged catalog comes from each champion playable model", async () =>
   const catalog = await packagePlayableChampions(repositoryRoot);
 
   assert.match(catalog, /katarina.*"dagger":"[A-Za-z0-9+/=]+"/s);
+  const daggerMatch = catalog.match(/"dagger":"([A-Za-z0-9+/=]+)"/);
+  const daggerBytes = Buffer.from(daggerMatch[1], "base64");
+  const dagger = new Float32Array(
+    daggerBytes.buffer,
+    daggerBytes.byteOffset,
+    daggerBytes.byteLength / Float32Array.BYTES_PER_ELEMENT
+  );
+  const bounds = [[Infinity, Infinity, Infinity], [-Infinity, -Infinity, -Infinity]];
+  for (let index = 0; index < dagger.length; index += 6) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      bounds[0][axis] = Math.min(bounds[0][axis], dagger[index + axis]);
+      bounds[1][axis] = Math.max(bounds[1][axis], dagger[index + axis]);
+    }
+  }
+  const width = bounds[1][0] - bounds[0][0];
+  const depth = bounds[1][2] - bounds[0][2];
+  assert.ok(width > depth * 1.5, "Katarina dagger must present its broad curved face");
 
   for (const champion of playableChampions) {
     const modelDirectory = path.join(repositoryRoot, "champions", champion, "playable-model");
