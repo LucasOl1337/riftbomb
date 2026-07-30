@@ -236,16 +236,21 @@ test("websocket room starts only after both players are ready", async (t) => {
     socket.on("error", reject);
   });
   const host = await open({
-    type: "hello", room: "ABC234", role: "host", inputProtocol: 1,
+    type: "hello", room: "ABC234", role: "host", inputProtocol: 1, actionProtocol: 1,
     preset: { matchTarget: 10 }
   });
   const guest = await open({
-    type: "hello", room: "ABC234", role: "guest", ready: true, inputProtocol: 1
+    type: "hello", room: "ABC234", role: "guest", ready: true,
+    inputProtocol: 1, actionProtocol: 1
   });
   const room = rooms.get("ABC234");
   let reconnectedGuest = null;
   assert.equal(host.messages.find(({ type }) => type === "connected")?.soundCursor, 0);
   assert.equal(guest.messages.find(({ type }) => type === "connected")?.soundCursor, 0);
+  assert.deepEqual(host.messages.find(({ type }) => type === "connected")?.action,
+    { v: 1, epoch: 0, ack: [0, 0] });
+  assert.deepEqual(guest.messages.find(({ type }) => type === "connected")?.action,
+    { v: 1, epoch: 0, ack: [0, 0] });
   t.after(() => {
     host.socket.terminate();
     guest.socket.terminate();
@@ -267,6 +272,7 @@ test("websocket room starts only after both players are ready", async (t) => {
         assert.deepEqual(message.data.input, {
           v: 1, epoch: 1, accepted: [0, 0], ack: [0, 0]
         });
+        assert.deepEqual(message.data.action, { v: 1, epoch: 1, ack: [0, 0] });
         resolve();
       }
     };
@@ -325,12 +331,44 @@ test("websocket room starts only after both players are ready", async (t) => {
   });
   const hostSound = waitForSound(host);
   const guestSound = waitForSound(guest);
-  host.socket.send(JSON.stringify({ type: "action", kind: "bomb" }));
+  const actionGapSnapshot = room.sequence;
+  host.socket.send(JSON.stringify({
+    type: "action", kind: "bomb", actionEpoch: epoch, actionSeq: 2,
+    actionRound: room.game.round
+  }));
+  await waitUntil(() => room.sequence > actionGapSnapshot, "snapshot after action gap");
+  assert.deepEqual(room.actionAck, [0, 0]);
+  assert.equal(room.game.bombs.length, 0, "an out-of-order action cannot mutate the match");
+
+  host.socket.send(JSON.stringify({
+    type: "action", kind: "bomb", actionEpoch: epoch, actionSeq: 1,
+    actionRound: room.game.round
+  }));
   const [hostAudio, guestAudio] = await Promise.all([hostSound, guestSound]);
   assert.deepEqual(hostAudio.event, guestAudio.event);
   assert.equal(hostAudio.event.id, 1);
   assert.equal("pan" in hostAudio.event, false);
   assert.equal("sourceId" in hostAudio.event, false);
+  assert.deepEqual(hostAudio.message.data.action, { v: 1, epoch, ack: [1, 0] });
+  assert.equal(room.game.bombs.length, 1);
+
+  const duplicateSnapshot = room.sequence;
+  host.socket.send(JSON.stringify({
+    type: "action", kind: "ability", slot: 0, actionEpoch: epoch, actionSeq: 1,
+    actionRound: room.game.round
+  }));
+  await waitUntil(() => room.sequence > duplicateSnapshot, "snapshot after duplicate action");
+  assert.deepEqual(room.actionAck, [1, 0]);
+  assert.equal(room.game.bombs.length, 1, "a conflicting duplicate cannot replay combat");
+  assert.equal(room.game.authoritativeSound.latest, 1, "a duplicate cannot replay its sound");
+
+  host.socket.send(JSON.stringify({
+    type: "action", kind: "bomb", actionEpoch: epoch, actionSeq: 2,
+    actionRound: room.game.round
+  }));
+  await waitUntil(() => room.actionAck[0] === 2, "mechanically rejected action ACK");
+  assert.equal(room.game.bombs.length, 1, "bomb capacity rejects the second effect");
+  assert.equal(room.game.authoritativeSound.latest, 1);
 
   guest.socket.terminate();
   const disconnectedBefore = Date.now() + 1000;
@@ -346,6 +384,10 @@ test("websocket room starts only after both players are ready", async (t) => {
     reconnectedGuest.messages.find(({ type }) => type === "connected")?.input,
     { v: 1, epoch, accepted: [2, 0], ack: [2, 0] }
   );
+  assert.deepEqual(
+    reconnectedGuest.messages.find(({ type }) => type === "connected")?.action,
+    { v: 1, epoch, ack: [2, 0] }
+  );
   const legacyResumeStart = await waitForMessage(
     reconnectedGuest,
     ({ type }) => type === "start",
@@ -354,6 +396,7 @@ test("websocket room starts only after both players are ready", async (t) => {
   assert.deepEqual(legacyResumeStart.input, {
     v: 1, epoch, accepted: [2, 0], ack: [2, 0]
   });
+  assert.deepEqual(legacyResumeStart.action, { v: 1, epoch, ack: [2, 0] });
   const resumedGrid = await new Promise((resolve, reject) => {
     const existing = reconnectedGuest.messages.find((message) =>
       message.type === "snapshot" && Array.isArray(message.data?.grid)
@@ -422,11 +465,12 @@ test("host rematch rebuilds the authoritative duel", async (t) => {
 
   const host = await open({
     type: "hello", room: "REMCH2", role: "host",
-    inputProtocol: 1,
+    inputProtocol: 1, actionProtocol: 1,
     preset: { hostChampion: "zed", guestChampion: "katarina", matchTarget: 3 }
   });
   const guest = await open({
-    type: "hello", room: "REMCH2", role: "guest", ready: true, inputProtocol: 1
+    type: "hello", room: "REMCH2", role: "guest", ready: true,
+    inputProtocol: 1, actionProtocol: 1
   });
   t.after(() => {
     host.socket.terminate();
@@ -436,6 +480,7 @@ test("host rematch rebuilds the authoritative duel", async (t) => {
 
   const start = await waitFor(guest, "start");
   assert.deepEqual(start.input, { v: 1, epoch: 1, accepted: [0, 0], ack: [0, 0] });
+  assert.deepEqual(start.action, { v: 1, epoch: 1, ack: [0, 0] });
   const room = rooms.get("REMCH2");
   assert.ok(room?.game);
   const firstGame = room.game;
@@ -449,7 +494,12 @@ test("host rematch rebuilds the authoritative duel", async (t) => {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
   assert.deepEqual(room.inputApplied, [1, 0]);
-  assert.equal(firstGame.placeBomb(firstGame.players[0]), true);
+  host.socket.send(JSON.stringify({
+    type: "action", kind: "bomb", actionEpoch: 1, actionSeq: 1,
+    actionRound: firstGame.round
+  }));
+  await waitUntil(() => room.actionAck[0] === 1, "pre-rematch action ACK");
+  assert.equal(firstGame.bombs.length, 1);
   assert.equal(firstGame.authoritativeSound.latest, 1);
   firstGame.mode = "matchover";
 
@@ -467,6 +517,7 @@ test("host rematch rebuilds the authoritative duel", async (t) => {
   assert.equal(rematch.type, "rematch");
   assert.equal(rematch.hostChampion, "zed");
   assert.deepEqual(rematch.input, { v: 1, epoch: 2, accepted: [0, 0], ack: [0, 0] });
+  assert.deepEqual(rematch.action, { v: 1, epoch: 2, ack: [0, 0] });
   assert.notEqual(room.game, firstGame);
   assert.equal(room.game.mode, "playing");
   assert.equal(room.game.matchTarget, 3);
@@ -474,10 +525,19 @@ test("host rematch rebuilds the authoritative duel", async (t) => {
   host.socket.send(JSON.stringify({
     type: "input", mask: 8, inputEpoch: 1, inputSeq: 2
   }));
+  host.socket.send(JSON.stringify({
+    type: "action", kind: "bomb", actionEpoch: 1, actionSeq: 2,
+    actionRound: firstGame.round
+  }));
   await new Promise((resolve) => setTimeout(resolve, 40));
   assert.deepEqual(room.inputs, [0, 0], "the previous match epoch must stay inert");
+  assert.deepEqual(room.actionAck, [0, 0], "the previous action epoch must stay inert");
   assert.equal(room.game.authoritativeSound.latest, 1);
-  assert.equal(room.game.placeBomb(room.game.players[0]), true);
+  host.socket.send(JSON.stringify({
+    type: "action", kind: "bomb", actionEpoch: 2, actionSeq: 1,
+    actionRound: room.game.round
+  }));
+  await waitUntil(() => room.actionAck[0] === 1, "post-rematch action ACK");
   assert.equal(room.game.authoritativeSound.latest, 2);
 });
 
@@ -561,7 +621,7 @@ test("websocket quick-match bearer recovers its assigned room and role when conn
   const pendingToken = "1".repeat(64);
   const rivalToken = "2".repeat(64);
   const originalPending = track(await openClient(port, {
-    type: "quick-match", inputProtocol: 1,
+    type: "quick-match", inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: pendingToken,
     preset: { hostChampion: "renekton", arena: "pit" }
   }, "quick-queued"));
@@ -573,7 +633,7 @@ test("websocket quick-match bearer recovers its assigned room and role when conn
     });
   });
   const pending = track(await openClient(port, {
-    type: "quick-match", inputProtocol: 1,
+    type: "quick-match", inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: pendingToken,
     preset: { hostChampion: "renekton", arena: "pit" }
   }, "quick-queued"));
@@ -581,7 +641,7 @@ test("websocket quick-match bearer recovers its assigned room and role when conn
   const queuedHealth = await (await fetch(`http://127.0.0.1:${port}/health`)).json();
   assert.equal(queuedHealth.quickMatchWaiting, 1, "same bearer must preserve one queue entry");
   const rival = track(await openClient(port, {
-    type: "quick-match", inputProtocol: 1,
+    type: "quick-match", inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: rivalToken,
     preset: { hostChampion: "vladimir", arena: "clearing" }
   }));
@@ -592,6 +652,8 @@ test("websocket quick-match bearer recovers its assigned room and role when conn
   const room = rooms.get(assigned.room);
   assert.equal(room.players[0].quickMatch, true);
   assert.equal(room.players[1].quickMatch, true);
+  assert.equal(room.players[0].actionProtocol, 1);
+  assert.equal(room.players[1].actionProtocol, 1);
   assert.notDeepEqual(room.players[0].resumeTokenDigest, room.players[1].resumeTokenDigest);
   assert.equal(
     originalPending.messages.some(({ type }) => type === "connected"),
@@ -600,6 +662,7 @@ test("websocket quick-match bearer recovers its assigned room and role when conn
   );
   await waitForMessage(pending, ({ type }) => type === "start", "quick match start before resume");
   assert.ok(room.game);
+  assert.deepEqual(room.actionReliable, [true, true]);
 
   const oldClosed = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("recovered quick socket did not replace old one")), 2000);
@@ -609,7 +672,7 @@ test("websocket quick-match bearer recovers its assigned room and role when conn
     });
   });
   const recovered = track(await openClient(port, {
-    type: "quick-match", inputProtocol: 1,
+    type: "quick-match", inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: pendingToken,
     preset: { hostChampion: "katarina", arena: "lattice" }
   }));
@@ -618,6 +681,9 @@ test("websocket quick-match bearer recovers its assigned room and role when conn
   assert.equal(recoveredConnected.role, "host");
   assert.equal(recoveredConnected.quickMatch, true);
   assert.deepEqual(recoveredConnected.resume, { v: 1, protected: true, resumed: true });
+  assert.deepEqual(recoveredConnected.action, {
+    v: 1, epoch: room.inputEpoch, ack: [0, 0]
+  });
   assert.equal(await oldClosed, 4001);
   const resume = await waitForMessage(recovered, ({ type }) => type === "resume", "quick resume control");
   assert.equal(resume.activeMatch, true);
@@ -625,7 +691,7 @@ test("websocket quick-match bearer recovers its assigned room and role when conn
 
   const strangerToken = "3".repeat(64);
   const stranger = track(await openClient(port, {
-    type: "quick-match", inputProtocol: 1,
+    type: "quick-match", inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: strangerToken,
     preset: { hostChampion: "zed", arena: "lattice" }
   }, "quick-queued"));
@@ -664,11 +730,12 @@ test("websocket authenticated F5 resume atomically replaces an open socket and p
   const hostToken = "a".repeat(64);
   const guestToken = "b".repeat(64);
   const host = track(await openClient(port, {
-    type: "hello", room: "AUTH24", role: "host", inputProtocol: 1,
+    type: "hello", room: "AUTH24", role: "host", inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: hostToken
   }));
   const guest = track(await openClient(port, {
-    type: "hello", room: "AUTH24", role: "guest", ready: true, inputProtocol: 1,
+    type: "hello", room: "AUTH24", role: "guest", ready: true,
+    inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: guestToken
   }));
   assert.deepEqual(
@@ -692,11 +759,19 @@ test("websocket authenticated F5 resume atomically replaces an open socket and p
     type: "input", mask: 8, inputEpoch: epoch, inputSeq: 1
   }));
   await waitUntil(() => room.inputApplied[1] === 1, "guest input ACK");
+  guest.socket.send(JSON.stringify({
+    type: "action", kind: "bomb", actionEpoch: epoch, actionSeq: 1,
+    actionRound: room.game.round
+  }));
+  await waitUntil(() => room.actionAck[1] === 1, "guest action ACK");
+  assert.equal(room.game.bombs.length, 1);
+  assert.equal(room.game.authoritativeSound.latest, 1);
   const gameBefore = room.game;
   const cursorsBefore = {
     epoch: room.inputEpoch,
     accepted: room.inputAccepted.slice(),
-    ack: room.inputApplied.slice()
+    ack: room.inputApplied.slice(),
+    actionAck: room.actionAck.slice()
   };
   const oldGuestServerSocket = room.players[1].socket;
   const hostMessageOffset = host.messages.length;
@@ -720,6 +795,11 @@ test("websocket authenticated F5 resume atomically replaces an open socket and p
     accepted: cursorsBefore.accepted,
     ack: cursorsBefore.ack
   });
+  assert.deepEqual(replacementConnected.action, {
+    v: 1,
+    epoch: cursorsBefore.epoch,
+    ack: cursorsBefore.actionAck
+  });
   assert.equal(await oldGuestClosed, 4001);
   assert.notEqual(room.players[1].socket, oldGuestServerSocket);
   assert.equal(room.players[1].socket.readyState, WebSocket.OPEN);
@@ -728,18 +808,37 @@ test("websocket authenticated F5 resume atomically replaces an open socket and p
   assert.deepEqual(room.inputAccepted, cursorsBefore.accepted);
   assert.deepEqual(room.inputApplied, cursorsBefore.ack);
   assert.equal(room.inputReliable[1], true, "resume must never downgrade reliable input");
+  assert.deepEqual(room.actionAck, cursorsBefore.actionAck);
+  assert.equal(room.actionReliable[1], true, "resume must never downgrade reliable actions");
   assert.equal(room.inputs[1], 0, "takeover must neutralize the superseded held direction");
 
   const resume = await waitForMessage(replacement, ({ type }) => type === "resume", "resume control");
   assert.equal(resume.activeMatch, true);
   assert.equal(resume.hostConnected, true);
   assert.deepEqual(resume.input, replacementConnected.input);
+  assert.deepEqual(resume.action, replacementConnected.action);
   const resumedGrid = await waitForMessage(
     replacement,
     (message) => message.type === "snapshot" && Array.isArray(message.data?.grid),
     "resumed full grid"
   );
   assert.deepEqual(resumedGrid.data.grid, room.game.grid);
+
+  const duplicateActionSnapshot = room.sequence;
+  replacement.socket.send(JSON.stringify({
+    type: "action", kind: "ability", slot: 0, actionEpoch: epoch, actionSeq: 1,
+    actionRound: room.game.round
+  }));
+  await waitUntil(() => room.sequence > duplicateActionSnapshot, "post-resume duplicate snapshot");
+  assert.deepEqual(room.actionAck, cursorsBefore.actionAck);
+  assert.equal(room.game.bombs.length, 1, "F5 replay cannot duplicate an accepted bomb");
+  assert.equal(room.game.authoritativeSound.latest, 1);
+  replacement.socket.send(JSON.stringify({
+    type: "action", kind: "bomb", actionEpoch: epoch, actionSeq: 2,
+    actionRound: room.game.round
+  }));
+  await waitUntil(() => room.actionAck[1] === 2, "post-resume action ACK");
+  assert.equal(room.game.bombs.length, 1, "mechanical rejection still advances the stream after F5");
 
   await new Promise((resolve) => setTimeout(resolve, 30));
   assert.equal(
@@ -771,6 +870,10 @@ test("websocket authenticated F5 resume atomically replaces an open socket and p
   assert.equal(
     reconnected.messages.find(({ type }) => type === "connected")?.resume.resumed,
     true
+  );
+  assert.deepEqual(
+    reconnected.messages.find(({ type }) => type === "connected")?.action,
+    { v: 1, epoch, ack: [0, 2] }
   );
   const recoveredPresence = await waitForMessage(
     host,
@@ -972,11 +1075,12 @@ test("websocket authenticated leave revokes a seat and host leave closes the roo
   const guestToken = "ab".repeat(32);
   const replacementToken = "ef".repeat(32);
   const host = track(await openClient(port, {
-    type: "hello", room: "LEAV24", role: "host", inputProtocol: 1,
+    type: "hello", room: "LEAV24", role: "host", inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: hostToken
   }));
   const guest = track(await openClient(port, {
-    type: "hello", room: "LEAV24", role: "guest", ready: true, inputProtocol: 1,
+    type: "hello", room: "LEAV24", role: "guest", ready: true,
+    inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: guestToken
   }));
   await waitForMessage(guest, ({ type }) => type === "start", "initial leave-test start");
@@ -986,12 +1090,19 @@ test("websocket authenticated leave revokes a seat and host leave closes the roo
     type: "input", mask: 8, inputEpoch: epoch, inputSeq: 1
   }));
   await waitUntil(() => room.inputApplied[1] === 1, "pre-leave guest ACK");
+  guest.socket.send(JSON.stringify({
+    type: "action", kind: "bomb", actionEpoch: epoch, actionSeq: 1,
+    actionRound: room.game.round
+  }));
+  await waitUntil(() => room.actionAck[1] === 1, "pre-leave guest action ACK");
 
   guest.socket.send(JSON.stringify({ type: "leave" }));
   await waitUntil(() => room.players[1] === null, "guest seat revocation");
   assert.equal(room.inputAccepted[1], 0);
   assert.equal(room.inputApplied[1], 0);
   assert.equal(room.inputReliable[1], false);
+  assert.equal(room.actionAck[1], 0);
+  assert.equal(room.actionReliable[1], false);
   const presence = await waitForMessage(
     host,
     (message) => message.type === "presence" && message.playerId === 2,
@@ -1019,7 +1130,8 @@ test("websocket authenticated leave revokes a seat and host leave closes the roo
   }
 
   const replacement = track(await openClient(port, {
-    type: "hello", room: "LEAV24", role: "guest", ready: true, inputProtocol: 1,
+    type: "hello", room: "LEAV24", role: "guest", ready: true,
+    inputProtocol: 1, actionProtocol: 1,
     resumeProtocol: 1, resumeToken: replacementToken
   }));
   assert.deepEqual(
@@ -1029,6 +1141,10 @@ test("websocket authenticated leave revokes a seat and host leave closes the roo
   assert.deepEqual(
     replacement.messages.find(({ type }) => type === "connected")?.input,
     { v: 1, epoch, accepted: [0, 0], ack: [0, 0] }
+  );
+  assert.deepEqual(
+    replacement.messages.find(({ type }) => type === "connected")?.action,
+    { v: 1, epoch, ack: [0, 0] }
   );
   await waitForMessage(replacement, ({ type }) => type === "start", "replacement active start");
   const replacementServerSocket = room.players[1].socket;
@@ -1079,11 +1195,12 @@ for (const expiredRole of ["host", "guest"]) {
     const guestToken = "7".repeat(64);
     const freshToken = "8".repeat(64);
     const host = track(await openClient(port, {
-      type: "hello", room: code, role: "host", inputProtocol: 1,
+      type: "hello", room: code, role: "host", inputProtocol: 1, actionProtocol: 1,
       resumeProtocol: 1, resumeToken: hostToken
     }));
     const guest = track(await openClient(port, {
-      type: "hello", room: code, role: "guest", ready: true, inputProtocol: 1,
+      type: "hello", room: code, role: "guest", ready: true,
+      inputProtocol: 1, actionProtocol: 1,
       resumeProtocol: 1, resumeToken: guestToken
     }));
     await waitForMessage(guest, ({ type }) => type === "start", "expiry match start");
@@ -1093,6 +1210,12 @@ for (const expiredRole of ["host", "guest"]) {
     const survivor = expiredIndex === 0 ? guest : host;
     const expiredToken = expiredIndex === 0 ? hostToken : guestToken;
     const gameBefore = room.game;
+    target.socket.send(JSON.stringify({
+      type: "action", kind: "bomb", actionEpoch: room.inputEpoch, actionSeq: 1,
+      actionRound: room.game.round
+    }));
+    await waitUntil(() => room.actionAck[expiredIndex] === 1,
+      `${expiredRole} pre-expiry action ACK`);
     let survivorClosed = null;
     if (expiredRole === "host") {
       survivorClosed = new Promise((resolve, reject) => {
@@ -1129,6 +1252,8 @@ for (const expiredRole of ["host", "guest"]) {
       assert.equal(room.inputAccepted[1], 0);
       assert.equal(room.inputApplied[1], 0);
       assert.equal(room.inputReliable[1], false);
+      assert.equal(room.actionAck[1], 0);
+      assert.equal(room.actionReliable[1], false);
       assert.equal(survivor.socket.readyState, WebSocket.OPEN);
     }
 
@@ -1147,7 +1272,8 @@ for (const expiredRole of ["host", "guest"]) {
     assert.equal(health.quickMatchWaiting, 0, "an expired bearer must not re-enter matchmaking");
 
     const replacement = track(await openClient(port, {
-      type: "hello", room: code, role: expiredRole, ready: true, inputProtocol: 1,
+      type: "hello", room: code, role: expiredRole, ready: true,
+      inputProtocol: 1, actionProtocol: 1,
       resumeProtocol: 1, resumeToken: freshToken
     }));
     const replacementConnected = replacement.messages.find(({ type }) => type === "connected");

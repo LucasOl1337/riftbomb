@@ -2,6 +2,7 @@ const TICK_RATE = 60;
 const SNAPSHOT_RATE = 30;
 const ROOMS_PER_TURN = 8;
 const INPUT_PROTOCOL_VERSION = 1;
+const ACTION_PROTOCOL_VERSION = 1;
 const MAX_INPUT_SEQUENCE = 0x7fffffff;
 const loadDefaultDuelRuntime = () => import("../../../game/create-authoritative-duel.mjs");
 const CHAMPIONS = new Set(["katarina", "zed", "renekton", "vladimir", "gangplank"]);
@@ -91,6 +92,8 @@ export class AuthoritativeRooms {
       inputAccepted: [0, 0],
       inputApplied: [0, 0],
       inputReliable: [false, false],
+      actionAck: [0, 0],
+      actionReliable: [false, false],
       sequence: 0,
       soundEventSequence: 0,
       lastTick: 0,
@@ -122,6 +125,14 @@ export class AuthoritativeRooms {
     };
   }
 
+  actionProtocol(room) {
+    return {
+      v: ACTION_PROTOCOL_VERSION,
+      epoch: room.inputEpoch,
+      ack: room.actionAck.slice()
+    };
+  }
+
   acceptInput(room, playerIndex, message) {
     if (!room.game || !Number.isInteger(playerIndex) || playerIndex < 0 || playerIndex > 1 ||
         !Number.isInteger(message?.mask) || message.mask < 0 || message.mask > 15) return false;
@@ -138,6 +149,38 @@ export class AuthoritativeRooms {
     room.inputs[playerIndex] = message.mask;
     room.inputAccepted[playerIndex] = message.inputSeq;
     room.inputReliable[playerIndex] = true;
+    return true;
+  }
+
+  processPlayerAction(room, playerIndex, message) {
+    if (!room.game || !Number.isInteger(playerIndex) || playerIndex < 0 || playerIndex > 1 ||
+        !message || typeof message !== "object") return false;
+    const validAction = message.kind === "bomb" ||
+      (message.kind === "ability" && Number.isInteger(message.slot) &&
+        message.slot >= 0 && message.slot <= 3);
+    if (!validAction) return false;
+
+    const hasReliableEnvelope = message.actionEpoch !== undefined || message.actionSeq !== undefined;
+    if (!hasReliableEnvelope) {
+      if (room.actionReliable[playerIndex]) return false;
+      return this.applyPlayerAction(room, playerIndex + 1, message);
+    }
+    if (!Number.isSafeInteger(message.actionEpoch) || message.actionEpoch !== room.inputEpoch ||
+        !Number.isSafeInteger(message.actionSeq) || message.actionSeq <= 0 ||
+        message.actionSeq > MAX_INPUT_SEQUENCE ||
+        !Number.isSafeInteger(message.actionRound) || message.actionRound < 0 ||
+        message.actionSeq !== room.actionAck[playerIndex] + 1) return false;
+
+    // ACK means the syntactically valid intention was processed. A cooldown,
+    // full bomb inventory, or another game rule may reject the effect, but the
+    // transport must still consume this sequence so one rejection cannot block
+    // every later action in the stream. An action retained across a round reset
+    // is also consumed without being allowed to fire on the next spawn.
+    if (message.actionRound === room.game.round) {
+      this.applyPlayerAction(room, playerIndex + 1, message);
+    }
+    room.actionAck[playerIndex] = message.actionSeq;
+    room.actionReliable[playerIndex] = true;
     return true;
   }
 
@@ -181,6 +224,7 @@ export class AuthoritativeRooms {
             includeGrid
           );
           snapshot.input = this.inputProtocol(room);
+          snapshot.action = this.actionProtocol(room);
           room.soundEventSequence = Math.max(room.soundEventSequence, snapshot.sound.latest);
           this.broadcast(room, { type: "snapshot", data: snapshot });
           this.performanceCounters.snapshotsProduced += 1;
@@ -277,13 +321,16 @@ export class AuthoritativeRooms {
       room.inputAccepted = [0, 0];
       room.inputApplied = [0, 0];
       room.inputReliable = room.players.map((player) => player?.inputProtocol === 1);
+      room.actionAck = [0, 0];
+      room.actionReliable = room.players.map((player) => player?.actionProtocol === 1);
       room.gridCache = null;
       room.lastTick = this.now();
       this.startClock();
       this.broadcast(room, {
         ...this.lobbyMessage(room),
         type: rematch ? "rematch" : "start",
-        input: this.inputProtocol(room)
+        input: this.inputProtocol(room),
+        action: this.actionProtocol(room)
       });
     } catch (error) {
       console.error("startMatch failed", room.code, error);

@@ -43,6 +43,10 @@
   const INPUT_RETRY_MS = 120;
   const INPUT_OUTBOX_LIMIT = 64;
   const MAX_INPUT_SEQUENCE = 0x7fffffff;
+  const ACTION_PROTOCOL_VERSION = 1;
+  const ACTION_RETRY_MS = 120;
+  const ACTION_OUTBOX_LIMIT = 16;
+  const MAX_ACTION_SEQUENCE = 0x7fffffff;
   const authoritativeAudio = globalThis.RIFTBOMB_AUTHORITATIVE_AUDIO;
   const browserGameplaySfx = game.sfx;
   const authoritativePredictionSink = Object.freeze({
@@ -233,6 +237,200 @@
     return Object.freeze({ currentEpoch, queue, replay, reset, snapshot, synchronize });
   }
 
+  function createReliableActionStream({
+    send,
+    persist = () => {},
+    now = () => performance.now(),
+    retryMs = ACTION_RETRY_MS,
+    outboxLimit = ACTION_OUTBOX_LIMIT
+  } = {}) {
+    if (typeof send !== "function") throw new TypeError("reliable action requires send");
+    if (typeof persist !== "function") throw new TypeError("reliable action requires persistence");
+    let mode = "unknown";
+    let epoch = 0;
+    let nextSequence = 1;
+    let acknowledgedSequence = 0;
+    let replayCount = 0;
+    let outbox = [];
+    let failure = "";
+
+    const validAction = (kind, slot) => kind === "bomb" ||
+      (kind === "ability" && Number.isInteger(slot) && slot >= 0 && slot <= 3);
+    const validRound = (round) => Number.isSafeInteger(round) && round >= 0;
+    const seatCursor = (protocol, seatIndex) => {
+      if (!protocol || protocol.v !== ACTION_PROTOCOL_VERSION ||
+          !Number.isSafeInteger(protocol.epoch) || protocol.epoch < 0 ||
+          !Array.isArray(protocol.ack) || !Number.isInteger(seatIndex) || seatIndex < 0) return null;
+      const ack = protocol.ack[seatIndex];
+      if (!Number.isSafeInteger(ack) || ack < 0 || ack > MAX_ACTION_SEQUENCE) return null;
+      return { epoch: protocol.epoch, ack };
+    };
+    const persistedState = () => ({
+      v: ACTION_PROTOCOL_VERSION,
+      epoch,
+      nextSequence,
+      acknowledgedSequence,
+      outbox: outbox.map(({ message }) => ({ ...message }))
+    });
+    const persistNow = () => {
+      try { return persist(persistedState()) !== false; } catch { return false; }
+    };
+    const transmit = (entry, replay = false) => {
+      entry.sentAt = now();
+      const delivered = send(entry.message) === true;
+      if (delivered && replay) replayCount += 1;
+      return delivered;
+    };
+    const clear = (nextMode = "unknown") => {
+      mode = nextMode;
+      epoch = 0;
+      nextSequence = 1;
+      acknowledgedSequence = 0;
+      replayCount = 0;
+      outbox = [];
+      failure = "";
+    };
+
+    const synchronize = (protocol, seatIndex) => {
+      const cursor = seatCursor(protocol, seatIndex);
+      if (!cursor || cursor.epoch < epoch) return false;
+      if (cursor.epoch > epoch) {
+        mode = "reliable";
+        epoch = cursor.epoch;
+        nextSequence = Math.min(MAX_ACTION_SEQUENCE + 1, cursor.ack + 1);
+        acknowledgedSequence = cursor.ack;
+        outbox = [];
+        persistNow();
+        return true;
+      }
+      if (cursor.ack < acknowledgedSequence) return false;
+      const changed = mode !== "reliable" || cursor.ack !== acknowledgedSequence ||
+        cursor.ack >= nextSequence ||
+        outbox.some(({ message }) => message.actionSeq <= cursor.ack);
+      const previousHead = outbox[0];
+      mode = "reliable";
+      acknowledgedSequence = cursor.ack;
+      nextSequence = Math.max(
+        nextSequence,
+        Math.min(MAX_ACTION_SEQUENCE + 1, cursor.ack + 1)
+      );
+      outbox = outbox.filter(({ message }) => message.actionSeq > cursor.ack);
+      if (changed) persistNow();
+      if (outbox.length && outbox[0] !== previousHead) transmit(outbox[0]);
+      return true;
+    };
+
+    const negotiate = (protocol, seatIndex) => {
+      if (seatCursor(protocol, seatIndex)) return synchronize(protocol, seatIndex);
+      const nextMode = protocol === undefined ? "legacy" : "disabled";
+      const changed = mode !== nextMode || epoch !== 0 || outbox.length > 0;
+      clear(nextMode);
+      if (changed) persistNow();
+      return false;
+    };
+
+    const hydrate = (saved) => {
+      clear();
+      if (!saved || saved.v !== ACTION_PROTOCOL_VERSION ||
+          !Number.isSafeInteger(saved.epoch) || saved.epoch <= 0 ||
+          !Number.isSafeInteger(saved.nextSequence) || saved.nextSequence <= 0 ||
+          saved.nextSequence > MAX_ACTION_SEQUENCE + 1 ||
+          !Number.isSafeInteger(saved.acknowledgedSequence) ||
+          saved.acknowledgedSequence < 0 ||
+          saved.acknowledgedSequence >= saved.nextSequence ||
+          !Array.isArray(saved.outbox) || saved.outbox.length > outboxLimit ||
+          saved.nextSequence !== saved.acknowledgedSequence + saved.outbox.length + 1) return false;
+      const restored = [];
+      for (let index = 0; index < saved.outbox.length; index += 1) {
+        const message = saved.outbox[index];
+        const expectedSequence = saved.acknowledgedSequence + index + 1;
+        if (!message || message.type !== "action" ||
+            !validAction(message.kind, message.slot) || !validRound(message.actionRound) ||
+            message.actionEpoch !== saved.epoch ||
+            message.actionSeq !== expectedSequence) return false;
+        const restoredMessage = {
+          type: "action",
+          kind: message.kind,
+          actionEpoch: message.actionEpoch,
+          actionSeq: message.actionSeq,
+          actionRound: message.actionRound
+        };
+        if (message.kind === "ability") restoredMessage.slot = message.slot;
+        restored.push({ message: restoredMessage, sentAt: Number.NEGATIVE_INFINITY });
+      }
+      epoch = saved.epoch;
+      nextSequence = saved.nextSequence;
+      acknowledgedSequence = saved.acknowledgedSequence;
+      outbox = restored;
+      return true;
+    };
+
+    const queue = (kind, slot, round) => {
+      failure = "";
+      if (mode !== "reliable" || epoch <= 0) {
+        failure = "protocol";
+        return false;
+      }
+      if (!validAction(kind, slot) || !validRound(round)) {
+        failure = "invalid";
+        return false;
+      }
+      if (outbox.length >= outboxLimit) {
+        failure = "capacity";
+        return false;
+      }
+      if (nextSequence > MAX_ACTION_SEQUENCE) {
+        failure = "sequence";
+        return false;
+      }
+      const message = {
+        type: "action",
+        kind,
+        actionEpoch: epoch,
+        actionSeq: nextSequence++,
+        actionRound: round
+      };
+      if (kind === "ability") message.slot = slot;
+      const entry = { message, sentAt: Number.NEGATIVE_INFINITY };
+      outbox.push(entry);
+      // The durable tab session must contain the envelope before its first
+      // transmission so an F5 between send and ACK can replay the same action.
+      if (!persistNow()) {
+        outbox.pop();
+        nextSequence -= 1;
+        failure = "storage";
+        return false;
+      }
+      if (outbox.length === 1) transmit(entry);
+      return true;
+    };
+
+    const replay = () => {
+      if (mode !== "reliable" || !outbox.length ||
+          now() - outbox[0].sentAt < retryMs) return false;
+      transmit(outbox[0], true);
+      return true;
+    };
+    const reset = () => clear();
+    const snapshot = () => ({
+      version: ACTION_PROTOCOL_VERSION,
+      mode,
+      epoch,
+      nextSequence,
+      acknowledgedSequence,
+      pendingSequences: outbox.map(({ message }) => message.actionSeq),
+      pendingKinds: outbox.map(({ message }) => message.kind),
+      replayCount
+    });
+    const currentMode = () => mode;
+    const currentFailure = () => failure;
+
+    return Object.freeze({
+      currentFailure, currentMode, hydrate, negotiate, persistedState, queue, replay, reset,
+      snapshot, synchronize
+    });
+  }
+
   const state = {
     role: "offline",
     roomCode: "",
@@ -275,10 +473,17 @@
   let pendingConnectCancel = null;
 
   const reliableInput = createReliableInputStream({ send: sendControl });
-  const reliableInputRetryTimer = setInterval(() => {
-    if (state.connected) reliableInput.replay();
+  const reliableAction = createReliableActionStream({
+    send: sendControl,
+    persist: () => saveSession()
+  });
+  setInterval(() => {
+    if (!state.connected) return;
+    reliableInput.replay();
+    reliableAction.replay();
   }, INPUT_RETRY_MS);
-  addEventListener("pagehide", () => clearInterval(reliableInputRetryTimer), { once: true });
+  // Timers are suspended automatically while a page is in BFCache. Clearing
+  // this interval on pagehide would make a restored match lose replay forever.
 
   const panel = document.createElement("section");
   panel.className = "online-panel";
@@ -448,6 +653,7 @@
       arena: state.arena,
       matchTarget: state.matchTarget,
       inputDelivery: reliableInput.snapshot(),
+      actionDelivery: reliableAction.snapshot(),
       status: status.textContent || "",
       tone: status.dataset.tone || ""
     };
@@ -487,7 +693,7 @@
         // Startup status publications happen before auto-resume while the
         // iframe still reports its initial offline role. Only explicit
         // cancel/leave/failure flows are allowed to erase a saved credential.
-        return;
+        return false;
       }
       // Persist even while briefly disconnected so F5 can reattach.
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({
@@ -505,9 +711,13 @@
           ? state.resumePhase
           : clientPhase(),
         confirmed: Boolean(state.sessionConfirmed),
+        actionDelivery: reliableAction.persistedState(),
         savedAt: Date.now()
       }));
-    } catch {}
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function readSession() {
@@ -855,6 +1065,7 @@
           ? {
               type: "quick-match",
               inputProtocol: INPUT_PROTOCOL_VERSION,
+              actionProtocol: ACTION_PROTOCOL_VERSION,
               resumeProtocol: RESUME_PROTOCOL_VERSION,
               resumeToken,
               preset: lobbyPayload()
@@ -862,6 +1073,7 @@
           : {
               type: "hello",
               inputProtocol: INPUT_PROTOCOL_VERSION,
+              actionProtocol: ACTION_PROTOCOL_VERSION,
               resumeProtocol: RESUME_PROTOCOL_VERSION,
               resumeToken,
               resumeOnly: resume && (
@@ -906,7 +1118,9 @@
             saveSession();
             clearPendingResume();
           }
-          reliableInput.synchronize(message.input, localOnlinePlayerId() - 1);
+          const seatIndex = localOnlinePlayerId() - 1;
+          reliableInput.synchronize(message.input, seatIndex);
+          reliableAction.negotiate(message.action, seatIndex);
           connectedReceived = true;
           const freshLobbyClaim = resume && resumePhase === "lobby" && !wasConfirmed &&
             message.resume?.v === RESUME_PROTOCOL_VERSION &&
@@ -1065,7 +1279,9 @@
       return;
     }
     if (message.type === "start" || message.type === "rematch" || message.type === "resume") {
-      reliableInput.synchronize(message.input, localOnlinePlayerId() - 1);
+      const seatIndex = localOnlinePlayerId() - 1;
+      reliableInput.synchronize(message.input, seatIndex);
+      reliableAction.synchronize(message.action, seatIndex);
       if (reliableInput.currentEpoch() <= 0) state.lastLegacyInput = -1;
       void startOnlineMatch(message);
       return;
@@ -1221,7 +1437,9 @@
     if (!data || ![2, 3].includes(data.v) || !Array.isArray(data.players)) return;
     if (Number.isFinite(data.s) && data.s <= state.receivedSequence) return;
     // ACK/outbox state is current even while rendering waits for model/runtime boot.
-    reliableInput.synchronize(data.input, localOnlinePlayerId() - 1);
+    const seatIndex = localOnlinePlayerId() - 1;
+    reliableInput.synchronize(data.input, seatIndex);
+    reliableAction.synchronize(data.action, seatIndex);
     const runtimeUnavailable = state.resuming || runtimeBootRecord ||
       (state.role !== "offline" && game.mode === "intro" && reliableInput.currentEpoch() > 0);
     if (runtimeUnavailable) {
@@ -1234,7 +1452,9 @@
   function applySnapshot(data) {
     if (!data || ![2, 3].includes(data.v) || !Array.isArray(data.players)) return;
     if (Number.isFinite(data.s) && data.s <= state.receivedSequence) return;
-    reliableInput.synchronize(data.input, localOnlinePlayerId() - 1);
+    const seatIndex = localOnlinePlayerId() - 1;
+    reliableInput.synchronize(data.input, seatIndex);
+    reliableAction.synchronize(data.action, seatIndex);
     state.receivedSequence = Number(data.s) || state.receivedSequence + 1;
     const previousRound = state.guestRound;
     const previousMode = state.guestMode;
@@ -1637,6 +1857,7 @@
       pendingGuestBombs: [], lastLegacyInput: -1
     });
     reliableInput.reset();
+    reliableAction.reset();
   }
 
   function chooseOffline() {
@@ -1695,6 +1916,7 @@
       game.selectArena(state.arena);
       game.resetPlayers();
     }
+    reliableAction.hydrate(saved.actionDelivery);
     setOnlineRole(saved.role);
     setChampionButtons(saved.role === "guest" ? state.guestChampion : state.hostChampion);
     setArenaButtons(state.arena);
@@ -1776,6 +1998,20 @@
     globalThis.configurePlayerView?.(id, { shared: false, localMultiplayer: false });
   }
 
+  function sendOnlineAction(kind, slot) {
+    if (reliableAction.currentMode() === "reliable") {
+      const queued = reliableAction.queue(kind, slot, game.round);
+      if (!queued && reliableAction.currentFailure() === "storage") {
+        setStatus("Browser storage unavailable; action was not sent to protect the match.", "error");
+      }
+      return queued;
+    }
+    if (reliableAction.currentMode() !== "legacy") return false;
+    const message = { type: "action", kind };
+    if (kind === "ability") message.slot = slot;
+    return sendControl(message);
+  }
+
   game.placeBomb = (player) => {
     if (state.role === "offline" || !state.connected || !state.socket) {
       return offlinePlaceBomb(player || game.player);
@@ -1784,7 +2020,7 @@
     const actor = player?.id === local?.id ? player : local;
     if (!actor) return false;
     // Always tell the server; optimistic predict may fail client-side.
-    sendControl({ type: "action", kind: "bomb" });
+    if (!sendOnlineAction("bomb")) return false;
     const bombIds = new Set(game.bombs.map((bomb) => bomb.id));
     const placed = offlinePlaceBomb(actor);
     if (!placed) return false;
@@ -1808,7 +2044,7 @@
     const local = localOnlinePlayer();
     const actor = player?.id === local?.id ? player : local;
     if (!actor) return false;
-    sendControl({ type: "action", kind: "ability", slot });
+    if (!sendOnlineAction("ability", slot)) return false;
     // The server owns postponed-spell buffering. Keep immediate local
     // prediction for legal casts, but never leave a client-only buffered cast
     // that could survive a snapshot or execute twice.

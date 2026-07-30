@@ -147,6 +147,7 @@ test("snapshots synchronize delivery immediately but render only the coalesced s
     "state",
     "game",
     "reliableInput",
+    "reliableAction",
     "localOnlinePlayerId",
     "bufferedSnapshots",
     "applySnapshot",
@@ -159,6 +160,7 @@ test("snapshots synchronize delivery immediately but render only the coalesced s
       currentEpoch: () => 7,
       synchronize: (input) => synchronized.push(input.ack[1])
     },
+    { synchronize() {} },
     () => 2,
     bufferedSnapshots,
     (snapshot) => applied.push(snapshot),
@@ -380,6 +382,24 @@ test("confirmed lobbies resume only their existing protected seat", async () => 
   assert.match(persistence, /confirmed: Boolean\(state\.sessionConfirmed\)/);
   const resume = extract(source, "async function tryResumeSession", "  function inputMask");
   assert.match(resume, /state\.sessionConfirmed = saved\.confirmed === true/);
+});
+
+test("F5 restores the durable action outbox before any resumed-state publication", async () => {
+  const source = await readFile(sourceUrl, "utf8");
+  const persistence = extract(source, "function saveSession", "  function readSession");
+  assert.match(persistence, /actionDelivery: reliableAction\.persistedState\(\)/);
+
+  const resume = extract(source, "async function tryResumeSession", "  function inputMask");
+  const hydrateIndex = resume.indexOf("reliableAction.hydrate(saved.actionDelivery)");
+  const roleIndex = resume.indexOf("setOnlineRole(saved.role)");
+  const connectIndex = resume.indexOf("connectAuthoritative(saved.role");
+  assert.ok(hydrateIndex >= 0 && hydrateIndex < roleIndex,
+    "setOnlineRole publishes and saves, so hydration must happen first");
+  assert.ok(roleIndex < connectIndex, "the durable outbox must exist before reconnecting");
+
+  const connection = extract(source, "function connectAuthoritative", "  async function onConnected");
+  assert.match(connection, /actionProtocol: ACTION_PROTOCOL_VERSION/g);
+  assert.match(connection, /reliableAction\.negotiate\(message\.action, seatIndex\)/);
 });
 
 test("presence recovery clears the rival disconnect state", async () => {

@@ -147,7 +147,7 @@ test("uses one authoritative WebSocket transport", async () => {
   assert.doesNotMatch(duel, /RTCPeerConnection|iceGatheringState|state\.inputChannel|state\.snapshots/);
 });
 
-test("movement uses bounded sequence, causal ACK and replay without repeating actions", async () => {
+test("movement and actions use independent bounded streams with causal ACK and replay", async () => {
   const [client, server, rooms] = await Promise.all([
     readFile(new URL("public/online-duel.js", root), "utf8"),
     readFile(new URL("server/src/server.mjs", root), "utf8"),
@@ -157,7 +157,7 @@ test("movement uses bounded sequence, causal ACK and replay without repeating ac
   assert.match(client, /function createReliableInputStream/);
   assert.match(client, /INPUT_OUTBOX_LIMIT = 64/);
   assert.match(client, /inputProtocol: INPUT_PROTOCOL_VERSION/);
-  assert.match(client, /reliableInputRetryTimer = setInterval/);
+  assert.match(client, /setInterval\(\(\) => \{\s*if \(!state\.connected\) return;\s*reliableInput\.replay\(\);\s*reliableAction\.replay\(\)/);
   assert.match(client, /function sendMovementInput/);
   assert.match(client, /reliableInput\.currentEpoch\(\) <= 0/);
   assert.match(client, /inputEpoch: epoch/);
@@ -180,18 +180,40 @@ test("movement uses bounded sequence, causal ACK and replay without repeating ac
   assert.ok(keyup.indexOf("state.localInput[direction] = false") <
     keyup.indexOf('game.mode !== "playing"'),
   "guest key release must clear local state even between matches");
-  assert.equal((client.match(/sendControl\(\{ type: "action"/g) || []).length, 2,
-    "bomb and ability remain one-shot and outside movement replay");
+  assert.match(client, /function createReliableActionStream/);
+  assert.match(client, /ACTION_OUTBOX_LIMIT = 16/);
+  assert.match(client, /actionProtocol: ACTION_PROTOCOL_VERSION/);
+  assert.match(client, /actionEpoch: epoch/);
+  assert.match(client, /actionSeq: nextSequence\+\+/);
+  assert.match(client, /actionRound: round/);
+  assert.match(client, /reliableAction\.negotiate\(message\.action/);
+  assert.match(client, /reliableAction\.synchronize\(data\.action/);
+  assert.match(client, /function sendOnlineAction/);
+  assert.match(client, /if \(!sendOnlineAction\("bomb"\)\) return false/);
+  assert.match(client, /if \(!sendOnlineAction\("ability", slot\)\) return false/);
+  assert.match(client,
+    /if \(!persistNow\(\)\) \{\s*outbox\.pop\(\);\s*nextSequence -= 1;\s*failure = "storage";\s*return false;\s*\}\s*if \(outbox\.length === 1\) transmit\(entry\)/,
+    "an action envelope must durably persist or roll back before transmission");
+  assert.doesNotMatch(client, /pagehide[^\n]*clearInterval/,
+    "BFCache restore must keep the delivery timer available");
+  assert.doesNotMatch(client, /sendControl\(\{ type: "action"/,
+    "gameplay actions must route through negotiated delivery");
   assert.doesNotMatch(client, /reliableInput\.queue\([^)]*(?:bomb|ability)/);
 
   assert.match(server, /room\.players\[index\]\?\.socket !== socket/);
   assert.match(server, /inputProtocol: message\.inputProtocol === 1 \? 1 : 0/);
+  assert.match(server, /actionProtocol: message\.actionProtocol === 1 \? 1 : 0/);
   assert.match(server, /authoritativeRooms\.acceptInput\(room, index, message\)/);
+  assert.match(server, /authoritativeRooms\.processPlayerAction\(room, index, message\)/);
   assert.match(server, /room\.game\?\.mode === "matchover"/);
   assert.match(server, /message\.inputEpoch === room\.inputEpoch/);
   assert.match(rooms, /message\.inputSeq !== room\.inputAccepted\[playerIndex\] \+ 1/);
   assert.match(rooms, /room\.game\.update\(dt\);\s*room\.inputApplied\[0\] =/);
   assert.match(rooms, /snapshot\.input = this\.inputProtocol\(room\)/);
+  assert.match(rooms, /snapshot\.action = this\.actionProtocol\(room\)/);
+  assert.match(rooms, /message\.actionSeq !== room\.actionAck\[playerIndex\] \+ 1/);
+  assert.match(rooms, /message\.actionRound === room\.game\.round/);
+  assert.match(rooms, /room\.actionAck\[playerIndex\] = message\.actionSeq/);
   assert.match(rooms, /inputEpoch: 0/);
 });
 
@@ -242,6 +264,7 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
     "WebSocket",
     "AUTHORITATIVE_SERVER_URL",
     "INPUT_PROTOCOL_VERSION",
+    "ACTION_PROTOCOL_VERSION",
     "RESUME_PROTOCOL_VERSION",
     "state",
     "pendingConnectCancel",
@@ -255,11 +278,13 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
     "saveSession",
     "clearPendingResume",
     "reliableInput",
+    "reliableAction",
     "localOnlinePlayerId",
     `"use strict"; ${declaration}; return connectAuthoritative;`
   )(
     FakeWebSocket,
     "ws://test.invalid/game-ws",
+    1,
     1,
     1,
     state,
@@ -274,6 +299,7 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
     () => {},
     () => {},
     { synchronize() { return true; } },
+    { negotiate() { return true; } },
     () => 1
   );
 

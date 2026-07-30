@@ -70,6 +70,83 @@ test("movement input accepts only the next sequence in the active match epoch", 
   assert.deepEqual(manager.inputProtocol(room).accepted, [2, 0]);
 });
 
+test("action transport processes each sequence once and ACKs mechanical rejection", () => {
+  const rooms = new Map();
+  const manager = new AuthoritativeRooms({ rooms, broadcast() {} });
+  const room = manager.create("ACTN01", {});
+  room.game = { round: 3 };
+  room.inputEpoch = 9;
+  const applied = [];
+  manager.duelRuntime = {
+    applyPlayerAction(_game, playerId, action) {
+      applied.push({ playerId, kind: action.kind, slot: action.slot });
+      return action.kind === "bomb";
+    }
+  };
+
+  assert.deepEqual(manager.actionProtocol(room), { v: 1, epoch: 9, ack: [0, 0] });
+  assert.equal(manager.processPlayerAction(room, 0, { type: "action", kind: "bomb" }), true,
+    "a legacy client remains usable while the server rolls out first");
+  assert.equal(applied.length, 1);
+  assert.deepEqual(manager.actionProtocol(room).ack, [0, 0],
+    "legacy traffic does not claim a reliable sequence");
+
+  assert.equal(manager.processPlayerAction(room, 0, {
+    type: "action", kind: "bomb", actionEpoch: 9, actionSeq: 2, actionRound: 3
+  }), false, "a gap waits for replay of the missing head");
+  assert.equal(applied.length, 1);
+
+  assert.equal(manager.processPlayerAction(room, 0, {
+    type: "action", kind: "ability", slot: 0,
+    actionEpoch: 9, actionSeq: 1, actionRound: 3
+  }), true, "transport acceptance is independent from mechanical acceptance");
+  assert.equal(applied.length, 2);
+  assert.deepEqual(manager.actionProtocol(room).ack, [1, 0],
+    "a syntactically valid cooldown/capacity rejection is consumed once");
+  assert.equal(manager.processPlayerAction(room, 0, { type: "action", kind: "bomb" }), false,
+    "a reliable seat can never downgrade to duplicate-prone legacy actions");
+  assert.equal(manager.processPlayerAction(room, 0, {
+    type: "action", kind: "bomb", actionEpoch: 9, actionSeq: 1, actionRound: 3
+  }), false, "a duplicate sequence cannot repeat a different payload");
+  assert.equal(applied.length, 2);
+
+  assert.equal(manager.processPlayerAction(room, 0, {
+    type: "action", kind: "bomb", actionEpoch: 9, actionSeq: 2, actionRound: 3
+  }), true);
+  assert.equal(manager.processPlayerAction(room, 1, {
+    type: "action", kind: "bomb", actionEpoch: 9, actionSeq: 1, actionRound: 3
+  }), true, "each seat owns an independent sequence cursor");
+  assert.deepEqual(manager.actionProtocol(room).ack, [2, 1]);
+  assert.deepEqual(applied.slice(-2).map(({ playerId }) => playerId), [1, 2]);
+
+  for (const message of [
+    { type: "action", kind: "bomb", actionEpoch: 8, actionSeq: 3, actionRound: 3 },
+    { type: "action", kind: "bomb", actionEpoch: 9, actionSeq: 0, actionRound: 3 },
+    { type: "action", kind: "bomb", actionEpoch: 9, actionSeq: 2.5, actionRound: 3 },
+    { type: "action", kind: "bomb", actionEpoch: 9, actionSeq: 3, actionRound: -1 },
+    {
+      type: "action", kind: "ability", slot: 4,
+      actionEpoch: 9, actionSeq: 3, actionRound: 3
+    },
+    { type: "action", kind: "admin", actionEpoch: 9, actionSeq: 3, actionRound: 3 }
+  ]) {
+    assert.equal(manager.processPlayerAction(room, 0, message), false);
+  }
+  assert.deepEqual(manager.actionProtocol(room).ack, [2, 1]);
+  assert.equal(applied.length, 4);
+
+  assert.equal(manager.processPlayerAction(room, 0, {
+    type: "action", kind: "bomb", actionEpoch: 9, actionSeq: 3, actionRound: 2
+  }), true, "a delayed action from the previous round is consumed without an effect");
+  assert.deepEqual(manager.actionProtocol(room).ack, [3, 1]);
+  assert.equal(applied.length, 4);
+  assert.equal(manager.processPlayerAction(room, 0, {
+    type: "action", kind: "bomb", actionEpoch: 9, actionSeq: 4, actionRound: 3
+  }), true, "the next current-round action cannot be head-of-line blocked");
+  assert.deepEqual(manager.actionProtocol(room).ack, [4, 1]);
+  assert.equal(applied.length, 5);
+});
+
 const unlockKit = (player) => {
   player.skillsUnlocked = [true, true, true, true];
   return player;

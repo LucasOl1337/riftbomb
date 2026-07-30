@@ -169,7 +169,8 @@ function joinQuickMatch(socket, message, resumeClaim) {
     if (resumedSeat) {
       attachPlayerToRoom(socket, {
         ready: true,
-        inputProtocol: message.inputProtocol
+        inputProtocol: message.inputProtocol,
+        actionProtocol: message.actionProtocol
       }, resumedSeat.room, resumedSeat.role, { quickMatch: true, resumeClaim });
       return;
     }
@@ -187,6 +188,7 @@ function joinQuickMatch(socket, message, resumeClaim) {
         socket,
         preset: validPreset(message.preset),
         inputProtocol: message.inputProtocol === 1 ? 1 : 0,
+        actionProtocol: message.actionProtocol === 1 ? 1 : 0,
         resumeClaim
       };
       if (queued.socket.readyState === WebSocket.OPEN) {
@@ -214,10 +216,14 @@ function joinQuickMatch(socket, message, resumeClaim) {
       matchTarget: 3
     });
     attachPlayerToRoom(waiting.socket, {
-      ready: true, inputProtocol: waiting.inputProtocol
+      ready: true,
+      inputProtocol: waiting.inputProtocol,
+      actionProtocol: waiting.actionProtocol
     }, room, "host", { quickMatch: true, resumeClaim: waiting.resumeClaim });
     attachPlayerToRoom(socket, {
-      ready: true, inputProtocol: message.inputProtocol
+      ready: true,
+      inputProtocol: message.inputProtocol,
+      actionProtocol: message.actionProtocol
     }, room, "guest", { quickMatch: true, resumeClaim });
     return;
   }
@@ -227,6 +233,7 @@ function joinQuickMatch(socket, message, resumeClaim) {
     socket,
     preset: validPreset(message.preset),
     inputProtocol: message.inputProtocol === 1 ? 1 : 0,
+    actionProtocol: message.actionProtocol === 1 ? 1 : 0,
     resumeClaim
   });
   send(socket, { type: "quick-queued", position: quickMatchQueue.length });
@@ -299,6 +306,7 @@ function attachPlayerToRoom(socket, message, room, role, {
     ready: role === "host" || Boolean(message.ready),
     disconnectedAt: 0,
     inputProtocol: 0,
+    actionProtocol: 0,
     quickMatch: Boolean(quickMatch),
     resumeProtocol: 0,
     resumeTokenDigest: null,
@@ -309,6 +317,10 @@ function attachPlayerToRoom(socket, message, room, role, {
   player.inputProtocol = Math.max(
     player.inputProtocol || 0,
     message.inputProtocol === 1 ? 1 : 0
+  );
+  player.actionProtocol = Math.max(
+    player.actionProtocol || 0,
+    message.actionProtocol === 1 ? 1 : 0
   );
   if (!protectedSeat && resumeClaim.version === RESUME_PROTOCOL_VERSION) {
     player.resumeProtocol = RESUME_PROTOCOL_VERSION;
@@ -321,6 +333,7 @@ function attachPlayerToRoom(socket, message, room, role, {
   if (room.game) {
     room.inputs[index] = 0;
     if (player.inputProtocol === 1) room.inputReliable[index] = true;
+    if (player.actionProtocol === 1) room.actionReliable[index] = true;
     room.gridCache = null;
   }
   if (previousSocket && previousSocket !== socket &&
@@ -335,6 +348,7 @@ function attachPlayerToRoom(socket, message, room, role, {
     quickMatch: Boolean(player.quickMatch),
     soundCursor: room.game?.authoritativeSound?.latest || room.soundEventSequence || 0,
     input: authoritativeRooms.inputProtocol(room),
+    action: authoritativeRooms.actionProtocol(room),
     resume: {
       v: RESUME_PROTOCOL_VERSION,
       protected: player.resumeProtocol === RESUME_PROTOCOL_VERSION,
@@ -347,13 +361,15 @@ function attachPlayerToRoom(socket, message, room, role, {
       type: "resume",
       activeMatch: Boolean(room.game),
       hostConnected: Boolean(room.players[0]?.socket),
-      input: authoritativeRooms.inputProtocol(room)
+      input: authoritativeRooms.inputProtocol(room),
+      action: authoritativeRooms.actionProtocol(room)
     });
   } else if (room.game) {
     send(socket, {
       ...authoritativeRooms.lobbyMessage(room),
       type: "start",
-      input: authoritativeRooms.inputProtocol(room)
+      input: authoritativeRooms.inputProtocol(room),
+      action: authoritativeRooms.actionProtocol(room)
     });
   }
   if (reconnected) {
@@ -388,6 +404,8 @@ function leaveRoom(socket, room, index, generation) {
   room.inputAccepted[index] = 0;
   room.inputApplied[index] = 0;
   room.inputReliable[index] = false;
+  room.actionAck[index] = 0;
+  room.actionReliable[index] = false;
   room.lastActivity = Date.now();
   broadcast(room, { type: "presence", playerId: index + 1, connected: false });
   broadcast(room, authoritativeRooms.lobbyMessage(room));
@@ -417,9 +435,7 @@ function handleMessage(socket, raw) {
   room.lastActivity = Date.now();
 
   if (message.type === "input") authoritativeRooms.acceptInput(room, index, message);
-  if (message.type === "action" && room.game) {
-    authoritativeRooms.applyPlayerAction(room, index + 1, message);
-  }
+  if (message.type === "action") authoritativeRooms.processPlayerAction(room, index, message);
   if (message.type === "guest-config" && index === 1 && !room.game) {
     room.players[1].ready = Boolean(message.ready);
     if (isChampion(message.champion)) room.preset.guestChampion = message.champion;
@@ -553,6 +569,8 @@ function releaseGuestAfterResumeExpiry(room, now) {
   room.inputAccepted[1] = 0;
   room.inputApplied[1] = 0;
   room.inputReliable[1] = false;
+  room.actionAck[1] = 0;
+  room.actionReliable[1] = false;
   room.gridCache = null;
   room.lastActivity = now;
   broadcast(room, { type: "presence", playerId: 2, connected: false });
