@@ -44,6 +44,14 @@ test("keeps the selected mode promise visible on portrait phones", async () => {
   );
 });
 
+test("makes the default Quick Match call to action immediate and specific", async () => {
+  const page = await readFile(new URL("app/page.tsx", root), "utf8");
+
+  assert.match(page, /if \(activeMode === "quick"\) return "JOGAR AGORA"/);
+  assert.match(page, /Encontre um rival online sem criar sala\./);
+  assert.doesNotMatch(page, /if \(activeMode === "quick"\) return "BUSCAR PARTIDA"/);
+});
+
 test("keeps the runtime authoritative behind a same-origin message bridge", async () => {
   const [page, runtime] = await Promise.all([
     readFile(new URL("app/page.tsx", root), "utf8"),

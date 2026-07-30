@@ -487,7 +487,7 @@ export default function Home() {
       if (!runtime.guestReady) return "OPONENTE ESCOLHENDO";
       return "INICIAR PARTIDA";
     }
-    if (activeMode === "quick") return "BUSCAR PARTIDA";
+    if (activeMode === "quick") return "JOGAR AGORA";
     if (activeMode === "online") return "CRIAR SALA PRIVADA";
     if (activeMode === "challenge") return "CRIAR DESAFIO";
     if (activeMode === "join") return "ENTRAR NA SALA";
@@ -915,7 +915,9 @@ export default function Home() {
                 </Icon>
               </button>
               <small>
-                {activeMode === "online" ||
+                {activeMode === "quick"
+                  ? "Encontre um rival online sem criar sala."
+                  : activeMode === "online" ||
                 activeMode === "challenge" ||
                 activeMode === "join"
                   ? "A partida online não pode ser pausada."
