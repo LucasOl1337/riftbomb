@@ -534,7 +534,10 @@ test("keeps arena WebP files out of the initial online payload", async () => {
   );
   assert.match(game, /\/arena-textures\/crate\.webp/);
   assert.match(game, /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp/);
+  assert.match(game, /\/arena-textures\/floor-clearing-v3\.webp/);
+  assert.match(game, /\/arena-textures\/nacre-growth-albedo\.webp/);
   assert.match(game, /\/arena-textures\/floor-storm-eye-combat-field-99509f91\.webp/);
+  assert.doesNotMatch(game, /\/arena-textures\/floor-clearing\.webp/);
   assert.doesNotMatch(game, /\/arena-textures\/floor-lattice\.webp/);
   assert.doesNotMatch(game, /\/arena-textures\/floor-pit\.webp/);
 
@@ -545,7 +548,8 @@ test("keeps arena WebP files out of the initial online payload", async () => {
       "game/arena-appearance/textures/ground/floor-salt-lens-combat-band-6ffb0854.webp",
       "floor-salt-lens-combat-band-6ffb0854.webp",
     ],
-    ["game/arena-appearance/textures/ground/floor-clearing.webp", "floor-clearing.webp"],
+    ["game/arena-appearance/textures/ground/floor-clearing-v3.webp", "floor-clearing-v3.webp"],
+    ["game/arena-appearance/textures/props/nacre-growth-albedo.webp", "nacre-growth-albedo.webp"],
     ["game/arena-appearance/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
     ["game/arena-appearance/textures/ground/floor-forts.webp", "floor-forts.webp"],
     [

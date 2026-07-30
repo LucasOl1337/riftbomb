@@ -49,7 +49,8 @@ const arenaTextureFiles = Object.freeze({
     "ground/floor-salt-lens-combat-band-6ffb0854.webp",
     "floor-salt-lens-combat-band-6ffb0854.webp",
   ],
-  floorClearing: ["ground/floor-clearing.webp", "floor-clearing.webp"],
+  floorClearing: ["ground/floor-clearing-v3.webp", "floor-clearing-v3.webp"],
+  nacreGrowth: ["props/nacre-growth-albedo.webp", "nacre-growth-albedo.webp"],
   floorLabyrinth: ["ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
   floorForts: ["ground/floor-forts.webp", "floor-forts.webp"],
   floorPit: [
