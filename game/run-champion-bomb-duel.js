@@ -44,14 +44,14 @@
         id: "clearing",
         label: "Nacre Hollow",
         blurb: "Sunken shell-garden · open center",
-        crateChance: 0.58,
+        crateChance: 0.25,
         powerupChance: 0.52,
         theme: Object.freeze({
           floor: "floorClearing",
           wall: "wallClearing",
           wallTop: "wallTopClearing",
           soft: "nacreGrowth",
-          clear: "#021216",
+          clear: "#03191e",
           base: "#08282c",
           floorA: "#b8b2a6",
           floorB: "#817f78",
@@ -66,7 +66,7 @@
             motif: 1,
             primary: "#4cced3",
             secondary: "#c6a7c7",
-            intensity: 0.26,
+            intensity: 0.20,
             speed: 0.32,
             density: 0.82
           })

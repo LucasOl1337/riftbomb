@@ -154,7 +154,7 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   };
   assert.deepEqual(
     [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(theme)],
-    ["nacreScene"]
+    ["nacreGrowth", "nacreReef", "floorClearing", "wallClearing", "wallTopClearing"]
   );
   assert.deepEqual(
     [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(null)],
@@ -169,11 +169,12 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   assert.doesNotMatch(controls, /paintArenaPreview|createArenaPreview|buildArenaPicker/);
   assert.doesNotMatch(controls, /renderer\.arenaTexturesReady/);
 
-  const themePattern = /theme: Object\.freeze\(\{\s*floor: "([^"]+)",\s*wall: "([^"]+)",\s*wallTop: "([^"]+)"/g;
-  const themes = [...rules.matchAll(themePattern)].map(([, floor, wall, wallTop]) => ({
+  const themePattern = /theme: Object\.freeze\(\{\s*floor: "([^"]+)",\s*wall: "([^"]+)",\s*wallTop: "([^"]+)"(?:,\s*soft: "([^"]+)")?/g;
+  const themes = [...rules.matchAll(themePattern)].map(([, floor, wall, wallTop, soft]) => ({
     floor,
     wall,
-    wallTop
+    wallTop,
+    ...(soft ? { soft } : {})
   }));
   const declaredThemeCount = (rules.match(/theme: Object\.freeze\(\{/g) ?? []).length;
   assert.ok(declaredThemeCount > 0, "at least one arena theme must be budgeted");
@@ -192,7 +193,7 @@ test("arena textures load only for the selected or explored arena", async (t) =>
       return path.join("ground", "floor-clearing-v3.webp");
     }
     if (key === "nacreGrowth") return path.join("props", "nacre-growth-albedo.webp");
-    if (key === "nacreScene") return path.join("background", "nacre-hollow-scene.webp");
+    if (key === "nacreReef") return path.join("props", "nacre-reef-albedo.webp");
     const directory = key.startsWith("floor") ? "ground" : "walls";
     const fileName = key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
     return path.join(directory, `${fileName}.webp`);
@@ -1364,13 +1365,15 @@ test("arena modular kit packs nineteen authored texture sources", async () => {
   assert.equal(
     [...packedTextures.matchAll(/data:image\/webp;base64,/g)].length,
     19,
-    "the offline build must embed each modular kit source once, including the Nacre match plate"
+    "the offline build must embed each modular material once without a flattened Nacre match plate"
   );
+  assert.doesNotMatch(packedTextures, /nacreScene|nacre-hollow-scene/);
 });
 
-test("Nacre Hollow renders its authored shell kit instead of generic crates", async () => {
+test("Nacre Hollow renders its authored shell kit as depth-tested cell geometry", async () => {
   const document = await readFile(sourcePath, "utf8");
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const start = await readFile(path.join(gameDirectory, "start-champion-duel.js"), "utf8");
   const nacre = await readFile(
     path.join(gameDirectory, "arena-appearance", "draw-nacre-hollow.js"),
     "utf8"
@@ -1385,12 +1388,108 @@ test("Nacre Hollow renders its authored shell kit instead of generic crates", as
   assert.match(renderer, /typeof RIFTBOMB_NACRE_APPEARANCE !== "undefined"/);
   assert.doesNotMatch(renderer, /globalThis\.RIFTBOMB_NACRE_APPEARANCE/);
   assert.match(renderer, /nacreGrowth:\s*\["nacreGrowth"\]/);
+  assert.match(renderer, /nacreReef:\s*\["nacreReef"\]/);
   assert.match(renderer, /uMapId > 4\.5 && uMapId < 5\.5/);
-  assert.match(renderer, /uUseArenaBackdrop/);
-  assert.match(renderer, /if \(!nacreAppearance\)/);
-  assert.match(renderer, /mix\(backdrop, scene\.rgb, scene\.a\)/);
+  assert.match(renderer, /uMapId > 5\.5 && uMapId < 6\.5/);
+  assert.match(renderer, /transpose\(inverse\(mat3\(uModel\)\)\)/);
+  assert.match(renderer, /\[0, 2, 1, 0, 3, 2\]/);
+  assert.doesNotMatch(renderer, /for \(const i of \[0, 1, 2, 0, 2, 3\]\) p\.push\(\.\.\.q\[i\], \.\.\.q\[i\]\)/);
+  assert.match(renderer, /this\.meshes\.nacreGrowthTall/);
+  assert.match(renderer, /this\.meshes\.nacreGrowthFan/);
+  assert.match(nacre, /emit\(a, c, b, center\);\s*emit\(a, d, c, center\);/);
+  assert.doesNotMatch(nacre, /emit\(a, b, c, center\);\s*emit\(a, c, d, center\);/);
+  assert.match(start, /modelReviewTarget === "nacre"\) game\.selectArena\("clearing"\)/);
+  assert.match(start, /modelReviewTarget === "nacre"[\s\S]*ensureArenaTextures\(game\.arenaTemplate\(\)\.theme\)/);
+  assert.doesNotMatch(renderer, /nacreScene|uArenaBackdrop|uUseArenaBackdrop/);
+  assert.doesNotMatch(renderer, /if \(!nacreAppearance\)/);
+  assert.doesNotMatch(renderer, /mix\(backdrop,\s*scene\.rgb,\s*scene\.a\)/);
   assert.match(nacre, /drawFloorOrnaments/);
   assert.match(nacre, /drawBreakableTile/);
+
+  const context = vm.createContext({ Float32Array });
+  vm.runInContext(
+    `${nacre}\nglobalThis.__nacreAppearance = RIFTBOMB_NACRE_APPEARANCE;`,
+    context,
+  );
+  const appearance = context.__nacreAppearance;
+  const recordDraws = () => {
+    const calls = [];
+    return {
+      calls,
+      renderer: {
+        mobilePerf: false,
+        draw(...args) {
+          calls.push(args);
+        },
+      },
+    };
+  };
+  const half = 0.66;
+  const tileContext = {
+    x: 1.32,
+    z: -2.64,
+    half,
+    edge: false,
+    frontEdge: false,
+    row: 3,
+    col: 4,
+    rows: 11,
+    cols: 13,
+  };
+  const hard = recordDraws();
+  appearance.drawHardTile(hard.renderer, tileContext);
+  const breakable = recordDraws();
+  appearance.drawBreakableTile(breakable.renderer, tileContext);
+  const backdrop = recordDraws();
+  const halfW = 8.58;
+  const halfD = 7.26;
+  appearance.drawBackdrop(backdrop.renderer, halfW, halfD, 1.25);
+
+  assert.ok(hard.calls.some((call) => call[10] === 3), "hard cells must draw the wall material");
+  assert.ok(
+    breakable.calls.some((call) => call[0] === "nacreGrowth" && call[10] === 5),
+    "breakable cells must draw the authored Nacre growth material",
+  );
+  for (const [label, calls] of [["hard", hard.calls], ["breakable", breakable.calls]]) {
+    assert.ok(calls.length > 0, `${label} cell must issue real mesh draws`);
+    for (const [, position, scale] of calls) {
+      assert.ok(
+        Math.abs(position[0] - tileContext.x) + Math.abs(scale[0]) <= half + 0.001,
+        `${label} mesh must stay inside its grid cell on X`,
+      );
+      assert.ok(
+        Math.abs(position[2] - tileContext.z) + Math.abs(scale[2]) <= half + 0.001,
+        `${label} mesh must stay inside its grid cell on Z`,
+      );
+    }
+  }
+
+  const luminance = ([red, green, blue]) => red * 0.2126 + green * 0.7152 + blue * 0.0722;
+  for (const call of [...hard.calls, ...breakable.calls]) {
+    assert.ok(
+      luminance(call[3]) >= 0.105,
+      `${call[0]} cell mesh must not use the near-black pedestal seen in the regression`,
+    );
+  }
+  const outsideArena = (call) => (
+    Math.abs(call[1][0]) > halfW || Math.abs(call[1][2]) > halfD
+  );
+  assert.ok(
+    backdrop.calls.filter((call) => (
+      call[0] === "nacreGrowth" && call[10] === 6 && outsideArena(call)
+    )).length >= 4,
+    "the cavern perimeter must contain authored Nacre formations",
+  );
+  assert.ok(
+    backdrop.calls.filter((call) => (
+      call[0] === "sphere" && outsideArena(call) && luminance(call[3]) >= 0.18
+    )).length >= 4,
+    "drawBackdrop must build visible peripheral shell fans",
+  );
+  assert.ok(
+    (nacre.match(/\bdrawShellFan\(renderer,/g) || []).length >= 2,
+    "drawBackdrop must invoke the shell-fan geometry helper",
+  );
 });
 
 test("the authored black bomb and explosion sequence drive live gameplay", async () => {

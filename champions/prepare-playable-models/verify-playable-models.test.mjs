@@ -220,6 +220,9 @@ test("the packaged catalog comes from each champion playable model", async () =>
 
 test("Katarina's ready dagger never collapses into an unreadable pickup", async () => {
   const renderer = await readFile(path.join(repositoryRoot, "game", "draw-bomber-rift.js"), "utf8");
+  assert.equal(katarinaDaggerPresentation.readyScale, 0.95);
+  assert.equal(katarinaDaggerPresentation.readyHeight, 0.34);
+  assert.equal(katarinaDaggerPresentation.readyHover, 0.025);
   for (const property of [
     "readyScale",
     "readyPitch",
@@ -253,10 +256,16 @@ test("Katarina's ready dagger never collapses into an unreadable pickup", async 
     }));
   const worst = silhouettes.reduce((smallest, silhouette) =>
     silhouette.major < smallest.major ? silhouette : smallest);
+  const largest = silhouettes.reduce((biggest, silhouette) =>
+    silhouette.major > biggest.major ? silhouette : biggest);
 
   assert.ok(
-    worst.major >= 50 && worst.area >= 850,
+    worst.major >= 18 && worst.area >= 120,
     `ready dagger collapsed to ${worst.size.map((value) => value.toFixed(1)).join("x")} px`,
+  );
+  assert.ok(
+    largest.major <= 28 && largest.area <= 260,
+    `ready dagger grew beyond its gameplay cell at ${largest.size.map((value) => value.toFixed(1)).join("x")} px`,
   );
 });
 

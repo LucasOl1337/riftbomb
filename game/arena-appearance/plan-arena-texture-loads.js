@@ -2,7 +2,7 @@
 
 function arenaTextureKeysForTheme(theme) {
   if (theme?.soft === "nacreGrowth") {
-    return ["nacreScene"];
+    return ["nacreGrowth", "nacreReef", theme.floor, theme.wall, theme.wallTop];
   }
   return [...new Set([
     "crate",

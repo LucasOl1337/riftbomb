@@ -536,7 +536,8 @@ test("keeps arena WebP files out of the initial online payload", async () => {
   assert.match(game, /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp/);
   assert.match(game, /\/arena-textures\/floor-clearing-v3\.webp/);
   assert.match(game, /\/arena-textures\/nacre-growth-albedo\.webp/);
-  assert.match(game, /\/arena-textures\/nacre-hollow-scene\.webp/);
+  assert.match(game, /\/arena-textures\/nacre-reef-albedo\.webp/);
+  assert.doesNotMatch(game, /nacreScene|nacre-hollow-scene\.webp/);
   assert.match(game, /\/arena-textures\/floor-storm-eye-combat-field-99509f91\.webp/);
   assert.doesNotMatch(game, /\/arena-textures\/floor-clearing\.webp/);
   assert.doesNotMatch(game, /\/arena-textures\/floor-lattice\.webp/);
@@ -551,7 +552,7 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     ],
     ["game/arena-appearance/textures/ground/floor-clearing-v3.webp", "floor-clearing-v3.webp"],
     ["game/arena-appearance/textures/props/nacre-growth-albedo.webp", "nacre-growth-albedo.webp"],
-    ["game/arena-appearance/textures/background/nacre-hollow-scene.webp", "nacre-hollow-scene.webp"],
+    ["game/arena-appearance/textures/props/nacre-reef-albedo.webp", "nacre-reef-albedo.webp"],
     ["game/arena-appearance/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
     ["game/arena-appearance/textures/ground/floor-forts.webp", "floor-forts.webp"],
     [
@@ -569,6 +570,7 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     ["game/arena-appearance/textures/walls/wall-top-forts.webp", "wall-top-forts.webp"],
     ["game/arena-appearance/textures/walls/wall-top-pit.webp", "wall-top-pit.webp"],
   ];
+  assert.equal(textures.length, 19, "the online build must publish only the modular arena materials");
   const arenaUrls = game.match(/\/arena-textures\/[^"]+\.webp/g) || [];
   assert.equal(arenaUrls.length, textures.length);
   assert.equal(new Set(arenaUrls).size, textures.length, "every arena slot must own one URL");
@@ -675,9 +677,22 @@ test("loads only the playable champion models selected in the lobby", async () =
         Object.values(payload.daggerParts).reduce((count, part) => count + part.count, 0),
         dagger.length / 6,
       );
-      assert.ok(payload.daggerPresentation.readyScale >= 1.3);
+      assert.ok(
+        payload.daggerPresentation.readyScale >= 0.9 &&
+          payload.daggerPresentation.readyScale <= 1,
+        "online ready dagger scale must remain readable without exceeding one gameplay cell",
+      );
       assert.ok(payload.daggerPresentation.readyHeadingSwing <= 0.15);
-      assert.ok(payload.daggerPresentation.readyHeight >= 0.2);
+      assert.ok(
+        payload.daggerPresentation.readyHeight >= 0.3 &&
+          payload.daggerPresentation.readyHeight <= 0.4,
+        "online ready dagger height must stay grounded near its pickup base",
+      );
+      assert.ok(
+        payload.daggerPresentation.readyHover >= 0.015 &&
+          payload.daggerPresentation.readyHover <= 0.04,
+        "online ready dagger hover must remain subtle",
+      );
     } else {
       assert.equal(payload.dagger, undefined);
       assert.equal(payload.daggerParts, undefined);

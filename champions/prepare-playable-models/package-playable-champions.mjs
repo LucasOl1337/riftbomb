@@ -4,12 +4,12 @@ import path from "node:path";
 const playableChampions = ["katarina", "zed", "renekton", "vladimir", "gangplank"];
 
 export const katarinaDaggerPresentation = Object.freeze({
-  readyScale: 2.3,
+  readyScale: 0.95,
   readyPitch: Math.PI / 3,
   readyHeading: Math.PI * (31 / 18),
   readyHeadingSwing: 0.055,
-  readyHeight: 0.58,
-  readyHover: 0.035
+  readyHeight: 0.34,
+  readyHover: 0.025
 });
 
 const encode = async (filePath) => (await readFile(filePath)).toString("base64");

@@ -76,7 +76,7 @@
     const modelReviewPose = modelReviewQuery.get("pose") || "idle";
     const modelReviewAction = modelReviewQuery.get("action") || "";
     const requestedModelReviewFrame = Number.parseInt(modelReviewQuery.get("frame") || "0", 10);
-    const modelReviewMode = ["katarina", "dagger", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron", "bomb"].includes(modelReviewTarget);
+    const modelReviewMode = ["nacre", "katarina", "dagger", "zed", "renekton", "vladimir", "gangplank", "minions", "herald", "baron", "bomb"].includes(modelReviewTarget);
 
     const UI = {
       app: $("#app"),
@@ -332,7 +332,7 @@
           const b0 = x / lon * TAU;
           const b1 = (x + 1) / lon * TAU;
           const q = [point(a0, b0), point(a1, b0), point(a1, b1), point(a0, b1)];
-          for (const i of [0, 1, 2, 0, 2, 3]) p.push(...q[i], ...q[i]);
+          for (const i of [0, 2, 1, 0, 3, 2]) p.push(...q[i], ...q[i]);
         }
       }
       return new Float32Array(p);
@@ -516,7 +516,7 @@
           "uVoracity", "uDash", "uShadow", "uStyle", "uAlpha", "uSkill"
         ]);
         this.postUniforms = this.uniforms(this.postProgram, [
-          "uScene", "uArenaBackdrop", "uUseArenaBackdrop", "uResolution", "uTime", "uBeat", "uEnergy", "uHit",
+          "uScene", "uResolution", "uTime", "uBeat", "uEnergy", "uHit",
           "uHealth", "uShock0", "uShock1", "uShock2", "uShock3", "uReduced"
         ]);
         this.meshes = {
@@ -532,7 +532,16 @@
         if (typeof RIFTBOMB_NACRE_APPEARANCE !== "undefined"
           && RIFTBOMB_NACRE_APPEARANCE?.buildGrowthMesh) {
           this.meshes.nacreGrowth = this.createMesh(
-            RIFTBOMB_NACRE_APPEARANCE.buildGrowthMesh(this.mobilePerf)
+            RIFTBOMB_NACRE_APPEARANCE.buildGrowthMesh(this.mobilePerf, 0)
+          );
+          this.meshes.nacreGrowthTall = this.createMesh(
+            RIFTBOMB_NACRE_APPEARANCE.buildGrowthMesh(this.mobilePerf, 1)
+          );
+          this.meshes.nacreGrowthFan = this.createMesh(
+            RIFTBOMB_NACRE_APPEARANCE.buildGrowthMesh(this.mobilePerf, 2)
+          );
+          this.meshes.nacreCavernShelf = this.createMesh(
+            RIFTBOMB_NACRE_APPEARANCE.buildCavernShelfMesh(this.mobilePerf)
           );
         }
         this.initialiseKatarinaDagger(PLAYABLE_CHAMPIONS?.katarina);
@@ -590,7 +599,7 @@
         const packagedDaggerPresentation = packed?.daggerPresentation || {};
         this.katarinaDaggerPresentation = Object.freeze({
           readyScale: Number.isFinite(packagedDaggerPresentation.readyScale)
-            ? packagedDaggerPresentation.readyScale : 1.35,
+            ? packagedDaggerPresentation.readyScale : 0.95,
           readyPitch: Number.isFinite(packagedDaggerPresentation.readyPitch)
             ? packagedDaggerPresentation.readyPitch : Math.PI * 0.4,
           readyHeading: Number.isFinite(packagedDaggerPresentation.readyHeading)
@@ -598,7 +607,7 @@
           readyHeadingSwing: Number.isFinite(packagedDaggerPresentation.readyHeadingSwing)
             ? packagedDaggerPresentation.readyHeadingSwing : 0.12,
           readyHeight: Number.isFinite(packagedDaggerPresentation.readyHeight)
-            ? packagedDaggerPresentation.readyHeight : 0.24,
+            ? packagedDaggerPresentation.readyHeight : 0.34,
           readyHover: Number.isFinite(packagedDaggerPresentation.readyHover)
             ? packagedDaggerPresentation.readyHover : 0.04
         });
@@ -1452,7 +1461,7 @@
           floorLattice: ["floorLattice"],
           floorClearing: ["floorClearing"],
           nacreGrowth: ["nacreGrowth"],
-          nacreScene: ["nacreScene"],
+          nacreReef: ["nacreReef"],
           floorLabyrinth: ["floorLabyrinth"],
           floorForts: ["floorForts"],
           floorPit: ["floorPit"],
@@ -1474,7 +1483,7 @@
           floorLattice: [138, 90, 58, 255],
           floorClearing: [40, 90, 96, 255],
           nacreGrowth: [108, 94, 88, 255],
-          nacreScene: [32, 44, 46, 255],
+          nacreReef: [34, 58, 62, 255],
           floorLabyrinth: [28, 40, 52, 255],
           floorForts: [52, 110, 48, 255],
           floorPit: [28, 36, 58, 255],
@@ -1502,7 +1511,6 @@
         // Aliases used by draw path
         this.arenaTextures.wall = this.arenaTextures.wallLattice;
         this.arenaTextures.wallTop = this.arenaTextures.wallTopLattice;
-        this.arenaBackdropTexture = null;
         // mapId 1 = floor plate. mapId 2 = crate multi-face. mapId 3 = wall multi-face.
         // mapId 4 = skill icon plate (face UV, single albedo — bound per draw).
         this.arenaMapTextures = [
@@ -1511,7 +1519,8 @@
           this.arenaTextures.crate,
           this.arenaTextures.wallLattice,
           null,
-          this.arenaTextures.nacreGrowth
+          this.arenaTextures.nacreGrowth,
+          this.arenaTextures.nacreReef
         ];
       }
 
@@ -1537,9 +1546,7 @@
         this.arenaMapTextures[1] = floor;
         this.arenaMapTextures[3] = wall;
         this.arenaMapTextures[5] = this.arenaTextures[theme.soft] || this.arenaTextures.nacreGrowth;
-        this.arenaBackdropTexture = theme.soft === "nacreGrowth"
-          ? this.arenaTextures.nacreScene
-          : null;
+        this.arenaMapTextures[6] = this.arenaTextures.nacreReef;
         this.arenaTextures.wall = wall;
         this.arenaTextures.wallTop = wallTop;
         this.arenaFloorProfile = floorKey === "floorLattice" || floorKey === "floorPit"
@@ -3173,7 +3180,17 @@ drawKatarinaFallback(player, t, beat) {
         const shakeX = Math.sin(t * 61) * essentialShake * 0.2;
         const shakeZ = Math.cos(t * 47) * essentialShake * 0.16;
         const orbit = prefersReducedMotion || this.mobilePerf ? 0 : Math.sin(t * 0.16) * 0.32;
-        const reviewCamera = modelReviewTarget === "dagger"
+        const nacreReviewCameras = {
+          overview: { eye: [0, 16.8, 13.2], target: [0, 0.16, 0.4], fov: 0.76 },
+          left: { eye: [-11.5, 10.2, 11.8], target: [0, 0.18, 0], fov: 0.76 },
+          right: { eye: [11.5, 10.2, 11.8], target: [0, 0.18, 0], fov: 0.76 },
+          rear: { eye: [0, 10.4, -14.2], target: [0, 0.18, 0], fov: 0.76 },
+          grazing: { eye: [10.8, 5.8, 13.5], target: [0, 0.28, 0], fov: 0.7 },
+          close: { eye: [4.8, 5.2, 6.4], target: [2.1, 0.3, 1.4], fov: 0.62 }
+        };
+        const reviewCamera = modelReviewTarget === "nacre"
+          ? (nacreReviewCameras[modelReviewPose] || nacreReviewCameras.overview)
+          : modelReviewTarget === "dagger"
           ? {
               eye: compact ? [0, 19.5, 15.5] : [0, 14.6, 13.4],
               target: [0, 0.2, compact ? 0.05 : 0.12],
@@ -3195,10 +3212,13 @@ drawKatarinaFallback(player, t, beat) {
         const focusPlayer = !modelReviewMode && this.viewPlayerId
           ? game.players?.find((player) => player.id === this.viewPlayerId)
           : null;
+        const nacreCamera = game.arenaTemplate?.().theme?.floor === "floorClearing";
         const overviewEye = compact
           ? [shakeX + orbit, 19.5, 15.5 + shakeZ]
-          : [shakeX + orbit, 14.6, 13.4 + shakeZ];
-        const overviewTarget = [0, 0.2, compact ? 0.05 : 0.12];
+          : nacreCamera
+            ? [shakeX + orbit, 16.8, 13.2 + shakeZ]
+            : [shakeX + orbit, 14.6, 13.4 + shakeZ];
+        const overviewTarget = [0, 0.2, compact ? 0.05 : (nacreCamera ? 0.4 : 0.12)];
         // Keep the widest zoom centered on the whole arena, then progressively
         // converge on the local player. At close zoom the champion is centered;
         // at overview zoom the maximum useful arena remains visible.
@@ -3223,7 +3243,7 @@ drawKatarinaFallback(player, t, beat) {
         const projection = mat4Perspective(
           modelReviewMode ? reviewCamera.fov : focusPlayer
             ? lerp(compact ? 0.84 : 0.74, compact ? 0.7 : 0.62, zoom)
-            : (compact ? 0.84 : 0.74),
+            : (compact ? 0.84 : (nacreCamera ? 0.77 : 0.74)),
           aspect,
           0.1,
           70
@@ -3250,10 +3270,10 @@ drawKatarinaFallback(player, t, beat) {
           ? RIFTBOMB_NACRE_APPEARANCE
           : null;
         this.bindArenaTheme(theme);
-        // Nacre uses its approved scene art as the actual match plate. Dynamic
-        // contestants and combat effects render into a transparent scene above it.
+        // Every arena is one opaque 3D scene. Nacre must share this depth buffer
+        // with champions, bombs and pickups; a screen-space beauty plate cannot.
         const clear = this.themeColor(theme, "clear", [0.05, 0.08, 0.07]);
-        gl.clearColor(clear[0], clear[1], clear[2], nacreAppearance ? 0 : 1);
+        gl.clearColor(clear[0], clear[1], clear[2], 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         gl.useProgram(this.mainProgram);
         gl.uniformMatrix4fv(this.mainUniforms.uViewProjection, false, vp);
@@ -3268,7 +3288,6 @@ drawKatarinaFallback(player, t, beat) {
         // Clean stage in deep tactical void (no outer tile mud)
         const halfW = (game.cols * game.tile) * 0.5;
         const halfD = (game.rows * game.tile) * 0.5;
-        if (!nacreAppearance) {
         // Hard stage plinth in tactical void — no soft cyan bloom disc
         const plinth = [
           clear[0] * 0.35 + 0.02,
@@ -3300,8 +3319,9 @@ drawKatarinaFallback(player, t, beat) {
         for (let r = 1; r < game.rows - 1; r++) {
           for (let c = 1; c < game.cols - 1; c++) {
             const [fx, fz] = game.worldFromCell(r, c);
+            const floorHalf = nacreAppearance ? game.tile * 0.496 : game.tile * 0.5;
             this.draw("cube", [fx, -0.055, fz],
-              [game.tile * 0.5, 0.04, game.tile * 0.5],
+              [floorHalf, 0.04, floorHalf],
               textureTint, 0, 0.01, 0, 1, 0, 0, 1);
           }
         }
@@ -3319,6 +3339,10 @@ drawKatarinaFallback(player, t, beat) {
           { x: 9.0, z: -7.15, color: C.redSide }
         ];
         nexuses.forEach((nexus, i) => {
+          if (nacreAppearance?.drawTeamNexus) {
+            nacreAppearance.drawTeamNexus(this, nexus, i, t, beat);
+            return;
+          }
           this.draw("sphere", [nexus.x, 0.04, nexus.z], [0.95, 0.05, 0.95],
             nexus.color, 4, 0.9 + beat * 0.25, t);
           this.draw("crystal", [nexus.x, 0.68 + Math.sin(t * 1.7 + i) * 0.06, nexus.z],
@@ -3333,6 +3357,10 @@ drawKatarinaFallback(player, t, beat) {
           { x: 9.05, z: -3.8, color: C.redSide }
         ];
         turrets.forEach((turret, i) => {
+          if (nacreAppearance?.drawTeamTurret) {
+            nacreAppearance.drawTeamTurret(this, turret, i, t, beat);
+            return;
+          }
           this.draw("cube", [turret.x, 0.22, turret.z], [0.34, 0.28, 0.34], C.arenaStone, 0, 0.15);
           this.draw("crystal", [turret.x, 0.72, turret.z], [0.18, 0.4, 0.18],
             turret.color, 2, 1.6 + beat * 0.3, (i % 2 ? -1 : 1) * t * 0.18);
@@ -3380,8 +3408,6 @@ drawKatarinaFallback(player, t, beat) {
             }
           }
         }
-        }
-
         for (const ultimate of game.ultimates) {
           const progress = clamp(ultimate.age / ultimate.fuse, 0, 1);
           const warning = 0.82 + Math.sin(t * 18) * 0.12;
@@ -3719,10 +3745,6 @@ drawKatarinaFallback(player, t, beat) {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.sceneTexture);
         gl.uniform1i(this.postUniforms.uScene, 0);
-        gl.activeTexture(gl.TEXTURE3);
-        gl.bindTexture(gl.TEXTURE_2D, this.arenaBackdropTexture || this.arenaWhiteTexture);
-        gl.uniform1i(this.postUniforms.uArenaBackdrop, 3);
-        gl.uniform1f(this.postUniforms.uUseArenaBackdrop, nacreAppearance ? 1 : 0);
         gl.uniform2f(this.postUniforms.uResolution, this.width, this.height);
         gl.uniform1f(this.postUniforms.uTime, t);
         gl.uniform1f(this.postUniforms.uBeat, beat);
@@ -3929,7 +3951,7 @@ drawKatarinaFallback(player, t, beat) {
       void main() {
         vec4 world = uModel * vec4(aPosition, 1.0);
         vWorld = world.xyz;
-        vNormal = normalize(mat3(uModel) * aNormal);
+          vNormal = normalize(transpose(inverse(mat3(uModel))) * aNormal);
         vLocal = aPosition;
         gl_Position = uViewProjection * world;
       }
@@ -4022,8 +4044,9 @@ drawKatarinaFallback(player, t, beat) {
         vec3 N = normalize(vNormal);
         if (!gl_FrontFacing) N = -N;
         vec3 V = normalize(uCamera - vWorld);
-        vec3 Lkey = normalize(vec3(-0.28, 0.92, 0.24));
-        vec3 Lfill = normalize(vec3(0.62, 0.42, -0.48));
+        float nacreProfile = step(0.5, uArenaProfile);
+        vec3 Lkey = normalize(mix(vec3(-0.28, 0.92, 0.24), vec3(-0.46, 0.78, 0.43), nacreProfile));
+        vec3 Lfill = normalize(mix(vec3(0.62, 0.42, -0.48), vec3(0.58, 0.24, -0.6), nacreProfile));
         float ndlKey = max(dot(N, Lkey), 0.0);
         float ndlFill = max(dot(N, Lfill), 0.0);
         float wrapKey = max(dot(N, Lkey) * 0.55 + 0.45, 0.0);
@@ -4044,12 +4067,22 @@ drawKatarinaFallback(player, t, beat) {
             uv = clamp(vLocal.xz * 0.5 + 0.5, 0.0, 1.0);
             albedo = texture(uAlbedo, uv).rgb;
             mapUv = uv;
+          } else if (uMapId > 5.5 && uMapId < 6.5) {
+            // The cave shelf spans the whole arena, so sample in world space.
+            // Local-space UVs stretched a single texel field across the huge
+            // slab and turned the reef into soft, repeated blobs.
+            vec3 weights = pow(abs(N), vec3(4.0));
+            weights /= max(weights.x + weights.y + weights.z, 0.001);
+            vec3 sampleX = texture(uAlbedo, mirroredTile(vWorld.zy * 0.105 + 0.5)).rgb;
+            vec3 sampleY = texture(uAlbedo, mirroredTile(vWorld.xz * 0.105 + 0.5)).rgb;
+            vec3 sampleZ = texture(uAlbedo, mirroredTile(vWorld.xy * 0.105 + 0.5)).rgb;
+            albedo = sampleX * weights.x + sampleY * weights.y + sampleZ * weights.z;
           } else if (uMapId > 4.5 && uMapId < 5.5) {
             vec3 weights = pow(abs(N), vec3(4.0));
             weights /= max(weights.x + weights.y + weights.z, 0.001);
-            vec3 sampleX = texture(uAlbedo, mirroredTile(vLocal.zy * 0.38 + 0.5)).rgb;
-            vec3 sampleY = texture(uAlbedo, mirroredTile(vLocal.xz * 0.38 + 0.5)).rgb;
-            vec3 sampleZ = texture(uAlbedo, mirroredTile(vLocal.xy * 0.38 + 0.5)).rgb;
+            vec3 sampleX = texture(uAlbedo, mirroredTile(vLocal.zy * 0.38 + vWorld.zy * 0.07 + 0.5)).rgb;
+            vec3 sampleY = texture(uAlbedo, mirroredTile(vLocal.xz * 0.38 + vWorld.xz * 0.07 + 0.5)).rgb;
+            vec3 sampleZ = texture(uAlbedo, mirroredTile(vLocal.xy * 0.38 + vWorld.xy * 0.07 + 0.5)).rgb;
             albedo = sampleX * weights.x + sampleY * weights.y + sampleZ * weights.z;
           } else if (uMapId > 1.5 && uMapId < 2.5) {
             // CRATE: one full face of the X-panel art — never tile/fract or multi-scale
@@ -4076,7 +4109,15 @@ drawKatarinaFallback(player, t, beat) {
             vec3 Nb = mix(NbSide, NbTop, topFace);
             N = normalize(mix(N, Nb, 0.3));
           } else {
-            if (uFloorProfile > 0.5) {
+            if (uArenaProfile > 0.5) {
+              // Nacre's 4x4 carved atlas is authored for the whole arena. Keep
+              // its central rings centered and expose the engraved cell seams.
+              uv = clamp(vWorld.xz * vec2(0.051, 0.061) + 0.5, 0.0, 1.0);
+              mapUv = uv;
+              albedo = sampleCombatBandDetail(uAlbedo, uv, 4.25, 0.32);
+              vec3 Nb = bumpFromAlbedo(uAlbedo, uv, N, 1.25);
+              N = normalize(mix(N, Nb, 0.36));
+            } else if (uFloorProfile > 0.5) {
               // Authored low-noise floors use one arena-scale material with restrained
               // microdetail. UVs remain independent from the 99 floor cells.
               uv = fract(vWorld.xz * 0.066 + 0.5);
@@ -4094,11 +4135,33 @@ drawKatarinaFallback(player, t, beat) {
             }
           }
           mapped = 1.0;
+          if (uMapId > 4.5) edge *= 0.12;
           // Nacre albedos are authored as bright oyster stone. Grade them in-scene
           // so the material keeps detail under the shared HDR/post stack instead of
           // clipping into the white prototype look.
           if (uArenaProfile > 0.5) {
-            albedo *= vec3(0.86, 0.88, 0.87);
+            if (uMapId > 5.5 && uMapId < 6.5) {
+              // The outer cavern owns a separate dark reef material. It is a
+              // real world-space mesh, but recedes behind the playable pearls.
+              float reefVein = smoothstep(0.045, 0.12, 0.5 * (albedo.g + albedo.b) - albedo.r);
+              albedo = mix(albedo, sqrt(max(albedo, vec3(0.0))), 0.06);
+              albedo *= vec3(0.42, 0.56, 0.64);
+              albedo += vec3(0.01, 0.24, 0.3) * reefVein * 0.24;
+            } else if (uMapId > 4.5 && uMapId < 5.5) {
+              albedo *= vec3(0.36, 0.39, 0.42);
+            } else if (uMapId > 0.5 && uMapId < 1.5) {
+              albedo *= vec3(0.84, 0.85, 0.84);
+            } else if (uMapId > 2.5 && uMapId < 3.5) {
+              albedo *= vec3(0.58, 0.62, 0.64);
+            } else {
+              albedo *= vec3(0.78, 0.8, 0.79);
+            }
+            if (uMapId > 2.5 && uMapId < 3.5
+               && uMaterial > 0.5 && uMaterial < 1.5) {
+              // Interior blockers use the same authored carved wall texture with
+              // a deep wet-stone grade; perimeter blocks remain pale pearl.
+              albedo *= vec3(0.58, 0.62, 0.64);
+            }
           }
           // Recompute lighting terms after bump
           ndlKey = max(dot(N, Lkey), 0.0);
@@ -4136,6 +4199,27 @@ drawKatarinaFallback(player, t, beat) {
             color += albedo * ambient * 0.1;
             color += albedo * edge * 0.06;
             color += vec3(1.0, 0.95, 0.85) * spec * 0.04;
+            if (uArenaProfile > 0.5) {
+              // Thin-film oyster response derived from view angle, normal and world
+              // position. It relights with the mesh instead of baking highlights into
+              // a screenshot, while the low energy keeps the pale stone from clipping.
+              float fresnel = pow(1.0 - max(dot(N, V), 0.0), 3.1);
+              float band = 0.5 + 0.5 * sin(dot(N, V) * 17.0
+                + vWorld.x * 0.31 - vWorld.z * 0.27);
+              vec3 roseSheen = vec3(0.34, 0.16, 0.28);
+              vec3 cyanSheen = vec3(0.08, 0.34, 0.38);
+              vec3 nacreSheen = mix(roseSheen, cyanSheen, band);
+              float growthSheen = (uMapId > 4.5 && uMapId < 5.5)
+                ? 1.85
+                 : ((uMapId > 5.5 && uMapId < 6.5) ? 0.35 : 1.0);
+              color += nacreSheen * (0.018 + fresnel * 0.09) * growthSheen;
+              color += vec3(0.72, 0.86, 0.9) * spec * 0.075 * growthSheen;
+              float broadPearl = pow(max(dot(N, normalize(Lkey + V)), 0.0), 18.0);
+              float pearlEnergy = (uMapId > 4.5 && uMapId < 5.5)
+                ? 0.16
+                : ((uMapId > 5.5 && uMapId < 6.5) ? 0.09 : 0.11);
+              color += vec3(0.72, 0.82, 0.86) * broadPearl * pearlEnergy;
+            }
           }
         } else {
           // PRIMARY Crash solid path — saturated, chunky, readable
@@ -4553,8 +4637,6 @@ drawKatarinaFallback(player, t, beat) {
       precision highp float;
       in vec2 vUv;
       uniform sampler2D uScene;
-      uniform sampler2D uArenaBackdrop;
-      uniform float uUseArenaBackdrop;
       uniform vec2 uResolution;
       uniform float uTime;
       uniform float uBeat;
@@ -4583,31 +4665,13 @@ drawKatarinaFallback(player, t, beat) {
         return uv - dir * wave * 0.01 * (1.0 - uReduced);
       }
 
-      vec2 backdropUv(vec2 uv) {
-        float viewportAspect = uResolution.x / max(uResolution.y, 1.0);
-        float imageAspect = 16.0 / 9.0;
-        if (viewportAspect > imageAspect) {
-          uv.y = (uv.y - 0.5) * (viewportAspect / imageAspect) + 0.5;
-        } else {
-          uv.x = (uv.x - 0.5) * (imageAspect / viewportAspect) + 0.5;
-        }
-        return uv;
-      }
-
-      vec4 compositeScene(vec2 uv) {
-        vec4 scene = texture(uScene, uv);
-        if (uUseArenaBackdrop < 0.5) return scene;
-        vec3 backdrop = texture(uArenaBackdrop, clamp(backdropUv(uv), 0.0, 1.0)).rgb;
-        return vec4(mix(backdrop, scene.rgb, scene.a), 1.0);
-      }
-
       vec3 sampleScene(vec2 uv) {
         vec2 px = 1.0 / uResolution;
         // Aberration only on hit — not constant wash
         float aberr = (uHit * 1.1 + uEnergy * 0.18) * px.x * (1.0 - uReduced);
-        float r = compositeScene(uv + vec2(aberr, 0.0)).r;
-        float g = compositeScene(uv).g;
-        float b = compositeScene(uv - vec2(aberr, 0.0)).b;
+        float r = texture(uScene, uv + vec2(aberr, 0.0)).r;
+        float g = texture(uScene, uv).g;
+        float b = texture(uScene, uv - vec2(aberr, 0.0)).b;
         return vec3(r, g, b);
       }
 
@@ -4621,7 +4685,7 @@ drawKatarinaFallback(player, t, beat) {
         uv = shockWarp(uv, uShock2, ring);
         uv = shockWarp(uv, uShock3, ring);
 
-        vec4 baseTex = compositeScene(uv);
+        vec4 baseTex = texture(uScene, uv);
         vec3 color = sampleScene(uv);
         vec2 px = 1.0 / uResolution;
         float safeBeat = uBeat * (1.0 - uReduced);
@@ -4634,7 +4698,7 @@ drawKatarinaFallback(player, t, beat) {
           vec2 dir = vec2(cos(a), sin(a));
           for (int j = 1; j <= 2; j++) {
             float fj = float(j);
-            vec3 s = compositeScene(uv + dir * px * fj * (1.6 + uEnergy * 1.4)).rgb;
+            vec3 s = texture(uScene, uv + dir * px * fj * (1.6 + uEnergy * 1.4)).rgb;
             float lum = dot(s, vec3(0.2126, 0.7152, 0.0722));
             bloom += s * smoothstep(0.78, 1.05, lum);
             weights += 1.0;

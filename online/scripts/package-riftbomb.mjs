@@ -55,7 +55,7 @@ const arenaTextureFiles = Object.freeze({
   ],
   floorClearing: ["ground/floor-clearing-v3.webp", "floor-clearing-v3.webp"],
   nacreGrowth: ["props/nacre-growth-albedo.webp", "nacre-growth-albedo.webp"],
-  nacreScene: ["background/nacre-hollow-scene.webp", "nacre-hollow-scene.webp"],
+  nacreReef: ["props/nacre-reef-albedo.webp", "nacre-reef-albedo.webp"],
   floorLabyrinth: ["ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
   floorForts: ["ground/floor-forts.webp", "floor-forts.webp"],
   floorPit: [

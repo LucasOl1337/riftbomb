@@ -350,6 +350,9 @@
       };
       game = new Game(previewRenderer, sfx, new BrowserMatchPresentation());
       game.activateBotOpponent();
+      // The Nacre review route is a deterministic visual inspection surface.
+      // Force the matching arena before Renderer captures any of its six views.
+      if (modelReviewTarget === "nacre") game.selectArena("clearing");
       try {
         renderer = new Renderer(UI.canvas);
         game.renderer = renderer;
@@ -359,6 +362,9 @@
         ]
           .filter(Boolean);
         void renderer.ensureChampionModels(embeddedModels);
+        if (modelReviewTarget === "nacre") {
+          void renderer.ensureArenaTextures(game.arenaTemplate().theme);
+        }
         if (modelReviewMode) {
           game.enemies = [];
           const reviewEnemy = {
