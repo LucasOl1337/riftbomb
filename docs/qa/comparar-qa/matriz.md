@@ -24,11 +24,11 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 
 | Métrica | Quantidade |
 |---|---:|
-| Total inventariado | 15 |
+| Total inventariado | 16 |
 | Aprovadas | 0 |
 | Mudança necessária | 0 |
 | Corrigidas localmente | 6 |
-| Verificadas ao vivo | 8 |
+| Verificadas ao vivo | 9 |
 | Em andamento | 0 |
 | Reauditoria necessária | 0 |
 | Bloqueadas | 1 |
@@ -53,6 +53,7 @@ projeto. As capturas ficam fora do Git em `artifacts/comparar-qa/`.
 | 013 | Qualidade LoL · rodada 08 · continuidade temporal VAT | verified_live | Codex `/root` | 2026-07-29T23:58:39-03:00 | `4d00db7` + worktree | `4747568` · release `286865b` · Worker `e0b6dc4a` | ✅ 4 matrizes antes/depois e 24 frames, 1280×720 produção | — | — | ✅ 25 reparos usam donors autorais imutáveis; quatro casts recuperaram progressão temporal | ✅ 68/68 + 31/31 + 21/21; 17/17 hashes live; P0=0, P1=0 | `artifacts/comparar-qa/2026-07-29/lol-quality-round-08/` | Fluidez 54→60. Katarina Q/E, Zed Q e Gangplank W passaram de plateaus longos para 8/8 poses únicas; Zed run e a recuperação parcial de Gangplank W permanecem P2. A prova cobre o renderer VAT; roteamento real de Katarina E/Gangplank W vira finding separado de mecânica. |
 | 014 | Qualidade LoL · rodada 09 · roteamento semântico Q/W/E/R | verified_live | Codex `/root` | 2026-07-30T01:12:41-03:00 | `4747568` + produção anterior | `ba77212` · release `84eabbf` · Worker `0fa64580` | ✅ antes/local/live, input real e framebuffer WebGL 1280×720 | — | — | ✅ 20/20 casts reais selecionam a ação VAT autoral; atores derivados, buffer, rejeição, cancelamento e transições sem flashback | ✅ 140/140 + 39/39 + 32/32; 17/17 assets live; console live limpo; P0=0, P1=0 | `artifacts/comparar-qa/2026-07-29/lol-quality-round-09/` | Mecânicas 58→62 e Fluidez 60→63. O fluxo publicado de Katarina E passou de `Q/Spell1` incorreto para `E/Spell3`; cinco rotas erradas e flickers de timers antigos foram eliminados. Assets físicos e dispositivos móveis permanecem fora do escopo desta rodada. |
 | 015 | Qualidade LoL · rodada 10 · ACK causal e replay de movimento | verified_live | Codex `/root` | 2026-07-30T02:09:04-03:00 | Worker `0fa64580` + Oracle anterior | `d114a11` · Oracle `d114a11` · Worker `e0597eb4` | ✅ antes/live, dois clientes e input real, 1936×1048 | — | — | ✅ epoch por partida, sequência exata, ACK pós-tick e replay; rolling deploy nos dois sentidos | ✅ 140/140 + 46/46 + 33/33; console live limpo; 0 ciclos pulados; P0=0, P1=0 no escopo | `artifacts/comparar-qa/2026-07-30/lol-quality-round-10/` | Netcode 60→66. Uma `seq=2` adiantada permaneceu sem ACK; replay `seq=1→2` avançou ACK `0→1→2`. Ações one-shot e retomada autenticada por assento continuam pendentes. |
+| 016 | Qualidade LoL · rodada 11 · retomada autenticada após F5 | verified_live | Codex `/root` | 2026-07-30T02:20:13-03:00 | `c9da842` + Worker `e0597eb4` | `a21c49f` · Oracle `a21c49f` · Worker `be838e1a` | ✅ antes 1936×1048/1440×900 e depois 1280×720, dois clientes visíveis, F5 e teclado real | — | — | ✅ bearer de 256 bits por assento, digest no servidor, substituição atômica, grace exato de 20 s, ACK preservado, boot coalescido e presença false→true | ✅ 140/140 + 63/63 + servidor 54/54; dry-run; P0=0/P1=0 bloqueadores | `artifacts/comparar-qa/2026-07-30/lol-quality-round-11/` | Netcode 66→72. O cliente voltou à mesma rodada após F5 em 3.523 ms, o rival confirmou reconexão em 3.598 ms e novo input `D` foi aceito. Bearer estável sem rotação e ACK de ações one-shot permanecem pendentes. |
 
 ## Placar de qualidade — baseline do programa
 
@@ -64,7 +65,7 @@ meta de 90% vale para cada aspecto do vertical slice, nunca para a média.
 | Gráficos | 63/100 | casts ainda têm silhuetas/deformações inferiores à referência e o cenário não projeta sombras suaves |
 | Som | 74/100 | faltam teste auditivo, mix medido, material original mais rico e feedback local reconciliado |
 | Mecânicas | 62/100 | faltam cast lock, resolução simultânea neutra e fidelidade fina dos kits |
-| Netcode | 66/100 | bombas/habilidades ainda são one-shot sem ACK; F5 carece de retomada autenticada e boot determinístico do runtime |
+| Netcode | 72/100 | bombas/habilidades ainda são one-shot sem ACK; o bearer de retomada ainda não rotaciona e faltam soak/reconexão sob perda severa |
 | Fluidez | 63/100 | faltam trace p95/p99, matriz física, locomoção íntegra de Zed e eliminação do parse síncrono do catálogo VAT de 95,53 MiB |
 
 Notas têm caps de evidência: sem testes perceptuais, trace p95/p99, soak e
@@ -308,17 +309,70 @@ que reinicialize o runtime/UI antes de aplicar o snapshot completo. Eles, e o
 ACK exatamente-uma-vez de ações, são melhorias separadas. Por isso Netcode sobe
 somente de 60→66 e nenhum outro aspecto recebe pontos nesta rodada.
 
+### Rodada 11 — retomada autenticada após F5 publicada
+
+Na produção anterior, um F5 durante a partida destruía o vínculo local: o
+cliente recarregado voltava à introdução e à rodada zero, enquanto o rival
+permanecia sozinho na rodada um com aviso de desconexão. A captura anterior e o
+trace registram os dois lados sem ler `sessionStorage`, bearer ou payload
+privado.
+
+Cada assento agora recebe um bearer aleatório de 256 bits, mantido apenas em
+`sessionStorage`; o servidor conserva somente seu digest SHA-256 e usa
+comparação constante. Uma retomada válida substitui o socket de forma atômica,
+incrementa a geração e torna mensagens e `close` atrasados do socket antigo
+inertes. Estado da partida, epoch, ACK cumulativo, cursores aceitos e fila
+confiável sobrevivem, enquanto a máscara de movimento mantida é neutralizada.
+O boot volta por um único snapshot coalescido e pode ser repetido sem criar
+outro runtime ou relógio.
+
+O grace de reconexão é exatamente 20 segundos. A expiração do host encerra a
+sala e notifica o rival; a do convidado libera somente sua vaga. Tokens
+revogados entram em denylist limitada, credenciais fora do formato hexadecimal
+minúsculo falham e o fencing depois dos dois `await` de inicialização impede
+ressuscitar partidas, timers ou broadcasts de salas removidas. A QA ao vivo
+revelou ainda que o rival permanecia visualmente “desconectado” depois da
+retomada; o patch incremental passou a publicar `presence connected:true` e o
+cliente restaura o status de continuidade.
+
+Na prova pública, os dois clientes estavam na rodada 01 com relógios 82/81. O
+cliente A recebeu input real `D` e sofreu reload completo; o rival observou
+`presence:false` em 448 ms, A exibiu “partida restaurada” em 3.523 ms e B exibiu
+“Player 1 reconnected” em 3.598 ms. Ambos continuaram na rodada 01, relógio 43,
+e um novo `D` manteve a partida ativa até o relógio 30. A sessão foi encerrada
+pela UI ao final; a Oracle voltou a zero salas, zero sockets e zero partidas.
+Não foram capturados segredos. Os dois warnings do cliente A são o timeout já
+conhecido de `AudioContext.resume` sujeito à política de autoplay; nenhum erro
+de console ocorreu.
+
+O rollout publicou primeiro a Oracle com o tarball final de 59.428 bytes
+(SHA-256 `934165b46ecbd20f78e5728e98f85b554a7d1a9761cb1bbc7516d1627e5dd32c`)
+e backup em `/opt/riftbomb-backups/pre-a21c49f-20260730T065216Z.tar.gz`.
+Depois, o Worker `be838e1a-652c-48c3-8390-52e7245ae521` recebeu 100% do tráfego.
+O fonte principal da Oracle coincide com o blob do commit depois de normalizar
+CRLF, e `online-duel.js` publicado coincide com o checkout por SHA-256
+`1340ed32c04f6bd8314381cdb2c1ed9a9959474034faaaf3948f91baf597f9ec`.
+
+A reauditoria terminou sem P0/P1 bloqueador de deploy. O bearer permanece
+estável durante a vida da sessão; se for furtado, ainda pode substituir o
+socket legítimo, portanto rotação segura continua como finding futuro. Bombas
+e habilidades também continuam sem ACK exatamente-uma-vez. O ganho conservador
+é somente Netcode 66→72; nenhum outro aspecto recebe pontos nesta rodada.
+
 ## Validações automatizadas
 
-- raiz da árvore exata de release: 140/140 testes passaram;
-- `online/`: build Vinext validado e 46/46 testes passaram;
-- `online/server/`: core, WebSocket, rematch e Quick Match passaram (33/33);
+- raiz da árvore exata da release funcional: 140/140 testes passaram;
+- `online/`: build Vinext validado e 63/63 testes passaram;
+- `online/server/`: core 20/20, runtime/fencing 5/5, serialização 3/3,
+  rate limit 3/3, transporte 12/12, rematch 1/1, matchmaking 1/1 e resume 9/9;
 - `npm run validate:artifact` e `npm run deploy -- --dry-run` passaram antes da
-  publicação do mesmo inventário;
-- artefato: 105 arquivos, 69.243.560 bytes, inventário SHA-256
-  `6672bfb9cbb8372550ac717dc8c1074df9cf739659962abffece87e4893f50d0`;
-- produção: `online-duel.js` coincidiu por hash, HTTP 200/426/400 passou e o
-  fluxo `seq=2 → seq=1 → seq=2` confirmou ACK causal `0→1→2`;
+  publicação do mesmo código;
+- produção: homepage 200, `/game-ws` 426 sem upgrade, API inválida 400,
+  `online-duel.js` idêntico por hash e Worker final com 100% do tráfego;
+- Oracle: serviço ativo, zero salas/sockets/partidas, zero ciclos pulados e
+  nenhum journal de prioridade warning desde o deploy;
+- navegador visível: F5 retomou a mesma rodada, presença voltou a `true` nos
+  dois lados e input real pós-retomada manteve a partida ativa;
 - nenhum Playwright headless ou `headless_shell` foi iniciado.
 
 ## Rodadas
@@ -337,3 +391,4 @@ somente de 60→66 e nenhum outro aspecto recebe pontos nesta rodada.
 | 2026-07-29 | Codex `/root` | 013 | 1 `verified_live` | `4747568`; release `286865b`; Worker `e0b6dc4a-a875-41f5-b830-54a608a7de6b` | Rodada 08: donors VAT tornaram-se imutáveis e reparos de rig recuperaram variedade temporal em Katarina Q/E, Zed Q e Gangplank W; 68/68 + 31/31 + 21/21 gates, 17/17 hashes públicos e quatro folhas antes/live depois. Fluidez 54→60. |
 | 2026-07-30 | Codex `/root` | 014 | 1 `verified_live` | `ba77212`; release `84eabbf`; Worker `0fa64580-d3c8-4930-9c2b-bba0baade1df` | Rodada 09: o gameplay passou a publicar a identidade Q/W/E/R aceita e o renderer deixou de inferir pelo timer genérico; 15/20→20/20 rotas, 140/140 + 39/39 + 32/32 gates, 17/17 assets públicos e prova antes/live por input real. Mecânicas 58→62; Fluidez 60→63. |
 | 2026-07-30 | Codex `/root` | 015 | 1 `verified_live` | `d114a11`; Oracle `d114a11`; Worker `e0597eb4-69eb-44e4-9d8a-c3475ff682d6` | Rodada 10: movimento ganhou epoch, sequência exata, ACK pós-tick e replay HOL limitado; rolling deploy servidor→cliente passou, 140/140 + 46/46 + 33/33 gates, hash HTTP exato, dois clientes visíveis e trace live `0→1→2`. Netcode 60→66. |
+| 2026-07-30 | Codex `/root` | 016 | 1 `verified_live` | `a21c49f`; Oracle `a21c49f`; Worker `be838e1a-652c-48c3-8390-52e7245ae521` | Rodada 11: bearer autenticado por assento, substituição atômica, grace de 20 s, fencing e presença restaurada após F5; 140/140 + 63/63 + servidor 54/54, hash público exato e prova com dois clientes/input real. Netcode 66→72. |
