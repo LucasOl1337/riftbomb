@@ -1,3 +1,15 @@
+.globalRoot,
+.globalBody {
+  min-height: 100%;
+  margin: 0;
+  color-scheme: dark;
+  background: #03080d;
+}
+
+.globalBody {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
 .page {
   position: relative;
   display: grid;

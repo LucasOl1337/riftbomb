@@ -5,8 +5,9 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 
 test("recovers landing failures without abandoning the playable entry", async () => {
-  const [page, styles] = await Promise.all([
+  const [page, globalPage, styles] = await Promise.all([
     readFile(new URL("app/error.tsx", root), "utf8"),
+    readFile(new URL("app/global-error.tsx", root), "utf8"),
     readFile(new URL("app/not-found.module.css", root), "utf8"),
   ]);
 
@@ -20,4 +21,15 @@ test("recovers landing failures without abandoning the playable entry", async ()
   assert.match(styles, /\.actions/);
   assert.match(styles, /prefers-reduced-motion:\s*reduce/);
   assert.match(styles, /secondaryCta:focus-visible/);
+
+  assert.match(globalPage, /^"use client";/);
+  assert.match(globalPage, /<html lang="pt-BR"/);
+  assert.match(globalPage, /<body className=\{styles\.globalBody\}>/);
+  assert.match(globalPage, /onClick=\{reset\}/);
+  assert.match(globalPage, /Recarregar arena/);
+  assert.match(globalPage, /href="\/"/);
+  assert.match(globalPage, /Voltar ao início/);
+  assert.match(globalPage, /aria-labelledby="global-error-title"/);
+  assert.match(styles, /\.globalRoot/);
+  assert.match(styles, /\.globalBody/);
 });
