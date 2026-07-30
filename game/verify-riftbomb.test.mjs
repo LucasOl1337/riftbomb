@@ -14,30 +14,46 @@ const releasePath = path.join(repositoryRoot, "riftbomb.html");
 
 const sha256 = (buffer) => createHash("sha256").update(buffer).digest("hex");
 
-function webpDimensions(buffer) {
+function webpInfo(buffer) {
   assert.equal(buffer.subarray(0, 4).toString("ascii"), "RIFF");
   assert.equal(buffer.subarray(8, 12).toString("ascii"), "WEBP");
-  const chunk = buffer.subarray(12, 16).toString("ascii");
-  if (chunk === "VP8 ") {
-    assert.equal(buffer.subarray(23, 26).toString("hex"), "9d012a");
-    return {
-      width: buffer.readUInt16LE(26) & 0x3fff,
-      height: buffer.readUInt16LE(28) & 0x3fff
-    };
+  const uint24 = (offset) => (
+    buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16)
+  );
+  let width = 0;
+  let height = 0;
+  let hasAlpha = false;
+  for (let offset = 12; offset + 8 <= buffer.length;) {
+    const chunk = buffer.subarray(offset, offset + 4).toString("ascii");
+    const size = buffer.readUInt32LE(offset + 4);
+    const data = offset + 8;
+    assert.ok(data + size <= buffer.length, `${chunk} exceeds its WebP container`);
+    if (chunk === "VP8 ") {
+      assert.equal(buffer.subarray(data + 3, data + 6).toString("hex"), "9d012a");
+      width ||= buffer.readUInt16LE(data + 6) & 0x3fff;
+      height ||= buffer.readUInt16LE(data + 8) & 0x3fff;
+    } else if (chunk === "VP8L") {
+      assert.equal(buffer[data], 0x2f);
+      const bits = buffer.readUInt32LE(data + 1);
+      width ||= (bits & 0x3fff) + 1;
+      height ||= ((bits >>> 14) & 0x3fff) + 1;
+      hasAlpha ||= Boolean(bits & 0x10000000);
+    } else if (chunk === "VP8X") {
+      hasAlpha ||= Boolean(buffer[data] & 0x10);
+      width = uint24(data + 4) + 1;
+      height = uint24(data + 7) + 1;
+    } else if (chunk === "ALPH") {
+      hasAlpha = true;
+    }
+    offset = data + size + (size & 1);
   }
-  if (chunk === "VP8L") {
-    assert.equal(buffer[20], 0x2f);
-    const bits = buffer.readUInt32LE(21);
-    return {
-      width: (bits & 0x3fff) + 1,
-      height: ((bits >>> 14) & 0x3fff) + 1
-    };
-  }
-  if (chunk === "VP8X") {
-    const uint24 = (offset) => buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16);
-    return { width: uint24(24) + 1, height: uint24(27) + 1 };
-  }
-  assert.fail(`unsupported WebP chunk ${JSON.stringify(chunk)}`);
+  assert.ok(width > 0 && height > 0, "WebP must contain a VP8, VP8L or VP8X size");
+  return { width, height, hasAlpha };
+}
+
+function webpDimensions(buffer) {
+  const { width, height } = webpInfo(buffer);
+  return { width, height };
 }
 
 function pngDimensions(buffer) {
@@ -181,7 +197,7 @@ test("arena textures load only for the selected or explored arena", async (t) =>
   const texturesDirectory = path.join(gameDirectory, "arena-appearance", "textures");
   const measuredThemes = await Promise.all(themes.map(async (arenaTheme) => {
     const keys = [...context.RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(arenaTheme)];
-    assert.ok(keys.length <= 5, `arena boot requests ${keys.length} textures; budget is 5`);
+    assert.equal(keys.length, 5, `arena boot must request exactly 5 textures, received ${keys.length}`);
     const sizes = await Promise.all(keys.map(async (key) => (
       await stat(path.join(texturesDirectory, texturePathForKey(key)))
     ).size));
@@ -276,7 +292,7 @@ test("Storm-Eye floor preserves original provenance, rollback, budget and packed
   const sourceSize = pngDimensions(source);
   assert.ok(sourceSize.width >= 1024 && sourceSize.height >= 1024);
   assert.equal(source[25], 2, "the native PNG must be RGB truecolor without alpha");
-  assert.equal(floor.indexOf(Buffer.from("ALPH")), -1, "the runtime WebP must not carry alpha");
+  assert.equal(webpInfo(floor).hasAlpha, false, "the runtime WebP must not carry alpha");
   assert.ok(floor.length <= 200_000, `Storm-Eye floor is ${floor.length} B; ceiling is 200000 B`);
   assert.ok(floor.length < legacy.length, "the promoted floor must remain smaller than its rollback");
   assert.equal(floor.length, provenance.assetByteLength);
