@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import vm from "node:vm";
+import { createAuthoritativeDuel } from "./create-authoritative-duel.mjs";
 
 const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.dirname(gameDirectory);
@@ -629,6 +630,262 @@ test("the full roster samples tiled VAT on the GPU with a bounded CPU fallback",
   assert.match(startup, /\.\.\.game\.players\.map\(\(player\) => player\.champion\),\s*modelReviewTarget/);
   assert.match(startup, /\.filter\(Boolean\)/);
   assert.match(startup, /renderer\.ensureChampionModels\(embeddedModels\)/);
+});
+
+test("real ability casts select their authored VAT actions across the roster", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  const resolverStart = renderer.indexOf("      resolveChampionAnimation(player, t, key) {");
+  const resolverEnd = renderer.indexOf("      resolveVladimirAnimation(player, t)", resolverStart);
+  assert.ok(resolverStart >= 0 && resolverEnd > resolverStart);
+
+  const ResolverHarness = new Function(
+    "clamp",
+    "prefersReducedMotion",
+    "modelReviewMode",
+    "modelReviewTarget",
+    "modelReviewAction",
+    "requestedModelReviewFrame",
+    `return class ResolverHarness {
+      constructor() { this.championAnimationStates = new Map(); }
+      sampleChampionAction(animation, action, progress) {
+        const clipKey = animation.actions[action];
+        return clipKey ? { key: action, clipKey, progress } : null;
+      }
+      ${renderer.slice(resolverStart, resolverEnd).trim()}
+    };`
+  )(
+    (value, min, max) => Math.max(min, Math.min(max, value)),
+    true,
+    false,
+    "",
+    "",
+    0
+  );
+
+  const expectedActions = {
+    katarina: ["q", "w", "e", "r"],
+    zed: ["q", "w", "e", "r"],
+    renekton: ["q", "w", "e", "r"],
+    vladimir: ["q", "poolDown", "e", "r"],
+    gangplank: ["q", "w", "e", "r"]
+  };
+  const expectedDurations = {
+    katarina: [0.42, 0.42, 0.42, 1.65],
+    zed: [0.48, 0.48, 0.52, 0.68],
+    renekton: [0.58, 0.56, 0.46, 0.72],
+    vladimir: [0.56, 1.45, 0.62, 0.66],
+    gangplank: [0.48, 0.4, 0.42, 0.7]
+  };
+  const correctedRoutes = new Set([
+    "katarina:w", "katarina:e", "zed:w", "renekton:w", "gangplank:w"
+  ]);
+
+  for (const [champion, actions] of Object.entries(expectedActions)) {
+    const metadata = JSON.parse(await readFile(
+      path.join(repositoryRoot, "champions", champion, "playable-model",
+        `${champion}-model-metadata.json`),
+      "utf8"
+    ));
+    for (let slot = 0; slot < actions.length; slot += 1) {
+      const game = await createAuthoritativeDuel({
+        hostChampion: champion,
+        guestChampion: "katarina",
+        seed: 600 + slot
+      });
+      const player = game.players[0];
+      const rival = game.players[1];
+      player.skillsUnlocked = [true, true, true, true];
+      player.invulnerable = 0;
+      player.stunned = 0;
+      player.lastDx = 0;
+      player.lastDz = 1;
+      player.facing = 0;
+      rival.x = player.x;
+      rival.z = player.z + 0.8;
+      rival.alive = true;
+      rival.invulnerable = 0;
+      game.daggers.push({
+        id: 999,
+        ownerId: player.id,
+        x: rival.x,
+        z: rival.z,
+        age: 1,
+        readyAt: 0,
+        life: 5
+      });
+      if (champion === "zed" && slot === 1) {
+        rival.x = player.x - 8;
+        rival.z = player.z - 8;
+        for (let distance = 1; distance <= 3; distance += 1) {
+          const cell = game.cellFromWorld(player.x, player.z + game.tile * distance);
+          if (game.grid[cell.r]) game.grid[cell.r][cell.c] = 0;
+        }
+        game.bombs = [];
+      }
+      if (champion === "gangplank" && slot === 2) {
+        const cell = game.cellFromWorld(player.x, player.z + game.tile);
+        if (game.grid[cell.r]) game.grid[cell.r][cell.c] = 0;
+        game.bombs = [];
+      }
+
+      assert.equal(game.castAbility(slot, player, { buffer: false }), true,
+        `${champion} ${"QWER"[slot]} cast must execute`);
+      assert.equal(player.abilityAnimAction, "qwer"[slot],
+        `${champion} ${"QWER"[slot]} must publish its semantic action`);
+      assert.equal(player.abilityAnimDuration, expectedDurations[champion][slot]);
+      assert.equal(player.abilityAnimRemaining, expectedDurations[champion][slot]);
+      const resolver = new ResolverHarness();
+      resolver[`${champion}Animation`] = {
+        frameCount: metadata.frameCount,
+        actions: metadata.animationActions,
+        clips: metadata.animationClips
+      };
+      const frame = resolver.resolveChampionAnimation(player, 1, champion);
+      const expectedAction = actions[slot];
+      assert.equal(frame?.key, expectedAction,
+        `${champion} ${"QWER"[slot]} must select ${expectedAction}`);
+      assert.equal(frame?.clipKey, metadata.animationActions[expectedAction],
+        `${champion} ${"QWER"[slot]} must select its authored clip`);
+
+      if (champion === "zed" && slot === 1) {
+        const shadow = game.zedShadows.find((candidate) => candidate.kind === "living");
+        assert.ok(shadow, "Living Shadow must create a rendered shadow actor");
+        assert.equal(shadow.abilityAnimAction, "w");
+        assert.equal(shadow.abilityAnimRemaining, 0.48);
+        assert.equal(resolver.resolveChampionAnimation(shadow, 1, champion)?.key, "w",
+          "Living Shadow must mirror the authored W clip when it appears");
+        assert.equal(game.castAbility(1, player, { buffer: false }), true,
+          "Living Shadow must support its immediate exchange recast");
+        assert.equal(shadow.abilityAnimAction, "w");
+        assert.equal(shadow.abilityAnimRemaining, 0.48,
+          "the exchanged shadow body must restart the W clip");
+        assert.equal(resolver.resolveChampionAnimation(shadow, 1.01, champion)?.key, "w");
+      }
+
+      if (correctedRoutes.has(`${champion}:${expectedAction}`)) {
+        if (champion === "renekton" && slot === 1) {
+          game.updateContestant(player, 0.51);
+          assert.ok(player.abilityAnimRemaining > 0.049 && player.abilityAnimRemaining < 0.051,
+            "Renekton W must retain its semantic clip through the final 50 ms");
+          assert.equal(resolver.resolveChampionAnimation(player, 1.51, champion)?.key, "w",
+            "Renekton W must not flicker to Q near recovery");
+          game.updateContestant(player, 0.06);
+        } else {
+          game.updateContestant(player, 1);
+        }
+        if (champion === "gangplank") game.updateGangplank(1);
+        assert.equal(player.abilityAnimAction, "");
+        assert.equal(player.abilityAnimRemaining, 0);
+        assert.equal(player.abilityAnimDuration, 0);
+        assert.equal(resolver.resolveChampionAnimation(player, 2, champion)?.key, "idle",
+          `${champion} ${expectedAction} must return to locomotion`);
+      }
+    }
+  }
+
+  const buffered = await createAuthoritativeDuel({
+    hostChampion: "gangplank",
+    guestChampion: "katarina",
+    seed: 704
+  });
+  const bufferedPlayer = buffered.players[0];
+  bufferedPlayer.skillsUnlocked = [true, true, true, true];
+  bufferedPlayer.invulnerable = 0;
+  bufferedPlayer.wCooldown = 0.1;
+  assert.equal(buffered.castAbility(1, bufferedPlayer), true);
+  assert.equal(bufferedPlayer.abilityAnimAction, "",
+    "a buffered command must not publish an action before execution");
+  buffered.updateContestant(bufferedPlayer, 0.11);
+  buffered.processAbilityBuffer(0.11);
+  assert.equal(bufferedPlayer.abilityAnimAction, "w",
+    "the buffered executeAbility path must publish the authored action");
+  assert.equal(bufferedPlayer.abilityAnimRemaining, 0.4);
+
+  const rejected = await createAuthoritativeDuel({
+    hostChampion: "katarina",
+    guestChampion: "katarina",
+    seed: 705
+  });
+  const rejectedPlayer = rejected.players[0];
+  const rejectedRival = rejected.players[1];
+  rejectedPlayer.skillsUnlocked = [true, true, true, true];
+  rejectedPlayer.invulnerable = 0;
+  rejected.daggers = [];
+  rejected.pickups = [];
+  rejectedRival.x = rejectedPlayer.x + rejected.tile * 8;
+  rejectedRival.z = rejectedPlayer.z + rejected.tile * 8;
+  assert.equal(rejected.castAbility(2, rejectedPlayer, { buffer: false }), false);
+  assert.equal(rejectedPlayer.abilityAnimAction, "",
+    "a rejected spatial cast must not publish an animation action");
+  assert.equal(rejectedPlayer.abilityAnimRemaining, 0);
+
+  const flashbackSequences = [
+    { champion: "zed", first: 3, second: 0, elapsed: 0.49, staleTimer: "zedUltAnim" },
+    { champion: "renekton", first: 1, second: 2, elapsed: 0.47, staleTimer: "renektonSlashAnim" },
+    { champion: "gangplank", first: 3, second: 0, elapsed: 0.49, staleTimer: "gangplankUltAnim" }
+  ];
+  for (const sequence of flashbackSequences) {
+    const game = await createAuthoritativeDuel({
+      hostChampion: sequence.champion,
+      guestChampion: "katarina",
+      seed: 710 + sequence.first
+    });
+    const player = game.players[0];
+    const rival = game.players[1];
+    player.skillsUnlocked = [true, true, true, true];
+    player.invulnerable = 0;
+    player.stunned = 0;
+    player.lastDx = 0;
+    player.lastDz = 1;
+    player.facing = 0;
+    rival.x = player.x;
+    rival.z = player.z + 0.8;
+    rival.alive = true;
+    rival.invulnerable = 0;
+    assert.equal(game.castAbility(sequence.first, player, { buffer: false }), true);
+    assert.equal(game.castAbility(sequence.second, player, { buffer: false }), true);
+    assert.equal(player.abilityAnimAction, "qwer"[sequence.second]);
+    game.updateContestant(player, sequence.elapsed);
+    if (sequence.champion === "gangplank") game.updateGangplank(sequence.elapsed);
+    assert.ok(player[sequence.staleTimer] > 0,
+      `${sequence.champion} must retain its independent procedural timer for this regression`);
+
+    const metadata = JSON.parse(await readFile(
+      path.join(repositoryRoot, "champions", sequence.champion, "playable-model",
+        `${sequence.champion}-model-metadata.json`),
+      "utf8"
+    ));
+    const resolver = new ResolverHarness();
+    resolver[`${sequence.champion}Animation`] = {
+      frameCount: metadata.frameCount,
+      actions: metadata.animationActions,
+      clips: metadata.animationClips
+    };
+    assert.equal(resolver.resolveChampionAnimation(player, 4, sequence.champion)?.key, "idle",
+      `${sequence.champion} must not flash back to an older ability after a newer cast ends`);
+  }
+
+  const canceled = await createAuthoritativeDuel({
+    hostChampion: "katarina",
+    guestChampion: "katarina",
+    seed: 720
+  });
+  const canceledPlayer = canceled.players[0];
+  const canceledRival = canceled.players[1];
+  canceledPlayer.skillsUnlocked = [true, true, true, true];
+  canceledPlayer.invulnerable = 0;
+  canceledRival.x = canceledPlayer.x;
+  canceledRival.z = canceledPlayer.z + 0.8;
+  canceledRival.invulnerable = 0;
+  assert.equal(canceled.castAbility(3, canceledPlayer, { buffer: false }), true);
+  assert.equal(canceledPlayer.abilityAnimAction, "r");
+  canceled.keys.add("KeyD");
+  canceled.updateContestant(canceledPlayer, 0.01);
+  assert.equal(canceledPlayer.ultChannel, 0, "movement must cancel Death Lotus");
+  assert.equal(canceledPlayer.abilityAnimAction, "",
+    "canceling Death Lotus must also stop its authored VAT action");
+  assert.equal(canceledPlayer.abilityAnimRemaining, 0);
+  assert.equal(canceledPlayer.abilityAnimDuration, 0);
 });
 
 test("real VAT binaries preserve CPU fallback samples after tiled GPU packing", async () => {

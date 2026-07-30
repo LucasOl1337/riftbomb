@@ -223,6 +223,14 @@
     // Bot skill intents ("q" | "w" | "e" | "r") map to the same slots the
     // human input uses; unknown values never reach castAbility.
     const BOT_SKILL_SLOTS = Object.freeze({ q: 0, w: 1, e: 2, r: 3 });
+    const ABILITY_ANIMATION_ACTIONS = Object.freeze(["q", "w", "e", "r"]);
+    const ABILITY_ANIMATION_DURATIONS = Object.freeze({
+      katarina: Object.freeze([0.42, 0.42, 0.42, 1.65]),
+      zed: Object.freeze([0.48, 0.48, 0.52, 0.68]),
+      renekton: Object.freeze([0.58, 0.56, 0.46, 0.72]),
+      vladimir: Object.freeze([0.56, 1.45, 0.62, 0.66]),
+      gangplank: Object.freeze([0.48, 0.4, 0.42, 0.7])
+    });
     const ABILITY_BUFFER_SECONDS = 0.15;
     const ABILITY_TIME_EPSILON = 0.000001;
 
@@ -524,6 +532,9 @@
           spin: 0,
           moving: false,
           castAnim: 0,
+          abilityAnimAction: "",
+          abilityAnimRemaining: 0,
+          abilityAnimDuration: 0,
           ultChannel: 0,
           ultTick: 0,
           zedUltAnim: 0,
@@ -916,6 +927,7 @@
         if (player?.champion !== "katarina" || player.ultChannel <= 0) return false;
         player.ultChannel = 0;
         player.ultTick = 0;
+        if (player.abilityAnimAction === "r") this.clearAbilityAnimation(player);
         this.slashes = this.slashes.filter((slash) =>
           !slash.lotus || slash.ownerId !== player.id
         );
@@ -960,40 +972,75 @@
         return executed;
       }
 
+      clearAbilityAnimation(actor) {
+        if (!actor) return;
+        actor.abilityAnimAction = "";
+        actor.abilityAnimRemaining = 0;
+        actor.abilityAnimDuration = 0;
+      }
+
+      startAbilityAnimation(actor, action, duration) {
+        if (!actor || !ABILITY_ANIMATION_ACTIONS.includes(action) ||
+            !Number.isFinite(duration) || duration <= ABILITY_TIME_EPSILON) {
+          this.clearAbilityAnimation(actor);
+          return false;
+        }
+        actor.abilityAnimAction = action;
+        actor.abilityAnimRemaining = duration;
+        actor.abilityAnimDuration = duration;
+        return true;
+      }
+
+      abilityAnimationDuration(player, slot) {
+        return Number(ABILITY_ANIMATION_DURATIONS[player?.champion]?.[slot]) || 0;
+      }
+
+      updateAbilityAnimation(actor, dt) {
+        if (!actor) return;
+        const remaining = Math.max(0, (Number(actor.abilityAnimRemaining) || 0) - dt);
+        if (remaining <= ABILITY_TIME_EPSILON) {
+          this.clearAbilityAnimation(actor);
+          return;
+        }
+        actor.abilityAnimRemaining = remaining;
+      }
+
       executeAbility(slot, player) {
+        let executed = false;
         if (player.champion === "zed") {
-          if (slot === 0) return this.castZedQ(player);
-          if (slot === 1) return this.castZedW(player);
-          if (slot === 2) return this.castZedE(player);
-          if (slot === 3) return this.castZedR(player);
-          return false;
+          if (slot === 0) executed = this.castZedQ(player);
+          else if (slot === 1) executed = this.castZedW(player);
+          else if (slot === 2) executed = this.castZedE(player);
+          else if (slot === 3) executed = this.castZedR(player);
+        } else if (player.champion === "renekton") {
+          if (slot === 0) executed = this.castRenektonQ(player);
+          else if (slot === 1) executed = this.castRenektonW(player);
+          else if (slot === 2) executed = this.castRenektonE(player);
+          else if (slot === 3) executed = this.castRenektonR(player);
+        } else if (player.champion === "vladimir") {
+          if (slot === 0) executed = this.castVladimirQ(player);
+          else if (slot === 1) executed = this.castVladimirW(player);
+          else if (slot === 2) executed = this.castVladimirE(player);
+          else if (slot === 3) executed = this.castVladimirR(player);
+        } else if (player.champion === "gangplank") {
+          if (slot === 0) executed = this.castGangplankQ(player);
+          else if (slot === 1) executed = this.castGangplankW(player);
+          else if (slot === 2) executed = this.castGangplankE(player);
+          else if (slot === 3) executed = this.castGangplankR(player);
+        } else {
+          if (slot === 0) executed = this.castKatarinaQ(player);
+          else if (slot === 1) executed = this.castKatarinaW(player);
+          else if (slot === 2) executed = this.castKatarinaE(player);
+          else if (slot === 3) executed = this.castKatarinaR(player);
         }
-        if (player.champion === "renekton") {
-          if (slot === 0) return this.castRenektonQ(player);
-          if (slot === 1) return this.castRenektonW(player);
-          if (slot === 2) return this.castRenektonE(player);
-          if (slot === 3) return this.castRenektonR(player);
-          return false;
+        if (executed) {
+          this.startAbilityAnimation(
+            player,
+            ABILITY_ANIMATION_ACTIONS[slot],
+            this.abilityAnimationDuration(player, slot)
+          );
         }
-        if (player.champion === "vladimir") {
-          if (slot === 0) return this.castVladimirQ(player);
-          if (slot === 1) return this.castVladimirW(player);
-          if (slot === 2) return this.castVladimirE(player);
-          if (slot === 3) return this.castVladimirR(player);
-          return false;
-        }
-        if (player.champion === "gangplank") {
-          if (slot === 0) return this.castGangplankQ(player);
-          if (slot === 1) return this.castGangplankW(player);
-          if (slot === 2) return this.castGangplankE(player);
-          if (slot === 3) return this.castGangplankR(player);
-          return false;
-        }
-        if (slot === 0) return this.castKatarinaQ(player);
-        if (slot === 1) return this.castKatarinaW(player);
-        if (slot === 2) return this.castKatarinaE(player);
-        if (slot === 3) return this.castKatarinaR(player);
-        return false;
+        return executed;
       }
 
       processAbilityBuffer(dt) {
@@ -1178,6 +1225,9 @@
           moving: false,
           castAnim: 0.46,
           castDuration: 0.48,
+          abilityAnimAction: "",
+          abilityAnimRemaining: 0,
+          abilityAnimDuration: 0,
           zedUltAnim: kind === "death" ? 0.68 : 0,
           zedSlashAnim: 0,
           hurt: 0,
@@ -1185,6 +1235,8 @@
           shield: 0,
           swapAvailable: kind === "living"
         };
+        this.startAbilityAnimation(shadow, kind === "death" ? "r" : "w",
+          kind === "death" ? 0.68 : 0.48);
         this.zedShadows.push(shadow);
         return shadow;
       }
@@ -1203,6 +1255,7 @@
         for (const [index, origin] of origins.entries()) {
           origin.castAnim = 0.48;
           origin.castDuration = 0.48;
+          this.startAbilityAnimation(origin, "q", 0.48);
           origin.facing = player.facing;
           this.projectiles.push({
             id: ++this.daggerId,
@@ -1239,6 +1292,7 @@
           living.swapAvailable = false;
           player.zedSwapWindow = 0;
           player.zedUltAnim = 0.42;
+          this.startAbilityAnimation(living, "w", 0.48);
           player.invulnerable = Math.max(player.invulnerable, 0.2);
           this.skillTrails.push({
             x1: fromX, z1: fromZ, x2: player.x, z2: player.z,
@@ -1292,6 +1346,7 @@
           origin.zedSlashAnim = 0.52;
           origin.castAnim = 0.4;
           origin.castDuration = 0.4;
+          this.startAbilityAnimation(origin, "e", 0.52);
           this.slashes.push({ x: origin.x, z: origin.z, radius, age: 0, life: 0.52, zed: true });
           this.spawnParticles(origin.x, 0.48, origin.z, Renderer.colors.zedCrimson, 18, 0.62, 0.1);
           for (let r = 1; r < this.rows - 1; r++) {
@@ -1970,6 +2025,7 @@
         player.speedBoost = Math.max(0, player.speedBoost - dt);
         player.spin = Math.max(0, player.spin - dt);
         player.castAnim = Math.max(0, player.castAnim - dt);
+        this.updateAbilityAnimation(player, dt);
         player.zedUltAnim = Math.max(0, player.zedUltAnim - dt);
         player.zedSlashAnim = Math.max(0, player.zedSlashAnim - dt);
         player.zedSwapWindow = Math.max(0, player.zedSwapWindow - dt);
@@ -2220,6 +2276,7 @@
         for (const shadow of this.zedShadows) {
           shadow.age += dt;
           shadow.castAnim = Math.max(0, shadow.castAnim - dt);
+          this.updateAbilityAnimation(shadow, dt);
           shadow.zedUltAnim = Math.max(0, shadow.zedUltAnim - dt);
           shadow.zedSlashAnim = Math.max(0, shadow.zedSlashAnim - dt);
         }

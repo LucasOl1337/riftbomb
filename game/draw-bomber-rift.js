@@ -2280,6 +2280,15 @@ drawKatarinaFallback(player, t, beat) {
         }
         const poolRemaining = player.vladimirPool || 0;
         let desired;
+        const usesSemanticAbilityAnimations = !modelReviewMode &&
+          Object.prototype.hasOwnProperty.call(player, "abilityAnimRemaining");
+        const abilityAnimRemaining = Math.max(0, Number(player.abilityAnimRemaining) || 0);
+        const abilityAnimDuration = Math.max(0, Number(player.abilityAnimDuration) || 0);
+        const abilityAnimAction = abilityAnimRemaining > 0 && abilityAnimDuration > 0 &&
+          ["q", "w", "e", "r"].includes(player.abilityAnimAction) &&
+          animation.actions[player.abilityAnimAction]
+          ? player.abilityAnimAction
+          : "";
         const action = (name, remaining, duration) => this.sampleChampionAction(
           animation,
           name,
@@ -2318,37 +2327,42 @@ drawKatarinaFallback(player, t, beat) {
             this.championAnimationStates.delete(`${key}:${player.id}`);
             return { hidden: true, key: "pool" };
           }
-        } else if (key === "vladimir" && player.vladimirQAnim > 0) {
+        } else if (abilityAnimAction) {
+          // The authoritative game publishes the exact authored Q/W/E/R action
+          // and its own visual lifetime. This outranks overlapping legacy VFX
+          // timers, so one ability cannot briefly borrow another ability's clip.
+          desired = action(abilityAnimAction, abilityAnimRemaining, abilityAnimDuration);
+        } else if (!usesSemanticAbilityAnimations && key === "vladimir" && player.vladimirQAnim > 0) {
           desired = action("q", player.vladimirQAnim, 0.56);
-        } else if (key === "vladimir" && player.vladimirEAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "vladimir" && player.vladimirEAnim > 0) {
           desired = action("e", player.vladimirEAnim, 0.62);
-        } else if (key === "vladimir" && player.vladimirUltAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "vladimir" && player.vladimirUltAnim > 0) {
           desired = action("r", player.vladimirUltAnim, 0.66);
         } else if (key === "vladimir" && player.vladimirAttackAnim > 0) {
           desired = action("attack", player.vladimirAttackAnim, 0.42);
-        } else if (key === "katarina" && player.ultChannel > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "katarina" && player.ultChannel > 0) {
           desired = action("r", player.ultChannel, 1.65);
         } else if (key === "katarina" && player.spin > 0) {
           desired = action("w", player.spin, 0.58);
         } else if (key === "katarina" && player.dashing > 0) {
           desired = action("e", player.dashing, 0.18);
-        } else if (key === "zed" && player.zedUltAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "zed" && player.zedUltAnim > 0) {
           desired = action("r", player.zedUltAnim, 0.68);
-        } else if (key === "zed" && player.zedSlashAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "zed" && player.zedSlashAnim > 0) {
           desired = action("e", player.zedSlashAnim, 0.52);
-        } else if (key === "renekton" && player.renektonUltAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "renekton" && player.renektonUltAnim > 0) {
           desired = action("r", player.renektonUltAnim, 0.72);
-        } else if (key === "renekton" && player.renektonDashAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "renekton" && player.renektonDashAnim > 0) {
           desired = action("e", player.renektonDashAnim, 0.46);
-        } else if (key === "renekton" && player.renektonSlashAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "renekton" && player.renektonSlashAnim > 0) {
           desired = action("q", player.renektonSlashAnim, 0.58);
-        } else if (key === "gangplank" && player.gangplankUltAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "gangplank" && player.gangplankUltAnim > 0) {
           desired = action("r", player.gangplankUltAnim, 0.7);
-        } else if (key === "gangplank" && player.gangplankKegAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "gangplank" && player.gangplankKegAnim > 0) {
           desired = action("e", player.gangplankKegAnim, 0.42);
-        } else if (key === "gangplank" && player.gangplankShotAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && key === "gangplank" && player.gangplankShotAnim > 0) {
           desired = action("q", player.gangplankShotAnim, 0.48);
-        } else if (player.castAnim > 0) {
+        } else if (!usesSemanticAbilityAnimations && player.castAnim > 0) {
           desired = action("q", player.castAnim, player.castDuration || 0.5);
         } else {
           desired = locomotion();
