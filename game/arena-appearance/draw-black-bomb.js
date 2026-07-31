@@ -298,13 +298,6 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
       renderer.drawExplosionBurst(x, z, 0, 0, phase, life, tile, true, seed, time);
     }
 
-    // Ignition microflash only — the particle field carries the core after that.
-    if (pFlash > 0.05) {
-      renderer.draw("cube", [x, plateY + rise * 0.3, z],
-        [tile * 0.15, rise * 0.7, tile * 0.15],
-        CORE_WHITE, 4, em * 1.6, 0, alpha * pFlash);
-    }
-
     const stubDirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     const sparkN = 36;
     for (let index = 0; index < sparkN; index++) {
