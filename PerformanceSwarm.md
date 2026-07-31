@@ -207,6 +207,17 @@ Playwright/headless não foi executado. Não houve deploy, push, PR ou merge.
 - Próxima recomendação: aguardar o coletor humano integrar o ciclo; novas execuções permanecem em hold até isso ocorrer ou até autorização explícita para um novo ciclo.
 - Commit local desta auditoria: o commit documental que contém esta seção; hash informado no fechamento da sessão.
 
+## Auditoria pós-ciclo — 2026-07-31 09:35 -03:00
+
+- Decisão: manter o enxame em **hold**. O ciclo permanece em **20/20 rodadas concluídas**, sem autorização para rodada 21 ou reinício; esta worktree isolada iniciou limpa em `main` (`f242547`) e recebeu a branch local `automation/perf-sequential-post-cycle-audit-93ac` apenas para o registro documental.
+- Evidência nova: as branches antigas do enxame já não existem localmente, mas os 20 commits do histórico continuam presentes no repositório. Em três medições idênticas, **20/20 hashes não são ancestrais de `main`**; a divergência `main...d52bbbf` foi **76/39** commits exclusivos em todas as amostras. Portanto, o ciclo ainda não foi coletado por ancestralidade, embora `main` tenha avançado desde a última auditoria.
+- Integridade: três execuções confirmaram **20 linhas concluídas**, **20 rodadas únicas**, **20 hashes únicos**, **0 commits ausentes** e **20 hashes fora de `main`**.
+- Estado antes/depois: histórico **20/20 → 20/20 concluído**, próxima rodada **hold → hold**, reivindicação **nenhuma → auditoria documental → nenhuma**.
+- Escopo e impacto: somente este `PerformanceSwarm.md` foi alterado; nenhum código, asset, budget, rota, API, segurança ou regra de negócio mudou. O impacto de runtime é **nenhum**.
+- Validação proporcional: auditoria determinística de integridade/ancestralidade em 3/3 e `git diff --check`. Builds, testes, lint e benchmarks não foram repetidos porque não houve mudança de produto e a rodada 20 já executou os gates finais.
+- Próxima recomendação: aguardar o coletor humano integrar o ciclo; novas execuções permanecem em hold até isso ocorrer ou até autorização explícita para um novo ciclo.
+- Commit local desta auditoria: o commit documental que contém esta seção; hash informado no fechamento da sessão.
+
 ## Mapa de arquivos e caminhos quentes
 
 - Registro/editáveis do jogo: `game/play-riftbomb.html` (28.743 B) e módulos sob `game/`.
