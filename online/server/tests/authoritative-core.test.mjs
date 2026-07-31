@@ -537,6 +537,7 @@ test("authoritative ability buffer executes the latest command once on its first
     sequence: 1,
     playerId: 1,
     slot: 0,
+    aim: null,
     remaining: 0.15,
     initialBlockers: ["cooldown"]
   });

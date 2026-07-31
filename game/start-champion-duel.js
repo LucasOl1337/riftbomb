@@ -190,12 +190,13 @@
         }
         game.keys.add(event.code);
         if (event.repeat) return;
+        const aim = { aim: game.pointerAim };
         if (event.code === "Space") game.placeBomb();
-        else if (event.code === "KeyQ") game.castAbility(0);
-        else if (event.code === "KeyF") game.castAbility(1);
-        else if (event.code === "KeyE") game.castAbility(2);
-        else if (event.code === "KeyR") game.castAbility(3);
-        else if (event.code === "ShiftLeft") game.castAbility(1);
+        else if (event.code === "KeyQ") game.castAbility(0, game.player, aim);
+        else if (event.code === "KeyF") game.castAbility(1, game.player, aim);
+        else if (event.code === "KeyE") game.castAbility(2, game.player, aim);
+        else if (event.code === "KeyR") game.castAbility(3, game.player, aim);
+        else if (event.code === "ShiftLeft") game.castAbility(1, game.player, aim);
         else if (event.code === "Enter" || event.code === "Numpad0") game.placeBomb(game.players[1]);
         else if (event.code === "ShiftRight") game.requestDash(game.players[1]);
         else if (["KeyJ", "Numpad1"].includes(event.code)) game.castAbility(0, game.players[1]);
@@ -207,6 +208,13 @@
       addEventListener("keyup", (event) => game.keys.delete(event.code));
       addEventListener("pointerdown", () => {
         if (game.mode === "playing") void sfx.start().catch(() => {});
+      }, { passive: true });
+      // League-style mouse aim: the cursor's ground-plane point feeds every
+      // keyboard cast. Touch pointers never write here — mobile aims by
+      // dragging the skill button (Wild Rift style).
+      addEventListener("pointermove", (event) => {
+        if (event.pointerType && event.pointerType !== "mouse") return;
+        game.pointerAim = renderer.arenaPointFromClient?.(event.clientX, event.clientY) || game.pointerAim;
       }, { passive: true });
       addEventListener("wheel", (event) => {
         if (!document.body.classList.contains("is-online-match") || game.mode !== "playing") return;
@@ -222,10 +230,10 @@
 
       setupTouchStick();
       bindTouchAction(UI.touchBomb, () => game.placeBomb());
-      bindTouchAction(UI.touchQ, () => game.castAbility(0));
-      bindTouchAction(UI.touchDash, () => game.castAbility(1));
-      bindTouchAction(UI.touchMine, () => game.castAbility(2));
-      bindTouchAction(UI.touchUlt, () => game.castAbility(3));
+      bindTouchSkill(UI.touchQ, 0);
+      bindTouchSkill(UI.touchDash, 1);
+      bindTouchSkill(UI.touchMine, 2);
+      bindTouchSkill(UI.touchUlt, 3);
     }
 
     function resetTouchStick() {
@@ -337,6 +345,65 @@
       addEventListener("pointerup", unpress, { capture: true });
       addEventListener("pointercancel", unpress, { capture: true });
       addEventListener("blur", () => unpress(), { passive: true });
+    }
+
+    // Wild Rift-style skill button: tap casts with current facing/auto-aim,
+    // press-and-drag aims the cast and releasing fires toward the drag vector.
+    function bindTouchSkill(button, slot) {
+      if (!button) return;
+      let activePointer = null;
+      let startX = 0;
+      let startY = 0;
+      const dragThreshold = 14; // px before a tap becomes an aimed cast
+
+      const aimFromDrag = (event) => {
+        const dragX = event.clientX - startX;
+        const dragY = event.clientY - startY;
+        if (Math.hypot(dragX, dragY) < dragThreshold) return null;
+        const player = game.players?.find((p) => p.id === game.localPlayerId) || game.player;
+        if (!player) return null;
+        // Map the screen drag onto the arena through the camera's ground axes.
+        const [rightX, , rightZ] = renderer.cameraRight || [1, 0, 0];
+        const forward = renderer.cameraBasis?.forward || [0, 0, -1];
+        const forwardLength = Math.max(0.0001, Math.hypot(forward[0], forward[2]));
+        const aheadX = forward[0] / forwardLength;
+        const aheadZ = forward[2] / forwardLength;
+        const dirX = rightX * dragX - aheadX * dragY;
+        const dirZ = rightZ * dragX - aheadZ * dragY;
+        const length = Math.max(0.0001, Math.hypot(dirX, dirZ));
+        const reach = game.tile * 5;
+        return {
+          x: player.x + dirX / length * reach,
+          z: player.z + dirZ / length * reach
+        };
+      };
+
+      button.addEventListener("pointerdown", (event) => {
+        if (activePointer !== null) return;
+        event.preventDefault();
+        activePointer = event.pointerId;
+        startX = event.clientX;
+        startY = event.clientY;
+        button.classList.add("is-pressed");
+        if (game.mode === "playing") void sfx.start().catch(() => {});
+      });
+      // Release resolves at the window capture phase so a finger dragged off
+      // the button still fires its aimed cast (same multitouch rule as the stick).
+      const release = (event) => {
+        if (event.pointerId !== activePointer) return;
+        activePointer = null;
+        button.classList.remove("is-pressed");
+        const aim = aimFromDrag(event);
+        game.castAbility(slot, game.player, aim ? { aim } : {});
+      };
+      const cancel = (event) => {
+        if (event && event.pointerId !== activePointer) return;
+        activePointer = null;
+        button.classList.remove("is-pressed");
+      };
+      addEventListener("pointerup", release, { capture: true });
+      addEventListener("pointercancel", cancel, { capture: true });
+      addEventListener("blur", () => cancel(), { passive: true });
     }
 
     function boot() {

@@ -295,6 +295,10 @@
         this.touchDirs = new Set();
         // Analog stick for mobile (-1..1). Zero when released.
         this.touchStick = { x: 0, z: 0 };
+        // Latest mouse position on the arena ground plane; null until the
+        // local player moves a mouse. Touch aim never writes here — it arrives
+        // per-cast from the skill-button drag.
+        this.pointerAim = null;
         // One authoritative postponed spell per player. Commands keep a player
         // id rather than an object reference because online snapshots replace
         // player objects in-place.
@@ -885,19 +889,41 @@
           Math.hypot(candidate.x - player.x, candidate.z - player.z) <= range);
       }
 
+      /**
+       * Aimed casts (mouse hover on desktop, drag release on mobile) only lock
+       * the rival when the aim point sits on them; aimless casts keep the
+       * classic auto-target so keyboards, bots and legacy clients still work.
+       */
+      hoveredRival(player, range) {
+        const rival = this.rivalInRange(player, range);
+        const aim = player.castAim;
+        if (!aim || !rival) return rival || null;
+        return Math.hypot(rival.x - aim.x, rival.z - aim.z) <= this.tile * 1.1 ? rival : null;
+      }
+
       katarinaShunpoTarget(player) {
         const range = this.tile * 5.1;
-        const dagger = this.daggers
-          .filter((candidate) => candidate.age >= candidate.readyAt &&
-            Math.hypot(candidate.x - player.x, candidate.z - player.z) <= range)
-          .sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) -
-            Math.hypot(b.x - player.x, b.z - player.z))[0];
+        const inRange = (candidate) =>
+          Math.hypot(candidate.x - player.x, candidate.z - player.z) <= range;
+        const daggers = this.daggers.filter((candidate) =>
+          candidate.age >= candidate.readyAt && inRange(candidate));
         const rival = this.rivalInRange(player, range);
-        const pickup = this.pickups
-          .filter((candidate) => Math.hypot(candidate.x - player.x, candidate.z - player.z) <= range)
-          .sort((a, b) => Math.hypot(a.x - player.x, a.z - player.z) -
-            Math.hypot(b.x - player.x, b.z - player.z))[0];
-        return dagger || rival || pickup;
+        const pickups = this.pickups.filter(inRange);
+        const aim = player.castAim;
+        if (aim) {
+          // League-style hover: Shunpo goes to the entity under the cursor.
+          return [...daggers, ...(rival ? [rival] : []), ...pickups]
+            .map((candidate) => ({
+              candidate,
+              gap: Math.hypot(candidate.x - aim.x, candidate.z - aim.z)
+            }))
+            .filter(({ gap }) => gap <= this.tile * 1.1)
+            .sort((a, b) => a.gap - b.gap)[0]?.candidate || null;
+        }
+        const nearest = (list) => list.sort((a, b) =>
+          Math.hypot(a.x - player.x, a.z - player.z) -
+          Math.hypot(b.x - player.x, b.z - player.z))[0];
+        return nearest(daggers) || rival || nearest(pickups) || null;
       }
 
       zedLivingShadow(player) {
@@ -939,14 +965,14 @@
       abilityTargetAvailable(player, slot) {
         if (player.champion === "katarina") {
           if (slot === 2) return Boolean(this.katarinaShunpoTarget(player));
-          if (slot === 3) return Boolean(this.rivalInRange(player, this.tile * 3.35));
+          if (slot === 3) return Boolean(this.hoveredRival(player, this.tile * 3.35));
         }
         if (player.champion === "zed") {
           if (slot === 1) return Boolean(
             (player.zedSwapWindow > ABILITY_TIME_EPSILON && this.zedLivingShadow(player)) ||
             this.zedShadowLanding(player)
           );
-          if (slot === 3) return Boolean(this.rivalInRange(player, this.tile * 4.5));
+          if (slot === 3) return Boolean(this.hoveredRival(player, this.tile * 4.5));
         }
         if (player.champion === "vladimir" && slot === 0) {
           const target = this.katTargetInFront(player, this.tile * 5);
@@ -967,11 +993,34 @@
         return "";
       }
 
-      queueAbility(slot, player, block) {
+      /**
+       * Point the champion at an aimed arena position (mouse ground point on
+       * desktop, drag vector on mobile) so every direction-derived cast fires
+       * toward it. Returns false and leaves facing untouched for invalid aim,
+       * which keeps auto-aim behavior for keyboards, bots and legacy clients.
+       */
+      applyAbilityAim(player, aim) {
+        const rawX = Number(aim?.x);
+        const rawZ = Number(aim?.z);
+        if (!Number.isFinite(rawX) || !Number.isFinite(rawZ)) return false;
+        const halfWidth = (this.cols - 1) / 2 * this.tile;
+        const halfDepth = (this.rows - 1) / 2 * this.tile;
+        const dx = clamp(rawX, -halfWidth, halfWidth) - player.x;
+        const dz = clamp(rawZ, -halfDepth, halfDepth) - player.z;
+        const length = Math.hypot(dx, dz);
+        if (length < 0.05) return false;
+        player.lastDx = dx / length;
+        player.lastDz = dz / length;
+        player.facing = Math.atan2(player.lastDx, player.lastDz);
+        return true;
+      }
+
+      queueAbility(slot, player, block, aim) {
         this.abilityBuffer.set(player.id, {
           sequence: ++this.abilityCommandSequence,
           playerId: player.id,
           slot,
+          aim,
           remaining: ABILITY_BUFFER_SECONDS,
           initialBlockers: block?.kinds || []
         });
@@ -1006,6 +1055,8 @@
         if (!player?.alive || this.mode !== "playing" || this.roundLocked) return false;
         if (!Number.isInteger(slot) || slot < 0 || slot > 3) return false;
         this.dropOwnerId = player.id;
+        const aimed = this.applyAbilityAim(player, options.aim) ? options.aim : null;
+        player.castAim = aimed;
         if (!this.isSkillUnlocked(player, slot)) {
           this.presentation.announce(`${this.skillSlotLabel(player, slot)} locked · break crates`);
           return false;
@@ -1023,7 +1074,7 @@
               block.remaining > ABILITY_BUFFER_SECONDS + ABILITY_TIME_EPSILON) return false;
           if (this.abilityBuffer.has(player.id)) this.abilityBufferStats.replaced += 1;
           if (player.ultChannel > 0) this.cancelKatarinaChannel(player, "new ability");
-          return this.queueAbility(slot, player, block);
+          return this.queueAbility(slot, player, block, aimed);
         }
         if (player.ultChannel > 0) this.cancelKatarinaChannel(player, "new ability");
         const executed = this.executeAbility(slot, player);
@@ -1132,6 +1183,9 @@
             continue;
           }
           this.abilityBuffer.delete(player.id);
+          player.castAim = command.aim && this.applyAbilityAim(player, command.aim)
+            ? command.aim
+            : null;
           if (this.executeAbility(command.slot, player)) this.abilityBufferStats.executed += 1;
         }
       }
@@ -1244,7 +1298,7 @@
 
       castKatarinaR(player) {
         if (player.rCooldown > 0 || player.ultChannel > 0) return false;
-        const rival = this.rivalInRange(player, this.tile * 3.35);
+        const rival = this.hoveredRival(player, this.tile * 3.35);
         if (!rival) {
           this.presentation.announce("Death Lotus needs the rival nearby");
           return false;
@@ -1438,7 +1492,7 @@
 
       castZedR(player) {
         if (player.rCooldown > 0 || this.isZedDeathMarkCommitted(player)) return false;
-        const rival = this.rivalInRange(player, this.tile * 4.5);
+        const rival = this.hoveredRival(player, this.tile * 4.5);
         if (!rival) {
           this.presentation.announce("Death Mark needs the rival in range");
           return false;
@@ -2741,14 +2795,21 @@
         for (const cell of cells) {
           this.blasts.push({ ...cell, age: 0, life: 0.58, source: bomb.id, ownerId: bomb.ownerId });
           const [x, z] = this.worldFromCell(cell.r, cell.c);
-          this.spawnParticles(x, 0.32, z,
-            cell.core ? Renderer.colors.whiteGold : (bomb.ownerId === 1 ? Renderer.colors.gold : Renderer.colors.ember),
-            cell.core ? 24 : 13, 0.72, cell.core ? 0.14 : 0.1);
+          // Multi-layer fire particle bursts (core gets denser cinematic spray).
+          if (cell.core) {
+            this.spawnParticles(x, 0.38, z, Renderer.colors.whiteGold, 36, 0.55, 0.16);
+            this.spawnParticles(x, 0.28, z, Renderer.colors.ember, 42, 0.72, 0.14);
+            this.spawnParticles(x, 0.22, z, Renderer.colors.gold, 28, 0.85, 0.11);
+            this.spawnParticles(x, 0.48, z, [0.12, 0.12, 0.13], 18, 1.05, 0.18);
+          } else {
+            this.spawnParticles(x, 0.3, z, Renderer.colors.ember, 18, 0.65, 0.12);
+            this.spawnParticles(x, 0.24, z, Renderer.colors.gold, 12, 0.75, 0.1);
+          }
           for (const other of this.bombs) {
             if (!other.exploded && other.r === cell.r && other.c === cell.c) other.age = other.fuse;
           }
         }
-        this.renderer.addShock(bomb.x, bomb.z, 0.78 + bomb.range * 0.12);
+        this.renderer.addShock(bomb.x, bomb.z, 0.95 + bomb.range * 0.14);
         this.playExplosionAt(bomb, clamp(0.7 + bomb.range * 0.08, 0.7, 1.12), {
           sourceId: bomb.id
         });

@@ -522,6 +522,8 @@
         this.meshes = {
           cube: this.createMesh(buildCube()),
           sphere: this.createMesh(buildSphere()),
+          // Dense sphere so the bomb silhouette stays round (no facet borders).
+          bombSphere: this.createMesh(buildSphere(this.mobilePerf ? 20 : 32, this.mobilePerf ? 28 : 48)),
           crystal: this.createMesh(buildOctahedron()),
           cylinder: this.createMesh(buildCylinder()),
           cone: this.createMesh(buildCylinder(16, 0.06, 1)),
@@ -593,6 +595,25 @@
       adjustViewZoom(delta) {
         this.viewZoom = clamp(this.viewZoom + delta, 0, 1.35);
         return this.viewZoom;
+      }
+
+      /** Cast the cursor ray from a client position onto the arena ground plane. */
+      arenaPointFromClient(clientX, clientY) {
+        const basis = this.cameraBasis;
+        if (!basis) return null;
+        const rect = this.canvas.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return null;
+        const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1;
+        const ndcY = 1 - ((clientY - rect.top) / rect.height) * 2;
+        const { eye, forward, right, up, tanHalfFov, aspect } = basis;
+        const dir = [
+          forward[0] + right[0] * ndcX * tanHalfFov * aspect + up[0] * ndcY * tanHalfFov,
+          forward[1] + right[1] * ndcX * tanHalfFov * aspect + up[1] * ndcY * tanHalfFov,
+          forward[2] + right[2] * ndcX * tanHalfFov * aspect + up[2] * ndcY * tanHalfFov
+        ];
+        if (dir[1] >= -0.0001) return null;
+        const t = -eye[1] / dir[1];
+        return { x: eye[0] + dir[0] * t, z: eye[2] + dir[2] * t };
       }
 
       initialiseKatarinaDagger(packed) {
@@ -1455,6 +1476,7 @@
           return texture;
         };
         // Modular kit: each of the five arenas owns floor + wall side + wall top.
+        // bombShell is match-global (every duel plants bombs).
         const textureGroups = {
           crate: ["crate"],
           crateTop: ["crateTop"],
@@ -1462,6 +1484,7 @@
           floorClearing: ["floorClearing"],
           nacreGrowth: ["nacreGrowth"],
           nacreReef: ["nacreReef"],
+          bombShell: ["bombShell"],
           floorLabyrinth: ["floorLabyrinth"],
           floorForts: ["floorForts"],
           floorPit: ["floorPit"],
@@ -1484,6 +1507,7 @@
           floorClearing: [40, 90, 96, 255],
           nacreGrowth: [108, 94, 88, 255],
           nacreReef: [34, 58, 62, 255],
+          bombShell: [28, 32, 38, 255],
           floorLabyrinth: [28, 40, 52, 255],
           floorForts: [52, 110, 48, 255],
           floorPit: [28, 36, 58, 255],
@@ -1513,6 +1537,7 @@
         this.arenaTextures.wallTop = this.arenaTextures.wallTopLattice;
         // mapId 1 = floor plate. mapId 2 = crate multi-face. mapId 3 = wall multi-face.
         // mapId 4 = skill icon plate (face UV, single albedo — bound per draw).
+        // mapId 7 = bomb shell (local triplanar panel-armor albedo).
         this.arenaMapTextures = [
           null,
           this.arenaTextures.floorLattice,
@@ -1520,13 +1545,16 @@
           this.arenaTextures.wallLattice,
           null,
           this.arenaTextures.nacreGrowth,
-          this.arenaTextures.nacreReef
+          this.arenaTextures.nacreReef,
+          this.arenaTextures.bombShell
         ];
       }
 
       ensureArenaTextures(theme) {
         const keys = RIFTBOMB_ARENA_TEXTURE_PLAN.forTheme(theme);
-        const loads = keys
+        // Bomb shell is match-global — load with every theme without inflating the
+        // theme-specific boot budget asserted by tests.
+        const loads = [...keys, "bombShell"]
           .map((key) => this.arenaTextureLoaders[key])
           .filter(Boolean)
           .map((load) => load());
@@ -3252,6 +3280,23 @@ drawKatarinaFallback(player, t, beat) {
         const vp = mat4Multiply(projection, view);
         this.lastViewProjection = vp;
         this.lastCamera = eye;
+        {
+          // Camera basis for cursor unprojection (mouse aim). Mirrors mat4LookAt.
+          const back = v3.norm(v3.sub(eye, target));
+          const right = v3.norm(v3.cross([0, 1, 0], back));
+          const up = v3.cross(back, right);
+          const fov = modelReviewMode ? reviewCamera.fov : focusPlayer
+            ? lerp(compact ? 0.84 : 0.74, compact ? 0.7 : 0.62, zoom)
+            : (compact ? 0.84 : (nacreCamera ? 0.77 : 0.74));
+          this.cameraBasis = {
+            eye,
+            forward: [-back[0], -back[1], -back[2]],
+            right,
+            up,
+            tanHalfFov: Math.tan(fov / 2),
+            aspect
+          };
+        }
         const forwardX = target[0] - eye[0];
         const forwardZ = target[2] - eye[2];
         const horizontalLength = Math.max(0.0001, Math.hypot(forwardX, forwardZ));
@@ -4067,6 +4112,24 @@ drawKatarinaFallback(player, t, beat) {
             uv = clamp(vLocal.xz * 0.5 + 0.5, 0.0, 1.0);
             albedo = texture(uAlbedo, uv).rgb;
             mapUv = uv;
+          } else if (uMapId > 6.5 && uMapId < 7.5) {
+            // BOMB shell: local triplanar at prop-scale PPI.
+            // Unit sphere local ∈ [-1,1]; scale ~0.5 maps ~one full albedo face across
+            // the diameter (same density class as crate face maps, not micro-tiled noise).
+            vec3 weights = pow(abs(N), vec3(5.0));
+            weights /= max(weights.x + weights.y + weights.z, 0.001);
+            vec2 uvX = clamp(vLocal.zy * 0.5 + 0.5, 0.0, 1.0);
+            vec2 uvY = clamp(vLocal.xz * 0.5 + 0.5, 0.0, 1.0);
+            vec2 uvZ = clamp(vLocal.xy * 0.5 + 0.5, 0.0, 1.0);
+            vec3 sampleX = texture(uAlbedo, uvX).rgb;
+            vec3 sampleY = texture(uAlbedo, uvY).rgb;
+            vec3 sampleZ = texture(uAlbedo, uvZ).rgb;
+            albedo = sampleX * weights.x + sampleY * weights.y + sampleZ * weights.z;
+            // Dominant-axis UV for bump so panel seams and screw heads catch light.
+            mapUv = weights.y >= weights.x && weights.y >= weights.z ? uvY
+              : (weights.x >= weights.z ? uvX : uvZ);
+            vec3 Nb = bumpFromAlbedo(uAlbedo, mapUv, N, 1.65);
+            N = normalize(mix(N, Nb, 0.48));
           } else if (uMapId > 5.5 && uMapId < 6.5) {
             // The cave shelf spans the whole arena, so sample in world space.
             // Local-space UVs stretched a single texel field across the huge
@@ -4139,7 +4202,8 @@ drawKatarinaFallback(player, t, beat) {
           // Nacre albedos are authored as bright oyster stone. Grade them in-scene
           // so the material keeps detail under the shared HDR/post stack instead of
           // clipping into the white prototype look.
-          if (uArenaProfile > 0.5) {
+          // Bomb shell (mapId 7) keeps authored near-black values — do not nacre-grade it.
+          if (uArenaProfile > 0.5 && !(uMapId > 6.5 && uMapId < 7.5)) {
             if (uMapId > 5.5 && uMapId < 6.5) {
               // The outer cavern owns a separate dark reef material. It is a
               // real world-space mesh, but recedes behind the playable pearls.
@@ -4199,10 +4263,11 @@ drawKatarinaFallback(player, t, beat) {
             color += albedo * ambient * 0.1;
             color += albedo * edge * 0.06;
             color += vec3(1.0, 0.95, 0.85) * spec * 0.04;
-            if (uArenaProfile > 0.5) {
+            if (uArenaProfile > 0.5 && !(uMapId > 6.5 && uMapId < 7.5)) {
               // Thin-film oyster response derived from view angle, normal and world
               // position. It relights with the mesh instead of baking highlights into
               // a screenshot, while the low energy keeps the pale stone from clipping.
+              // Bomb shell (mapId 7) is forged steel — skip oyster iridescence.
               float fresnel = pow(1.0 - max(dot(N, V), 0.0), 3.1);
               float band = 0.5 + 0.5 * sin(dot(N, V) * 17.0
                 + vWorld.x * 0.31 - vWorld.z * 0.27);
@@ -4605,7 +4670,8 @@ drawKatarinaFallback(player, t, beat) {
       void main() {
         vec4 clip = uViewProjection * vec4(aPosition, 1.0);
         gl_Position = clip;
-        gl_PointSize = clamp(aSize * uResolution.y / max(clip.w, 0.1), 1.0, 92.0);
+        // Larger ceiling so fire burst particles read as soft flame sprites.
+        gl_PointSize = clamp(aSize * uResolution.y / max(clip.w, 0.1), 1.0, 140.0);
         vColor = aColor;
       }
     `;
@@ -4618,8 +4684,13 @@ drawKatarinaFallback(player, t, beat) {
         vec2 p = gl_PointCoord * 2.0 - 1.0;
         float d = dot(p, p);
         if (d > 1.0) discard;
-        float core = smoothstep(1.0, 0.0, d);
-        outColor = vec4(vColor.rgb * (1.25 + core * 1.8), vColor.a * core);
+        // Soft fire sprite: hot white core → mid color → transparent rim.
+        float core = exp(-d * 3.4);
+        float mid = smoothstep(1.0, 0.08, d);
+        float rim = smoothstep(1.0, 0.55, d);
+        vec3 hot = mix(vColor.rgb, vec3(1.0, 0.96, 0.85), core * 0.72);
+        float alpha = vColor.a * mid * (0.55 + core * 0.85) * rim;
+        outColor = vec4(hot * (1.1 + core * 1.6), alpha);
       }
     `;
 

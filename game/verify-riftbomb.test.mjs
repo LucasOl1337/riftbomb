@@ -405,7 +405,7 @@ test("abilities share a bounded simulation-time buffer and interrupt Death Lotus
   assert.match(rules, /initialBlockers\.includes\("stun"\)/);
   assert.match(rules, /abilityTargetAvailable\(player, slot\)/);
   assert.match(rules, /this\.gangplankKegPlacement\(player\)/);
-  assert.match(online, /offlineCastAbility\(slot, actor, \{ buffer: false \}\)/);
+  assert.match(online, /offlineCastAbility\(slot, actor, \{ buffer: false, \.\.\.\(aim \? \{ aim \} : \{\}\) \}\)/);
   assert.match(online, /player\.ultChannel > 0\) game\.cancelKatarinaChannel\?\.\(player, "movement"\)/);
   assert.match(contract, /final \*\*150 ms\*\*/);
   assert.match(contract, /cannot acquire a target, free landing or deployable capacity later/);
@@ -1349,7 +1349,7 @@ test("real VAT binaries preserve CPU fallback samples after tiled GPU packing", 
   assert.match(renderer, /normalize\(mix\(previousNormal, currentNormal, uTransition\)\)/);
 });
 
-test("arena modular kit packs nineteen authored texture sources", async () => {
+test("arena modular kit packs twenty authored texture sources", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
   const packedTextures = await readFile(
     path.join(gameDirectory, "arena-appearance", "load-arena-appearance.js"),
@@ -1362,9 +1362,10 @@ test("arena modular kit packs nineteen authored texture sources", async () => {
   assert.match(renderer, /wallLabyrinth:\s*\["wallLabyrinth"\]/);
   assert.match(renderer, /wallForts:\s*\["wallForts"\]/);
   assert.match(renderer, /wallPit:\s*\["wallPit"\]/);
+  assert.match(renderer, /bombShell:\s*\["bombShell"\]/);
   assert.equal(
     [...packedTextures.matchAll(/data:image\/webp;base64,/g)].length,
-    19,
+    20,
     "the offline build must embed each modular material once without a flattened Nacre match plate"
   );
   assert.doesNotMatch(packedTextures, /nacreScene|nacre-hollow-scene/);
@@ -1512,9 +1513,14 @@ test("the authored black bomb and explosion sequence drive live gameplay", async
   assert.match(renderer, /RIFTBOMB_BOMB_APPEARANCE\.drawExplosion\(this, blast/);
   assert.match(appearance, /function drawArmorPetals/);
   assert.match(appearance, /for \(let index = 0; index < 6; index\+\+\)/);
+  assert.match(appearance, /BOMB_MAP|mapId:\s*BOMB_MAP|const BOMB_MAP = 7/);
   assert.match(appearance, /function drawExplosion/);
   assert.match(appearance, /shockRadius/);
   assert.match(appearance, /SMOKE/);
+  assert.match(appearance, /fireball|FIRE_MID|sparkN|cardinal flame/i);
+  assert.match(appearance, /ONE clean textured sphere|no stacked petals/i);
+  assert.match(renderer, /bombSphere/);
+  assert.match(renderer, /uMapId > 6\.5 && uMapId < 7\.5/);
   assert.ok(spec.componentTree.filter((component) => component.id.startsWith("armor-petal-")).length >= 6);
   assert.ok(spec.qualityContract.featureGroups.some((group) => group.id === "detonation-continuity"));
 });
@@ -1538,4 +1544,100 @@ test("the build retains the five playable champions and duel rules", async () =>
   assert.match(document, /id="runtime-bootstrap" hidden/);
   assert.match(document, /id="chrome"/);
   assert.doesNotMatch(document, /id="intro"|UNOFFICIAL FAN PROTOTYPE|Champions of the Bomber Rift/);
+});
+
+test("mouse aim steers a directional cast toward the aimed arena point", async () => {
+  const game = await createAuthoritativeDuel({
+    hostChampion: "zed",
+    guestChampion: "katarina",
+    seed: 730
+  });
+  const player = game.players[0];
+  player.skillsUnlocked = [true, true, true, true];
+  player.stunned = 0;
+  player.lastDx = 0;
+  player.lastDz = 1;
+  player.facing = 0;
+
+  // Aim east of the champion; the shuriken must fly +X regardless of facing.
+  const aim = { x: player.x + game.tile * 4, z: player.z };
+  assert.equal(game.castAbility(0, player, { buffer: false, aim }), true);
+  const shuriken = game.projectiles.at(-1);
+  assert.ok(shuriken.dx > 0.99, "projectile must fly toward the aimed point");
+  assert.ok(Math.abs(shuriken.dz) < 0.01);
+  assert.ok(Math.abs(player.facing - Math.PI / 2) < 0.01,
+    "the cast must also turn the champion toward the aim");
+
+  // Invalid aim keeps the current facing (auto-aim fallback for keyboards/bots).
+  player.qCooldown = 0;
+  player.lastDx = 0;
+  player.lastDz = 1;
+  player.facing = 0;
+  assert.equal(game.castAbility(0, player, { buffer: false, aim: { x: Number.NaN, z: 2 } }), true);
+  assert.ok(game.projectiles.at(-1).dz > 0.99, "invalid aim must fall back to facing");
+
+  // A buffered cast preserves its aim and applies it on execution.
+  player.qCooldown = 0.1;
+  const bufferedAim = { x: player.x - game.tile * 4, z: player.z };
+  assert.equal(game.castAbility(0, player, { aim: bufferedAim }), true);
+  game.processAbilityBuffer(0.11);
+  player.qCooldown = 0;
+  game.processAbilityBuffer(0.01);
+  assert.ok(game.projectiles.at(-1).dx < -0.99,
+    "a postponed cast must fire toward the aim captured at press time");
+
+  // The online action payload carries the aim through applyPlayerAction.
+  const { applyPlayerAction } = await import("./create-authoritative-duel.mjs");
+  player.qCooldown = 0;
+  player.lastDx = 0;
+  player.lastDz = 1;
+  assert.equal(applyPlayerAction(game, 1, {
+    kind: "ability", slot: 0, aimX: player.x, aimZ: player.z - game.tile * 4
+  }), true);
+  assert.ok(game.projectiles.at(-1).dz < -0.99,
+    "the authoritative server must honor aimX/aimZ from the action message");
+});
+
+test("lock-on skills require the aim point over the target", async () => {
+  const game = await createAuthoritativeDuel({
+    hostChampion: "zed",
+    guestChampion: "katarina",
+    seed: 731
+  });
+  const [zed, kat] = game.players;
+  for (const player of game.players) {
+    player.skillsUnlocked = [true, true, true, true];
+    player.stunned = 0;
+  }
+  kat.x = zed.x + game.tile * 2;
+  kat.z = zed.z;
+
+  // Death Mark aimed at empty ground beside the rival must refuse to lock.
+  const miss = { x: kat.x, z: kat.z + game.tile * 2 };
+  assert.equal(game.castAbility(3, zed, { buffer: false, aim: miss }), false,
+    "Death Mark must not fire when the cursor is off the rival");
+  assert.equal(game.castAbility(3, zed, { buffer: false, aim: { x: kat.x, z: kat.z } }), true,
+    "Death Mark must fire when the cursor hovers the rival");
+
+  // Without any aim (keyboard/bot/legacy client) auto-targeting still works.
+  zed.rCooldown = 0;
+  zed.zedDeathMarkCommitment = null;
+  assert.equal(game.castAbility(3, zed, { buffer: false }), true,
+    "aimless casts keep the classic auto-target");
+
+  // Shunpo hover picks the entity under the cursor, not the nearest one.
+  game.daggers.push(
+    { x: kat.x + game.tile, z: kat.z, age: 1, readyAt: 0 },
+    { x: kat.x - game.tile * 3, z: kat.z, age: 1, readyAt: 0 }
+  );
+  const far = game.daggers.at(-1);
+  assert.equal(game.katarinaShunpoTarget(kat), game.daggers.at(-2),
+    "aimless Shunpo keeps the nearest dagger");
+  kat.castAim = { x: far.x, z: far.z };
+  assert.equal(game.katarinaShunpoTarget(kat), far,
+    "hovered Shunpo takes the dagger under the cursor");
+  kat.castAim = { x: kat.x, z: kat.z - game.tile * 3 };
+  assert.equal(game.katarinaShunpoTarget(kat), null,
+    "hovered Shunpo refuses when the cursor is over nothing");
+  kat.castAim = null;
 });

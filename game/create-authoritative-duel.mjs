@@ -145,7 +145,10 @@ export function applyPlayerAction(game, playerId, action) {
   if (!player) return false;
   if (action.kind === "bomb") return game.placeBomb(player);
   if (action.kind === "ability" && Number.isInteger(action.slot)) {
-    return game.castAbility(action.slot, player);
+    const aim = Number.isFinite(action.aimX) && Number.isFinite(action.aimZ)
+      ? { x: action.aimX, z: action.aimZ }
+      : null;
+    return game.castAbility(action.slot, player, aim ? { aim } : {});
   }
   return false;
 }

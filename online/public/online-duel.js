@@ -355,7 +355,13 @@
           actionSeq: message.actionSeq,
           actionRound: message.actionRound
         };
-        if (message.kind === "ability") restoredMessage.slot = message.slot;
+        if (message.kind === "ability") {
+          restoredMessage.slot = message.slot;
+          if (Number.isFinite(message.aimX) && Number.isFinite(message.aimZ)) {
+            restoredMessage.aimX = message.aimX;
+            restoredMessage.aimZ = message.aimZ;
+          }
+        }
         restored.push({ message: restoredMessage, sentAt: Number.NEGATIVE_INFINITY });
       }
       epoch = saved.epoch;
@@ -365,7 +371,7 @@
       return true;
     };
 
-    const queue = (kind, slot, round) => {
+    const queue = (kind, slot, round, aim = null) => {
       failure = "";
       if (mode !== "reliable" || epoch <= 0) {
         failure = "protocol";
@@ -390,7 +396,13 @@
         actionSeq: nextSequence++,
         actionRound: round
       };
-      if (kind === "ability") message.slot = slot;
+      if (kind === "ability") {
+        message.slot = slot;
+        if (Number.isFinite(aim?.x) && Number.isFinite(aim?.z)) {
+          message.aimX = aim.x;
+          message.aimZ = aim.z;
+        }
+      }
       const entry = { message, sentAt: Number.NEGATIVE_INFINITY };
       outbox.push(entry);
       // The durable tab session must contain the envelope before its first
@@ -1954,9 +1966,9 @@
     globalThis.configurePlayerView?.(id, { shared: false, localMultiplayer: false });
   }
 
-  function sendOnlineAction(kind, slot) {
+  function sendOnlineAction(kind, slot, aim = null) {
     if (reliableAction.currentMode() === "reliable") {
-      const queued = reliableAction.queue(kind, slot, game.round);
+      const queued = reliableAction.queue(kind, slot, game.round, aim);
       if (!queued && reliableAction.currentFailure() === "storage") {
         const message = "Action blocked: browser storage is unavailable. Reload after enabling site data.";
         setStatus(message, "error");
@@ -1967,7 +1979,13 @@
     }
     if (reliableAction.currentMode() !== "legacy") return false;
     const message = { type: "action", kind };
-    if (kind === "ability") message.slot = slot;
+    if (kind === "ability") {
+      message.slot = slot;
+      if (Number.isFinite(aim?.x) && Number.isFinite(aim?.z)) {
+        message.aimX = aim.x;
+        message.aimZ = aim.z;
+      }
+    }
     return sendControl(message);
   }
 
@@ -1995,19 +2013,22 @@
     return true;
   };
 
-  game.castAbility = (slot, player) => {
+  game.castAbility = (slot, player, options = {}) => {
     if (state.role === "offline" || !state.connected || !state.socket) {
-      return offlineCastAbility(slot, player || game.player);
+      return offlineCastAbility(slot, player || game.player, options);
     }
     if (!Number.isInteger(slot)) return false;
     const local = localOnlinePlayer();
     const actor = player?.id === local?.id ? player : local;
     if (!actor) return false;
-    if (!sendOnlineAction("ability", slot)) return false;
+    const aim = Number.isFinite(options.aim?.x) && Number.isFinite(options.aim?.z)
+      ? { x: options.aim.x, z: options.aim.z }
+      : null;
+    if (!sendOnlineAction("ability", slot, aim)) return false;
     // The server owns postponed-spell buffering. Keep immediate local
     // prediction for legal casts, but never leave a client-only buffered cast
     // that could survive a snapshot or execute twice.
-    return offlineCastAbility(slot, actor, { buffer: false });
+    return offlineCastAbility(slot, actor, { buffer: false, ...(aim ? { aim } : {}) });
   };
 
   if (typeof offlineRequestDash === "function") {
@@ -2028,7 +2049,9 @@
     const guest = localOnlinePlayer();
     if (!guest) return;
     if (kind === "bomb") game.placeBomb(guest);
-    if (kind === "ability" && Number.isInteger(slot)) game.castAbility(slot, guest);
+    if (kind === "ability" && Number.isInteger(slot)) {
+      game.castAbility(slot, guest, game.pointerAim ? { aim: game.pointerAim } : {});
+    }
   }
 
   const keyDirections = {
