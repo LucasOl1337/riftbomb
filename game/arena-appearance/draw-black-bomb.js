@@ -124,6 +124,7 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
 
   /**
    * CINEMATIC_EXPLOSION_IMAGINE_V1 + CORRIDOR_CROSS_V3 + EXPLOSION_GPU_BURST_V1
+   * + EXPLOSION_PARTICLE_HERO_V1
    * Bomberman CROSS = geometry scaffold + dense multi-frame Imagine plates (1024).
    * Multi-layer corridor beams, temporal morph, corridor-locked sparks only.
    * Radial fireball-as-hero is banned.
@@ -133,6 +134,9 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
   }
 
   function drawFxPlate(renderer, texture, x, y, z, scaleX, scaleZ, alpha, emissive, rotation = 0) {
+    // EXPLOSION_PARTICLE_HERO_V1: plates are only a faint textured underlay now —
+    // at full alpha their rectangular silhouette was the "blocky sticker".
+    alpha *= 0.28;
     if (!texture || !renderer?.draw || alpha < 0.02) return;
     const gl = renderer.gl;
     if (gl) {
@@ -196,33 +200,15 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
     const hx = alongWorldX ? halfLen : halfWidth;
     const hz = alongWorldX ? halfWidth : halfLen;
     const flicker = 0.9 + Math.sin(seed * 11 + phase * 18) * 0.1;
+    // EXPLOSION_PARTICLE_HERO_V1: the GPU burst field is the flame body now.
+    // Geometry only lays a soft heat bed so the corridor reads at distance —
+    // hard-edged stacked bars and plastic crystal tips made it look blocky.
     renderer.draw("cube", [x, y, z],
-      [hx, rise * 0.5, hz],
-      DEEP_RED, 4, em * 0.7 * flicker, 0, alpha * 0.8);
-    renderer.draw("cube", [x, y + rise * 0.07, z],
-      [hx * 0.82, rise * 0.68, hz * 0.74],
-      MID_FIRE, 4, em * flicker, 0, alpha);
-    renderer.draw("cube", [x, y + rise * 0.12, z],
-      [hx * 0.5, rise * 0.58, hz * 0.42],
-      HOT_ORANGE, 4, em * 1.2 * flicker, 0, alpha * 0.95);
-    renderer.draw("cube", [x, y + rise * 0.16, z],
-      [hx * 0.22, rise * 0.4, hz * 0.2],
-      CORE_WHITE, 4, em * 1.55 * flicker, 0, alpha * (0.45 + flicker * 0.25));
-    const tipN = 10;
-    for (let i = 0; i < tipN; i++) {
-      const u = (i + 0.5) / tipN - 0.5;
-      const wobble = Math.sin(phase * 22 + seed + i * 1.7) * halfWidth * 0.35;
-      const ox = alongWorldX ? u * halfLen * 1.85 : wobble + (hash01(seed + i) - 0.5) * halfWidth * 0.5;
-      const oz = alongWorldX ? wobble + (hash01(seed + i * 3) - 0.5) * halfWidth * 0.5 : u * halfLen * 1.85;
-      const tipA = alpha * (0.5 + (1 - Math.abs(u) * 1.2) * 0.45);
-      if (tipA < 0.05) continue;
-      const h = rise * (0.55 + (1 - Math.abs(u)) * 0.7 + hash01(seed + i * 5) * 0.25);
-      renderer.draw("crystal",
-        [x + ox, y + rise * 0.45 + h * 0.25, z + oz],
-        [halfWidth * (0.22 + (i % 3) * 0.06), h, halfWidth * (0.22 + (i % 3) * 0.06)],
-        i % 3 === 0 ? HOT_ORANGE : (i % 3 === 1 ? MID_FIRE : DEEP_RED),
-        3, em * (1.05 + (i % 2) * 0.15), seed + i + phase * 4, tipA);
-    }
+      [hx, rise * 0.2, hz],
+      DEEP_RED, 4, em * 0.4 * flicker, 0, alpha * 0.22);
+    renderer.draw("cube", [x, y + rise * 0.05, z],
+      [hx * 0.86, rise * 0.28, hz * 0.8],
+      MID_FIRE, 4, em * 0.55 * flicker, 0, alpha * 0.15);
   }
 
   function drawCorridorSparks(renderer, x, z, alongWorldX, tile, halfWidth, phase, energy, seed, time, count) {
@@ -312,12 +298,12 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
       renderer.drawExplosionBurst(x, z, 0, 0, phase, life, tile, true, seed, time);
     }
 
-    renderer.draw("cube", [x, plateY + rise * 0.18, z],
-      [tile * 0.24, rise * 0.75, tile * 0.24],
-      HOT_ORANGE, 4, em * 1.4, time * 2, alpha);
-    renderer.draw("cube", [x, plateY + rise * 0.26, z],
-      [tile * 0.14, rise * 0.5, tile * 0.14],
-      CORE_WHITE, 4, em * 1.75, 0, alpha * (0.55 + pFlash * 0.4));
+    // Ignition microflash only — the particle field carries the core after that.
+    if (pFlash > 0.05) {
+      renderer.draw("cube", [x, plateY + rise * 0.3, z],
+        [tile * 0.15, rise * 0.7, tile * 0.15],
+        CORE_WHITE, 4, em * 1.6, 0, alpha * pFlash);
+    }
 
     const coreMorph = pickMorph(roles,
       ["ignition", "coreCross", "corePeak", "crossMid", "crossLate", "smoke"], phase);

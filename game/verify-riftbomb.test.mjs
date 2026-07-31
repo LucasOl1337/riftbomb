@@ -556,9 +556,10 @@ test("the modern client presents the V1 opponent as a measured product", async (
   assert.match(sourceDocument, /id="runtime-bootstrap"[^>]+hidden/);
   assert.doesNotMatch(sourceDocument, /data-match-mode|id="bot-roster"/);
   assert.match(startup, /game\.activateBotOpponent\(\)/);
-  assert.match(client, /activeMode === "solo"[\s\S]*OPONENTE DE TREINO/);
+  assert.match(client, /activeMode === "solo" \? \([\s\S]*training-bot-card/);
   assert.match(client, /bot: TRAINING_BOT\.id/);
   assert.match(clientData, /id: "v1-renekton"/);
+  assert.match(clientData, /Tático adaptativo/);
   assert.match(onlineRuntime, /game\.selectBotOpponent\(payload\.bot\)/);
   assert.match(profile, /id: "v1-renekton"/);
   assert.match(profile, /champion: "renekton"/);
@@ -1515,9 +1516,11 @@ test("the authored black bomb and explosion sequence drive live gameplay", async
   assert.match(appearance, /for \(let index = 0; index < 6; index\+\+\)/);
   assert.match(appearance, /BOMB_MAP|mapId:\s*BOMB_MAP|const BOMB_MAP = 7/);
   assert.match(appearance, /function drawExplosion/);
-  assert.match(appearance, /shockRadius/);
+  assert.doesNotMatch(appearance, /shockRadius/);
+  assert.match(appearance, /function drawCorridorArm/);
+  assert.match(appearance, /function pickMorph/);
   assert.match(appearance, /SMOKE/);
-  assert.match(appearance, /fireball|FIRE_MID|sparkN|cardinal flame/i);
+  assert.match(appearance, /fireball|HOT_ORANGE|FIRE_MID|sparkN|drawFireBar|CORRIDOR_CROSS|CINEMATIC_EXPLOSION_V3/i);
   assert.match(appearance, /ONE clean textured sphere|no stacked petals/i);
   assert.match(renderer, /bombSphere/);
   assert.match(renderer, /uMapId > 6\.5 && uMapId < 7\.5/);

@@ -4,28 +4,30 @@ Aplicação hospedável do Riftbomb com partidas PvP entre dois navegadores.
 
 ## Fluxo da partida
 
-- o host cria um lobby e compartilha o código;
-- cada jogador escolhe o próprio campeão;
-- o host escolhe a arena;
-- o convidado confirma `READY`;
+- `Partida rápida` procura automaticamente um rival e joga uma melhor de 3;
+- `Jogar com amigo` trava a formação e a arena em uma melhor de 10 e gera um link direto;
+- o convidado abre o link e ocupa o segundo lugar sem digitar código ou confirmar uma etapa intermediária;
+- `Treinamento` inicia uma sessão local contra o V1 Renekton (`Dominus-01`);
 - a partida online não pode ser pausada;
 - a Oracle em São Paulo mantém a simulação autoritativa a 60 ticks/s;
 - os dois jogadores enviam comandos por WebSocket e recebem snapshots a 30 Hz.
 
-A API em `app/api/pvp/route.ts` usa D1 para reservar códigos e links de convite.
+A API em `app/api/pvp/route.ts` usa D1 para reservar os identificadores internos dos convites.
+Esses códigos continuam no protocolo, mas não fazem parte da interface pública.
 O Worker encaminha `/game-ws` ao servidor em `server/`; nenhum navegador é dono
 do relógio, bombas, dano, placar ou transições de rodada.
 
 ## Estrutura
 
-- `app/page.tsx`: único frontend de lobby, seleção e entrada na partida;
+- `app/page.tsx`: War Table de produção, seleção e entrada na partida;
+- `app/war-table.css`: sistema visual responsivo da montagem pré-partida;
 - `public/online-duel.js`: bridge interna de comandos e sincronização do runtime;
 - `public/online-duel.css`: somente alertas operacionais do runtime;
 - `app/api/pvp/route.ts`: criação, entrada e encerramento de salas;
 - `server/`: motor headless, protocolo WebSocket e instalação na Oracle;
 - `scripts/package-riftbomb.mjs`: divide o `riftbomb.html` da raiz em partes
   para carregamento;
-- `tests/`: verificações do lobby e do HTML renderizado.
+- `tests/`: verificações da War Table, do protocolo e do HTML renderizado.
 
 ## Desenvolvimento
 

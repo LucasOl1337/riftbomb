@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import "./war-table.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Riftbomb — Bomber Rift Client",
-  description: "Escolha o modo, prepare a sala e entre na arena do Riftbomb.",
+  title: "Riftbomb — War Table",
+  description: "Monte seu protocolo, escolha a arena e entre em um duelo tático de Riftbomb.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -34,7 +34,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#03080d",
+  themeColor: "#05090c",
 };
 
 export default function RootLayout({

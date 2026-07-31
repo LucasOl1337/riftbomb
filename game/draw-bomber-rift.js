@@ -599,8 +599,8 @@
 
         // EXPLOSION_GPU_BURST_V1 seed field. One static buffer; motion and color
         // are fully computed in the vertex shader (Sharingan mangekyo technique).
-        this.burstSmokeCount = 224;
-        this.burstFireCount = 640;
+        this.burstSmokeCount = 1024;
+        this.burstFireCount = 2000;
         const burstTotal = this.burstSmokeCount + this.burstFireCount;
         const burstSeeds = new Float32Array(burstTotal * 4);
         let burstState = 0x9e3779b9;
@@ -3999,11 +3999,11 @@ drawKatarinaFallback(player, t, beat) {
         // Smoke first (normal alpha) so additive fire blooms on top of it.
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.uniform1f(this.burstUniforms.uSmoke, 1);
-        gl.drawArrays(gl.POINTS, 0, this.mobilePerf ? 96 : this.burstSmokeCount);
+        gl.drawArrays(gl.POINTS, 0, this.mobilePerf ? 192 : this.burstSmokeCount);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
         gl.uniform1f(this.burstUniforms.uSmoke, 0);
         gl.drawArrays(gl.POINTS, this.burstSmokeCount,
-          this.mobilePerf ? 256 : this.burstFireCount);
+          this.mobilePerf ? 640 : this.burstFireCount);
         gl.bindVertexArray(null);
         gl.depthMask(true);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -4861,8 +4861,8 @@ drawKatarinaFallback(player, t, beat) {
         float r1 = rnd.x, r2 = rnd.y, r3 = rnd.z, r4 = rnd.w;
         float smoke = uSmoke;
 
-        float birth = smoke > 0.5 ? 0.14 + r1 * 0.4 : r1 * 0.3;
-        float span = smoke > 0.5 ? 0.5 + r2 * 0.4 : 0.32 + r2 * 0.38;
+        float birth = smoke > 0.5 ? 0.2 + r1 * 0.4 : r1 * 0.45;
+        float span = smoke > 0.5 ? 0.55 + r2 * 0.35 : 0.4 + r2 * 0.45;
         float t = (uPhase - birth) / span;
         float alive = step(0.0, t) * (1.0 - step(1.0, t));
         t = clamp(t, 0.0, 1.0);
@@ -4877,9 +4877,10 @@ drawKatarinaFallback(player, t, beat) {
         }
         vec2 side = vec2(-axis.y, axis.x);
 
-        float along = smoke > 0.5 ? 0.5 + r3 * 0.9 : 1.7 + r3 * 3.4;
-        float lateral = (r4 - 0.5) * (smoke > 0.5 ? 0.5 : 1.0);
-        float lift = smoke > 0.5 ? 0.7 + r2 * 1.0 : 1.3 + r2 * 2.4;
+        float along = smoke > 0.5 ? 0.4 + r3 * 0.8 : 1.7 + r3 * 3.4;
+        float lateral = (r4 - 0.5) * (smoke > 0.5 ? 1.0 : 1.0);
+        float lift = smoke > 0.5 ? 1.0 + r2 * 1.3
+          : (r4 > 0.55 ? 2.2 + r2 * 3.4 : 0.9 + r2 * 1.7);
         float travel = (1.0 - exp(-seconds * (smoke > 0.5 ? 1.4 : 2.6)))
           * uTile * (smoke > 0.5 ? 0.35 : 0.5);
         vec3 pos = uOrigin;
@@ -4896,14 +4897,14 @@ drawKatarinaFallback(player, t, beat) {
 
         float heat = 1.0 - t;
         float size = smoke > 0.5
-          ? (0.09 + r4 * 0.1) * (0.55 + t * 1.9)
-          : (0.04 + r4 * 0.07) * (1.2 - t * 0.6);
+          ? (0.07 + r4 * 0.09) * (0.4 + t * 1.7)
+          : (0.055 + r4 * 0.1) * (1.3 - t * 0.55);
         gl_PointSize = alive * clamp(size * uResolution.y / max(clip.w, 0.1),
-          0.0, smoke > 0.5 ? 200.0 : 140.0);
+          0.0, smoke > 0.5 ? 260.0 : 190.0);
 
         float fadeIn = smoothstep(0.0, smoke > 0.5 ? 0.12 : 0.03, t);
         float fadeOut = 1.0 - smoothstep(smoke > 0.5 ? 0.55 : 0.6, 1.0, t);
-        vAlpha = alive * fadeIn * fadeOut * (smoke > 0.5 ? 0.42 : 0.5 + heat * 0.5);
+        vAlpha = alive * fadeIn * fadeOut * (smoke > 0.5 ? 0.2 : 0.2 + heat * 0.3);
 
         // Heat ramp: deep red -> orange -> yellow -> white flash. Smoke: warm black.
         vec3 fire = mix(vec3(0.42, 0.05, 0.008), vec3(1.0, 0.33, 0.03),
@@ -4912,7 +4913,7 @@ drawKatarinaFallback(player, t, beat) {
         fire = mix(fire, vec3(1.0, 0.95, 0.78),
           smoothstep(0.85, 0.99, heat) * step(0.55, r4));
         vColor = smoke > 0.5
-          ? mix(vec3(0.028, 0.026, 0.03), vec3(0.1, 0.075, 0.055), r2)
+          ? mix(vec3(0.05, 0.048, 0.052), vec3(0.16, 0.12, 0.09), r2)
           : fire;
       }
     `;

@@ -23,6 +23,7 @@ async function loadBombAppearanceAsync() {
 
 function createDrawRecorder() {
   const calls = [];
+  const bursts = [];
   const record = (mesh, position, scale, color, material, emissive, rotation = 0, alpha = 1) => {
     calls.push({
       mesh,
@@ -37,9 +38,13 @@ function createDrawRecorder() {
   };
   return {
     calls,
+    bursts,
     draw: record,
     drawMesh(_mesh, position, scale, color, material, emissive, rotation, alpha) {
       record("mesh", position, scale, color, material, emissive, rotation, alpha);
+    },
+    drawExplosionBurst(x, z, dr, dc, phase, life, tile, core, seed, time) {
+      bursts.push({ x, z, dr, dc, phase, life, tile, core, seed, time });
     }
   };
 }
@@ -88,7 +93,12 @@ test("drawExplosion paints multi-phase fire layers without full black bomb shell
       { r: 5, c: 6, core: true, age: phase * 0.72, life: 0.72, source: 1, ownerId: 1, dr: 0, dc: 0 },
       0, 0, 1.2, 0.4, tile
     );
-    assert.ok(recorder.calls.length >= 16, `core phase ${phase} must issue dense draw layers`);
+    assert.ok(recorder.calls.length >= 6, `core phase ${phase} must issue draw layers`);
+    // EXPLOSION_PARTICLE_HERO_V1: the GPU burst field runs every phase, core mode.
+    assert.equal(recorder.bursts.length, 1, `phase ${phase} must emit the GPU particle burst`);
+    assert.equal(recorder.bursts[0].core, true, "core blast must use the four-axis burst");
+    assert.ok(Math.abs(recorder.bursts[0].phase - phase) < 0.001, "burst receives the blast phase");
+    assert.ok(recorder.bursts[0].life >= 0.7, "burst receives the blast life");
 
     const fireDraws = recorder.calls.filter((call) => isFireColor(call.color) && call.emissive >= 1);
     coreTotals.fireDraws += fireDraws.length;
@@ -109,11 +119,23 @@ test("drawExplosion paints multi-phase fire layers without full black bomb shell
       const [sx, , sz] = call.scale;
       return Math.max(sx, sz) / Math.max(0.001, Math.min(sx, sz)) >= 1.6;
     });
-    assert.ok(fireBars.length >= 2, `phase ${phase} needs elongated fire bars for Bomberman cross`);
+    assert.ok(fireBars.length >= 2, `phase ${phase} needs elongated heat bed bars for Bomberman cross`);
+    // The heat bed must stay a faint underlay — never the blocky sticker.
+    assert.ok(
+      fireBars.every((call) => (call.alpha ?? 1) <= 0.35),
+      `phase ${phase}: heat bed bars must stay faint (alpha <= 0.35)`
+    );
+    // Anti-blocky guard: no large high-alpha fire cubes (that was the sticker look).
+    const blocky = recorder.calls.filter((call) =>
+      call.mesh === "cube" && isFireColor(call.color)
+      && (call.alpha ?? 1) > 0.6 && call.scale && Math.max(...call.scale) >= 0.3
+    );
+    assert.equal(blocky.length, 0, `phase ${phase} must not draw large opaque fire cubes`);
 
-    // Cardinal tips / sparks offset from origin at peak fire phases
+    // Cardinal sparks offset from origin at peak fire phases
     if (phase >= 0.12 && phase <= 0.55) {
-      const offsetFire = fireDraws.filter((call) => {
+      const offsetFire = recorder.calls.filter((call) => {
+        if (!isFireColor(call.color)) return false;
         const [px, , pz] = call.position || [0, 0, 0];
         return Math.hypot(px, pz) > tile * 0.08;
       });
@@ -135,9 +157,7 @@ test("drawExplosion paints multi-phase fire layers without full black bomb shell
     assert.equal(largeDarkSpheres.length, 0, `phase ${phase} must not redraw full black bomb shells`);
   }
 
-  assert.ok(coreTotals.fireDraws >= 40, "multi-phase core must accumulate dense fire draws");
-  assert.ok(coreTotals.shock >= 16, "elongated fire bars / tips must appear in the sequence");
-  assert.ok(coreTotals.arms >= 12, "cardinal arms must appear across fire peak phases");
+  assert.ok(coreTotals.arms >= 12, "cardinal sparks must appear across fire peak phases");
   assert.ok(coreTotals.sparks >= 8, "dense cardinal sparks must appear");
 
   // Arm cell path: elongated corridor beam along blast direction
@@ -147,8 +167,12 @@ test("drawExplosion paints multi-phase fire layers without full black bomb shell
     { r: 5, c: 7, core: false, dr: 0, dc: 1, step: 1, age: 0.2 * 0.72, life: 0.72, source: 1, ownerId: 1 },
     tile, 0, 1.0, 0.3, tile
   );
+  assert.equal(armRecorder.bursts.length, 1, "arm cell must emit the GPU particle burst");
+  assert.equal(armRecorder.bursts[0].core, false, "arm burst stays single-axis");
+  assert.ok(armRecorder.bursts[0].dr === 0 && armRecorder.bursts[0].dc === 1,
+    "arm burst receives the corridor direction");
   const armFire = armRecorder.calls.filter((call) => isFireColor(call.color));
-  assert.ok(armFire.length >= 10, "arm cells must draw dense multi-layer fire frames");
+  assert.ok(armFire.length >= 6, "arm cells must draw corridor fire layers");
   assert.equal(
     armRecorder.calls.filter((call) => isDarkMetal(call.color) && call.scale && Math.max(...call.scale) >= 0.28).length,
     0,

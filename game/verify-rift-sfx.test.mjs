@@ -716,6 +716,7 @@ test("arena explosion emits once with camera pan and stable source metadata", ()
   match.tile = 1.32;
   match.grid = Array.from({ length: match.rows }, () => Array(match.cols).fill(0));
   match.blasts = [];
+  match.particles = [];
   match.players = [];
   match.bombs = [];
   match.renderer = { addShock() {}, viewPlayerId: 0 };
