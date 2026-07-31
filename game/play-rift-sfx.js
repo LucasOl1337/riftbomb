@@ -15,8 +15,8 @@
     const SFX_VOLUME_DEFAULTS = Object.freeze({
       master: 0.78,
       // Arena bombs
-      explosion: 0.55,
-      bomb: 0.85,
+      explosion: 0.68,
+      bomb: 0.9,
       // Pickups / utility
       pickup: 1.0,
       // Movement / dashes
@@ -115,13 +115,18 @@
      * champion detonations stay shorter and occupy a recognisably different band.
      */
     const SFX_BLAST_PROFILES = Object.freeze({
+      // Cinematic arena bomb: sharp detonation crack → pressure body → deep room tail.
       arena: Object.freeze({
         level: 1,
-        crackFilter: "highpass", crackFrom: 4300, crackTo: 1050, crackDuration: 0.045, crackGain: 0.09, crackDrive: 12,
-        bodyFilter: "lowpass", bodyFrom: 2300, bodyTo: 105, bodyDuration: 0.6, bodyGain: 0.1, bodyDrive: 7,
-        subFrom: 94, subTo: 36, subDuration: 0.54, subGain: 0.12,
-        tailFrom: 1450, tailTo: 180, tailDuration: 0.52, tailGain: 0.052,
-        debris: 2, debrisPitch: 1700, debrisGain: 0.012, reverb: 0.28, pulse: 0.3
+        crackFilter: "highpass", crackFrom: 6200, crackTo: 980, crackDuration: 0.055, crackGain: 0.12, crackDrive: 14,
+        bodyFilter: "lowpass", bodyFrom: 2100, bodyTo: 78, bodyDuration: 0.78, bodyGain: 0.13, bodyDrive: 9,
+        subFrom: 72, subTo: 28, subDuration: 0.72, subGain: 0.16,
+        tailFrom: 980, tailTo: 95, tailDuration: 0.85, tailGain: 0.07,
+        debris: 4, debrisPitch: 1450, debrisGain: 0.018, reverb: 0.42, pulse: 0.38,
+        // Extra layers only used by arena profile in explosion().
+        detonateFrom: 880, detonateTo: 120, detonateDuration: 0.09, detonateGain: 0.07,
+        airFrom: 420, airTo: 55, airDuration: 0.55, airGain: 0.045,
+        boomFrom: 48, boomTo: 22, boomDuration: 0.9, boomGain: 0.09
       }),
       powder: Object.freeze({
         level: 0.65,
@@ -818,12 +823,28 @@
         this.pulse(SFX_PULSE[name] ?? 0.16);
         try {
           if (name === "bombTick") {
-            const pitch = 620 + (power - 0.5) * 1600;
+            // Fuse spark: rising metallic hiss + tiny ember pop (accelerates with power).
+            const pitch = 720 + (power - 0.5) * 2100;
+            const late = power > 1.05;
             this.noiseBurst(time, {
-              duration: 0.045, gain: 0.048 * power, filter: "bandpass",
-              frequency: pitch, endFrequency: pitch * 0.62, q: 2.6,
-              pan, reverb: 0.08, bus
+              duration: late ? 0.07 : 0.05, gain: (late ? 0.07 : 0.052) * power,
+              filter: "bandpass",
+              frequency: pitch, endFrequency: pitch * (late ? 0.48 : 0.58), q: late ? 3.4 : 2.8,
+              drive: late ? 5 : 2, pan, reverb: late ? 0.16 : 0.1, bus
             });
+            this.toneSweep(time, {
+              from: pitch * 0.35, to: pitch * 0.18,
+              duration: late ? 0.09 : 0.06,
+              gain: (late ? 0.028 : 0.016) * power,
+              type: "triangle", pan, reverb: 0.08, bus
+            });
+            if (late) {
+              // Final fuse climax — brief detonation wind-up before the boom.
+              this.noiseBurst(time + 0.02, {
+                duration: 0.08, gain: 0.04 * power, filter: "highpass",
+                frequency: 3800, endFrequency: 900, drive: 6, pan, reverb: 0.18, bus
+              });
+            }
             return;
           }
 
@@ -989,17 +1010,26 @@
           }
 
           if (name === "bomb") {
-            // Heavy body, mechanism click, contact thud and a restrained metal tick.
-            this.toneSweep(time, { from: 150, to: 38, duration: 0.2, gain: 0.13 * power, type: "triangle", pan, bus });
+            // Cinematic plant: weight thud → shell mechanism → metal settle.
+            this.toneSweep(time, {
+              from: 118, to: 32, duration: 0.28, gain: 0.15 * power,
+              type: "triangle", pan, reverb: 0.1, bus
+            });
             this.noiseBurst(time, {
-              duration: 0.065, gain: 0.085 * power, frequency: 2400,
-              endFrequency: 480, q: 1.1, pan, reverb: 0.12, bus
+              duration: 0.08, gain: 0.1 * power, filter: "highpass",
+              frequency: 2800, endFrequency: 520, q: 1.2, drive: 4,
+              pan, reverb: 0.14, bus
             });
-            this.noiseBurst(time + 0.05, {
-              duration: 0.14, gain: 0.065 * power, filter: "lowpass",
-              frequency: 700, endFrequency: 145, pan, reverb: 0.12, bus
+            this.noiseBurst(time + 0.04, {
+              duration: 0.18, gain: 0.08 * power, filter: "lowpass",
+              frequency: 620, endFrequency: 110, drive: 3, pan, reverb: 0.16, bus
             });
-            this.metalStrike(time + 0.015, 490 + Math.random() * 45, 0.035 * power, pan, 0.16, bus);
+            this.metalStrike(time + 0.018, 420 + Math.random() * 55, 0.042 * power, pan, 0.2, bus);
+            // Soft fuse light-up after plant.
+            this.noiseBurst(time + 0.09, {
+              duration: 0.1, gain: 0.028 * power, filter: "bandpass",
+              frequency: 1400, endFrequency: 700, q: 2.2, pan, reverb: 0.12, bus
+            });
             return;
           }
 
@@ -1074,13 +1104,34 @@
           this._recentBlasts.push({ time, sourceKey, profile: profileName, pan });
           this.pulse(profile.pulse * Math.min(1, power) * (secondary ? 0.62 : 1));
 
+          // Arena detonation snap — the “pin pulls / shell ruptures” hit before pressure.
+          if (profileName === "arena" && profile.detonateGain && !secondary) {
+            this.noiseBurst(time, {
+              duration: profile.detonateDuration, gain: profile.detonateGain * mix,
+              attack: 0.0008, filter: "bandpass",
+              frequency: profile.detonateFrom, endFrequency: profile.detonateTo,
+              q: 1.4, drive: 10, pan, reverb: profile.reverb * 0.35, bus, priority: true
+            });
+            this.toneSweep(time + 0.006, {
+              from: profile.boomFrom, to: profile.boomTo,
+              duration: profile.boomDuration, gain: profile.boomGain * mix,
+              type: "sine", pan, reverb: 0.12, bus, priority: true
+            });
+            this.noiseBurst(time + 0.03, {
+              duration: profile.airDuration, gain: profile.airGain * mix,
+              attack: 0.02, filter: "lowpass",
+              frequency: profile.airFrom, endFrequency: profile.airTo,
+              playbackRate: 0.7, drive: 2, pan, reverb: profile.reverb, bus, priority: true
+            });
+          }
+
           if (!secondary) {
             this.noiseBurst(time + 0.016, {
               duration: profile.tailDuration, gain: profile.tailGain * mix,
               attack: 0.018, filter: "lowpass",
               frequency: profile.tailFrom, endFrequency: profile.tailTo,
-              playbackRate: profileName === "blood" ? 0.58 : 0.76,
-              drive: 2, pan, reverb: profile.reverb, bus, priority: true
+              playbackRate: profileName === "blood" ? 0.58 : (profileName === "arena" ? 0.68 : 0.76),
+              drive: profileName === "arena" ? 3 : 2, pan, reverb: profile.reverb, bus, priority: true
             });
           }
 
@@ -1098,13 +1149,14 @@
           const debrisCount = secondary ? 0 : profile.debris;
           for (let index = 0; index < debrisCount; index++) {
             const spread = (index - (debrisCount - 1) / 2) * 0.12;
-            this.noiseBurst(time + 0.1 + index * 0.065 + Math.random() * 0.025, {
-              duration: 0.08 + Math.random() * 0.06,
-              gain: profile.debrisGain * mix,
-              frequency: profile.debrisPitch * (0.86 + Math.random() * 0.28),
-              endFrequency: 180 + Math.random() * 220,
-              q: 1.15, playbackRate: 0.88 + Math.random() * 0.22,
-              drive: 4, pan: clamp(pan + spread, -0.78, 0.78),
+            this.noiseBurst(time + 0.08 + index * 0.055 + Math.random() * 0.03, {
+              duration: 0.09 + Math.random() * 0.08,
+              gain: profile.debrisGain * mix * (profileName === "arena" ? 1.15 : 1),
+              frequency: profile.debrisPitch * (0.82 + Math.random() * 0.35),
+              endFrequency: 160 + Math.random() * 240,
+              q: 1.2, playbackRate: 0.85 + Math.random() * 0.28,
+              drive: profileName === "arena" ? 6 : 4,
+              pan: clamp(pan + spread, -0.78, 0.78),
               reverb: profile.reverb, bus
             });
           }

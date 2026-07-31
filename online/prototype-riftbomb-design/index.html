@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#05090c" />
+    <meta
+      name="description"
+      content="Laboratório visual isolado do Riftbomb com três direções de interface."
+    />
+    <title>Riftbomb · Design Prototype</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body data-variant="command" data-arena="lattice">
+    <a class="skip-link" href="#prototype-main">Pular para o conteúdo</a>
+
+    <main id="prototype-main" tabindex="-1">
+      <div id="app"></div>
+    </main>
+
+    <aside class="prototype-state" aria-label="Estado completo do protótipo">
+      <details>
+        <summary>
+          <span>LAB STATE</span>
+          <b id="state-summary">QUICK · KATARINA · SALT LENS</b>
+        </summary>
+        <dl id="state-readout"></dl>
+      </details>
+    </aside>
+
+    <nav class="prototype-switcher" aria-label="Alternar variante do protótipo">
+      <button type="button" data-cycle-variant="-1" aria-label="Variante anterior">←</button>
+      <div>
+        <small>PROTÓTIPO DESCARTÁVEL</small>
+        <strong id="variant-label">A · COMMAND DECK</strong>
+      </div>
+      <button type="button" data-cycle-variant="1" aria-label="Próxima variante">→</button>
+    </nav>
+
+    <p class="sr-only" id="prototype-announcer" aria-live="polite" aria-atomic="true"></p>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
