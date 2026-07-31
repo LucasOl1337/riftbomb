@@ -290,9 +290,9 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
     const alpha = (0.92 + pPeak * 0.08) * energy;
     const em = 1.35 + pPeak * 0.95 + pFlash * 0.6;
 
-    drawFireBar(renderer, x, z, true, barHalfLen, barHalfWidth, plateY, rise, alpha, em, phase, seed);
-    drawFireBar(renderer, x, z, false, barHalfLen, barHalfWidth, plateY + 0.012, rise * 0.98, alpha, em, phase, seed + 1.7);
-
+    // CORE_NO_STICKER_V1: no heat bed, no Imagine plates at the core cell.
+    // Stacked bars + starred plates formed a solid square sticker there; the
+    // GPU particle sheet alone carries the core now.
     // EXPLOSION_GPU_BURST_V1: dense smoke + fire point field on the four axes.
     if (typeof renderer?.drawExplosionBurst === "function") {
       renderer.drawExplosionBurst(x, z, 0, 0, phase, life, tile, true, seed, time);
@@ -305,39 +305,7 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
         CORE_WHITE, 4, em * 1.6, 0, alpha * pFlash);
     }
 
-    const coreMorph = pickMorph(roles,
-      ["ignition", "coreCross", "corePeak", "crossMid", "crossLate", "smoke"], phase);
-    if (coreMorph.tex) {
-      const coreHalf = tile * (0.52 + pPeak * 0.08 + pFlash * 0.05);
-      drawFxPlate(renderer, coreMorph.tex, x, plateY + rise * 0.38, z,
-        coreHalf, coreHalf, plateAlpha * 0.85, plateEm, 0);
-      if (coreMorph.next && coreMorph.blend > 0.06) {
-        drawFxPlate(renderer, coreMorph.next, x, plateY + rise * 0.42, z,
-          coreHalf * (1.03 + coreMorph.blend * 0.05), coreHalf * (1.03 + coreMorph.blend * 0.05),
-          plateAlpha * coreMorph.blend * 0.75, plateEm * 0.95, 0.02);
-      }
-      if (phase < 0.7) {
-        drawFxPlate(renderer, coreMorph.tex, x, plateY + rise * 0.48, z,
-          coreHalf * 0.62, coreHalf * 0.62, plateAlpha * 0.4 * (1 - pSmoke), plateEm * 0.85, Math.PI * 0.25);
-      }
-    }
-
-    const armMorph = pickMorph(roles, ["armCorridor", "armPeak", "armCorridor"], phase);
     const stubDirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    if (armMorph.tex) {
-      for (const [dr, dc] of stubDirs) {
-        const yaw = armYaw(dr, dc);
-        const ox = dc * tile * 0.4;
-        const oz = dr * tile * 0.4;
-        drawFxPlate(renderer, armMorph.tex, x + ox, plateY + rise * 0.3, z + oz,
-          tile * 0.42, tile * 0.28, plateAlpha * 0.75, plateEm * 0.95, yaw);
-        if (armMorph.next && armMorph.blend > 0.1) {
-          drawFxPlate(renderer, armMorph.next, x + ox, plateY + rise * 0.34, z + oz,
-            tile * 0.4, tile * 0.26, plateAlpha * armMorph.blend * 0.55, plateEm * 0.85, yaw);
-        }
-      }
-    }
-
     const sparkN = 36;
     for (let index = 0; index < sparkN; index++) {
       const cardinal = stubDirs[index % 4];

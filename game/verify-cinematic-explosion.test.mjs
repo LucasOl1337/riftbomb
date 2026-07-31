@@ -113,18 +113,13 @@ test("drawExplosion paints multi-phase fire layers without full black bomb shell
       call.color && luminance(call.color) < 0.25 && (call.emissive || 0) < 0.1 && call.scale && Math.max(...call.scale) > 0.15
     ).length;
 
-    // Geometric cross: elongated fire bars (cube with anisotropic scale) on both axes
-    const fireBars = recorder.calls.filter((call) => {
+    // CORE_NO_STICKER_V1: the core cell must not draw plate/bar sticker geometry.
+    const coreBars = recorder.calls.filter((call) => {
       if (call.mesh !== "cube" || !isFireColor(call.color) || !call.scale) return false;
       const [sx, , sz] = call.scale;
       return Math.max(sx, sz) / Math.max(0.001, Math.min(sx, sz)) >= 1.6;
     });
-    assert.ok(fireBars.length >= 2, `phase ${phase} needs elongated heat bed bars for Bomberman cross`);
-    // The heat bed must stay a faint underlay — never the blocky sticker.
-    assert.ok(
-      fireBars.every((call) => (call.alpha ?? 1) <= 0.35),
-      `phase ${phase}: heat bed bars must stay faint (alpha <= 0.35)`
-    );
+    assert.equal(coreBars.length, 0, `phase ${phase}: core must not draw heat bed bars (sticker)`);
     // Anti-blocky guard: no large high-alpha fire cubes (that was the sticker look).
     const blocky = recorder.calls.filter((call) =>
       call.mesh === "cube" && isFireColor(call.color)
@@ -171,6 +166,17 @@ test("drawExplosion paints multi-phase fire layers without full black bomb shell
   assert.equal(armRecorder.bursts[0].core, false, "arm burst stays single-axis");
   assert.ok(armRecorder.bursts[0].dr === 0 && armRecorder.bursts[0].dc === 1,
     "arm burst receives the corridor direction");
+  // Arm cells keep the faint elongated heat bed for corridor readability.
+  const armBeds = armRecorder.calls.filter((call) => {
+    if (call.mesh !== "cube" || !isFireColor(call.color) || !call.scale) return false;
+    const [sx, , sz] = call.scale;
+    return Math.max(sx, sz) / Math.max(0.001, Math.min(sx, sz)) >= 1.6;
+  });
+  assert.ok(armBeds.length >= 2, "arm cells must draw the faint corridor heat bed");
+  assert.ok(
+    armBeds.every((call) => (call.alpha ?? 1) <= 0.35),
+    "arm heat bed must stay faint (alpha <= 0.35)"
+  );
   const armFire = armRecorder.calls.filter((call) => isFireColor(call.color));
   assert.ok(armFire.length >= 6, "arm cells must draw corridor fire layers");
   assert.equal(
