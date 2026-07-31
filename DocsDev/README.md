@@ -30,6 +30,7 @@ estar indexados por este hub.
 | Histórico de produto | [CHANGELOG](../CHANGELOG.md) | Alterações publicadas e links para notas de versão. |
 | Notas da versão 1.2.0 | [Patch Notes](../PATCH_NOTES_V1.2.0.md) | Consolidado histórico de arenas, desempenho e fundação online. |
 | Notas da versão 1.3.0 | [Patch Notes](../PATCH_NOTES_V1.3.0.md) | Bot treinado, combate online confiável, novas arenas e performance 20/20. |
+| Notas da versão 1.4.0 | [Patch Notes](../PATCH_NOTES_V1.4.0.md) | Katarina, Nacre Hollow, bomb art e integração final da performance 20/20. |
 | Desempenho | [PERFORMANCE](../PERFORMANCE.md) | Scorecard, método e limites das medições. |
 | Ciclo de performance 20/20 | [Performance Swarm](../PerformanceSwarm.md) | Ledger completo, budgets e resultados do enxame sequencial de performance. |
 | Histórico da landing | [Swarm Ledger](../SwarmLedger-landing.md) | Registro extenso das rodadas do enxame comercial; histórico, não estado atual. |
