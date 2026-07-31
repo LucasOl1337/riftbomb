@@ -8,7 +8,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 - Rodada atual: **20/20 — Polimento final e relatório (concluída)**
 - Última rodada concluída: **20/20 — Polimento final e relatório**
-- Próxima rodada planejada: **ciclo sequencial concluído; aguardar coletor humano**
+- Próxima rodada planejada: **ciclo sequencial concluído e integrado na branch coletora local**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/r20p/riftbomb`
 - Branch local: `automation/perf-sequential-r20-final-report`
 - Base: `8584b6b89ed7c5d43006c7ea6d2784ae2204afc0`
@@ -16,7 +16,7 @@ Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos obj
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 20 e o ciclo sequencial foram concluídos; o ledger está liberado para o coletor humano.
+Nenhuma. A rodada 20 e o ciclo sequencial foram concluídos e integrados na branch coletora local.
 
 ## Baseline inicial
 
@@ -217,6 +217,16 @@ Playwright/headless não foi executado. Não houve deploy, push, PR ou merge.
 - Validação proporcional: auditoria determinística de integridade/ancestralidade em 3/3 e `git diff --check`. Builds, testes, lint e benchmarks não foram repetidos porque não houve mudança de produto e a rodada 20 já executou os gates finais.
 - Próxima recomendação: aguardar o coletor humano integrar o ciclo; novas execuções permanecem em hold até isso ocorrer ou até autorização explícita para um novo ciclo.
 - Commit local desta auditoria: o commit documental que contém esta seção; hash informado no fechamento da sessão.
+
+## Coleta do ciclo — 2026-07-31
+
+- Decisão: integrar o fechamento terminal `d52bbbf` com `--no-ff` na branch isolada `automation/perf-sequential-post-cycle-audit-93ac`, preservando como ancestrais todos os **39 commits exclusivos** do ciclo, incluindo as 20 entregas registradas e seus fechamentos documentais.
+- Resolução: os **19 arquivos em conflito** mantiveram as versões atuais de `main`, pois elas já contêm as otimizações em implementações posteriores e também incorporam matchmaking, retomada de sessão, entrega confiável de ações e a arena Nacre. As mudanças ausentes e não conflitantes foram aceitas automaticamente pelo merge.
+- Integridade esperada após o commit: `d52bbbf` e os **20 hashes de entrega** do histórico passam a ser ancestrais da branch coletora; `main` permanece intocada nesta worktree.
+- Validação: gates da raiz, `online/` e `online/server/`, além de `git diff --check`; Playwright/headless permanece proibido e não será executado.
+- Impacto: integração de histórico sem regredir as versões mais novas do produto; nenhuma regra de negócio ou garantia de segurança foi removida para resolver conflitos.
+- Próxima recomendação: após os gates verdes, usar esta branch como fonte da integração final; não iniciar rodada 21 sem autorização explícita.
+- Commit local: merge commit que contém esta seção; hash informado no fechamento da sessão.
 
 ## Mapa de arquivos e caminhos quentes
 
