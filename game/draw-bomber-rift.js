@@ -4877,19 +4877,28 @@ drawKatarinaFallback(player, t, beat) {
         }
         vec2 side = vec2(-axis.y, axis.x);
 
-        float along = smoke > 0.5 ? 0.4 + r3 * 0.8 : 1.7 + r3 * 3.4;
-        float lateral = (r4 - 0.5) * (smoke > 0.5 ? 1.0 : 1.0);
-        float lift = smoke > 0.5 ? 1.0 + r2 * 1.3
-          : (r4 > 0.55 ? 2.2 + r2 * 3.4 : 0.9 + r2 * 1.7);
-        float travel = (1.0 - exp(-seconds * (smoke > 0.5 ? 1.4 : 2.6)))
-          * uTile * (smoke > 0.5 ? 0.35 : 0.5);
+        // Flame sheet: particles are distributed across the corridor rectangle
+        // of THIS cell and flicker in place. Jets from the cell center read as
+        // a radial fireball — banned in Bomberman.
+        float sheetAlong = (r1 - 0.5) * 1.04;
+        float sheetSide = (r2 - 0.5) * 0.55;
         vec3 pos = uOrigin;
-        pos.xz += (axis * along + side * lateral) * travel;
-        pos.y += 0.05 + lift * seconds - (smoke > 0.5 ? 0.25 : 2.8) * seconds * seconds;
+        pos.xz += (axis * sheetAlong + side * sheetSide) * uTile;
+
+        // In-place upward flicker + slight outward drift. A spark subset
+        // darts along the corridor; tongues rise tall but stay corridor-locked.
+        float isSpark = step(0.86, r4);
+        float isTongue = step(0.74, r4) * (1.0 - isSpark);
+        float drift = 0.2 + r3 * 0.6 + isSpark * (1.6 + r3 * 2.2);
+        float travel = (1.0 - exp(-seconds * (smoke > 0.5 ? 1.2 : 2.2)))
+          * uTile * (smoke > 0.5 ? 0.16 : (0.2 + isSpark * 0.3));
+        pos.xz += axis * drift * travel;
+        float lift = smoke > 0.5 ? 0.8 + r3 * 1.2
+          : (0.5 + r3 * 1.2 + isTongue * (1.4 + r3 * 1.8));
+        pos.y += 0.05 + lift * seconds - (smoke > 0.5 ? 0.2 : 2.2) * seconds * seconds;
         pos.y = max(pos.y, 0.035);
-        // Oscillating swirl: alive without de-syncing the corridor shape.
-        float sw = sin(uTime * 2.3 + r1 * 39.0 + t * 8.0)
-          * (0.04 + t * (smoke > 0.5 ? 0.12 : 0.06));
+        // Small corridor-locked wobble — never wide enough to round the cross.
+        float sw = sin(uTime * 2.6 + r1 * 41.0 + t * 7.0) * (0.03 + t * 0.05);
         pos.xz += side * sw * uTile;
 
         vec4 clip = uViewProjection * vec4(pos, 1.0);
