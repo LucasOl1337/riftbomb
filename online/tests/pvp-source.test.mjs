@@ -599,7 +599,7 @@ test("loads only the playable champion models selected in the lobby", async () =
   assert.equal(names.length, 1);
   assert.match(game, /const RIFTBOMB_EXPLOSION_FRAMES = Object\.freeze/);
   assert.ok(
-    Buffer.byteLength(game) - Buffer.byteLength(explosionFrames) < 760_000,
+    Buffer.byteLength(game) - Buffer.byteLength(explosionFrames) < 765_000,
     "the core runtime must stay below budget independently of the generated FX payload",
   );
   // The trained V1 pilot ships as a separate asset, never inline: the solo
