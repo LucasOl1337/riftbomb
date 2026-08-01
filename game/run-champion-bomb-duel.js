@@ -2405,7 +2405,14 @@
         this.rollCrateDrop(r, c, dropOwner);
         const [x, z] = this.worldFromCell(r, c);
         this.spawnParticles(x, 0.42, z, color, 22, 0.78, 0.12);
-        this.renderer.addShock(x, z, 0.3);
+        // No circular post ring — crates die inside bomb lanes constantly and the
+        // expanding gold wave reads as a radial blast on top of the cross fire.
+        if (typeof this.renderer.addImpact === "function") {
+          this.renderer.addImpact(0.22);
+        } else {
+          this.renderer.cameraShake = Math.max(this.renderer.cameraShake || 0, 0.1);
+          this.renderer.hitPulse = Math.max(this.renderer.hitPulse || 0, 0.22);
+        }
         return true;
       }
 
@@ -2806,25 +2813,35 @@
           });
           const [x, z] = this.worldFromCell(cell.r, cell.c);
           // Dense corridor-locked sparks — never radial sphere cloud.
+          // NO_RED_RIM_V1: amber/orange/smoke only — never pure deep-red layers
+          // (those read as a red border under additive soft sprites).
           if (cell.core) {
-            this.spawnCorridorParticles(x, 0.34, z, [1, 0.34, 0.04], 42, 0.48, 0.07, 0, 0, true);
-            this.spawnCorridorParticles(x, 0.26, z, [0.95, 0.18, 0.02], 34, 0.56, 0.06, 0, 0, true);
-            this.spawnCorridorParticles(x, 0.2, z, [0.55, 0.06, 0.01], 26, 0.62, 0.05, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.34, z, [1, 0.38, 0.05], 42, 0.48, 0.07, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.26, z, [0.98, 0.24, 0.03], 34, 0.56, 0.06, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.2, z, [0.62, 0.16, 0.03], 26, 0.62, 0.05, 0, 0, true);
             this.spawnCorridorParticles(x, 0.44, z, [0.08, 0.08, 0.09], 20, 0.85, 0.09, 0, 0, true);
             this.spawnCorridorParticles(x, 0.3, z, [1, 0.55, 0.2], 18, 0.4, 0.045, 0, 0, true);
           } else {
-            this.spawnCorridorParticles(x, 0.28, z, [1, 0.3, 0.03], 22, 0.48, 0.06, cell.dr, cell.dc, false);
-            this.spawnCorridorParticles(x, 0.22, z, [0.9, 0.15, 0.02], 16, 0.55, 0.05, cell.dr, cell.dc, false);
-            this.spawnCorridorParticles(x, 0.18, z, [0.55, 0.06, 0.01], 12, 0.6, 0.045, cell.dr, cell.dc, false);
+            this.spawnCorridorParticles(x, 0.28, z, [1, 0.34, 0.04], 22, 0.48, 0.06, cell.dr, cell.dc, false);
+            this.spawnCorridorParticles(x, 0.22, z, [0.95, 0.22, 0.03], 16, 0.55, 0.05, cell.dr, cell.dc, false);
+            this.spawnCorridorParticles(x, 0.18, z, [0.62, 0.16, 0.03], 12, 0.6, 0.045, cell.dr, cell.dc, false);
           }
           for (const other of this.bombs) {
             if (!other.exploded && other.r === cell.r && other.c === cell.c) other.age = other.fuse;
           }
         }
-        // Soft camera hit only — avoid a heavy circular post-process ring.
-        this.renderer.addShock(bomb.x, bomb.z, 0.35 + bomb.range * 0.05);
+        // Camera kick only — never the expanding circular post-process ring
+        // (that radial wave fights the Bomberman cross explosion read).
+        if (typeof this.renderer.addImpact === "function") {
+          this.renderer.addImpact(0.35 + bomb.range * 0.05);
+        } else {
+          this.renderer.cameraShake = Math.max(this.renderer.cameraShake || 0, (0.35 + bomb.range * 0.05) * 0.44);
+          this.renderer.hitPulse = Math.max(this.renderer.hitPulse || 0, 0.35 + bomb.range * 0.05);
+        }
         this.playExplosionAt(bomb, clamp(0.7 + bomb.range * 0.08, 0.7, 1.12), {
-          sourceId: bomb.id
+          sourceId: bomb.id,
+          // Keep sample window locked to the fire-corridor visual (blasts[].life).
+          visualLife: 0.72
         });
         this.damageAtCells(cells, bomb);
       }
@@ -2900,7 +2917,9 @@
         this.cancelZedDeathMarkCommitment(player);
         this.renderer.hitPulse = player.id === 1 ? 1.25 : 0.75;
         this.renderer.cameraShake = 0.82;
-        this.playSfxAt("hit", player);
+        // Spoken death line (forced VO). Procedural impact still available via
+        // the championDeath → kill bus fallback when the sample bank is empty.
+        this.playSfxAt("championDeath", player);
         this.spawnParticles(player.x, 0.58, player.z,
           player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 54, 1.1, 0.15);
         const owner = this.players.find((candidate) => candidate.id === bomb.ownerId);

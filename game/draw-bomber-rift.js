@@ -599,8 +599,9 @@
 
         // EXPLOSION_GPU_BURST_V1 seed field. One static buffer; motion and color
         // are fully computed in the vertex shader (Sharingan mangekyo technique).
-        this.burstSmokeCount = 1024;
-        this.burstFireCount = 2000;
+        // PARTICLES_ONLY_V1: denser field — no mesh heat bed/debris to lean on.
+        this.burstSmokeCount = 1280;
+        this.burstFireCount = 2600;
         const burstTotal = this.burstSmokeCount + this.burstFireCount;
         const burstSeeds = new Float32Array(burstTotal * 4);
         let burstState = 0x9e3779b9;
@@ -1815,11 +1816,21 @@
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       }
 
+      /**
+       * Camera kick + hit grade only — no expanding circular post-process ring.
+       * Use for Bomberman-cross bomb blasts where a radial ring fights the cross read.
+       */
+      addImpact(strength = 1) {
+        const amount = Math.max(0, Number(strength) || 0);
+        this.cameraShake = Math.max(this.cameraShake, amount * 0.44);
+        this.hitPulse = Math.max(this.hitPulse, amount);
+      }
+
+      /** Full shock: impact feel plus the expanding circular post warp/ring. */
       addShock(x, z, strength = 1) {
         this.shocks.unshift({ x, z, age: 0, strength });
         this.shocks.length = Math.min(this.shocks.length, 8);
-        this.cameraShake = Math.max(this.cameraShake, strength * 0.44);
-        this.hitPulse = Math.max(this.hitPulse, strength);
+        this.addImpact(strength);
       }
 
       draw(meshName, position, scale, color, material, emissive, rotation = 0, alpha = 1, rz = 0, rx = 0, mapId = 0, textureOverride = null) {
@@ -4916,14 +4927,16 @@ drawKatarinaFallback(player, t, beat) {
         vAlpha = alive * fadeIn * fadeOut
           * (smoke > 0.5 ? 0.2 : (0.045 + heat * 0.06) * (1.0 - uCore * 0.25));
 
-        // Heat ramp: deep red -> orange -> yellow -> white flash. Smoke: warm black.
-        vec3 fire = mix(vec3(0.42, 0.05, 0.008), vec3(1.0, 0.33, 0.03),
+        // NO_RED_RIM_V1: cool end is dark amber, never pure deep red.
+        // Deep-red tails on soft additive points stacked into a red fringe
+        // around the corridor fire (reads as a painted red border).
+        vec3 fire = mix(vec3(0.55, 0.14, 0.02), vec3(1.0, 0.38, 0.04),
           smoothstep(0.05, 0.5, heat));
-        fire = mix(fire, vec3(1.0, 0.74, 0.14), smoothstep(0.5, 0.8, heat));
-        fire = mix(fire, vec3(1.0, 0.9, 0.6),
+        fire = mix(fire, vec3(1.0, 0.72, 0.16), smoothstep(0.5, 0.8, heat));
+        fire = mix(fire, vec3(1.0, 0.9, 0.55),
           smoothstep(0.9, 0.99, heat) * step(0.85, r4));
         vColor = smoke > 0.5
-          ? mix(vec3(0.05, 0.048, 0.052), vec3(0.16, 0.12, 0.09), r2)
+          ? mix(vec3(0.05, 0.048, 0.052), vec3(0.14, 0.11, 0.09), r2)
           : fire;
       }
     `;
@@ -4939,9 +4952,16 @@ drawKatarinaFallback(player, t, beat) {
         float d = dot(p, p);
         if (d > 1.0) discard;
         float core = exp(-d * 3.4);
-        float mid = smoothstep(1.0, 0.1, d);
-        float alpha = vAlpha * mid * (0.5 + core * 0.6);
-        vec3 color = vColor * (1.0 + core * (1.0 - uSmoke) * 0.9);
+        // Tighter falloff than mid-only: outer ring of each point used to
+        // stack as a solid red border under additive blend.
+        float mid = smoothstep(1.0, 0.18, d);
+        float edgeKill = 1.0 - smoothstep(0.55, 1.0, d);
+        float alpha = vAlpha * mid * edgeKill * (0.45 + core * 0.7);
+        // Bias body toward orange-yellow; strip residual red fringe.
+        vec3 body = mix(vColor, vColor * vec3(1.05, 1.02, 0.92), core * 0.5);
+        body = max(body, vec3(0.0));
+        body.r = min(body.r, body.g * 2.35 + 0.08);
+        vec3 color = body * (1.0 + core * (1.0 - uSmoke) * 0.85);
         outColor = vec4(color, alpha);
       }
     `;

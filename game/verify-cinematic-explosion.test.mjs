@@ -57,9 +57,9 @@ function luminance(rgb) {
 function isFireColor(rgb) {
   if (!rgb || rgb.length < 3) return false;
   const [r, g, b] = rgb;
-  // V3 palette: hot orange / mid fire / deep red / ember dark (not pale yellow bulk).
+  // V3 + NO_RED_RIM_V1: hot orange / mid fire / dark amber (not pure blood red).
   if (r >= 0.85 && g >= 0.55 && b <= 0.9 && g <= 0.95) return true; // microflash white only
-  if (r >= 0.45 && g <= 0.45 && b <= 0.12 && r >= g * 1.4) return true; // orange/red fire
+  if (r >= 0.32 && g <= 0.5 && b <= 0.14 && r >= g * 1.2 && g >= 0.05) return true; // amber/orange
   return false;
 }
 
@@ -68,23 +68,20 @@ function isDarkMetal(rgb) {
   return luminance(rgb) < 0.2 && rgb[0] < 0.25 && rgb[1] < 0.25 && rgb[2] < 0.28;
 }
 
-test("drawExplosion paints multi-phase fire layers without full black bomb shells", async () => {
+test("drawExplosion is 100% GPU particles — no mesh rectangles (PARTICLES_ONLY_V1)", async () => {
   const appearance = await loadBombAppearanceAsync();
   const source = await readFile(path.join(gameDirectory, "arena-appearance", "draw-black-bomb.js"), "utf8");
-  assert.match(source, /CINEMATIC_EXPLOSION_IMAGINE_V1|CINEMATIC_EXPLOSION_V3/);
-  assert.match(source, /CORRIDOR_CROSS_V3|CORRIDOR_CROSS_V2|CORRIDOR_CROSS_V1/);
-  assert.match(source, /drawFxPlate|drawFireBar|drawCorridorArm|pickMorph/i);
-  assert.match(source, /cardinal|corridor|Bomberman|mapId 8/i);
-  assert.match(source, /sparkN|drawCorridorSparks|multi-frame/i);
-  assert.match(source, /HOT_ORANGE|MID_FIRE|DEEP_RED/);
-  // drawExplosion body must not call with BOMB_MAP as a mapId argument.
+  assert.match(source, /PARTICLES_ONLY_V1/);
+  assert.match(source, /drawExplosionBurst/);
+  assert.match(source, /NO_RED_RIM_V1/);
   const explosionFn = source.slice(source.indexOf("function drawExplosion"));
+  assert.doesNotMatch(explosionFn, /draw\("cube"/);
+  assert.doesNotMatch(explosionFn, /draw\("sphere"/);
+  assert.doesNotMatch(explosionFn, /drawFireBar|drawFxPlate|drawCorridorSparks/);
   assert.doesNotMatch(explosionFn, /,\s*BOMB_MAP\s*\)/);
-  assert.doesNotMatch(explosionFn, /mapId\s*=\s*BOMB_MAP/);
 
   const tile = 1.32;
   const phases = [0.05, 0.18, 0.35, 0.55, 0.78];
-  const coreTotals = { fireDraws: 0, shock: 0, arms: 0, sparks: 0, smoke: 0, largeDarkSpheres: 0 };
 
   for (const phase of phases) {
     const recorder = createDrawRecorder();
@@ -93,69 +90,14 @@ test("drawExplosion paints multi-phase fire layers without full black bomb shell
       { r: 5, c: 6, core: true, age: phase * 0.72, life: 0.72, source: 1, ownerId: 1, dr: 0, dc: 0 },
       0, 0, 1.2, 0.4, tile
     );
-    assert.ok(recorder.calls.length >= 6, `core phase ${phase} must issue draw layers`);
-    // EXPLOSION_PARTICLE_HERO_V1: the GPU burst field runs every phase, core mode.
     assert.equal(recorder.bursts.length, 1, `phase ${phase} must emit the GPU particle burst`);
     assert.equal(recorder.bursts[0].core, true, "core blast must use the four-axis burst");
     assert.ok(Math.abs(recorder.bursts[0].phase - phase) < 0.001, "burst receives the blast phase");
     assert.ok(recorder.bursts[0].life >= 0.7, "burst receives the blast life");
-
-    const fireDraws = recorder.calls.filter((call) => isFireColor(call.color) && call.emissive >= 1);
-    coreTotals.fireDraws += fireDraws.length;
-    // V2: geometric cross uses elongated cubes, not a shock torus.
-    coreTotals.shock += recorder.calls.filter((call) =>
-      (call.mesh === "cube" || call.mesh === "crystal") && isFireColor(call.color)
-    ).length;
-    coreTotals.sparks += recorder.calls.filter((call) =>
-      call.mesh === "sphere" && isFireColor(call.color) && call.scale && Math.max(...call.scale) < 0.12
-    ).length;
-    coreTotals.smoke += recorder.calls.filter((call) =>
-      call.color && luminance(call.color) < 0.25 && (call.emissive || 0) < 0.1 && call.scale && Math.max(...call.scale) > 0.15
-    ).length;
-
-    // CORE_NO_STICKER_V1: the core cell must not draw plate/bar sticker geometry.
-    const coreBars = recorder.calls.filter((call) => {
-      if (call.mesh !== "cube" || !isFireColor(call.color) || !call.scale) return false;
-      const [sx, , sz] = call.scale;
-      return Math.max(sx, sz) / Math.max(0.001, Math.min(sx, sz)) >= 1.6;
-    });
-    assert.equal(coreBars.length, 0, `phase ${phase}: core must not draw heat bed bars (sticker)`);
-    // Anti-blocky guard: no large high-alpha fire cubes (that was the sticker look).
-    const blocky = recorder.calls.filter((call) =>
-      call.mesh === "cube" && isFireColor(call.color)
-      && (call.alpha ?? 1) > 0.6 && call.scale && Math.max(...call.scale) >= 0.3
-    );
-    assert.equal(blocky.length, 0, `phase ${phase} must not draw large opaque fire cubes`);
-
-    // Cardinal sparks offset from origin at peak fire phases
-    if (phase >= 0.12 && phase <= 0.55) {
-      const offsetFire = recorder.calls.filter((call) => {
-        if (!isFireColor(call.color)) return false;
-        const [px, , pz] = call.position || [0, 0, 0];
-        return Math.hypot(px, pz) > tile * 0.08;
-      });
-      assert.ok(offsetFire.length >= 4, `phase ${phase} needs cardinal arm fire volumes`);
-      coreTotals.arms += offsetFire.length;
-    }
-
-    // No bomb-sized solid dark shells (smoke is dark but translucent / soft).
-    const largeDarkSpheres = recorder.calls.filter((call) => {
-      if (call.mesh !== "sphere" && call.mesh !== "mesh") return false;
-      if (!isDarkMetal(call.color)) return false;
-      const maxScale = call.scale ? Math.max(...call.scale) : 0;
-      const minScale = call.scale ? Math.min(...call.scale) : 0;
-      const spherical = maxScale > 0 && minScale / maxScale > 0.72;
-      const solid = (call.alpha ?? 1) > 0.85;
-      return maxScale >= 0.28 && spherical && solid && (call.emissive || 0) < 0.35;
-    });
-    coreTotals.largeDarkSpheres += largeDarkSpheres.length;
-    assert.equal(largeDarkSpheres.length, 0, `phase ${phase} must not redraw full black bomb shells`);
+    // Zero mesh draws — particles only.
+    assert.equal(recorder.calls.length, 0, `phase ${phase}: no cube/sphere/plate mesh draws`);
   }
 
-  assert.ok(coreTotals.arms >= 12, "cardinal sparks must appear across fire peak phases");
-  assert.ok(coreTotals.sparks >= 8, "dense cardinal sparks must appear");
-
-  // Arm cell path: elongated corridor beam along blast direction
   const armRecorder = createDrawRecorder();
   appearance.drawExplosion(
     armRecorder,
@@ -166,24 +108,7 @@ test("drawExplosion paints multi-phase fire layers without full black bomb shell
   assert.equal(armRecorder.bursts[0].core, false, "arm burst stays single-axis");
   assert.ok(armRecorder.bursts[0].dr === 0 && armRecorder.bursts[0].dc === 1,
     "arm burst receives the corridor direction");
-  // Arm cells keep the faint elongated heat bed for corridor readability.
-  const armBeds = armRecorder.calls.filter((call) => {
-    if (call.mesh !== "cube" || !isFireColor(call.color) || !call.scale) return false;
-    const [sx, , sz] = call.scale;
-    return Math.max(sx, sz) / Math.max(0.001, Math.min(sx, sz)) >= 1.6;
-  });
-  assert.ok(armBeds.length >= 2, "arm cells must draw the faint corridor heat bed");
-  assert.ok(
-    armBeds.every((call) => (call.alpha ?? 1) <= 0.35),
-    "arm heat bed must stay faint (alpha <= 0.35)"
-  );
-  const armFire = armRecorder.calls.filter((call) => isFireColor(call.color));
-  assert.ok(armFire.length >= 6, "arm cells must draw corridor fire layers");
-  assert.equal(
-    armRecorder.calls.filter((call) => isDarkMetal(call.color) && call.scale && Math.max(...call.scale) >= 0.28).length,
-    0,
-    "arm cells must not draw bomb shells"
-  );
+  assert.equal(armRecorder.calls.length, 0, "arm cell must not draw mesh heat beds or plates");
 });
 
 async function loadGameClass() {
@@ -230,10 +155,17 @@ test("explodeBomb emits multi-layer fire/smoke particles on the real match path"
   const Game = await loadGameClass();
   const particleCalls = [];
   const sfxCalls = [];
+  let shockCalls = 0;
   const renderer = {
     mobilePerf: false,
-    addShock() {},
-    cameraShake: 0
+    shocks: [],
+    addShock() { shockCalls += 1; },
+    addImpact(strength = 1) {
+      this.cameraShake = Math.max(this.cameraShake || 0, strength * 0.44);
+      this.hitPulse = Math.max(this.hitPulse || 0, strength);
+    },
+    cameraShake: 0,
+    hitPulse: 0
   };
   const sfx = {
     emitGameEvent() { return false; },
@@ -256,6 +188,7 @@ test("explodeBomb emits multi-layer fire/smoke particles on the real match path"
     }
   }
   game.damageAtCells = () => {};
+  const realDestroyBreakable = game.destroyBreakable.bind(game);
   game.destroyBreakable = () => false;
   game.playExplosionAt = (...args) => sfxCalls.push(["playExplosionAt", ...args]);
 
@@ -286,14 +219,30 @@ test("explodeBomb emits multi-layer fire/smoke particles on the real match path"
   assert.ok(game.blasts.some((blast) => blast.core), "core blast cell required");
   assert.ok(game.blasts.some((blast) => !blast.core && (blast.dr || blast.dc)), "arm cells carry corridor direction");
   assert.ok(particleCalls.length >= 5, "core detonation must issue multi-layer corridor particle bursts");
+  assert.equal(shockCalls, 0, "bomb detonation must not spawn the circular post-process shock ring");
+  assert.ok(renderer.cameraShake > 0 || renderer.hitPulse > 0, "bomb still kicks the camera without the ring");
+
+  // Crate cells broken by the same blast must also stay ring-free (this was the
+  // residual gold halo still visible after the bomb path itself was fixed).
+  shockCalls = 0;
+  renderer.cameraShake = 0;
+  renderer.hitPulse = 0;
+  game.grid[5][7] = 2;
+  game.destroyBreakable = realDestroyBreakable;
+  assert.equal(game.destroyBreakable(5, 7, [1, 0, 0], 1), true);
+  assert.equal(shockCalls, 0, "crate break must not spawn the circular post-process shock ring");
+  assert.ok(renderer.cameraShake > 0 || renderer.hitPulse > 0, "crate break still kicks the camera");
 
   const colors = particleCalls.map((call) => call.color);
-  const hasHot = colors.some((c) => Array.isArray(c) && c[0] >= 0.9 && c[1] <= 0.45 && c[2] <= 0.1);
-  const hasMid = colors.some((c) => Array.isArray(c) && c[0] >= 0.8 && c[1] <= 0.3 && c[2] <= 0.08);
+  const hasHot = colors.some((c) => Array.isArray(c) && c[0] >= 0.9 && c[1] <= 0.5 && c[2] <= 0.12);
+  const hasMid = colors.some((c) => Array.isArray(c) && c[0] >= 0.55 && c[1] <= 0.35 && c[2] <= 0.1 && c[1] >= 0.1);
   const hasSmoke = colors.some((c) => Array.isArray(c) && c[0] <= 0.15 && c[1] <= 0.15 && c[2] <= 0.15);
+  // NO_RED_RIM_V1: no pure deep-red particle layer (g nearly 0, high r).
+  const hasBloodRed = colors.some((c) => Array.isArray(c) && c[0] >= 0.45 && c[1] <= 0.08 && c[2] <= 0.04);
   assert.ok(hasHot, "hot orange particle layer required");
-  assert.ok(hasMid, "mid fire particle layer required");
+  assert.ok(hasMid, "mid amber/fire particle layer required");
   assert.ok(hasSmoke, "smoke particle layer required");
+  assert.equal(hasBloodRed, false, "explosion particles must not use pure deep-red rim colors");
   assert.ok(particleCalls.some((call) => call.core === true), "core uses corridor-locked particle spawn");
   const coreCounts = particleCalls.filter((call) => call.core).reduce((s, c) => s + c.count, 0);
   assert.ok(coreCounts >= 100, "core corridor particles are dense");
@@ -309,6 +258,18 @@ test("explodeBomb emits multi-layer fire/smoke particles on the real match path"
     return major > 0.2 && minor / major > 0.65;
   });
   assert.ok(offAxis.length / Math.max(1, game.particles.length) < 0.35, "most sparks stay corridor-aligned");
+});
+
+test("GPU burst fire ramp bans pure deep-red cool tails (NO_RED_RIM_V1)", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  assert.match(renderer, /NO_RED_RIM_V1/);
+  assert.match(renderer, /0\.55,\s*0\.14,\s*0\.02/, "cool fire end must be dark amber");
+  assert.doesNotMatch(
+    renderer,
+    /mix\(vec3\(0\.42,\s*0\.05,\s*0\.008\)/,
+    "legacy deep-red cool tail must stay gone"
+  );
+  assert.match(renderer, /body\.r = min\(body\.r, body\.g \* 2\.35/, "fragment must clamp red fringe");
 });
 
 test("live renderer still routes blasts through RIFTBOMB_BOMB_APPEARANCE.drawExplosion", async () => {
@@ -332,8 +293,10 @@ test("live renderer still routes blasts through RIFTBOMB_BOMB_APPEARANCE.drawExp
   assert.match(frames, /armCorridor|coreCross|armPeak|corePeak/);
   assert.match(frames, /data:image\/webp;base64,/);
   assert.ok((frames.match(/data:image\/webp;base64,/g) || []).length >= 8);
-  assert.match(duel, /Dense corridor-locked sparks|spawnCorridorParticles/);
-  assert.match(duel, /spawnCorridorParticles\(x, 0\.34, z, \[1, 0\.34, 0\.04\]/);
+  assert.match(duel, /Dense corridor-locked sparks|spawnCorridorParticles|NO_RED_RIM_V1/);
+  assert.match(duel, /NO_RED_RIM_V1/);
+  assert.match(duel, /spawnCorridorParticles\(x, 0\.34, z, \[1, 0\.38, 0\.05\]/);
+  assert.doesNotMatch(duel, /spawnCorridorParticles\([^)]*\[0\.55, 0\.06, 0\.01\]/);
   assert.match(duel, /life: 0\.72/);
   assert.match(duel, /dr: 0, dc: 0, step: 0|core: true, dr: 0, dc: 0/);
 });

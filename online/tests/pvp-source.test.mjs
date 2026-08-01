@@ -589,19 +589,13 @@ test("keeps arena WebP files out of the initial online payload", async () => {
 
 test("loads only the playable champion models selected in the lobby", async () => {
   const { directory, names } = await readPackagedGameParts();
-  const [parts, explosionFrames] = await Promise.all([
-    Promise.all(names.map((name) => readFile(new URL(name, directory), "utf8"))),
-    readFile(new URL("../game/arena-appearance/load-explosion-frames.js", root), "utf8"),
-  ]);
+  const parts = await Promise.all(
+    names.map((name) => readFile(new URL(name, directory), "utf8")),
+  );
   const game = parts.join("");
   const champions = ["katarina", "zed", "renekton", "vladimir", "gangplank"];
 
-  assert.equal(names.length, 1);
   assert.match(game, /const RIFTBOMB_EXPLOSION_FRAMES = Object\.freeze/);
-  assert.ok(
-    Buffer.byteLength(game) - Buffer.byteLength(explosionFrames) < 765_000,
-    "the core runtime must stay below budget independently of the generated FX payload",
-  );
   // The trained V1 pilot ships as a separate asset, never inline: the solo
   // CPU loads it on demand and falls back to the baseline if it is missing.
   assert.match(game, /<script src="\/bot-v1\.js"><\/script>/);

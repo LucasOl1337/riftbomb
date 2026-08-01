@@ -1,0 +1,319 @@
+{
+  "champion": "katarina",
+  "locale": "pt_BR",
+  "referenceCatalog": {
+    "site": "https://lolsound.com/champion/Katarina",
+    "localeControl": "pt_BR",
+    "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+    "skin": "katarina_base",
+    "importedAt": "2026-08-01T14:24:23.443Z"
+  },
+  "layout": {
+    "audioRoot": "pt-br",
+    "filePattern": "{action-slug}-{nn}.mp3"
+  },
+  "actions": {
+    "shunpo": {
+      "gameEffect": "shunpo",
+      "bus": "dash",
+      "lolsound": {
+        "section": "01 MOVEMENT",
+        "label": "Move Standard",
+        "kind": "voice"
+      },
+      "files": [],
+      "gain": 0.62,
+      "reverb": 0.14,
+      "preferSample": false,
+      "notes": "Shunpo dash uses procedural whoosh; Move Standard is ambient move/idle VO.",
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "Move Standard"
+      }
+    },
+    "bladeHit": {
+      "gameEffect": "bladeHit",
+      "bus": "impact",
+      "lolsound": {
+        "section": "02 ATTACK",
+        "label": "Attack General",
+        "kind": "voice"
+      },
+      "files": [
+        "pt-br/attack-general-01.m4a",
+        "pt-br/attack-general-02.m4a",
+        "pt-br/attack-general-03.m4a",
+        "pt-br/attack-general-04.m4a",
+        "pt-br/attack-general-05.m4a",
+        "pt-br/attack-general-06.m4a",
+        "pt-br/attack-general-07.m4a"
+      ],
+      "gain": 0.58,
+      "reverb": 0.12,
+      "preferSample": true,
+      "notes": "Ataque básico / impacto de lâmina. Variantes LoLSound: Attack General, Basic Attack cast, Crit Attack cast.",
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "Attack General"
+      },
+      "voice": true,
+      "force": false
+    },
+    "hit": {
+      "gameEffect": "hit",
+      "bus": "impact",
+      "lolsound": {
+        "section": "02 ATTACK",
+        "label": "Basic Attack cast",
+        "kind": "voice"
+      },
+      "files": [
+        "pt-br/katarina-basic-attack-cast-01.m4a",
+        "pt-br/katarina-basic-attack-cast-02.m4a",
+        "pt-br/katarina-basic-attack-cast-03.m4a",
+        "pt-br/katarina-basic-attack-cast-04.m4a"
+      ],
+      "gain": 0.55,
+      "reverb": 0.12,
+      "preferSample": true,
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "Basic Attack cast"
+      },
+      "voice": true,
+      "force": false
+    },
+    "katQ": {
+      "gameEffect": "katQ",
+      "bus": "projectile",
+      "lolsound": {
+        "section": "03 ABILITIES",
+        "label": "Q cast",
+        "kind": "voice"
+      },
+      "files": [
+        "pt-br/katarina-q-cast-01.m4a",
+        "pt-br/katarina-q-cast-02.m4a",
+        "pt-br/katarina-q-cast-03.m4a",
+        "pt-br/katarina-q-cast-04.m4a"
+      ],
+      "gain": 0.7,
+      "reverb": 0.16,
+      "preferSample": true,
+      "notes": "Cast do Q (Bouncing Blade). A adaga como prop 3D fica no playable-model; este slot é o som do cast.",
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "Q cast"
+      },
+      "voice": true,
+      "force": false
+    },
+    "daggerLand": {
+      "gameEffect": "daggerLand",
+      "bus": "projectile",
+      "lolsound": {
+        "section": "03 ABILITIES",
+        "label": "Q cast",
+        "kind": "sfx",
+        "detail": "Prefer a short metal/land layer, not a full voice line."
+      },
+      "files": [
+        "pt-br/katarina-basic-attack2-cast-01.m4a",
+        "pt-br/katarina-basic-attack2-cast-02.m4a",
+        "pt-br/katarina-basic-attack2-cast-03.m4a",
+        "pt-br/katarina-basic-attack2-cast-04.m4a"
+      ],
+      "gain": 0.64,
+      "reverb": 0.14,
+      "preferSample": true,
+      "notes": "Adaga pousando no chão (pickup). Muitas vezes é SFX de metal, não VO.",
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "Q cast"
+      },
+      "voice": false,
+      "force": false,
+      "kind": "sfx"
+    },
+    "katW": {
+      "gameEffect": "katW",
+      "bus": "cast",
+      "lolsound": {
+        "section": "03 ABILITIES",
+        "label": "W cast",
+        "kind": "voice"
+      },
+      "files": [
+        "pt-br/katarina-w-cast-01.m4a",
+        "pt-br/katarina-w-cast-02.m4a",
+        "pt-br/katarina-w-cast-03.m4a",
+        "pt-br/katarina-w-cast-04.m4a"
+      ],
+      "gain": 0.66,
+      "reverb": 0.18,
+      "preferSample": true,
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "W cast"
+      },
+      "voice": true,
+      "force": false
+    },
+    "deathLotus": {
+      "gameEffect": "deathLotus",
+      "bus": "ultimate",
+      "lolsound": {
+        "section": "03 ABILITIES",
+        "label": "R cast",
+        "kind": "voice"
+      },
+      "files": [
+        "pt-br/katarina-r-cast-01.m4a",
+        "pt-br/katarina-r-cast-02.m4a",
+        "pt-br/katarina-r-cast-03.m4a",
+        "pt-br/katarina-r-cast-04.m4a",
+        "pt-br/katarina-r-cast-05.m4a",
+        "pt-br/katarina-r-cast-06.m4a",
+        "pt-br/katarina-r-cast-07.m4a",
+        "pt-br/katarina-r-cast-08.m4a"
+      ],
+      "gain": 0.78,
+      "reverb": 0.22,
+      "preferSample": true,
+      "notes": "Ultimate Death Lotus. Várias linhas R cast no catálogo → coloque como variantes em files[].",
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "R cast"
+      },
+      "voice": true,
+      "force": true
+    },
+    "voracity": {
+      "gameEffect": "voracity",
+      "bus": "impact",
+      "lolsound": {
+        "section": "02 ATTACK",
+        "label": "Crit Attack cast",
+        "kind": "voice"
+      },
+      "files": [
+        "pt-br/katarina-crit-attack-cast-01.m4a",
+        "pt-br/katarina-crit-attack-cast-02.m4a",
+        "pt-br/katarina-crit-attack-cast-03.m4a",
+        "pt-br/katarina-crit-attack-cast-04.m4a"
+      ],
+      "gain": 0.6,
+      "reverb": 0.14,
+      "preferSample": true,
+      "notes": "Reset/kill proc da passiva Voracity.",
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "Crit Attack cast"
+      },
+      "voice": true,
+      "force": false
+    },
+    "championDeath": {
+      "gameEffect": "championDeath",
+      "bus": "kill",
+      "files": [
+        "pt-br/death-01.m4a",
+        "pt-br/death-02.m4a",
+        "pt-br/death-03.m4a",
+        "pt-br/death-04.m4a"
+      ],
+      "gain": 0.78,
+      "reverb": 0.16,
+      "preferSample": true,
+      "voice": true,
+      "force": true,
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "Death"
+      }
+    },
+    "move": {
+      "gameEffect": "move",
+      "bus": "dash",
+      "files": [
+        "pt-br/move-standard-01.m4a",
+        "pt-br/move-standard-02.m4a",
+        "pt-br/move-standard-03.m4a",
+        "pt-br/move-standard-04.m4a",
+        "pt-br/move-standard-05.m4a",
+        "pt-br/move-standard-06.m4a",
+        "pt-br/move-standard-07.m4a",
+        "pt-br/move-standard-08.m4a",
+        "pt-br/move-standard-09.m4a",
+        "pt-br/move-standard-10.m4a"
+      ],
+      "gain": 0.58,
+      "reverb": 0.16,
+      "preferSample": true,
+      "voice": true,
+      "force": false,
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "Move Standard"
+      }
+    },
+    "idle": {
+      "gameEffect": "idle",
+      "bus": "dash",
+      "files": [
+        "pt-br/move-standard-01.m4a",
+        "pt-br/move-standard-02.m4a",
+        "pt-br/move-standard-03.m4a",
+        "pt-br/move-standard-04.m4a",
+        "pt-br/move-standard-05.m4a",
+        "pt-br/move-standard-06.m4a",
+        "pt-br/move-standard-07.m4a",
+        "pt-br/move-standard-08.m4a",
+        "pt-br/move-standard-09.m4a",
+        "pt-br/move-standard-10.m4a"
+      ],
+      "gain": 0.55,
+      "reverb": 0.16,
+      "preferSample": true,
+      "voice": true,
+      "force": false,
+      "source": {
+        "catalog": "https://lolsound.com/champion/Katarina",
+        "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+        "locale": "pt_BR",
+        "skin": "katarina_base",
+        "label": "Move Standard"
+      }
+    }
+  }
+}

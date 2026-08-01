@@ -5,13 +5,16 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
   const BLACK_FORGED = [0.045, 0.052, 0.06];
   const GUNMETAL = [0.14, 0.155, 0.17];
   const FUSE_FIBER = [0.09, 0.095, 0.1];
-  // Cinematic fire palette — saturated, dark smoke; white only for microflash.
-  // Marker: CINEMATIC_EXPLOSION_V3
+  // Cinematic fire palette — amber/orange only; NO pure deep-red rim.
+  // Marker: CINEMATIC_EXPLOSION_V3 + NO_RED_RIM_V1
+  // Deep red on soft additive sprites stacked into a painted red border on
+  // the corridor edge — banned. Cool end is dark amber, not blood red.
   const CORE_WHITE = [1, 0.9, 0.78];
-  const HOT_ORANGE = [1, 0.32, 0.03];
-  const MID_FIRE = [0.92, 0.16, 0.015];
-  const DEEP_RED = [0.52, 0.05, 0.01];
-  const EMBER_DARK = [0.32, 0.07, 0.02];
+  const HOT_ORANGE = [1, 0.38, 0.04];
+  const MID_FIRE = [0.95, 0.22, 0.03];
+  /** Dark amber (legacy name DEEP_RED kept for tests; not a red rim). */
+  const DEEP_RED = [0.48, 0.12, 0.02];
+  const EMBER_DARK = [0.36, 0.1, 0.025];
   const SMOKE_DARK = [0.055, 0.055, 0.06];
   const SMOKE_BROWN = [0.11, 0.085, 0.065];
   // Compat aliases (tests / callers)
@@ -19,7 +22,7 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
   const EMBER_CORE = HOT_ORANGE;
   const FIRE = MID_FIRE;
   const FIRE_MID = HOT_ORANGE;
-  const FIRE_SOFT = DEEP_RED;
+  const FIRE_SOFT = EMBER_DARK;
   const SMOKE = SMOKE_DARK;
   const SMOKE_LIT = SMOKE_BROWN;
   const BOMB_MAP = 7;
@@ -195,152 +198,31 @@ const RIFTBOMB_BOMB_APPEARANCE = (() => {
     };
   }
 
-  function drawFireBar(renderer, x, z, alongWorldX, halfLen, halfWidth, y, rise, alpha, em, phase, seed) {
-    if (alpha < 0.04) return;
-    const hx = alongWorldX ? halfLen : halfWidth;
-    const hz = alongWorldX ? halfWidth : halfLen;
-    const flicker = 0.9 + Math.sin(seed * 11 + phase * 18) * 0.1;
-    // EXPLOSION_PARTICLE_HERO_V1: the GPU burst field is the flame body now.
-    // Geometry only lays a soft heat bed so the corridor reads at distance —
-    // hard-edged stacked bars and plastic crystal tips made it look blocky.
-    renderer.draw("cube", [x, y, z],
-      [hx, rise * 0.2, hz],
-      DEEP_RED, 4, em * 0.4 * flicker, 0, alpha * 0.22);
-    renderer.draw("cube", [x, y + rise * 0.05, z],
-      [hx * 0.86, rise * 0.28, hz * 0.8],
-      MID_FIRE, 4, em * 0.55 * flicker, 0, alpha * 0.15);
-  }
-
-  function drawCorridorSparks(renderer, x, z, alongWorldX, tile, halfWidth, phase, energy, seed, time, count) {
-    const pSparks = smoothstep(0.02, 0.15, phase) * (1 - smoothstep(0.55, 0.95, phase));
-    for (let index = 0; index < count; index++) {
-      const u = (index / Math.max(1, count - 1) - 0.5) * tile * 1.05;
-      const side = (hash01(seed + index) - 0.5) * halfWidth * 2.2;
-      const px = alongWorldX ? x + u : x + side;
-      const pz = alongWorldX ? z + side : z + u;
-      const a = pSparks * energy * (0.55 + hash01(seed + index * 7) * 0.45);
-      if (a < 0.04) continue;
-      const sr = 0.012 + (index % 5) * 0.006;
-      const col = index % 4 === 0 ? CORE_WHITE
-        : (index % 4 === 1 ? HOT_ORANGE : (index % 4 === 2 ? MID_FIRE : DEEP_RED));
-      renderer.draw("sphere",
-        [px, 0.12 + hash01(seed + index * 2) * 0.32 * (1 - phase * 0.4), pz],
-        [sr, sr, sr], col, 3, 1.25 * a, -time * 7 - index, a);
-    }
-  }
-
-  function drawCorridorArm(renderer, roles, x, z, tile, dr, dc, phase, energy, pPeak, pFlash, seed, time, life = 0.72) {
-    const alongWorldX = Math.abs(dc) >= Math.abs(dr);
-    const halfLen = tile * (0.58 + pPeak * 0.05 + pFlash * 0.04);
-    const halfWidth = tile * (0.24 + pPeak * 0.07 + pFlash * 0.04);
-    const y = 0.09 + pFlash * 0.03;
-    const rise = tile * (0.2 + pPeak * 0.1 + pFlash * 0.06);
-    const alpha = (0.9 + pPeak * 0.1) * energy;
-    const em = 1.2 + pPeak * 1.0 + pFlash * 0.55;
-    const yaw = armYaw(dr, dc);
-
-    drawFireBar(renderer, x, z, alongWorldX, halfLen, halfWidth, y, rise, alpha, em, phase, seed);
-
-    const morph = pickMorph(roles, ["armCorridor", "armPeak", "armCorridor", "crossLate"], phase);
-    if (morph.tex) {
-      drawFxPlate(renderer, morph.tex, x, y + rise * 0.28, z,
-        halfLen * 1.05, halfWidth * 1.45, alpha * 0.82, em * 0.95, yaw);
-      if (morph.next && morph.blend > 0.08) {
-        drawFxPlate(renderer, morph.next, x, y + rise * 0.32, z,
-          halfLen * (1.02 + morph.blend * 0.06), halfWidth * (1.4 + morph.blend * 0.08),
-          alpha * morph.blend * 0.7, em * 0.9, yaw + 0.01);
-      }
-      drawFxPlate(renderer, morph.tex, x, y + rise * 0.42, z,
-        halfLen * 0.92, halfWidth * 1.1, alpha * 0.45 * (1 - phase * 0.3), em * 0.8, yaw + seed * 0.02);
-    }
-
-    drawCorridorSparks(renderer, x, z, alongWorldX, tile, halfWidth, phase, energy, seed, time, 16);
-    drawCorridorSparks(renderer, x, z, alongWorldX, tile * 0.9, halfWidth * 0.7, phase, energy * 0.7, seed + 9, time, 10);
-
-    // EXPLOSION_GPU_BURST_V1: dense smoke + fire point field along this corridor.
-    if (typeof renderer?.drawExplosionBurst === "function") {
-      renderer.drawExplosionBurst(x, z, dr, dc, phase, life, tile, false, seed, time);
-    }
+  /**
+   * PARTICLES_ONLY_V1 — explosion visual is 100% GPU point sprites.
+   * No cubes, heat beds, Imagine plates, mesh sparks, or debris rectangles.
+   * Those hard-edged meshes read as the "retângulo" the player keeps reporting.
+   */
+  function drawCorridorArm(renderer, x, z, tile, dr, dc, phase, life, seed, time) {
+    if (typeof renderer?.drawExplosionBurst !== "function") return;
+    renderer.drawExplosionBurst(x, z, dr, dc, phase, life, tile, false, seed, time);
   }
 
   function drawExplosion(renderer, blast, x, z, time, beat, tile) {
     const life = Math.max(0.01, blast.life);
     const phase = clamp(blast.age / life);
-    const energy = 1 - phase;
     const seed = blast.r * 13.17 + blast.c * 7.31 + (blast.source || 0) * 0.17;
-    const pFlash = 1 - smoothstep(0.0, 0.1, phase);
-    const pPeak = smoothstep(0.05, 0.22, phase) * (1 - smoothstep(0.38, 0.85, phase));
-    const pSparks = smoothstep(0.02, 0.15, phase) * (1 - smoothstep(0.55, 0.95, phase));
-    const pSmoke = smoothstep(0.45, 0.65, phase) * (1 - smoothstep(0.85, 1, phase));
 
-    const roles = renderer?.explosionRoleTextures || {};
-    const plateY = 0.08 + pFlash * 0.03;
-    const plateAlpha = (0.82 + pPeak * 0.18) * energy;
-    const plateEm = 0.95 + pPeak * 0.75 + pFlash * 0.45;
+    if (typeof renderer?.drawExplosionBurst !== "function") return;
 
     if (!blast.core) {
       const { dr, dc } = resolveArmDir(blast);
-      drawCorridorArm(renderer, roles, x, z, tile, dr, dc, phase, energy, pPeak, pFlash, seed, time, life);
+      drawCorridorArm(renderer, x, z, tile, dr, dc, phase, life, seed, time);
       return;
     }
 
-    const barHalfLen = tile * (0.54 + pPeak * 0.07 + pFlash * 0.05);
-    const barHalfWidth = tile * (0.22 + pPeak * 0.06);
-    const rise = tile * (0.22 + pPeak * 0.12 + pFlash * 0.07);
-    const alpha = (0.92 + pPeak * 0.08) * energy;
-    const em = 1.35 + pPeak * 0.95 + pFlash * 0.6;
-
-    // CORE_NO_STICKER_V1: no heat bed, no Imagine plates at the core cell.
-    // Stacked bars + starred plates formed a solid square sticker there; the
-    // GPU particle sheet alone carries the core now.
-    // EXPLOSION_GPU_BURST_V1: dense smoke + fire point field on the four axes.
-    if (typeof renderer?.drawExplosionBurst === "function") {
-      renderer.drawExplosionBurst(x, z, 0, 0, phase, life, tile, true, seed, time);
-    }
-
-    const stubDirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    const sparkN = 36;
-    for (let index = 0; index < sparkN; index++) {
-      const cardinal = stubDirs[index % 4];
-      const along = (0.1 + phase * tile * 0.95) * (0.45 + (index % 6) * 0.12);
-      const side = (hash01(seed + index) - 0.5) * tile * 0.16;
-      const px = x + cardinal[1] * along + cardinal[0] * side;
-      const pz = z + cardinal[0] * along + cardinal[1] * side;
-      const sy = 0.1 + Math.sin(phase * Math.PI + index * 0.35) * (0.22 + (index % 5) * 0.05);
-      const a = pSparks * energy * (0.5 + hash01(seed + index * 3) * 0.5);
-      if (a < 0.04) continue;
-      const sr = 0.011 + (index % 5) * 0.005;
-      const col = index % 4 === 0 ? CORE_WHITE
-        : (index % 4 === 1 ? HOT_ORANGE : (index % 4 === 2 ? MID_FIRE : DEEP_RED));
-      renderer.draw("sphere", [px, sy, pz], [sr, sr, sr],
-        col, 3, (1.15 + beat * 0.25) * a, -time * 6 - index, a);
-    }
-
-    for (let index = 0; index < 10; index++) {
-      const [dr, dc] = stubDirs[index % 4];
-      const fly = smoothstep(0.04, 0.55, phase);
-      const dist = fly * tile * (0.55 + (index % 5) * 0.12);
-      const fy = 0.12 + Math.sin(fly * Math.PI + index) * (0.3 + (index % 3) * 0.08);
-      const a = (1 - smoothstep(0.4, 0.9, phase)) * energy * 0.85;
-      if (a < 0.05) continue;
-      const side = (hash01(seed + index * 4) - 0.5) * tile * 0.1;
-      renderer.draw("cube",
-        [x + dc * dist + dr * side, fy, z + dr * dist + dc * side],
-        [0.04, 0.014, 0.055],
-        index % 2 ? GUNMETAL : EMBER_DARK, 1, 0.04,
-        phase * 12 + index, a, phase * 5, phase * 7);
-    }
-
-    if (pSmoke > 0.05) {
-      for (let index = 0; index < 6; index++) {
-        const [dr, dc] = stubDirs[index % 4];
-        const d = tile * (0.2 + index * 0.08);
-        renderer.draw("cube",
-          [x + dc * d, 0.2 + index * 0.04, z + dr * d],
-          [tile * 0.18, tile * 0.08, tile * 0.12],
-          SMOKE_DARK, 0, 0.02, index, pSmoke * energy * 0.45);
-      }
-    }
+    // Core cell: four-axis GPU fire + smoke only (no mesh fallback layers).
+    renderer.drawExplosionBurst(x, z, 0, 0, phase, life, tile, true, seed, time);
   }
 
   return Object.freeze({
