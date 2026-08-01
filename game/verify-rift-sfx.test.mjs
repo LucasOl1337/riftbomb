@@ -222,7 +222,13 @@ function traceAction(action, options = {}) {
 test("the SFX module stays explicitly registered before game startup", async () => {
   const document = await readFile(documentPath, "utf8");
   const entrypoint = '<script src="./play-rift-sfx.js"></script>';
+  const samplePack = '<script src="./arena-appearance/load-arena-sfx.js"></script>';
+  const championPack = '<script src="./load-champion-sfx.js"></script>';
   assert.equal(document.split(entrypoint).length - 1, 1);
+  assert.equal(document.split(samplePack).length - 1, 1);
+  assert.equal(document.split(championPack).length - 1, 1);
+  assert.ok(document.indexOf(samplePack) < document.indexOf(entrypoint));
+  assert.ok(document.indexOf(championPack) < document.indexOf(entrypoint));
   assert.ok(document.indexOf(entrypoint) < document.indexOf('<script src="./start-champion-duel.js"></script>'));
 });
 
@@ -289,6 +295,191 @@ test("arena and champion detonations use their declared buses and distinct signa
   const panned = traceAction("barrelBoom", { pan: 0.46 }).trace;
   assert.ok(panned.slice(0, 4).every((layer) => layer.pan === 0.46));
   assert.ok(panned.slice(0, 4).every((layer) => layer.priority));
+});
+
+test("Katarina champion SFX map covers the combat effects with PT-BR catalog labels", async () => {
+  const mapPath = path.join(gameDirectory, "..", "champions", "katarina", "sfx", "sfx-map.json");
+  const map = JSON.parse(await readFile(mapPath, "utf8"));
+  assert.equal(map.champion, "katarina");
+  assert.equal(map.locale, "pt_BR");
+  for (const effect of ["katQ", "katW", "deathLotus", "shunpo", "daggerLand", "bladeHit"]) {
+    assert.ok(map.actions[effect], `${effect} must be mapped for Katarina`);
+    assert.equal(map.actions[effect].gameEffect, effect);
+    assert.ok(map.actions[effect].lolsound?.label, `${effect} needs a catalog label`);
+    assert.ok(Array.isArray(map.actions[effect].files), `${effect}.files must be an array`);
+  }
+  assert.match(map.referenceCatalog.site, /lolsound\.com\/champion\/Katarina/i);
+});
+
+test("champion action samples prefer the bank over procedural synth when decoded", () => {
+  const SfxEngine = loadSfxEngine();
+  const sfx = new SfxEngine();
+  const samples = [];
+  sfx.ctx = { state: "running", currentTime: 2 };
+  sfx.master = {};
+  sfx.sampleBuffers.katQ = { duration: 0.8 };
+  sfx.sampleVariants.katQ = ["katQ"];
+  sfx.sampleMeta.katQ = {
+    gain: 0.7, reverb: 0.16, preferSample: true, champion: "katarina", voice: true
+  };
+  sfx.playSample = (name, time, layer) => {
+    samples.push({ name, time: Number(time.toFixed(3)), bus: layer.bus, gain: layer.gain, pan: layer.pan });
+    return true;
+  };
+  sfx.whoosh = () => {
+    throw new Error("procedural katQ must not run when the sample plays");
+  };
+  sfx.metalStrike = () => {
+    throw new Error("procedural katQ must not run when the sample plays");
+  };
+
+  sfx.effect("katQ", 1, { pan: -0.2 });
+
+  assert.equal(samples.length, 1);
+  assert.equal(samples[0].name, "katQ");
+  assert.equal(samples[0].bus, "projectile");
+  assert.equal(samples[0].pan, -0.2);
+  assert.ok(samples[0].gain > 0.4);
+});
+
+test("champion VO shares a cooldown so skill spam falls back to synth", () => {
+  const SfxEngine = loadSfxEngine();
+  const sfx = new SfxEngine();
+  const samples = [];
+  const whooshes = [];
+  sfx.ctx = { state: "running", currentTime: 10 };
+  sfx.master = {};
+  for (const name of ["katQ", "katW", "bladeHit"]) {
+    sfx.sampleBuffers[name] = { duration: 0.6 };
+    sfx.sampleVariants[name] = [name];
+    sfx.sampleMeta[name] = {
+      gain: 0.7, reverb: 0.16, preferSample: true, champion: "katarina", voice: true
+    };
+  }
+  sfx.playSample = (name, time) => {
+    samples.push({ name, time: Number(time.toFixed(3)) });
+    return true;
+  };
+  sfx.whoosh = (time) => {
+    whooshes.push(Number(time.toFixed(3)));
+    return true;
+  };
+  sfx.metalStrike = () => true;
+  sfx.toneSweep = () => true;
+  sfx.noiseBurst = () => true;
+
+  sfx.effect("katQ", 1, { pan: 0 });
+  sfx.ctx.currentTime = 10.4;
+  sfx.effect("katW", 1, { pan: 0 });
+  sfx.ctx.currentTime = 10.8;
+  sfx.effect("bladeHit", 1, { pan: 0 });
+
+  assert.equal(samples.length, 1, "only the first VO within the cooldown may speak");
+  assert.equal(samples[0].name, "katQ");
+  assert.ok(whooshes.length >= 1, "gated skills keep procedural combat layers");
+
+  sfx.ctx.currentTime = 10 + SfxEngine.VOICE_COOLDOWN + 0.05;
+  sfx.effect("katW", 1, { pan: 0 });
+  assert.equal(samples.at(-1).name, "katW", "after the cooldown another line may speak");
+});
+
+test("forced death and ultimate VO ignore the shared cooldown", () => {
+  const SfxEngine = loadSfxEngine();
+  const sfx = new SfxEngine();
+  const samples = [];
+  sfx.ctx = { state: "running", currentTime: 3 };
+  sfx.master = {};
+  for (const [name, force] of [["katQ", false], ["deathLotus", true], ["championDeath", true]]) {
+    sfx.sampleBuffers[name] = { duration: 0.7 };
+    sfx.sampleVariants[name] = [name];
+    sfx.sampleMeta[name] = {
+      gain: 0.75, reverb: 0.18, preferSample: true, champion: "katarina", voice: true, force
+    };
+  }
+  sfx.playSample = (name) => {
+    samples.push(name);
+    return true;
+  };
+  sfx.whoosh = () => true;
+  sfx.metalStrike = () => true;
+  sfx.toneSweep = () => true;
+  sfx.noiseBurst = () => true;
+
+  sfx.effect("katQ", 1);
+  sfx.ctx.currentTime = 3.2;
+  sfx.effect("deathLotus", 1);
+  sfx.ctx.currentTime = 3.4;
+  sfx.effect("championDeath", 1);
+
+  assert.deepEqual(samples, ["katQ", "deathLotus", "championDeath"]);
+});
+
+test("ambient move VO waits for the interval and the shared voice gate", () => {
+  const SfxEngine = loadSfxEngine();
+  const sfx = new SfxEngine();
+  const samples = [];
+  sfx.ctx = { state: "running", currentTime: 20 };
+  sfx.master = {};
+  sfx.sampleBuffers.move = { duration: 0.5 };
+  sfx.sampleVariants.move = ["move"];
+  sfx.sampleMeta.move = {
+    gain: 0.55, reverb: 0.14, preferSample: true, champion: "katarina", voice: true
+  };
+  sfx.playSample = (name) => {
+    samples.push(name);
+    return true;
+  };
+
+  const game = {
+    players: [{ alive: true, moving: true, x: 1, z: 0 }],
+    audioPanAt: () => 0.1
+  };
+
+  sfx.tickChampionMoveVoice(game, 4);
+  assert.equal(samples.length, 0, "interval not reached yet");
+  sfx.tickChampionMoveVoice(game, SfxEngine.MOVE_VOICE_INTERVAL);
+  assert.equal(samples[0], "move");
+
+  sfx.tickChampionMoveVoice(game, SfxEngine.MOVE_VOICE_INTERVAL);
+  assert.equal(samples.length, 1, "shared VO gate blocks back-to-back move banter");
+
+  sfx.ctx.currentTime = 20 + SfxEngine.VOICE_COOLDOWN + 0.1;
+  sfx._moveVoiceTimer = SfxEngine.MOVE_VOICE_INTERVAL;
+  sfx.tickChampionMoveVoice(game, 0.016);
+  assert.equal(samples.length, 2);
+});
+
+test("arena blasts prefer the packaged explosion sample when it is decoded", () => {
+  const SfxEngine = loadSfxEngine();
+  const sfx = new SfxEngine();
+  const samples = [];
+  const tones = [];
+  sfx.ctx = { state: "running", currentTime: 4 };
+  sfx.master = {};
+  sfx.sampleBuffers.explosion = { duration: 3.4 };
+  sfx.playSample = (name, time, layer) => {
+    samples.push({ name, time: Number(time.toFixed(3)), ...layer });
+    return true;
+  };
+  sfx.toneSweep = (time, layer) => {
+    tones.push({ time: Number(time.toFixed(3)), bus: layer.bus, gain: layer.gain });
+    return true;
+  };
+  sfx.noiseBurst = () => {
+    throw new Error("procedural arena stack must not run when the sample plays");
+  };
+
+  sfx.explosion(1, { profile: "arena", pan: 0.2, visualLife: 0.72 });
+
+  assert.equal(samples.length, 1);
+  assert.equal(samples[0].name, "explosion");
+  assert.equal(samples[0].bus, "explosion");
+  assert.equal(samples[0].pan, 0.2);
+  assert.ok(samples[0].duration <= 0.72 + 1e-6, "sample must not outlive the blast visual");
+  assert.ok(samples[0].duration >= 0.5, "sample still covers the fire corridor window");
+  assert.ok(samples[0].fadeOut <= samples[0].duration * 0.25 + 1e-6, "fade stays inside the visual window");
+  assert.equal(tones.length, 1, "sample path keeps a thin sub bed");
+  assert.equal(tones[0].bus, "explosion");
 });
 
 test("fuse scheduling emits one newest tick per update and never replays rollback", () => {
@@ -716,6 +907,7 @@ test("arena explosion emits once with camera pan and stable source metadata", ()
   match.tile = 1.32;
   match.grid = Array.from({ length: match.rows }, () => Array(match.cols).fill(0));
   match.blasts = [];
+  match.particles = [];
   match.players = [];
   match.bombs = [];
   match.renderer = { addShock() {}, viewPlayerId: 0 };

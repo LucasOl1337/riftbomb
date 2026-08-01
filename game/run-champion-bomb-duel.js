@@ -2405,7 +2405,14 @@
         this.rollCrateDrop(r, c, dropOwner);
         const [x, z] = this.worldFromCell(r, c);
         this.spawnParticles(x, 0.42, z, color, 22, 0.78, 0.12);
-        this.renderer.addShock(x, z, 0.3);
+        // No circular post ring — crates die inside bomb lanes constantly and the
+        // expanding gold wave reads as a radial blast on top of the cross fire.
+        if (typeof this.renderer.addImpact === "function") {
+          this.renderer.addImpact(0.22);
+        } else {
+          this.renderer.cameraShake = Math.max(this.renderer.cameraShake || 0, 0.1);
+          this.renderer.hitPulse = Math.max(this.renderer.hitPulse || 0, 0.22);
+        }
         return true;
       }
 
@@ -2774,14 +2781,15 @@
         if (!bomb || bomb.exploded) return;
         bomb.exploded = true;
         bomb.cleanup = 0.04;
-        const cells = [{ r: bomb.r, c: bomb.c, core: true }];
+        // Core + corridor cells with explicit arm direction for Bomberman-style cross VFX.
+        const cells = [{ r: bomb.r, c: bomb.c, core: true, dr: 0, dc: 0, step: 0 }];
         const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
         for (const [dr, dc] of directions) {
           for (let i = 1; i <= bomb.range; i++) {
             const r = bomb.r + dr * i;
             const c = bomb.c + dc * i;
             if (r < 0 || c < 0 || r >= this.rows || c >= this.cols || this.grid[r][c] === 1) break;
-            cells.push({ r, c, core: false });
+            cells.push({ r, c, core: false, dr, dc, step: i });
             if (this.grid[r][c] === 2) {
               this.destroyBreakable(
                 r, c,
@@ -2793,25 +2801,47 @@
           }
         }
         for (const cell of cells) {
-          this.blasts.push({ ...cell, age: 0, life: 0.58, source: bomb.id, ownerId: bomb.ownerId });
+          this.blasts.push({
+            ...cell,
+            age: 0,
+            // Longer window so multi-frame Imagine morph + dense sparks read clearly.
+            life: 0.72,
+            source: bomb.id,
+            ownerId: bomb.ownerId,
+            originR: bomb.r,
+            originC: bomb.c
+          });
           const [x, z] = this.worldFromCell(cell.r, cell.c);
-          // Multi-layer fire particle bursts (core gets denser cinematic spray).
+          // Dense corridor-locked sparks — never radial sphere cloud.
+          // NO_RED_RIM_V1: amber/orange/smoke only — never pure deep-red layers
+          // (those read as a red border under additive soft sprites).
           if (cell.core) {
-            this.spawnParticles(x, 0.38, z, Renderer.colors.whiteGold, 36, 0.55, 0.16);
-            this.spawnParticles(x, 0.28, z, Renderer.colors.ember, 42, 0.72, 0.14);
-            this.spawnParticles(x, 0.22, z, Renderer.colors.gold, 28, 0.85, 0.11);
-            this.spawnParticles(x, 0.48, z, [0.12, 0.12, 0.13], 18, 1.05, 0.18);
+            this.spawnCorridorParticles(x, 0.34, z, [1, 0.38, 0.05], 42, 0.48, 0.07, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.26, z, [0.98, 0.24, 0.03], 34, 0.56, 0.06, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.2, z, [0.62, 0.16, 0.03], 26, 0.62, 0.05, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.44, z, [0.08, 0.08, 0.09], 20, 0.85, 0.09, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.3, z, [1, 0.55, 0.2], 18, 0.4, 0.045, 0, 0, true);
           } else {
-            this.spawnParticles(x, 0.3, z, Renderer.colors.ember, 18, 0.65, 0.12);
-            this.spawnParticles(x, 0.24, z, Renderer.colors.gold, 12, 0.75, 0.1);
+            this.spawnCorridorParticles(x, 0.28, z, [1, 0.34, 0.04], 22, 0.48, 0.06, cell.dr, cell.dc, false);
+            this.spawnCorridorParticles(x, 0.22, z, [0.95, 0.22, 0.03], 16, 0.55, 0.05, cell.dr, cell.dc, false);
+            this.spawnCorridorParticles(x, 0.18, z, [0.62, 0.16, 0.03], 12, 0.6, 0.045, cell.dr, cell.dc, false);
           }
           for (const other of this.bombs) {
             if (!other.exploded && other.r === cell.r && other.c === cell.c) other.age = other.fuse;
           }
         }
-        this.renderer.addShock(bomb.x, bomb.z, 0.95 + bomb.range * 0.14);
+        // Camera kick only — never the expanding circular post-process ring
+        // (that radial wave fights the Bomberman cross explosion read).
+        if (typeof this.renderer.addImpact === "function") {
+          this.renderer.addImpact(0.35 + bomb.range * 0.05);
+        } else {
+          this.renderer.cameraShake = Math.max(this.renderer.cameraShake || 0, (0.35 + bomb.range * 0.05) * 0.44);
+          this.renderer.hitPulse = Math.max(this.renderer.hitPulse || 0, 0.35 + bomb.range * 0.05);
+        }
         this.playExplosionAt(bomb, clamp(0.7 + bomb.range * 0.08, 0.7, 1.12), {
-          sourceId: bomb.id
+          sourceId: bomb.id,
+          // Keep sample window locked to the fire-corridor visual (blasts[].life).
+          visualLife: 0.72
         });
         this.damageAtCells(cells, bomb);
       }
@@ -2868,6 +2898,26 @@
         this.scheduleRoundDecision();
       }
 
+      /**
+       * HITBOX_VISUAL_MATCH_V1 — while a blast cell is alive on screen, its
+       * grid cell remains lethal. Damage is no longer a one-shot at detonation
+       * only: walking into the fire corridor during `blast.life` (0.72s) kills,
+       * matching the particle display which is drawn for the same cells/time.
+       */
+      applyActiveBlastDamage() {
+        if (!this.blasts.length || this.mode !== "playing") return;
+        let hit = false;
+        for (const player of this.players) {
+          if (!player.alive) continue;
+          const cell = this.cellFromWorld(player.x, player.z);
+          const blast = this.blasts.find((entry) => entry.r === cell.r && entry.c === cell.c);
+          if (!blast) continue;
+          this.hitContestant(player, { ownerId: blast.ownerId });
+          hit = true;
+        }
+        if (hit) this.scheduleRoundDecision();
+      }
+
       hitContestant(player, bomb) {
         if (!this.isContestantTargetable(player) || player.invulnerable > 0 ||
             player.dashing > 0 || this.mode !== "playing") return;
@@ -2887,7 +2937,9 @@
         this.cancelZedDeathMarkCommitment(player);
         this.renderer.hitPulse = player.id === 1 ? 1.25 : 0.75;
         this.renderer.cameraShake = 0.82;
-        this.playSfxAt("hit", player);
+        // Spoken death line (forced VO). Procedural impact still available via
+        // the championDeath → kill bus fallback when the sample bank is empty.
+        this.playSfxAt("championDeath", player);
         this.spawnParticles(player.x, 0.58, player.z,
           player.id === 1 ? Renderer.colors.blueSide : Renderer.colors.redSide, 54, 1.1, 0.15);
         const owner = this.players.find((candidate) => candidate.id === bomb.ownerId);
@@ -3088,6 +3140,54 @@
         }
       }
 
+      /**
+       * Corridor-locked sparks for bomb detonation (Bomberman cross).
+       * core=true: four cardinal axes only. Else: single axis from dr/dc.
+       * Never emits a radial sphere cloud.
+       */
+      spawnCorridorParticles(x, y, z, color, count, life, size, dr = 0, dc = 0, core = false) {
+        const mobile = Boolean(this.renderer?.mobilePerf);
+        const density = mobile ? 0.4 : 1;
+        const limit = Math.max(2, Math.ceil(count * density));
+        const axes = core
+          ? [[1, 0], [-1, 0], [0, 1], [0, -1]]
+          : [[dr || 0, dc || (Math.abs(dr) + Math.abs(dc) === 0 ? 1 : 0)]];
+        // Normalize single axis if zero
+        if (!core && axes[0][0] === 0 && axes[0][1] === 0) axes[0] = [0, 1];
+        // HITBOX_VISUAL_MATCH_V1: keep CPU sparks inside ~one cell so they do not
+        // paint fire over safe tiles outside the lethal blast footprint.
+        const half = this.tile * 0.42;
+        for (let i = 0; i < limit; i++) {
+          const axis = axes[i % axes.length];
+          const along = (0.08 + this.random() * 0.55) * (this.random() < 0.5 ? 1 : -1);
+          const side = (this.random() - 0.5) * 0.35;
+          // axis[0]=dr (world Z), axis[1]=dc (world X)
+          const vx = axis[1] * along + axis[0] * side;
+          const vz = axis[0] * along + axis[1] * side;
+          const ox = (this.random() - 0.5) * half;
+          const oz = (this.random() - 0.5) * half;
+          this.particles.push({
+            x: x + ox, y, z: z + oz,
+            vx,
+            vy: 0.5 + this.random() * 1.6,
+            vz,
+            age: 0,
+            life: life * (0.7 + this.random() * 0.5) * (mobile ? 0.82 : 1),
+            size: size * (0.55 + this.random() * 0.55),
+            alpha: 0.55 + this.random() * 0.35,
+            color,
+            // Optional home cell clamp during integrate (visual == hitbox cell).
+            homeX: x,
+            homeZ: z,
+            homeHalf: half
+          });
+        }
+        const maxParticles = mobile ? 110 : 520;
+        if (this.particles.length > maxParticles) {
+          this.particles.splice(0, this.particles.length - maxParticles);
+        }
+      }
+
       updateParticles(dt) {
         for (const particle of this.particles) {
           particle.age += dt;
@@ -3097,6 +3197,12 @@
           particle.vy -= 5.8 * dt;
           particle.vx *= Math.pow(0.3, dt);
           particle.vz *= Math.pow(0.3, dt);
+          // HITBOX_VISUAL_MATCH_V1: corridor bomb sparks stay in their blast cell.
+          if (Number.isFinite(particle.homeX) && Number.isFinite(particle.homeHalf)) {
+            const half = particle.homeHalf;
+            particle.x = clamp(particle.x, particle.homeX - half, particle.homeX + half);
+            particle.z = clamp(particle.z, particle.homeZ - half, particle.homeZ + half);
+          }
         }
         this.particles = this.particles.filter((particle) => particle.age < particle.life && particle.y > -0.2);
       }
@@ -3136,6 +3242,8 @@
         this.updateGangplank(dt);
         this.processAbilityBuffer(dt);
         this.updateBombs(dt);
+        // After movement + new detonations: lethal cells == visible blast cells.
+        this.applyActiveBlastDamage();
         this.collectPickups();
 
         if (this.roundDecisionTimer >= 0) {

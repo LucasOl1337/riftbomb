@@ -1,0 +1,571 @@
+{
+  "champion": "katarina",
+  "locale": "pt_BR",
+  "skin": "katarina_base",
+  "api": "https://lolsound.com/api/v1/champions/katarina/skins/katarina_base/sounds?language=pt_BR",
+  "downloadedAt": "2026-08-01T14:24:23.446Z",
+  "count": 49,
+  "effectCounts": {
+    "bladeHit": 7,
+    "hit": 4,
+    "daggerLand": 4,
+    "voracity": 4,
+    "championDeath": 4,
+    "move": 10,
+    "idle": 10,
+    "katQ": 4,
+    "deathLotus": 8,
+    "katW": 4
+  },
+  "files": [
+    {
+      "effects": [
+        "bladeHit"
+      ],
+      "file": "pt-br/attack-general-01.m4a",
+      "bytes": 30659,
+      "label": "Attack General",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Attack_General_01.m4a",
+      "id": 1251155
+    },
+    {
+      "effects": [
+        "bladeHit"
+      ],
+      "file": "pt-br/attack-general-02.m4a",
+      "bytes": 32703,
+      "label": "Attack General",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Attack_General_02.m4a",
+      "id": 1251156
+    },
+    {
+      "effects": [
+        "bladeHit"
+      ],
+      "file": "pt-br/attack-general-03.m4a",
+      "bytes": 41546,
+      "label": "Attack General",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Attack_General_03.m4a",
+      "id": 1251158
+    },
+    {
+      "effects": [
+        "bladeHit"
+      ],
+      "file": "pt-br/attack-general-04.m4a",
+      "bytes": 22653,
+      "label": "Attack General",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Attack_General_04.m4a",
+      "id": 1251157
+    },
+    {
+      "effects": [
+        "bladeHit"
+      ],
+      "file": "pt-br/attack-general-05.m4a",
+      "bytes": 36320,
+      "label": "Attack General",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Attack_General_05.m4a",
+      "id": 1251159
+    },
+    {
+      "effects": [
+        "bladeHit"
+      ],
+      "file": "pt-br/attack-general-06.m4a",
+      "bytes": 35956,
+      "label": "Attack General",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Attack_General_06.m4a",
+      "id": 1251160
+    },
+    {
+      "effects": [
+        "bladeHit"
+      ],
+      "file": "pt-br/attack-general-07.m4a",
+      "bytes": 32316,
+      "label": "Attack General",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Attack_General_07.m4a",
+      "id": 1251162
+    },
+    {
+      "effects": [
+        "hit"
+      ],
+      "file": "pt-br/katarina-basic-attack-cast-01.m4a",
+      "bytes": 9718,
+      "label": "Basic Attack cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Basic_Attack_cast_01.m4a",
+      "id": 1251167
+    },
+    {
+      "effects": [
+        "hit"
+      ],
+      "file": "pt-br/katarina-basic-attack-cast-02.m4a",
+      "bytes": 9427,
+      "label": "Basic Attack cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Basic_Attack_cast_02.m4a",
+      "id": 1251168
+    },
+    {
+      "effects": [
+        "hit"
+      ],
+      "file": "pt-br/katarina-basic-attack-cast-03.m4a",
+      "bytes": 7990,
+      "label": "Basic Attack cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Basic_Attack_cast_03.m4a",
+      "id": 1251169
+    },
+    {
+      "effects": [
+        "hit"
+      ],
+      "file": "pt-br/katarina-basic-attack-cast-04.m4a",
+      "bytes": 8942,
+      "label": "Basic Attack cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Basic_Attack_cast_04.m4a",
+      "id": 1251170
+    },
+    {
+      "effects": [
+        "daggerLand"
+      ],
+      "file": "pt-br/katarina-basic-attack2-cast-01.m4a",
+      "bytes": 9718,
+      "label": "Basic Attack2 cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Basic_Attack2_cast_01.m4a",
+      "id": 1251171
+    },
+    {
+      "effects": [
+        "daggerLand"
+      ],
+      "file": "pt-br/katarina-basic-attack2-cast-02.m4a",
+      "bytes": 9427,
+      "label": "Basic Attack2 cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Basic_Attack2_cast_02.m4a",
+      "id": 1251172
+    },
+    {
+      "effects": [
+        "daggerLand"
+      ],
+      "file": "pt-br/katarina-basic-attack2-cast-03.m4a",
+      "bytes": 7990,
+      "label": "Basic Attack2 cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Basic_Attack2_cast_03.m4a",
+      "id": 1251173
+    },
+    {
+      "effects": [
+        "daggerLand"
+      ],
+      "file": "pt-br/katarina-basic-attack2-cast-04.m4a",
+      "bytes": 8942,
+      "label": "Basic Attack2 cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Basic_Attack2_cast_04.m4a",
+      "id": 1251174
+    },
+    {
+      "effects": [
+        "voracity"
+      ],
+      "file": "pt-br/katarina-crit-attack-cast-01.m4a",
+      "bytes": 9718,
+      "label": "Crit Attack cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Crit_Attack_cast_01.m4a",
+      "id": 1251175
+    },
+    {
+      "effects": [
+        "voracity"
+      ],
+      "file": "pt-br/katarina-crit-attack-cast-02.m4a",
+      "bytes": 9427,
+      "label": "Crit Attack cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Crit_Attack_cast_02.m4a",
+      "id": 1251176
+    },
+    {
+      "effects": [
+        "voracity"
+      ],
+      "file": "pt-br/katarina-crit-attack-cast-03.m4a",
+      "bytes": 7990,
+      "label": "Crit Attack cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Crit_Attack_cast_03.m4a",
+      "id": 1251177
+    },
+    {
+      "effects": [
+        "voracity"
+      ],
+      "file": "pt-br/katarina-crit-attack-cast-04.m4a",
+      "bytes": 8942,
+      "label": "Crit Attack cast",
+      "category": "Attack",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Crit_Attack_cast_04.m4a",
+      "id": 1251178
+    },
+    {
+      "effects": [
+        "championDeath"
+      ],
+      "file": "pt-br/death-01.m4a",
+      "bytes": 17882,
+      "label": "Death",
+      "category": "Death / Respawn",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Death_01.m4a",
+      "id": 1251161
+    },
+    {
+      "effects": [
+        "championDeath"
+      ],
+      "file": "pt-br/death-02.m4a",
+      "bytes": 16792,
+      "label": "Death",
+      "category": "Death / Respawn",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Death_02.m4a",
+      "id": 1251163
+    },
+    {
+      "effects": [
+        "championDeath"
+      ],
+      "file": "pt-br/death-03.m4a",
+      "bytes": 13853,
+      "label": "Death",
+      "category": "Death / Respawn",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Death_03.m4a",
+      "id": 1251164
+    },
+    {
+      "effects": [
+        "championDeath"
+      ],
+      "file": "pt-br/death-04.m4a",
+      "bytes": 17114,
+      "label": "Death",
+      "category": "Death / Respawn",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Death_04.m4a",
+      "id": 1251165
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-01.m4a",
+      "bytes": 33091,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_01.m4a",
+      "id": 1251199
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-02.m4a",
+      "bytes": 31220,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_02.m4a",
+      "id": 1251200
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-03.m4a",
+      "bytes": 25828,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_03.m4a",
+      "id": 1251201
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-04.m4a",
+      "bytes": 36851,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_04.m4a",
+      "id": 1251202
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-05.m4a",
+      "bytes": 25647,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_05.m4a",
+      "id": 1251203
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-06.m4a",
+      "bytes": 37303,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_06.m4a",
+      "id": 1251204
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-07.m4a",
+      "bytes": 82651,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_07.m4a",
+      "id": 1251205
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-08.m4a",
+      "bytes": 33689,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_08.m4a",
+      "id": 1251207
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-09.m4a",
+      "bytes": 20850,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_09.m4a",
+      "id": 1251206
+    },
+    {
+      "effects": [
+        "move",
+        "idle"
+      ],
+      "file": "pt-br/move-standard-10.m4a",
+      "bytes": 49799,
+      "label": "Move Standard",
+      "category": "Movement",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Move_Standard_10.m4a",
+      "id": 1251208
+    },
+    {
+      "effects": [
+        "katQ"
+      ],
+      "file": "pt-br/katarina-q-cast-01.m4a",
+      "bytes": 10178,
+      "label": "Q cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Q_cast_01.m4a",
+      "id": 1251179
+    },
+    {
+      "effects": [
+        "katQ"
+      ],
+      "file": "pt-br/katarina-q-cast-02.m4a",
+      "bytes": 9260,
+      "label": "Q cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Q_cast_02.m4a",
+      "id": 1251180
+    },
+    {
+      "effects": [
+        "katQ"
+      ],
+      "file": "pt-br/katarina-q-cast-03.m4a",
+      "bytes": 8325,
+      "label": "Q cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Q_cast_03.m4a",
+      "id": 1251181
+    },
+    {
+      "effects": [
+        "katQ"
+      ],
+      "file": "pt-br/katarina-q-cast-04.m4a",
+      "bytes": 9403,
+      "label": "Q cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_Q_cast_04.m4a",
+      "id": 1251182
+    },
+    {
+      "effects": [
+        "deathLotus"
+      ],
+      "file": "pt-br/katarina-r-cast-01.m4a",
+      "bytes": 10178,
+      "label": "R cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_R_cast_01.m4a",
+      "id": 1251183
+    },
+    {
+      "effects": [
+        "deathLotus"
+      ],
+      "file": "pt-br/katarina-r-cast-02.m4a",
+      "bytes": 9260,
+      "label": "R cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_R_cast_02.m4a",
+      "id": 1251184
+    },
+    {
+      "effects": [
+        "deathLotus"
+      ],
+      "file": "pt-br/katarina-r-cast-03.m4a",
+      "bytes": 8325,
+      "label": "R cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_R_cast_03.m4a",
+      "id": 1251185
+    },
+    {
+      "effects": [
+        "deathLotus"
+      ],
+      "file": "pt-br/katarina-r-cast-04.m4a",
+      "bytes": 9403,
+      "label": "R cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_R_cast_04.m4a",
+      "id": 1251186
+    },
+    {
+      "effects": [
+        "deathLotus"
+      ],
+      "file": "pt-br/katarina-r-cast-05.m4a",
+      "bytes": 41557,
+      "label": "R cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_R_cast_05.m4a",
+      "id": 1251187
+    },
+    {
+      "effects": [
+        "deathLotus"
+      ],
+      "file": "pt-br/katarina-r-cast-06.m4a",
+      "bytes": 28491,
+      "label": "R cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_R_cast_06.m4a",
+      "id": 1251188
+    },
+    {
+      "effects": [
+        "deathLotus"
+      ],
+      "file": "pt-br/katarina-r-cast-07.m4a",
+      "bytes": 38851,
+      "label": "R cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_R_cast_07.m4a",
+      "id": 1251189
+    },
+    {
+      "effects": [
+        "deathLotus"
+      ],
+      "file": "pt-br/katarina-r-cast-08.m4a",
+      "bytes": 23033,
+      "label": "R cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_R_cast_08.m4a",
+      "id": 1251190
+    },
+    {
+      "effects": [
+        "katW"
+      ],
+      "file": "pt-br/katarina-w-cast-01.m4a",
+      "bytes": 10178,
+      "label": "W cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_W_cast_01.m4a",
+      "id": 1251191
+    },
+    {
+      "effects": [
+        "katW"
+      ],
+      "file": "pt-br/katarina-w-cast-02.m4a",
+      "bytes": 9260,
+      "label": "W cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_W_cast_02.m4a",
+      "id": 1251192
+    },
+    {
+      "effects": [
+        "katW"
+      ],
+      "file": "pt-br/katarina-w-cast-03.m4a",
+      "bytes": 8325,
+      "label": "W cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_W_cast_03.m4a",
+      "id": 1251193
+    },
+    {
+      "effects": [
+        "katW"
+      ],
+      "file": "pt-br/katarina-w-cast-04.m4a",
+      "bytes": 9403,
+      "label": "W cast",
+      "category": "Abilities",
+      "url": "https://lolsound.com/sounds/katarina/pt_BR/base/Katarina_W_cast_04.m4a",
+      "id": 1251194
+    }
+  ]
+}

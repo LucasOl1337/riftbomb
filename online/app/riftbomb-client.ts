@@ -14,13 +14,8 @@ export type ArenaId =
   | "forts"
   | "pit";
 
-export type ClientMode =
-  | "quick"
-  | "online"
-  | "solo"
-  | "local"
-  | "challenge"
-  | "join";
+/** Product modes exposed by the War Table. Legacy room actions stay in the runtime bridge. */
+export type ClientMode = "quick" | "friend" | "solo";
 
 export type RuntimeRole = "offline" | "host" | "guest";
 export type RuntimePhase = "boot" | "setup" | "lobby" | "match";
@@ -65,37 +60,43 @@ export const CHAMPIONS: ReadonlyArray<{
   id: ChampionId;
   name: string;
   role: string;
+  signature: string;
   portrait: string;
 }> = [
   {
     id: "katarina",
     name: "Katarina",
     role: "Assassina",
+    signature: "Mobilidade · Reativação",
     portrait: "/client/champions/katarina.webp",
   },
   {
     id: "zed",
     name: "Zed",
     role: "Assassino",
-    portrait: "/client/champions/zed.webp",
+    signature: "Sombra · Execução",
+    portrait: "/client/champions/zed-war-table-v1.webp",
   },
   {
     id: "renekton",
     name: "Renekton",
     role: "Lutador",
-    portrait: "/client/champions/renekton.webp",
+    signature: "Fúria · Pressão",
+    portrait: "/client/champions/renekton-war-table-v1.webp",
   },
   {
     id: "vladimir",
     name: "Vladimir",
     role: "Mago",
-    portrait: "/client/champions/vladimir.webp",
+    signature: "Sangue · Sustento",
+    portrait: "/client/champions/vladimir-war-table-v1.webp",
   },
   {
     id: "gangplank",
     name: "Gangplank",
     role: "Especialista",
-    portrait: "/client/champions/gangplank.webp",
+    signature: "Barril · Zona",
+    portrait: "/client/champions/gangplank-war-table-v1.webp",
   },
 ] as const;
 
@@ -104,6 +105,9 @@ export const ARENAS: ReadonlyArray<{
   name: string;
   shortName: string;
   description: string;
+  trait: string;
+  danger: string;
+  cover: string;
   hero: string;
 }> = [
   {
@@ -111,20 +115,29 @@ export const ARENAS: ReadonlyArray<{
     name: "Salt Lens Array",
     shortName: "Salt Lens",
     description: "Rotas abertas, leitura rápida e confrontos diretos.",
+    trait: "Leitura aberta",
+    danger: "Centro exposto",
+    cover: "32%",
     hero: "/client/arenas/lattice.webp",
   },
   {
     id: "clearing",
     name: "Nacre Hollow",
     shortName: "Nacre",
-    description: "Arena equilibrada com corredores de pressão variável.",
+    description: "Corredores de pressão variável e flancos curtos.",
+    trait: "Ritmo equilibrado",
+    danger: "Rotas espelhadas",
+    cover: "46%",
     hero: "/client/arenas/clearing.webp",
   },
   {
     id: "labyrinth",
     name: "Cinderfrost Works",
     shortName: "Cinderfrost",
-    description: "Passagens estreitas e domínio de espaço.",
+    description: "Passagens estreitas e domínio agressivo de espaço.",
+    trait: "Pressão alta",
+    danger: "Gargalos térmicos",
+    cover: "61%",
     hero: "/client/arenas/labyrinth.webp",
   },
   {
@@ -132,6 +145,9 @@ export const ARENAS: ReadonlyArray<{
     name: "Aeolian Bastions",
     shortName: "Bastions",
     description: "Bolsões defensivos e ataques por flanco.",
+    trait: "Defesa tática",
+    danger: "Entradas laterais",
+    cover: "55%",
     hero: "/client/arenas/forts-key-art-v2.webp",
   },
   {
@@ -139,6 +155,9 @@ export const ARENAS: ReadonlyArray<{
     name: "Storm-Eye Basin",
     shortName: "Storm-Eye",
     description: "Centro perigoso e decisões de alto risco.",
+    trait: "Risco extremo",
+    danger: "Olho da tempestade",
+    cover: "39%",
     hero: "/client/arenas/pit-key-art-v2.webp",
   },
 ] as const;
@@ -152,6 +171,7 @@ export const TRAINING_BOT = Object.freeze({
   intelligence: "4/5 · Tático adaptativo",
   record: "100–0 vs baseline",
   survival: "100% na primeira bomba",
+  description: "Abre rotas, lê hábitos e converte vantagem no combo E → R → W → Q → Dice.",
   weakness: "Especialista em Renekton",
 });
 
@@ -165,39 +185,20 @@ export const MODES: ReadonlyArray<{
   {
     id: "quick",
     eyebrow: "PAREAMENTO AUTOMÁTICO",
-    name: "Quick Match",
-    description: "Encontre outro jogador e entre direto em uma partida melhor de 3.",
-    badge: "RECOMENDADO",
+    name: "Partida rápida",
+    description: "Encontre um rival na região e dispute uma melhor de 3.",
   },
   {
-    id: "online",
-    eyebrow: "SALA PRIVADA",
+    id: "friend",
+    eyebrow: "CONVITE POR LINK",
     name: "Jogar com amigo",
-    description: "Crie uma sala e enfrente um amigo no servidor de São Paulo.",
+    description: "Configure uma melhor de 10 e envie um link que abre o duelo direto.",
   },
   {
     id: "solo",
     eyebrow: "CONTRA CPU",
     name: "Treinamento",
-    description: "Teste Champions, rotas e habilidades no seu ritmo.",
-  },
-  {
-    id: "local",
-    eyebrow: "MESMO DISPOSITIVO",
-    name: "Versus local",
-    description: "Dois jogadores, dois controles e uma única arena.",
-  },
-  {
-    id: "challenge",
-    eyebrow: "MELHOR DE 10",
-    name: "Desafio personalizado",
-    description: "Trave Champions e arena antes de compartilhar o link.",
-  },
-  {
-    id: "join",
-    eyebrow: "CÓDIGO DE 6 DÍGITOS",
-    name: "Entrar em sala",
-    description: "Use o código enviado pelo administrador da partida.",
+    description: "Treine contra o V1 Renekton certificado como Dominus-01.",
   },
 ] as const;
 

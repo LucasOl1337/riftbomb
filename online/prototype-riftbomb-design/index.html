@@ -6,38 +6,20 @@
     <meta name="theme-color" content="#05090c" />
     <meta
       name="description"
-      content="Laboratório visual isolado do Riftbomb com três direções de interface."
+      content="War Table do Riftbomb: montagem de protocolo, arena e formação antes da partida."
     />
-    <title>Riftbomb · Design Prototype</title>
+    <title>War Table · Riftbomb</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body data-variant="command" data-arena="lattice">
-    <a class="skip-link" href="#prototype-main">Pular para o conteúdo</a>
+  <body data-arena="lattice" data-phase="idle">
+    <a class="skip-link" href="#war-table-main">Pular para a montagem da partida</a>
 
-    <main id="prototype-main" tabindex="-1">
+    <main id="war-table-main" tabindex="-1">
       <div id="app"></div>
     </main>
 
-    <aside class="prototype-state" aria-label="Estado completo do protótipo">
-      <details>
-        <summary>
-          <span>LAB STATE</span>
-          <b id="state-summary">QUICK · KATARINA · SALT LENS</b>
-        </summary>
-        <dl id="state-readout"></dl>
-      </details>
-    </aside>
-
-    <nav class="prototype-switcher" aria-label="Alternar variante do protótipo">
-      <button type="button" data-cycle-variant="-1" aria-label="Variante anterior">←</button>
-      <div>
-        <small>PROTÓTIPO DESCARTÁVEL</small>
-        <strong id="variant-label">A · COMMAND DECK</strong>
-      </div>
-      <button type="button" data-cycle-variant="1" aria-label="Próxima variante">→</button>
-    </nav>
-
-    <p class="sr-only" id="prototype-announcer" aria-live="polite" aria-atomic="true"></p>
+    <p class="sr-only" id="war-table-announcer" aria-live="polite" aria-atomic="true"></p>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

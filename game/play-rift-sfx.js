@@ -86,7 +86,11 @@
       kill: "kill",
       markPop: "kill",
       hemoplaguePop: "kill",
-      barrelBoom: "kill"
+      barrelBoom: "kill",
+      championDeath: "kill",
+
+      move: "dash",
+      idle: "dash"
     });
 
     const SFX_PULSE = Object.freeze({
@@ -109,6 +113,15 @@
     const SFX_RESERVED_VOICES = 8;
     const SFX_PENDING_LIMIT = 12;
     const SFX_RESUME_TIMEOUT_MS = 1500;
+
+    /**
+     * Champion spoken lines (LoLSound VO banks) share one anti-spam gate so
+     * multi-skill spam never stacks three phrases on top of each other.
+     * Combat synth still fires underneath when a VO is skipped.
+     */
+    const SFX_VOICE_COOLDOWN = 5;
+    /** Ambient move / idle banter cadence while a contestant is on the map. */
+    const SFX_MOVE_VOICE_INTERVAL = 10;
 
     /**
      * Procedural blast identities. Arena bombs alone get the full pressure/debris tail;
@@ -187,6 +200,18 @@
         this.outputFilter = null;
         this.limiter = null;
         this.noiseBuffer = null;
+        /** @type {Record<string, AudioBuffer>} decoded samples (arena + champion banks) */
+        this.sampleBuffers = Object.create(null);
+        /** @type {Record<string, string[]>} effect → buffer keys (variant list) */
+        this.sampleVariants = Object.create(null);
+        /** @type {Record<string, { gain?: number, reverb?: number, preferSample?: boolean, champion?: string }>} */
+        this.sampleMeta = Object.create(null);
+        this._sampleLoadPromise = null;
+        this._sampleLoadContext = null;
+        /** AudioContext time when the last champion VO finished starting. */
+        this._lastVoiceAt = -Infinity;
+        /** Seconds accumulated toward ambient move/idle banter. */
+        this._moveVoiceTimer = 0;
         this.intensity = 0;
         this.actionPulse = 0;
         /** Fuse progress already ticked per live bomb id. */
@@ -262,7 +287,236 @@
           if (resumeContext !== this.ctx) return this.start();
         }
         if (this.ctx.state !== "running") throw new Error(`AudioContext remained ${this.ctx.state}`);
+        void this._ensureSampleBuffers().catch((error) => {
+          console.warn("[sfx] Arena sample decode skipped:", error);
+        });
         this._flushPendingEffects();
+      }
+
+      /**
+       * Decode packaged arena + champion samples (data URLs from load-*-sfx.js).
+       * Safe to call repeatedly; no-ops when sources are missing or already loaded.
+       */
+      async _ensureSampleBuffers() {
+        if (!this.ctx) return;
+        const arenaSources = typeof RIFTBOMB_ARENA_SFX_SOURCES !== "undefined"
+          ? RIFTBOMB_ARENA_SFX_SOURCES
+          : null;
+        const championSources = typeof RIFTBOMB_CHAMPION_SFX_SOURCES !== "undefined"
+          ? RIFTBOMB_CHAMPION_SFX_SOURCES
+          : null;
+        const championMeta = typeof RIFTBOMB_CHAMPION_SFX_META !== "undefined"
+          ? RIFTBOMB_CHAMPION_SFX_META
+          : null;
+        if (championMeta && typeof championMeta === "object") {
+          Object.assign(this.sampleMeta, championMeta);
+        }
+
+        /** @type {Array<[string, string]>} bufferKey, dataUrl */
+        const jobs = [];
+        if (arenaSources && typeof arenaSources === "object") {
+          for (const [key, value] of Object.entries(arenaSources)) {
+            if (!value || this.sampleBuffers[key]) continue;
+            jobs.push([key, value]);
+            this.sampleVariants[key] = [key];
+          }
+        }
+        if (championSources && typeof championSources === "object") {
+          for (const [effect, value] of Object.entries(championSources)) {
+            const urls = Array.isArray(value) ? value : [value];
+            const keys = [];
+            urls.forEach((url, index) => {
+              if (!url) return;
+              const bufferKey = urls.length === 1 ? effect : `${effect}__${index}`;
+              keys.push(bufferKey);
+              if (!this.sampleBuffers[bufferKey]) jobs.push([bufferKey, url]);
+            });
+            if (keys.length) this.sampleVariants[effect] = keys;
+          }
+        }
+        if (!jobs.length) return;
+        if (this._sampleLoadPromise && this._sampleLoadContext === this.ctx) {
+          await this._sampleLoadPromise;
+          return;
+        }
+        const loadContext = this.ctx;
+        this._sampleLoadContext = loadContext;
+        this._sampleLoadPromise = (async () => {
+          await Promise.all(jobs.map(async ([key, dataUrl]) => {
+            if (this.sampleBuffers[key] || this.ctx !== loadContext) return;
+            try {
+              const response = await fetch(dataUrl);
+              const arrayBuffer = await response.arrayBuffer();
+              if (this.ctx !== loadContext) return;
+              const buffer = await loadContext.decodeAudioData(arrayBuffer.slice(0));
+              if (this.ctx !== loadContext) return;
+              this.sampleBuffers[key] = buffer;
+            } catch (error) {
+              console.warn(`[sfx] Failed to decode sample "${key}":`, error);
+            }
+          }));
+        })();
+        try {
+          await this._sampleLoadPromise;
+        } finally {
+          if (this._sampleLoadPromise && this._sampleLoadContext === loadContext) {
+            this._sampleLoadPromise = null;
+            this._sampleLoadContext = null;
+          }
+        }
+      }
+
+      /**
+       * Champion VO banks (lines imported from the catalog) vs combat SFX samples.
+       * VO shares the anti-spam gate; plain SFX samples do not.
+       */
+      isChampionVoiceAction(name) {
+        const meta = this.sampleMeta[name];
+        if (!meta || meta.preferSample === false) return false;
+        if (meta.voice === false) return false;
+        // Packaged champion banks default to spoken lines unless marked otherwise.
+        return Boolean(meta.champion) || meta.voice === true;
+      }
+
+      isForcedChampionVoice(name) {
+        const meta = this.sampleMeta[name];
+        if (meta?.force === true) return true;
+        return name === "championDeath" || name === "deathLotus" || name === "ult"
+          || name === "deathMark" || name === "dominus" || name === "hemoplague"
+          || name === "cannonBarrage" || name === "kill";
+      }
+
+      voiceGateOpen(time, { force = false } = {}) {
+        if (force) return true;
+        const now = Number.isFinite(time) ? time : (this.ctx?.currentTime ?? 0);
+        return (now - this._lastVoiceAt) >= SFX_VOICE_COOLDOWN;
+      }
+
+      /**
+       * Play a packaged sample for a game effect when present.
+       * Champion VO lines respect the shared cooldown unless force is set.
+       * @returns {boolean}
+       */
+      playActionSample(name, time, {
+        strength = 1,
+        pan = 0,
+        bus,
+        priority = true,
+        force = false
+      } = {}) {
+        const meta = this.sampleMeta[name];
+        if (meta && meta.preferSample === false) return false;
+        const variants = this.sampleVariants[name];
+        if (!variants?.length) return false;
+        const available = variants.filter((key) => this.sampleBuffers[key]);
+        if (!available.length) return false;
+
+        const isVoice = this.isChampionVoiceAction(name);
+        const forceVoice = force || this.isForcedChampionVoice(name);
+        if (isVoice && !this.voiceGateOpen(time, { force: forceVoice })) return false;
+
+        const bufferKey = available[Math.floor(Math.random() * available.length)];
+        const power = clamp(Number(strength) || 1, 0.5, 1.45);
+        const gain = (Number.isFinite(meta?.gain) ? meta.gain : 0.6) * power;
+        const reverb = Number.isFinite(meta?.reverb) ? meta.reverb : 0.16;
+        const started = this.playSample(bufferKey, time, {
+          gain,
+          pan,
+          bus: bus || this.busForAction(name),
+          reverb,
+          playbackRate: 0.98 + Math.random() * 0.04,
+          fadeIn: 0.004,
+          fadeOut: (name === "deathLotus" || name === "championDeath") ? 0.35 : 0.16,
+          priority
+        });
+        if (started && isVoice) {
+          this._lastVoiceAt = Number.isFinite(time) ? time : (this.ctx?.currentTime ?? 0);
+        }
+        return started;
+      }
+
+      /**
+       * Ambient Move Standard / idle banter — about once every SFX_MOVE_VOICE_INTERVAL
+       * seconds, and only when the shared VO gate is free.
+       */
+      tickChampionMoveVoice(game, dt) {
+        if (!this.ctx || this.ctx.state !== "running") return;
+        const step = Number(dt);
+        if (!Number.isFinite(step) || step <= 0) return;
+        this._moveVoiceTimer += step;
+        if (this._moveVoiceTimer < SFX_MOVE_VOICE_INTERVAL) return;
+
+        const players = Array.isArray(game?.players) ? game.players : [];
+        const active = players.find((player) => player?.alive && (player.moving || player.dashing > 0))
+          || players.find((player) => player?.alive);
+        if (!active) return;
+
+        const time = this.ctx.currentTime;
+        if (!this.voiceGateOpen(time)) return;
+
+        const pan = typeof game?.audioPanAt === "function"
+          ? game.audioPanAt(active.x, active.z)
+          : 0;
+        const moving = Boolean(active.moving || active.dashing > 0);
+        const order = moving ? ["move", "idle", "shunpo"] : ["idle", "move"];
+        for (const name of order) {
+          if (this.playActionSample(name, time, { pan, strength: 0.9, priority: false })) {
+            this._moveVoiceTimer = 0;
+            return;
+          }
+        }
+      }
+
+      /**
+       * Play a decoded AudioBuffer through the SFX graph.
+       * @returns {boolean} true when a voice started
+       */
+      playSample(name, time, {
+        gain = 0.5,
+        pan = 0,
+        bus,
+        reverb = 0.2,
+        playbackRate = 1,
+        duration = null,
+        fadeIn = 0.004,
+        fadeOut = 0.18,
+        priority = true
+      } = {}) {
+        if (!this.ctx || !this.master) return false;
+        const buffer = this.sampleBuffers[name];
+        if (!buffer) return false;
+        if (!this._claimVoice(priority)) return false;
+        try {
+          const source = this.ctx.createBufferSource();
+          source.buffer = buffer;
+          const rate = clamp(Number(playbackRate) || 1, 0.5, 1.5);
+          source.playbackRate.value = rate;
+          const envelope = this.ctx.createGain();
+          const start = Number.isFinite(time) ? time : this.ctx.currentTime;
+          const maxDuration = buffer.duration / rate;
+          const playDuration = duration == null
+            ? maxDuration
+            : clamp(Number(duration) || maxDuration, 0.05, maxDuration);
+          const attack = clamp(fadeIn, 0.001, 0.05);
+          const release = clamp(fadeOut, 0.02, Math.max(0.05, playDuration * 0.6));
+          const peak = clamp(Number(gain) || 0, 0, 2);
+          envelope.gain.setValueAtTime(0.0001, start);
+          envelope.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak), start + attack);
+          const fadeStart = Math.max(start + attack, start + playDuration - release);
+          envelope.gain.setValueAtTime(Math.max(0.0001, peak), fadeStart);
+          envelope.gain.exponentialRampToValueAtTime(0.0001, start + playDuration);
+          source.connect(envelope);
+          const routed = this.connectSfx(envelope, { reverb, pan, bus });
+          const releaseVoice = this._trackVoice(source, [envelope, ...routed]);
+          source.start(start);
+          source.stop(start + playDuration + 0.02);
+          source.onended = releaseVoice;
+          return true;
+        } catch (error) {
+          this._activeVoices = Math.max(0, this._activeVoices - 1);
+          console.warn(`[sfx] Sample "${name}" skipped:`, error);
+          return false;
+        }
       }
 
       _createAudioGraph(AudioContext) {
@@ -342,6 +596,13 @@
         this.outputFilter = null;
         this.limiter = null;
         this.noiseBuffer = null;
+        this.sampleBuffers = Object.create(null);
+        this.sampleVariants = Object.create(null);
+        this.sampleMeta = Object.create(null);
+        this._sampleLoadPromise = null;
+        this._sampleLoadContext = null;
+        this._lastVoiceAt = -Infinity;
+        this._moveVoiceTimer = 0;
         this.busDry = Object.create(null);
         this.busWet = Object.create(null);
       }
@@ -646,6 +907,8 @@
             : 0;
           this.effect("bombTick", 0.55 + latestCrossedTick * 0.85, { pan });
         }
+
+        this.tickChampionMoveVoice(game, dt);
       }
 
       visualPulse() {
@@ -822,6 +1085,19 @@
         this._routeBus = bus;
         this.pulse(SFX_PULSE[name] ?? 0.16);
         try {
+          // Champion VO / packaged banks: spoken lines are rate-limited so skill
+          // spam falls back to procedural combat layers instead of stacking phrases.
+          if (name !== "bombTick" && this.playActionSample(name, time, {
+            strength: power,
+            pan,
+            bus,
+            priority: true
+          })) {
+            // Voice lines replace the synth bed; non-voice samples do too.
+            // When the VO gate blocks, we fall through to the procedural profile.
+            return;
+          }
+
           if (name === "bombTick") {
             // Fuse spark: rising metallic hiss + tiny ember pop (accelerates with power).
             const pitch = 720 + (power - 0.5) * 2100;
@@ -1079,6 +1355,48 @@
         this._routeBus = bus;
 
         try {
+          // Arena bombs prefer the packaged FreeSound sample (CC0 Big Explosion / qubodup).
+          // Audio window matches blast visual life (explodeBomb life: 0.72) so the
+          // sample dies when the fire corridor leaves the board — no hanging tail.
+          if (profileName === "arena" && this.sampleBuffers.explosion) {
+            const visualLife = Number(options.visualLife);
+            const blastLife = Number.isFinite(visualLife) && visualLife > 0
+              ? clamp(visualLife, 0.35, 1.2)
+              : 0.72;
+            const sampleGain = (secondary ? 0.52 : 0.78) * mix;
+            // Primary: full blast window. Secondary/chain: shorter so stacked bombs
+            // don't keep roaring after their corridor is gone.
+            const sampleDuration = secondary
+              ? Math.min(0.48, blastLife * 0.7)
+              : blastLife;
+            const sampleRate = 0.97 + Math.random() * 0.05 + chainDepth * 0.01;
+            const sampleStarted = this.playSample("explosion", time, {
+              gain: sampleGain,
+              pan,
+              bus,
+              reverb: secondary ? 0.12 : 0.2,
+              playbackRate: clamp(sampleRate, 0.9, 1.12),
+              duration: sampleDuration,
+              fadeIn: 0.002,
+              // Hard stop with the visual: most of the energy in the punch,
+              // fade only the last ~18% so it doesn't click off.
+              fadeOut: Math.max(0.08, sampleDuration * 0.18),
+              priority: true
+            });
+            if (sampleStarted) {
+              this._recentBlasts.push({ time, sourceKey, profile: profileName, pan });
+              this.pulse(profile.pulse * Math.min(1, power) * (secondary ? 0.62 : 1));
+              // Thin sub bed under the sample, also capped to blast life.
+              this.toneSweep(time + 0.004, {
+                from: profile.subFrom, to: profile.subTo,
+                duration: Math.min(profile.subDuration, sampleDuration * 0.75),
+                gain: profile.subGain * mix * 0.45,
+                type: "sine", pan, reverb: 0.06, bus, priority: true
+              });
+              return;
+            }
+          }
+
           const crackStarted = this.noiseBurst(time, {
             duration: profile.crackDuration, gain: profile.crackGain * mix,
             attack: 0.001, filter: profile.crackFilter,
@@ -1173,3 +1491,5 @@
     SfxEngine.ACTION_BUS = SFX_ACTION_BUS;
     SfxEngine.BLAST_PROFILES = SFX_BLAST_PROFILES;
     SfxEngine.MAX_VOICES = SFX_MAX_VOICES;
+    SfxEngine.VOICE_COOLDOWN = SFX_VOICE_COOLDOWN;
+    SfxEngine.MOVE_VOICE_INTERVAL = SFX_MOVE_VOICE_INTERVAL;

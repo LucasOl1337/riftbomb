@@ -417,6 +417,24 @@
       return new Float32Array(data);
     }
 
+    /**
+     * Soft FX plate: unit square in XZ, +Y normals.
+     * Local x/z ∈ [-1,1] → UV = xz*0.5+0.5 (mapId 8). Supports elongated
+     * Bomberman corridor arms (skillDisc would clip into an ellipse).
+     */
+    function buildFxPlate() {
+      const data = [];
+      const up = [0, 1, 0];
+      const push = (p) => data.push(...p, ...up);
+      const a = [-1, 0, -1];
+      const b = [1, 0, -1];
+      const c = [1, 0, 1];
+      const d = [-1, 0, 1];
+      push(a); push(b); push(c);
+      push(a); push(c); push(d);
+      return new Float32Array(data);
+    }
+
     /** Thick coin body: top disc, bottom disc, cylindrical rim (true 3D token). */
     function buildSkillCoin(segments = 40) {
       const data = [];
@@ -490,6 +508,8 @@
           Renderer.katarinaFragment
         );
         this.particleProgram = this.createProgram(Renderer.particleVertex, Renderer.particleFragment);
+        // EXPLOSION_GPU_BURST_V1: stateless GPU burst field for bomb blasts.
+        this.burstProgram = this.createProgram(Renderer.burstVertex, Renderer.burstFragment);
         this.postProgram = this.createProgram(Renderer.postVertex, Renderer.postFragment);
         this.mainUniforms = this.uniforms(this.mainProgram, [
           "uModel", "uViewProjection", "uColor", "uCamera", "uTime", "uBeat",
@@ -502,6 +522,10 @@
         ]);
         this.particleUniforms = this.uniforms(this.particleProgram, [
           "uViewProjection", "uResolution", "uTime"
+        ]);
+        this.burstUniforms = this.uniforms(this.burstProgram, [
+          "uViewProjection", "uResolution", "uOrigin", "uAxis", "uCore", "uPhase",
+          "uLife", "uTime", "uTile", "uSeed", "uSmoke"
         ]);
         this.katarinaUniforms = this.uniforms(this.katarinaProgram, [
           "uModel", "uViewProjection", "uChampion", "uCamera", "uTime", "uBeat",
@@ -529,6 +553,8 @@
           cone: this.createMesh(buildCylinder(16, 0.06, 1)),
           torus: this.createMesh(buildTorus()),
           skillDisc: this.createMesh(buildSkillDisc(this.mobilePerf ? 24 : 56)),
+          // Rectangular soft-FX plate for Bomberman corridor explosion arms.
+          fxPlate: this.createMesh(buildFxPlate()),
           skillCoin: this.createMesh(buildSkillCoin(this.mobilePerf ? 20 : 48))
         };
         if (typeof RIFTBOMB_NACRE_APPEARANCE !== "undefined"
@@ -569,6 +595,30 @@
         gl.vertexAttribPointer(sLoc, 1, gl.FLOAT, false, 8 * 4, 3 * 4);
         gl.enableVertexAttribArray(cLoc);
         gl.vertexAttribPointer(cLoc, 4, gl.FLOAT, false, 8 * 4, 4 * 4);
+        gl.bindVertexArray(null);
+
+        // EXPLOSION_GPU_BURST_V1 seed field. One static buffer; motion and color
+        // are fully computed in the vertex shader (Sharingan mangekyo technique).
+        // PARTICLES_ONLY_V1: denser field — no mesh heat bed/debris to lean on.
+        this.burstSmokeCount = 1280;
+        this.burstFireCount = 2600;
+        const burstTotal = this.burstSmokeCount + this.burstFireCount;
+        const burstSeeds = new Float32Array(burstTotal * 4);
+        let burstState = 0x9e3779b9;
+        for (let i = 0; i < burstSeeds.length; i++) {
+          burstState |= 0; burstState = (burstState + 0x6D2B79F5) | 0;
+          let tt = Math.imul(burstState ^ (burstState >>> 15), 1 | burstState);
+          tt = (tt + Math.imul(tt ^ (tt >>> 7), 61 | tt)) ^ tt;
+          burstSeeds[i] = ((tt ^ (tt >>> 14)) >>> 0) / 4294967296;
+        }
+        this.burstVao = gl.createVertexArray();
+        gl.bindVertexArray(this.burstVao);
+        const burstBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, burstBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, burstSeeds, gl.STATIC_DRAW);
+        const bLoc = gl.getAttribLocation(this.burstProgram, "aRnd");
+        gl.enableVertexAttribArray(bLoc);
+        gl.vertexAttribPointer(bLoc, 4, gl.FLOAT, false, 0, 0);
         gl.bindVertexArray(null);
 
         this.postVao = gl.createVertexArray();
@@ -1558,6 +1608,8 @@
           .map((key) => this.arenaTextureLoaders[key])
           .filter(Boolean)
           .map((load) => load());
+        // Imagine explosion plates ride every match with the bomb shell.
+        loads.push(this.ensureExplosionTextures());
         this.arenaTexturesReady = Promise.all(loads);
         return this.arenaTexturesReady;
       }
@@ -1764,11 +1816,21 @@
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       }
 
+      /**
+       * Camera kick + hit grade only — no expanding circular post-process ring.
+       * Use for Bomberman-cross bomb blasts where a radial ring fights the cross read.
+       */
+      addImpact(strength = 1) {
+        const amount = Math.max(0, Number(strength) || 0);
+        this.cameraShake = Math.max(this.cameraShake, amount * 0.44);
+        this.hitPulse = Math.max(this.hitPulse, amount);
+      }
+
+      /** Full shock: impact feel plus the expanding circular post warp/ring. */
       addShock(x, z, strength = 1) {
         this.shocks.unshift({ x, z, age: 0, strength });
         this.shocks.length = Math.min(this.shocks.length, 8);
-        this.cameraShake = Math.max(this.cameraShake, strength * 0.44);
-        this.hitPulse = Math.max(this.hitPulse, strength);
+        this.addImpact(strength);
       }
 
       draw(meshName, position, scale, color, material, emissive, rotation = 0, alpha = 1, rz = 0, rx = 0, mapId = 0, textureOverride = null) {
@@ -1780,9 +1842,9 @@
         gl.uniform1f(this.mainUniforms.uMaterial, material);
         gl.uniform1f(this.mainUniforms.uEmissive, emissive);
         gl.uniform1f(this.mainUniforms.uAlpha, alpha);
-        // mapId 4 = skill icon (textureOverride required); 2/3 = arena multi-face
-        const useMap = mapId === 4 && textureOverride
-          ? 4
+        // mapId 4 = skill icon; mapId 8 = soft FX sprite (both need textureOverride)
+        const useMap = (mapId === 4 || mapId === 8) && textureOverride
+          ? mapId
           : (mapId > 0 && this.arenaMapTextures?.[mapId] ? mapId : 0);
         gl.uniform1f(this.mainUniforms.uMapId, useMap);
         gl.uniform1f(
@@ -1793,7 +1855,7 @@
         const white = this.arenaWhiteTexture;
         let side = white;
         let top = white;
-        if (useMap === 4 && textureOverride) {
+        if ((useMap === 4 || useMap === 8) && textureOverride) {
           side = textureOverride;
           top = textureOverride;
         } else if (useMap > 0) {
@@ -1821,8 +1883,8 @@
         gl.uniform1f(this.mainUniforms.uMaterial, material);
         gl.uniform1f(this.mainUniforms.uEmissive, emissive);
         gl.uniform1f(this.mainUniforms.uAlpha, alpha);
-        const useMap = mapId === 4 && textureOverride
-          ? 4
+        const useMap = (mapId === 4 || mapId === 8) && textureOverride
+          ? mapId
           : (mapId > 0 && this.arenaMapTextures?.[mapId] ? mapId : 0);
         gl.uniform1f(this.mainUniforms.uMapId, useMap);
         gl.uniform1f(
@@ -1833,7 +1895,7 @@
         const white = this.arenaWhiteTexture;
         let side = white;
         let top = white;
-        if (useMap === 4 && textureOverride) {
+        if ((useMap === 4 || useMap === 8) && textureOverride) {
           side = textureOverride;
           top = textureOverride;
         } else if (useMap > 0) {
@@ -1850,6 +1912,56 @@
         gl.uniform1i(this.mainUniforms.uAlbedoTop, 2);
         gl.bindVertexArray(mesh.vao);
         gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+      }
+
+      ensureExplosionTextures() {
+        if (this.explosionTexturesReady) return this.explosionTexturesReady;
+        const gl = this.gl;
+        const pack = typeof RIFTBOMB_EXPLOSION_FRAMES !== "undefined"
+          ? RIFTBOMB_EXPLOSION_FRAMES
+          : null;
+        // CORRIDOR_CROSS_V1: sequence morph + named role plates (coreCross, armCorridor).
+        const sequence = (pack?.sequence || pack?.sources || []).filter(Boolean);
+        const roles = pack?.roles || {};
+        const roleEntries = Object.entries(roles).filter(([, src]) => !!src);
+        this.explosionTextures = [];
+        this.explosionRoleTextures = Object.create(null);
+        if (!sequence.length && !roleEntries.length) {
+          this.explosionTexturesReady = Promise.resolve([]);
+          return this.explosionTexturesReady;
+        }
+        const loadOne = (src) => new Promise((resolve) => {
+          const texture = gl.createTexture();
+          gl.bindTexture(gl.TEXTURE_2D, texture);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA,
+            gl.UNSIGNED_BYTE, new Uint8Array([255, 120, 20, 255]));
+          const image = new Image();
+          image.decoding = "async";
+          image.onload = () => {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.generateMipmap(gl.TEXTURE_2D);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+            resolve(texture);
+          };
+          image.onerror = () => resolve(null);
+          image.src = src;
+        });
+        const sequenceLoads = sequence.map((src, index) => loadOne(src).then((texture) => {
+          this.explosionTextures[index] = texture;
+          return texture;
+        }));
+        const roleLoads = roleEntries.map(([key, src]) => loadOne(src).then((texture) => {
+          this.explosionRoleTextures[key] = texture;
+          return texture;
+        }));
+        this.explosionTexturesReady = Promise.all([...sequenceLoads, ...roleLoads]);
+        return this.explosionTexturesReady;
       }
 
       drawKatarinaDagger(position, scale, heading, pitch, emissive, energized = false, alpha = 1) {
@@ -3485,7 +3597,6 @@ drawKatarinaFallback(player, t, beat) {
 
         for (const bomb of game.bombs) {
           const progress = clamp(bomb.age / bomb.fuse, 0, 1);
-          const teamGlow = bomb.ownerId === 2 ? C.redSide : C.blueSide;
 
           // Landing pose: the shell drops, bounces once and squashes on impact.
           const fall = clamp(bomb.age / 0.24, 0, 1);
@@ -3501,21 +3612,12 @@ drawKatarinaFallback(player, t, beat) {
           const flash = 0.5 + 0.5 * Math.sin(bomb.age * (6 + heat * 34) + bomb.id * 1.7);
           const pulse = 0.86 + Math.pow(progress, 3) * 0.28 + flash * heat * 0.12;
 
-          // Plant shockwave: a team ring that expands and fades in 0.45s.
-          const landRing = clamp(bomb.age / 0.45, 0, 1);
-          if (landRing < 1) {
-            const ringRadius = 0.42 + landRing * 1.15;
-            this.draw("sphere", [bomb.x, 0.045, bomb.z], [ringRadius, 0.028, ringRadius],
-              teamGlow, 4, (1 - landRing) * 2.6, t, 0.55 * (1 - landRing));
-          }
-          this.draw("sphere", [bomb.x, 0.055, bomb.z], [0.55, 0.035, 0.55],
-            teamGlow, 4, 1.2 + beat + flash * heat * 2.4, t, 0.42);
+          // No team halo / land disc under bombs — reads as a blue/cyan circle.
           RIFTBOMB_BOMB_APPEARANCE.drawBomb(this, bomb, t, beat, {
             bodyY,
             progress,
             pulse,
-            squash,
-            teamGlow
+            squash
           });
         }
 
@@ -3880,6 +3982,44 @@ drawKatarinaFallback(player, t, beat) {
         gl.disable(gl.BLEND);
         gl.useProgram(this.mainProgram);
       }
+
+      /**
+       * EXPLOSION_GPU_BURST_V1 — stateless GPU particle burst for bomb blasts.
+       * One seed buffer; motion + color run fully in the vertex shader
+       * (Sharingan mangekyo technique). Two passes per blast cell:
+       * black smoke (alpha blend) then orange/yellow fire (additive).
+       * Corridor-locked to the Bomberman cross — never a radial cloud.
+       */
+      drawExplosionBurst(x, z, dr, dc, phase, life, tile, core, seed, time) {
+        if (!this.burstProgram || modelReviewMode || phase <= 0 || phase >= 1) return;
+        const gl = this.gl;
+        gl.enable(gl.BLEND);
+        gl.depthMask(false);
+        gl.useProgram(this.burstProgram);
+        gl.uniformMatrix4fv(this.burstUniforms.uViewProjection, false, this.lastViewProjection);
+        gl.uniform2f(this.burstUniforms.uResolution, this.width, this.height);
+        gl.uniform3f(this.burstUniforms.uOrigin, x, 0, z);
+        gl.uniform2f(this.burstUniforms.uAxis, dc, dr);
+        gl.uniform1f(this.burstUniforms.uCore, core ? 1 : 0);
+        gl.uniform1f(this.burstUniforms.uPhase, phase);
+        gl.uniform1f(this.burstUniforms.uLife, Math.max(0.1, life));
+        gl.uniform1f(this.burstUniforms.uTime, time);
+        gl.uniform1f(this.burstUniforms.uTile, tile);
+        gl.uniform1f(this.burstUniforms.uSeed, seed || 0);
+        gl.bindVertexArray(this.burstVao);
+        // Smoke first (normal alpha) so additive fire blooms on top of it.
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.uniform1f(this.burstUniforms.uSmoke, 1);
+        gl.drawArrays(gl.POINTS, 0, this.mobilePerf ? 192 : this.burstSmokeCount);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+        gl.uniform1f(this.burstUniforms.uSmoke, 0);
+        gl.drawArrays(gl.POINTS, this.burstSmokeCount,
+          this.mobilePerf ? 640 : this.burstFireCount);
+        gl.bindVertexArray(null);
+        gl.depthMask(true);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.useProgram(this.mainProgram);
+      }
     }
 
     Renderer.colors = {
@@ -4103,6 +4243,7 @@ drawKatarinaFallback(player, t, beat) {
         // mapped: texture is ground truth. solid: stylized uColor.
         vec3 albedo = uColor;
         float mapped = 0.0;
+        float texAlpha = 1.0;
         vec2 mapUv = vec2(0.0);
         float topFace = step(0.55, abs(N.y));
         if (uMapId > 0.5) {
@@ -4112,6 +4253,14 @@ drawKatarinaFallback(player, t, beat) {
             uv = clamp(vLocal.xz * 0.5 + 0.5, 0.0, 1.0);
             albedo = texture(uAlbedo, uv).rgb;
             mapUv = uv;
+          } else if (uMapId > 7.5 && uMapId < 8.5) {
+            // Explosion / soft FX sprite: skillDisc UVs + authored alpha channel.
+            uv = clamp(vLocal.xz * 0.5 + 0.5, 0.0, 1.0);
+            vec4 fx = texture(uAlbedo, uv);
+            albedo = fx.rgb;
+            texAlpha = fx.a;
+            mapUv = uv;
+            if (texAlpha < 0.02) discard;
           } else if (uMapId > 6.5 && uMapId < 7.5) {
             // BOMB shell: local triplanar at prop-scale PPI.
             // Unit sphere local ∈ [-1,1]; scale ~0.5 maps ~one full albedo face across
@@ -4250,7 +4399,11 @@ drawKatarinaFallback(player, t, beat) {
 
         vec3 color;
         if (mapped > 0.5) {
-          if (uMapId > 3.5 && uMapId < 4.5) {
+          if (uMapId > 7.5 && uMapId < 8.5) {
+            // Additive-friendly fire plate: texture is ground truth, light emissive lift.
+            color = albedo * (0.85 + uEmissive * 0.55);
+            color += albedo * wrapKey * 0.08;
+          } else if (uMapId > 3.5 && uMapId < 4.5) {
             float shade = 0.94 + wrapKey * 0.06;
             color = albedo * shade;
             color += albedo * uEmissive * 0.7;
@@ -4327,7 +4480,7 @@ drawKatarinaFallback(player, t, beat) {
         color = mix(color, fogColor, fog * 0.16);
 
         color = tonemap(color * 1.12);
-        outColor = vec4(color, uAlpha);
+        outColor = vec4(color, uAlpha * texAlpha);
       }
     `;
 
@@ -4684,13 +4837,133 @@ drawKatarinaFallback(player, t, beat) {
         vec2 p = gl_PointCoord * 2.0 - 1.0;
         float d = dot(p, p);
         if (d > 1.0) discard;
-        // Soft fire sprite: hot white core → mid color → transparent rim.
+        // Soft fire sprite: slight hot core lift without pale-white blowout.
+        float core = exp(-d * 3.8);
+        float mid = smoothstep(1.0, 0.1, d);
+        float rim = smoothstep(1.0, 0.5, d);
+        vec3 hot = mix(vColor.rgb, vColor.rgb * vec3(1.15, 1.05, 0.95), core * 0.35);
+        float alpha = vColor.a * mid * (0.5 + core * 0.65) * rim;
+        outColor = vec4(hot * (1.05 + core * 0.9), alpha);
+      }
+    `;
+
+    // EXPLOSION_GPU_BURST_V1: vertex shader owns the whole particle life.
+    // Emission window -> corridor-locked travel (ease-out drag) -> vertical
+    // lift/gravity -> oscillating swirl (never accumulates, like mangekyo).
+    Renderer.burstVertex = `#version 300 es
+      precision highp float;
+      in vec4 aRnd;
+      uniform mat4 uViewProjection;
+      uniform vec2 uResolution;
+      uniform vec3 uOrigin;
+      uniform vec2 uAxis;
+      uniform float uCore;
+      uniform float uPhase;
+      uniform float uLife;
+      uniform float uTime;
+      uniform float uTile;
+      uniform float uSeed;
+      uniform float uSmoke;
+      out vec3 vColor;
+      out float vAlpha;
+      void main() {
+        // Re-hash per blast so corridor cells don't share one frozen pattern.
+        vec4 rnd = fract(aRnd + vec4(uSeed * 0.713, uSeed * 0.371, uSeed * 0.537, uSeed * 0.177));
+        float r1 = rnd.x, r2 = rnd.y, r3 = rnd.z, r4 = rnd.w;
+        float smoke = uSmoke;
+
+        float birth = smoke > 0.5 ? 0.2 + r1 * 0.4 : r1 * 0.45;
+        float span = smoke > 0.5 ? 0.55 + r2 * 0.35 : 0.4 + r2 * 0.45;
+        float t = (uPhase - birth) / span;
+        float alive = step(0.0, t) * (1.0 - step(1.0, t));
+        t = clamp(t, 0.0, 1.0);
+        float seconds = t * span * uLife;
+
+        vec2 axis = uAxis;
+        if (uCore > 0.5) {
+          float k = floor(r3 * 3.999);
+          axis = k < 0.5 ? vec2(1.0, 0.0)
+            : k < 1.5 ? vec2(-1.0, 0.0)
+            : k < 2.5 ? vec2(0.0, 1.0) : vec2(0.0, -1.0);
+        }
+        vec2 side = vec2(-axis.y, axis.x);
+
+        // HITBOX_VISUAL_MATCH_V1: fill THIS grid cell only (±0.5 tile).
+        // No spill into safe neighbors — lethal cells == painted cells.
+        float sheetAlong = (r1 - 0.5) * 0.96;
+        float sheetSide = (r2 - 0.5) * 0.96;
+        vec3 pos = uOrigin;
+        pos.xz += (axis * sheetAlong + side * sheetSide) * uTile;
+
+        // Tiny in-cell drift/flicker only — never leave the blast footprint.
+        float isSpark = step(0.86, r4);
+        float isTongue = step(0.74, r4) * (1.0 - isSpark);
+        float drift = 0.08 + r3 * 0.18 + isSpark * 0.22;
+        float travel = (1.0 - exp(-seconds * (smoke > 0.5 ? 1.0 : 1.8)))
+          * uTile * (smoke > 0.5 ? 0.04 : (0.05 + isSpark * 0.06));
+        pos.xz += axis * drift * travel;
+        float lift = smoke > 0.5 ? 0.8 + r3 * 1.2
+          : (0.5 + r3 * 1.2 + isTongue * (1.4 + r3 * 1.8));
+        pos.y += 0.05 + lift * seconds - (smoke > 0.5 ? 0.2 : 2.2) * seconds * seconds;
+        pos.y = max(pos.y, 0.035);
+        float sw = sin(uTime * 2.6 + r1 * 41.0 + t * 7.0) * (0.015 + t * 0.02);
+        pos.xz += side * sw * uTile;
+        // Hard clamp to the cell AABB (matches damageAtCells / applyActiveBlastDamage).
+        float half = uTile * 0.49;
+        pos.x = clamp(pos.x, uOrigin.x - half, uOrigin.x + half);
+        pos.z = clamp(pos.z, uOrigin.z - half, uOrigin.z + half);
+
+        vec4 clip = uViewProjection * vec4(pos, 1.0);
+        gl_Position = clip;
+
+        float heat = 1.0 - t;
+        float size = smoke > 0.5
+          ? (0.07 + r4 * 0.09) * (0.4 + t * 1.7)
+          : (0.08 + r4 * 0.12) * (1.35 - t * 0.5);
+        gl_PointSize = alive * clamp(size * uResolution.y / max(clip.w, 0.1),
+          0.0, smoke > 0.5 ? 260.0 : 220.0);
+
+        float fadeIn = smoothstep(0.0, smoke > 0.5 ? 0.12 : 0.03, t);
+        float fadeOut = 1.0 - smoothstep(smoke > 0.5 ? 0.55 : 0.6, 1.0, t);
+        vAlpha = alive * fadeIn * fadeOut
+          * (smoke > 0.5 ? 0.2 : (0.045 + heat * 0.06) * (1.0 - uCore * 0.25));
+
+        // NO_RED_RIM_V1: cool end is dark amber, never pure deep red.
+        // Deep-red tails on soft additive points stacked into a red fringe
+        // around the corridor fire (reads as a painted red border).
+        vec3 fire = mix(vec3(0.55, 0.14, 0.02), vec3(1.0, 0.38, 0.04),
+          smoothstep(0.05, 0.5, heat));
+        fire = mix(fire, vec3(1.0, 0.72, 0.16), smoothstep(0.5, 0.8, heat));
+        fire = mix(fire, vec3(1.0, 0.9, 0.55),
+          smoothstep(0.9, 0.99, heat) * step(0.85, r4));
+        vColor = smoke > 0.5
+          ? mix(vec3(0.05, 0.048, 0.052), vec3(0.14, 0.11, 0.09), r2)
+          : fire;
+      }
+    `;
+
+    Renderer.burstFragment = `#version 300 es
+      precision highp float;
+      in vec3 vColor;
+      in float vAlpha;
+      uniform float uSmoke;
+      out vec4 outColor;
+      void main() {
+        vec2 p = gl_PointCoord * 2.0 - 1.0;
+        float d = dot(p, p);
+        if (d > 1.0) discard;
         float core = exp(-d * 3.4);
-        float mid = smoothstep(1.0, 0.08, d);
-        float rim = smoothstep(1.0, 0.55, d);
-        vec3 hot = mix(vColor.rgb, vec3(1.0, 0.96, 0.85), core * 0.72);
-        float alpha = vColor.a * mid * (0.55 + core * 0.85) * rim;
-        outColor = vec4(hot * (1.1 + core * 1.6), alpha);
+        // Tighter falloff than mid-only: outer ring of each point used to
+        // stack as a solid red border under additive blend.
+        float mid = smoothstep(1.0, 0.18, d);
+        float edgeKill = 1.0 - smoothstep(0.55, 1.0, d);
+        float alpha = vAlpha * mid * edgeKill * (0.45 + core * 0.7);
+        // Bias body toward orange-yellow; strip residual red fringe.
+        vec3 body = mix(vColor, vColor * vec3(1.05, 1.02, 0.92), core * 0.5);
+        body = max(body, vec3(0.0));
+        body.r = min(body.r, body.g * 2.35 + 0.08);
+        vec3 color = body * (1.0 + core * (1.0 - uSmoke) * 0.85);
+        outColor = vec4(color, alpha);
       }
     `;
 

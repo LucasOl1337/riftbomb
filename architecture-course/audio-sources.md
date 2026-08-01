@@ -1,4 +1,4 @@
-# Fontes de áudio para o Riftbomb
+# Fontes de áudio do Riftbomb
 
 **Pesquisa verificada em:** 31 de julho de 2026  
 **Escopo:** vozes de campeões originais e SFX de jogo para um produto publicado.  

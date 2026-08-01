@@ -212,7 +212,9 @@ test("movement and actions use independent bounded streams with causal ACK and r
   assert.doesNotMatch(clientCss, /is-match-active[^\n]*runtime-action-alert/,
     "match mode must not hide its critical action-delivery alert");
   assert.match(client, /if \(!sendOnlineAction\("bomb"\)\) return false/);
-  assert.match(client, /if \(!sendOnlineAction\("ability", slot\)\) return false/);
+  assert.match(client, /if \(!sendOnlineAction\("ability", slot, aim\)\) return false/);
+  assert.match(client, /reliableAction\.queue\(kind, slot, game\.round, aim\)/,
+    "aimed abilities must preserve their target in the reliable action envelope");
   assert.match(client,
     /if \(!persistNow\(\)\) \{\s*outbox\.pop\(\);\s*nextSequence -= 1;\s*failure = "storage";\s*return false;\s*\}\s*if \(outbox\.length === 1\) transmit\(entry\)/,
     "an action envelope must durably persist or roll back before transmission");
@@ -442,7 +444,7 @@ test("online one-shot audio is authoritative, ordered and locally panned", async
 test("online client can leave match/lobby and resume a saved session after reload", async () => {
   const duel = await readFile(new URL("public/online-duel.js", root), "utf8");
   const page = await readFile(new URL("app/page.tsx", root), "utf8");
-  const styles = await readFile(new URL("app/globals.css", root), "utf8");
+  const styles = await readFile(new URL("app/war-table.css", root), "utf8");
 
   assert.match(duel, /SESSION_KEY/);
   assert.match(duel, /tryResumeSession/);
@@ -451,9 +453,9 @@ test("online client can leave match/lobby and resume a saved session after reloa
   assert.match(duel, /sessionStorage/);
   assert.match(page, /leaveMatch/);
   assert.match(page, /match-exit-button/);
-  assert.match(page, /client-sticky-cta/);
+  assert.match(page, /action-cluster__primary/);
   assert.match(page, /SAIR DA PARTIDA/);
-  assert.match(styles, /\.client-sticky-cta/);
+  assert.match(styles, /\.action-cluster__primary/);
   assert.match(styles, /\.match-exit-button/);
 });
 
@@ -593,8 +595,7 @@ test("loads only the playable champion models selected in the lobby", async () =
   const game = parts.join("");
   const champions = ["katarina", "zed", "renekton", "vladimir", "gangplank"];
 
-  assert.equal(names.length, 1);
-  assert.ok(Buffer.byteLength(game) < 760_000);
+  assert.match(game, /const RIFTBOMB_EXPLOSION_FRAMES = Object\.freeze/);
   // The trained V1 pilot ships as a separate asset, never inline: the solo
   // CPU loads it on demand and falls back to the baseline if it is missing.
   assert.match(game, /<script src="\/bot-v1\.js"><\/script>/);

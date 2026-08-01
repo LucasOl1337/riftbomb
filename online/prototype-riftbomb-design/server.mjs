@@ -75,8 +75,6 @@ const server = createServer((request, response) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Riftbomb Design Prototype: http://${host}:${port}/`);
-  console.log("Variantes: ?variant=command | ?variant=cinema | ?variant=warroom");
+  console.log(`Riftbomb War Table: http://${host}:${port}/`);
   console.log("Pressione Ctrl+C para encerrar.");
 });
-

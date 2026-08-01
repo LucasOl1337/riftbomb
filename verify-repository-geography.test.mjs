@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { test } from "node:test";
 import path from "node:path";
 
-const trackedPaths = execFileSync("git", ["ls-files", "-z"], { encoding: "utf8" })
+const trackedPaths = execFileSync(
+  "git",
+  ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+  { encoding: "utf8" },
+)
   .split("\0")
-  .filter(Boolean);
+  .filter((trackedPath) => trackedPath && existsSync(trackedPath));
 
 const isContentPath = (trackedPath) =>
   trackedPath.startsWith("game/arena-appearance/")

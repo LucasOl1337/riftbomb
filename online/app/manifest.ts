@@ -4,12 +4,12 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Riftbomb — Bomber Rift",
     short_name: "Riftbomb",
-    description: "Duelos Bomber Rift offline, locais e online.",
+    description: "Duelos Bomber Rift em fila rápida, convite por link ou treinamento.",
     start_url: "/",
     display: "fullscreen",
     orientation: "landscape",
     background_color: "#03080d",
-    theme_color: "#03080d",
+    theme_color: "#05090c",
     icons: [
       {
         src: "/favicon.svg",
