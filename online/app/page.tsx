@@ -113,10 +113,17 @@ function SectionHeading({
   );
 }
 
-function formatRuntimeStatus(runtime: RuntimeState) {
+function formatRuntimeStatus(runtime: RuntimeState, mode?: ClientMode) {
   if (runtime.tone === "error") {
     if (/not found|expired/i.test(runtime.status)) return "O convite expirou ou não existe mais.";
     if (/already has two|room_full/i.test(runtime.status)) return "O duelo já está com os dois lugares ocupados.";
+    if (/treino local|offline beginGame|start the local/i.test(runtime.status)) {
+      return "Não foi possível iniciar o treino local. Recarregue a página e tente de novo.";
+    }
+    // Sticky online resume failures must not read as “treino precisa de servidor”.
+    if (mode === "solo" || /temporarily unavailable|no longer accepts|session was kept/i.test(runtime.status)) {
+      return "Sessão online anterior falhou. No treino isso não é necessário — clique em Iniciar treino de novo.";
+    }
     return "Não foi possível concluir a conexão. Tente novamente.";
   }
   if (runtime.phase === "boot") return "Preparando a arena e os campeões…";
@@ -243,7 +250,24 @@ export default function Home() {
   function chooseMode(mode: ClientMode) {
     if (inLobby || runtime.matchmaking || runtime.busy) return;
     setActiveMode(mode);
-    if (mode === "solo") setRivalChampion(TRAINING_BOT.champion);
+    if (mode === "solo") {
+      setRivalChampion(TRAINING_BOT.champion);
+      // Drop sticky online-resume error so Treinamento does not look "offline broken".
+      sendCommand("choose-offline");
+      setRuntime((current) =>
+        current.tone === "error"
+          ? {
+              ...current,
+              tone: "ok",
+              status: "Treino local selecionado. Sem servidor necessário.",
+              busy: false,
+              role: "offline",
+              connected: false,
+              matchmaking: false,
+            }
+          : current
+      );
+    }
     if (mode === "friend" && rivalChampion === champion) {
       setRivalChampion(CHAMPIONS.find((item) => item.id !== champion)?.id ?? "zed");
     }
@@ -331,7 +355,12 @@ export default function Home() {
       sendCommand("cancel-quick-match");
       return;
     }
-    if (!bridgeReady || runtime.busy) return;
+    if (!bridgeReady) {
+      setClientNotice("A arena ainda está carregando. Aguarde um instante.");
+      return;
+    }
+    // Solo must not be blocked by a stale "busy" left by failed online resume.
+    if (runtime.busy && activeMode !== "solo") return;
     if (friendHostAwaiting) {
       void copyInvite();
       return;
@@ -358,6 +387,10 @@ export default function Home() {
       return;
     }
 
+    // Solo never waits on online busy flags left by a dead resume attempt.
+    if (runtime.busy && activeMode === "solo") {
+      setRuntime((current) => ({ ...current, busy: false, tone: "ok" }));
+    }
     requestMobileMatchPresentation();
     sendCommand("start-offline", {
       mode: "solo",
@@ -704,7 +737,7 @@ export default function Home() {
               >
                 <div className="action-cluster__status" aria-live="polite">
                   <small>{statusLabel}</small>
-                  <p>{formatRuntimeStatus(runtime)}</p>
+                  <p>{formatRuntimeStatus(runtime, activeMode)}</p>
                 </div>
 
                 {showInviteFallback && runtime.inviteUrl ? (

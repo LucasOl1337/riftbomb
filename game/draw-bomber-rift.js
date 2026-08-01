@@ -4909,9 +4909,10 @@ drawKatarinaFallback(player, t, beat) {
         float sw = sin(uTime * 2.6 + r1 * 41.0 + t * 7.0) * (0.015 + t * 0.02);
         pos.xz += side * sw * uTile;
         // Hard clamp to the cell AABB (matches damageAtCells / applyActiveBlastDamage).
-        float half = uTile * 0.49;
-        pos.x = clamp(pos.x, uOrigin.x - half, uOrigin.x + half);
-        pos.z = clamp(pos.z, uOrigin.z - half, uOrigin.z + half);
+        // "half" is a reserved word in GLSL ES 3.00 — name it cellHalf.
+        float cellHalf = uTile * 0.49;
+        pos.x = clamp(pos.x, uOrigin.x - cellHalf, uOrigin.x + cellHalf);
+        pos.z = clamp(pos.z, uOrigin.z - cellHalf, uOrigin.z + cellHalf);
 
         vec4 clip = uViewProjection * vec4(pos, 1.0);
         gl_Position = clip;

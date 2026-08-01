@@ -340,8 +340,10 @@ test("blast hitbox cells match visual cells for the full blast life (HITBOX_VISU
 test("GPU burst particles are clamped to the blast cell footprint", async () => {
   const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
   assert.match(renderer, /HITBOX_VISUAL_MATCH_V1/);
-  assert.match(renderer, /half = uTile \* 0\.49/);
-  assert.match(renderer, /clamp\(pos\.x, uOrigin\.x - half, uOrigin\.x \+ half\)/);
+  assert.match(renderer, /cellHalf = uTile \* 0\.49/);
+  assert.match(renderer, /clamp\(pos\.x, uOrigin\.x - cellHalf, uOrigin\.x \+ cellHalf\)/);
+  // GLSL ES 3.00 reserves `half` — the clamp variable must never use that name.
+  assert.doesNotMatch(renderer, /float half = uTile/);
   assert.match(renderer, /sheetAlong = \(r1 - 0\.5\) \* 0\.96/);
   assert.doesNotMatch(renderer, /sheetAlong = \(r1 - 0\.5\) \* 1\.04/);
 });

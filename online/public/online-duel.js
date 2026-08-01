@@ -2307,24 +2307,79 @@
   }
 
   async function startOfflineFromClient(payload = {}) {
+    // TRAINING_LOCAL_V1: solo/treino must never depend on São Paulo / WebSocket.
+    // Always hard-reset to intro first so a sticky online resume/error cannot
+    // leave the match engine in a mode that rejects champion/bot selection.
     chooseOffline();
+    returnToSetupState();
+    clearSession();
+    setBusy(false);
+    setStatus("Preparando treino local…", "ok");
+
     const champion = validChampion(payload.champion) ? payload.champion : "katarina";
     const guestChampion = validChampion(payload.guestChampion) ? payload.guestChampion : "zed";
     const arena = validArena(payload.arena) ? payload.arena : ARENAS[0];
+    const botId = typeof payload.bot === "string" ? payload.bot : "";
+
+    game.mode = "intro";
+    game.p2Human = false;
+    game.matchTarget = 3;
+    if (game.presentation) game.presentation.matchTarget = 3;
+
     game.selectChampion(champion);
     if (payload.mode === "local") {
       game.selectChampion2(guestChampion);
       game.activatePlayerTwo();
     } else {
-      game.activateBotOpponent();
-      if (!game.selectBotOpponent(payload.bot)) game.selectChampion2(guestChampion);
+      // Prefer the trained V1 profile; fall back to champion + baseline/V1 policy.
+      let selected = false;
+      try {
+        game.activateBotOpponent();
+        selected = Boolean(botId && game.selectBotOpponent(payload.bot));
+      } catch (error) {
+        console.warn("Bot opponent setup failed; falling back to champion CPU", error);
+      }
+      if (!selected) {
+        game.p2Human = false;
+        game.selectChampion2(guestChampion);
+      }
     }
+
     game.selectArena(arena);
     state.hostChampion = champion;
-    state.guestChampion = game.selectedChampion2;
+    state.guestChampion = game.selectedChampion2 || guestChampion;
     state.arena = arena;
     state.matchTarget = 3;
-    await originalBeginGame();
+    state.role = "offline";
+    state.connected = false;
+    state.rivalConnected = false;
+    state.guestReady = false;
+    state.inviteMode = false;
+    state.inviteUrl = "";
+    state.matchmaking = false;
+    state.quickMatch = false;
+
+    // beginGame toggles UI.start; guard so a missing control cannot abort solo.
+    if (UI.start) {
+      UI.start.disabled = true;
+      UI.start.textContent = "Loading selected arena…";
+    }
+    try {
+      await originalBeginGame();
+    } catch (error) {
+      console.warn("Offline beginGame failed", error);
+      returnToSetupState();
+      setStatus(
+        "Não foi possível iniciar o treino local. Recarregue a página e tente de novo.",
+        "error"
+      );
+      throw error;
+    }
+    if (UI.start) {
+      UI.start.disabled = false;
+      UI.start.textContent = "Match ready";
+    }
+    setStatus("Treino local em andamento.", "ok");
     publishClientState("match");
   }
 
@@ -2390,6 +2445,11 @@
       await startOfflineFromClient(payload);
       return;
     }
+    if (action === "choose-offline" || action === "clear-connection-error") {
+      // War Table "Treinamento" selection: drop sticky online resume errors.
+      chooseOffline();
+      return;
+    }
     if (action === "leave-lobby") {
       leaveOnlineSession({ fromMatch: false });
       return;
@@ -2420,7 +2480,14 @@
       : {};
     void handleClientCommand(message.action, payload).catch((error) => {
       console.warn("Riftbomb client command failed", error);
-      setStatus("Could not complete that client action. Try again.", "error");
+      const offlineAction = message.action === "start-offline" ||
+        message.action === "choose-offline";
+      setStatus(
+        offlineAction
+          ? "Não foi possível iniciar o treino local. Recarregue e tente de novo."
+          : "Could not complete that client action. Try again.",
+        "error"
+      );
     });
   });
 
@@ -2462,3 +2529,6 @@
     });
   }, 120);
 })();
+
+// training-local-v1 2026-08-01T11:49:31.4238391-03:00
+
