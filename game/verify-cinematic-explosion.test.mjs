@@ -229,6 +229,7 @@ test("explodeBomb emits multi-layer fire/smoke particles on the real match path"
   renderer.hitPulse = 0;
   game.grid[5][7] = 2;
   game.destroyBreakable = realDestroyBreakable;
+  game.rollCrateDrop = () => {};
   assert.equal(game.destroyBreakable(5, 7, [1, 0, 0], 1), true);
   assert.equal(shockCalls, 0, "crate break must not spawn the circular post-process shock ring");
   assert.ok(renderer.cameraShake > 0 || renderer.hitPulse > 0, "crate break still kicks the camera");
@@ -258,6 +259,91 @@ test("explodeBomb emits multi-layer fire/smoke particles on the real match path"
     return major > 0.2 && minor / major > 0.65;
   });
   assert.ok(offAxis.length / Math.max(1, game.particles.length) < 0.35, "most sparks stay corridor-aligned");
+});
+
+test("blast hitbox cells match visual cells for the full blast life (HITBOX_VISUAL_MATCH_V1)", async () => {
+  const Game = await loadGameClass();
+  const renderer = {
+    mobilePerf: false,
+    addShock() {},
+    addImpact() {},
+    cameraShake: 0,
+    hitPulse: 0
+  };
+  const game = new Game(renderer, {
+    emitGameEvent() { return false; },
+    effect() {},
+    explosion() {}
+  }, {
+    prepareRound() {},
+    announce() {},
+    update() {},
+    selectChampion() {},
+    finish() {}
+  });
+  game.mode = "playing";
+  for (let r = 1; r < game.rows - 1; r++) {
+    for (let c = 1; c < game.cols - 1; c++) game.grid[r][c] = 0;
+  }
+  game.destroyBreakable = () => false;
+  game.playExplosionAt = () => {};
+
+  // Open lane: bomb at (5,6) range 2 east reaches (5,7)(5,8)
+  const [bx, bz] = game.worldFromCell(5, 6);
+  const bomb = {
+    id: 7, r: 5, c: 6, x: bx, z: bz,
+    age: 2.35, fuse: 2.35, range: 2, ownerId: 1, exploded: false
+  };
+  game.bombs = [bomb];
+  game.players = [
+    { id: 1, name: "P1", alive: true, x: bx, z: bz, invulnerable: 0, dashing: 0, shield: 0, health: 100 },
+    {
+      id: 2, name: "P2", alive: true,
+      // Safe cell at detonation (off the cross), then walks into a live arm.
+      ...(() => {
+        const [x, z] = game.worldFromCell(3, 3);
+        return { x, z };
+      })(),
+      invulnerable: 0, dashing: 0, shield: 0, health: 100
+    }
+  ];
+  game.hitContestant = function (player) {
+    player.alive = false;
+    player.health = 0;
+  };
+
+  game.explodeBomb(bomb);
+  assert.equal(game.players[0].alive, false, "occupant of core cell dies at detonation");
+  assert.equal(game.players[1].alive, true, "player outside blast is safe at detonation");
+  assert.ok(game.blasts.some((b) => b.r === 5 && b.c === 7), "arm cell is a visual blast");
+  assert.ok(game.blasts.every((b) => b.life === 0.72), "visual life is the hitbox window");
+
+  // Mid-life: walk into an arm cell that is still drawing fire.
+  const [armX, armZ] = game.worldFromCell(5, 7);
+  game.players[1].x = armX;
+  game.players[1].z = armZ;
+  game.players[1].alive = true;
+  game.players[1].health = 100;
+  game.applyActiveBlastDamage();
+  assert.equal(game.players[1].alive, false, "walking into live blast cell kills (visual==hitbox)");
+
+  // After blasts expire, same cell is safe.
+  game.blasts = [];
+  game.players[1].alive = true;
+  game.players[1].health = 100;
+  game.players[1].x = armX;
+  game.players[1].z = armZ;
+  game.applyActiveBlastDamage();
+  assert.equal(game.players[1].alive, true, "no damage when blasts are gone from the board");
+});
+
+test("GPU burst particles are clamped to the blast cell footprint", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  assert.match(renderer, /HITBOX_VISUAL_MATCH_V1/);
+  assert.match(renderer, /half = uTile \* 0\.49/);
+  assert.match(renderer, /clamp\(pos\.x, uOrigin\.x - half, uOrigin\.x \+ half\)/);
+  assert.match(renderer, /sheetAlong = \(r1 - 0\.5\) \* 0\.96/);
+  assert.doesNotMatch(renderer, /sheetAlong = \(r1 - 0\.5\) \* 1\.04/);
 });
 
 test("GPU burst fire ramp bans pure deep-red cool tails (NO_RED_RIM_V1)", async () => {

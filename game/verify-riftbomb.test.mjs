@@ -1520,7 +1520,7 @@ test("the authored black bomb and explosion sequence drive live gameplay", async
   assert.match(appearance, /function drawCorridorArm/);
   assert.match(appearance, /function pickMorph/);
   assert.match(appearance, /SMOKE/);
-  assert.match(appearance, /fireball|HOT_ORANGE|FIRE_MID|sparkN|drawFireBar|CORRIDOR_CROSS|CINEMATIC_EXPLOSION_V3/i);
+  assert.match(appearance, /PARTICLES_ONLY_V1|drawExplosionBurst|HOT_ORANGE|CORRIDOR_CROSS|CINEMATIC_EXPLOSION_V3/i);
   assert.match(appearance, /ONE clean textured sphere|no stacked petals/i);
   assert.match(renderer, /bombSphere/);
   assert.match(renderer, /uMapId > 6\.5 && uMapId < 7\.5/);

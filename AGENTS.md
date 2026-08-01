@@ -97,6 +97,18 @@ Dois helpers no renderer (`draw-bomber-rift.js`):
 
 Testes: `game/verify-cinematic-explosion.test.mjs`, `game/verify-rift-sfx.test.mjs`.
 
+### Hitbox ↔ visual (HITBOX_VISUAL_MATCH_V1)
+
+| Eixo | Regra |
+|------|--------|
+| **Células letais** | As mesmas `blasts[]` desenhadas (`r,c` por célula da cruz) |
+| **Alcance** | `1..bomb.range` por eixo, para em parede (`grid===1`) e caixote (`grid===2`) |
+| **Tempo** | Dano **enquanto** `blast.age < blast.life` (0,72 s), não só no frame da detonation — `applyActiveBlastDamage()` no `update` |
+| **Espaço** | Partículas GPU clampadas ao AABB da célula (`±0.49 * tile` do centro); sparks CPU com `homeHalf` |
+| **Teste** | `verify-cinematic-explosion.test.mjs` (walk-in mid-life + clamp shader) |
+
+Desalinhamentos proibidos: fogo pintado em célula segura; célula letal sem fogo; dano one-shot com fogo ainda no chão.
+
 ### Visual = 100% partículas (PARTICLES_ONLY_V1)
 
 A explosão da bomba **não** desenha mesh de fogo:

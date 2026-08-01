@@ -2898,6 +2898,26 @@
         this.scheduleRoundDecision();
       }
 
+      /**
+       * HITBOX_VISUAL_MATCH_V1 — while a blast cell is alive on screen, its
+       * grid cell remains lethal. Damage is no longer a one-shot at detonation
+       * only: walking into the fire corridor during `blast.life` (0.72s) kills,
+       * matching the particle display which is drawn for the same cells/time.
+       */
+      applyActiveBlastDamage() {
+        if (!this.blasts.length || this.mode !== "playing") return;
+        let hit = false;
+        for (const player of this.players) {
+          if (!player.alive) continue;
+          const cell = this.cellFromWorld(player.x, player.z);
+          const blast = this.blasts.find((entry) => entry.r === cell.r && entry.c === cell.c);
+          if (!blast) continue;
+          this.hitContestant(player, { ownerId: blast.ownerId });
+          hit = true;
+        }
+        if (hit) this.scheduleRoundDecision();
+      }
+
       hitContestant(player, bomb) {
         if (!this.isContestantTargetable(player) || player.invulnerable > 0 ||
             player.dashing > 0 || this.mode !== "playing") return;
@@ -3134,23 +3154,32 @@
           : [[dr || 0, dc || (Math.abs(dr) + Math.abs(dc) === 0 ? 1 : 0)]];
         // Normalize single axis if zero
         if (!core && axes[0][0] === 0 && axes[0][1] === 0) axes[0] = [0, 1];
+        // HITBOX_VISUAL_MATCH_V1: keep CPU sparks inside ~one cell so they do not
+        // paint fire over safe tiles outside the lethal blast footprint.
+        const half = this.tile * 0.42;
         for (let i = 0; i < limit; i++) {
           const axis = axes[i % axes.length];
-          const along = (0.4 + this.random() * 2.4) * (this.random() < 0.5 ? 1 : -1);
-          const side = (this.random() - 0.5) * 0.55;
+          const along = (0.08 + this.random() * 0.55) * (this.random() < 0.5 ? 1 : -1);
+          const side = (this.random() - 0.5) * 0.35;
           // axis[0]=dr (world Z), axis[1]=dc (world X)
           const vx = axis[1] * along + axis[0] * side;
           const vz = axis[0] * along + axis[1] * side;
+          const ox = (this.random() - 0.5) * half;
+          const oz = (this.random() - 0.5) * half;
           this.particles.push({
-            x, y, z,
+            x: x + ox, y, z: z + oz,
             vx,
-            vy: 0.6 + this.random() * 2.2,
+            vy: 0.5 + this.random() * 1.6,
             vz,
             age: 0,
             life: life * (0.7 + this.random() * 0.5) * (mobile ? 0.82 : 1),
             size: size * (0.55 + this.random() * 0.55),
             alpha: 0.55 + this.random() * 0.35,
-            color
+            color,
+            // Optional home cell clamp during integrate (visual == hitbox cell).
+            homeX: x,
+            homeZ: z,
+            homeHalf: half
           });
         }
         const maxParticles = mobile ? 110 : 520;
@@ -3168,6 +3197,12 @@
           particle.vy -= 5.8 * dt;
           particle.vx *= Math.pow(0.3, dt);
           particle.vz *= Math.pow(0.3, dt);
+          // HITBOX_VISUAL_MATCH_V1: corridor bomb sparks stay in their blast cell.
+          if (Number.isFinite(particle.homeX) && Number.isFinite(particle.homeHalf)) {
+            const half = particle.homeHalf;
+            particle.x = clamp(particle.x, particle.homeX - half, particle.homeX + half);
+            particle.z = clamp(particle.z, particle.homeZ - half, particle.homeZ + half);
+          }
         }
         this.particles = this.particles.filter((particle) => particle.age < particle.life && particle.y > -0.2);
       }
@@ -3207,6 +3242,8 @@
         this.updateGangplank(dt);
         this.processAbilityBuffer(dt);
         this.updateBombs(dt);
+        // After movement + new detonations: lethal cells == visible blast cells.
+        this.applyActiveBlastDamage();
         this.collectPickups();
 
         if (this.roundDecisionTimer >= 0) {

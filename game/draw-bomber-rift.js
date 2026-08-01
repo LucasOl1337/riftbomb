@@ -4888,29 +4888,30 @@ drawKatarinaFallback(player, t, beat) {
         }
         vec2 side = vec2(-axis.y, axis.x);
 
-        // Flame sheet: particles are distributed across the corridor rectangle
-        // of THIS cell and flicker in place. Jets from the cell center read as
-        // a radial fireball — banned in Bomberman.
-        float sheetAlong = (r1 - 0.5) * 1.04;
-        float sheetSide = (r2 - 0.5) * 0.55;
+        // HITBOX_VISUAL_MATCH_V1: fill THIS grid cell only (±0.5 tile).
+        // No spill into safe neighbors — lethal cells == painted cells.
+        float sheetAlong = (r1 - 0.5) * 0.96;
+        float sheetSide = (r2 - 0.5) * 0.96;
         vec3 pos = uOrigin;
         pos.xz += (axis * sheetAlong + side * sheetSide) * uTile;
 
-        // In-place upward flicker + slight outward drift. A spark subset
-        // darts along the corridor; tongues rise tall but stay corridor-locked.
+        // Tiny in-cell drift/flicker only — never leave the blast footprint.
         float isSpark = step(0.86, r4);
         float isTongue = step(0.74, r4) * (1.0 - isSpark);
-        float drift = 0.2 + r3 * 0.6 + isSpark * (1.6 + r3 * 2.2);
-        float travel = (1.0 - exp(-seconds * (smoke > 0.5 ? 1.2 : 2.2)))
-          * uTile * (smoke > 0.5 ? 0.16 : (0.2 + isSpark * 0.3));
+        float drift = 0.08 + r3 * 0.18 + isSpark * 0.22;
+        float travel = (1.0 - exp(-seconds * (smoke > 0.5 ? 1.0 : 1.8)))
+          * uTile * (smoke > 0.5 ? 0.04 : (0.05 + isSpark * 0.06));
         pos.xz += axis * drift * travel;
         float lift = smoke > 0.5 ? 0.8 + r3 * 1.2
           : (0.5 + r3 * 1.2 + isTongue * (1.4 + r3 * 1.8));
         pos.y += 0.05 + lift * seconds - (smoke > 0.5 ? 0.2 : 2.2) * seconds * seconds;
         pos.y = max(pos.y, 0.035);
-        // Small corridor-locked wobble — never wide enough to round the cross.
-        float sw = sin(uTime * 2.6 + r1 * 41.0 + t * 7.0) * (0.03 + t * 0.05);
+        float sw = sin(uTime * 2.6 + r1 * 41.0 + t * 7.0) * (0.015 + t * 0.02);
         pos.xz += side * sw * uTile;
+        // Hard clamp to the cell AABB (matches damageAtCells / applyActiveBlastDamage).
+        float half = uTile * 0.49;
+        pos.x = clamp(pos.x, uOrigin.x - half, uOrigin.x + half);
+        pos.z = clamp(pos.z, uOrigin.z - half, uOrigin.z + half);
 
         vec4 clip = uViewProjection * vec4(pos, 1.0);
         gl_Position = clip;
