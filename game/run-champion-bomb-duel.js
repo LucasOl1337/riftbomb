@@ -2804,8 +2804,8 @@
           this.blasts.push({
             ...cell,
             age: 0,
-            // Longer window so multi-frame Imagine morph + dense sparks read clearly.
-            life: 0.72,
+            // Fire-corridor window: punch + strong fire + short smoke (visual == hitbox).
+            life: 0.5,
             source: bomb.id,
             ownerId: bomb.ownerId,
             originR: bomb.r,
@@ -2815,16 +2815,17 @@
           // Dense corridor-locked sparks — never radial sphere cloud.
           // NO_RED_RIM_V1: amber/orange/smoke only — never pure deep-red layers
           // (those read as a red border under additive soft sprites).
+          // Soft CPU sparks must finish inside blast life (0.5s) — no hanging tail.
           if (cell.core) {
-            this.spawnCorridorParticles(x, 0.34, z, [1, 0.38, 0.05], 42, 0.48, 0.07, 0, 0, true);
-            this.spawnCorridorParticles(x, 0.26, z, [0.98, 0.24, 0.03], 34, 0.56, 0.06, 0, 0, true);
-            this.spawnCorridorParticles(x, 0.2, z, [0.62, 0.16, 0.03], 26, 0.62, 0.05, 0, 0, true);
-            this.spawnCorridorParticles(x, 0.44, z, [0.08, 0.08, 0.09], 20, 0.85, 0.09, 0, 0, true);
-            this.spawnCorridorParticles(x, 0.3, z, [1, 0.55, 0.2], 18, 0.4, 0.045, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.34, z, [1, 0.38, 0.05], 42, 0.30, 0.07, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.26, z, [0.98, 0.24, 0.03], 34, 0.34, 0.06, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.2, z, [0.62, 0.16, 0.03], 26, 0.38, 0.05, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.44, z, [0.08, 0.08, 0.09], 20, 0.45, 0.09, 0, 0, true);
+            this.spawnCorridorParticles(x, 0.3, z, [1, 0.55, 0.2], 18, 0.26, 0.045, 0, 0, true);
           } else {
-            this.spawnCorridorParticles(x, 0.28, z, [1, 0.34, 0.04], 22, 0.48, 0.06, cell.dr, cell.dc, false);
-            this.spawnCorridorParticles(x, 0.22, z, [0.95, 0.22, 0.03], 16, 0.55, 0.05, cell.dr, cell.dc, false);
-            this.spawnCorridorParticles(x, 0.18, z, [0.62, 0.16, 0.03], 12, 0.6, 0.045, cell.dr, cell.dc, false);
+            this.spawnCorridorParticles(x, 0.28, z, [1, 0.34, 0.04], 22, 0.30, 0.06, cell.dr, cell.dc, false);
+            this.spawnCorridorParticles(x, 0.22, z, [0.95, 0.22, 0.03], 16, 0.34, 0.05, cell.dr, cell.dc, false);
+            this.spawnCorridorParticles(x, 0.18, z, [0.62, 0.16, 0.03], 12, 0.36, 0.045, cell.dr, cell.dc, false);
           }
           for (const other of this.bombs) {
             if (!other.exploded && other.r === cell.r && other.c === cell.c) other.age = other.fuse;
@@ -2841,7 +2842,7 @@
         this.playExplosionAt(bomb, clamp(0.7 + bomb.range * 0.08, 0.7, 1.12), {
           sourceId: bomb.id,
           // Keep sample window locked to the fire-corridor visual (blasts[].life).
-          visualLife: 0.72
+          visualLife: 0.5
         });
         this.damageAtCells(cells, bomb);
       }
@@ -2901,7 +2902,7 @@
       /**
        * HITBOX_VISUAL_MATCH_V1 — while a blast cell is alive on screen, its
        * grid cell remains lethal. Damage is no longer a one-shot at detonation
-       * only: walking into the fire corridor during `blast.life` (0.72s) kills,
+       * only: walking into the fire corridor during `blast.life` (0.5s) kills,
        * matching the particle display which is drawn for the same cells/time.
        */
       applyActiveBlastDamage() {
@@ -3168,11 +3169,12 @@
           const oz = (this.random() - 0.5) * half;
           this.particles.push({
             x: x + ox, y, z: z + oz,
-            vx,
-            vy: 0.5 + this.random() * 1.6,
-            vz,
+            // Snappier corridor sparks so the soft layer keeps pace with GPU burst.
+            vx: vx * 1.35,
+            vy: 0.75 + this.random() * 2.1,
+            vz: vz * 1.35,
             age: 0,
-            life: life * (0.7 + this.random() * 0.5) * (mobile ? 0.82 : 1),
+            life: life * (0.7 + this.random() * 0.45) * (mobile ? 0.82 : 1),
             size: size * (0.55 + this.random() * 0.55),
             alpha: 0.55 + this.random() * 0.35,
             color,

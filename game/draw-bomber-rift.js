@@ -3991,7 +3991,8 @@ drawKatarinaFallback(player, t, beat) {
        * Corridor-locked to the Bomberman cross — never a radial cloud.
        */
       drawExplosionBurst(x, z, dr, dc, phase, life, tile, core, seed, time) {
-        if (!this.burstProgram || modelReviewMode || phase <= 0 || phase >= 1) return;
+        // Allow phase 0 so detonation-frame ignition still draws (was phase<=0 skip).
+        if (!this.burstProgram || modelReviewMode || phase < 0 || phase >= 1) return;
         const gl = this.gl;
         gl.enable(gl.BLEND);
         gl.depthMask(false);
@@ -4847,9 +4848,11 @@ drawKatarinaFallback(player, t, beat) {
       }
     `;
 
-    // EXPLOSION_GPU_BURST_V1: vertex shader owns the whole particle life.
-    // Emission window -> corridor-locked travel (ease-out drag) -> vertical
-    // lift/gravity -> oscillating swirl (never accumulates, like mangekyo).
+    // EXPLOSION_GPU_BURST_V1 + SNAPP_BURST_0_5_V1:
+    // Vertex shader owns the whole particle life. Emission is front-loaded so
+    // flash → fire → ember → smoke all complete inside blast phase 0..1
+    // (blast life 0.5s). Motion uses a fixed designSeconds curve, NOT span*uLife,
+    // so shortening the corridor window never truncates the travel path.
     Renderer.burstVertex = `#version 300 es
       precision highp float;
       in vec4 aRnd;
@@ -4872,12 +4875,22 @@ drawKatarinaFallback(player, t, beat) {
         float r1 = rnd.x, r2 = rnd.y, r3 = rnd.z, r4 = rnd.w;
         float smoke = uSmoke;
 
-        float birth = smoke > 0.5 ? 0.2 + r1 * 0.4 : r1 * 0.45;
-        float span = smoke > 0.5 ? 0.55 + r2 * 0.35 : 0.4 + r2 * 0.45;
-        float t = (uPhase - birth) / span;
+        // SNAPP_BURST_0_5_V1: birth early, span long enough that t→1 before phase ends.
+        // Fire: almost all born by phase ~0.08, done by ~0.9.
+        // Smoke: slight lag after the punch, still finishes inside the blast window.
+        float birth = smoke > 0.5 ? 0.02 + r1 * 0.14 : r1 * 0.07;
+        float span = smoke > 0.5 ? 0.70 + r2 * 0.24 : 0.62 + r2 * 0.30;
+        float t = (uPhase - birth) / max(span, 0.001);
         float alive = step(0.0, t) * (1.0 - step(1.0, t));
         t = clamp(t, 0.0, 1.0);
-        float seconds = t * span * uLife;
+        // Full spatial path over particle life (independent of absolute uLife).
+        // designSeconds keeps lift/travel snappy inside the 0.5s corridor.
+        float designSeconds = smoke > 0.5 ? 0.40 : 0.32;
+        float seconds = t * designSeconds;
+        // Keep uLife referenced so optimizers/uniforms stay live; mild speed-up
+        // when blast is shorter than the classic 0.72 design window.
+        float tempo = clamp(0.72 / max(uLife, 0.25), 1.0, 1.85);
+        seconds *= tempo;
 
         vec2 axis = uAxis;
         if (uCore > 0.5) {
@@ -4899,14 +4912,14 @@ drawKatarinaFallback(player, t, beat) {
         float isSpark = step(0.86, r4);
         float isTongue = step(0.74, r4) * (1.0 - isSpark);
         float drift = 0.08 + r3 * 0.18 + isSpark * 0.22;
-        float travel = (1.0 - exp(-seconds * (smoke > 0.5 ? 1.0 : 1.8)))
-          * uTile * (smoke > 0.5 ? 0.04 : (0.05 + isSpark * 0.06));
+        float travel = (1.0 - exp(-seconds * (smoke > 0.5 ? 2.6 : 4.4)))
+          * uTile * (smoke > 0.5 ? 0.045 : (0.055 + isSpark * 0.07));
         pos.xz += axis * drift * travel;
-        float lift = smoke > 0.5 ? 0.8 + r3 * 1.2
-          : (0.5 + r3 * 1.2 + isTongue * (1.4 + r3 * 1.8));
-        pos.y += 0.05 + lift * seconds - (smoke > 0.5 ? 0.2 : 2.2) * seconds * seconds;
+        float lift = smoke > 0.5 ? 1.1 + r3 * 1.5
+          : (0.7 + r3 * 1.5 + isTongue * (1.8 + r3 * 2.1));
+        pos.y += 0.05 + lift * seconds - (smoke > 0.5 ? 0.35 : 3.4) * seconds * seconds;
         pos.y = max(pos.y, 0.035);
-        float sw = sin(uTime * 2.6 + r1 * 41.0 + t * 7.0) * (0.015 + t * 0.02);
+        float sw = sin(uTime * 4.2 + r1 * 41.0 + t * 11.0) * (0.015 + t * 0.022);
         pos.xz += side * sw * uTile;
         // Hard clamp to the cell AABB (matches damageAtCells / applyActiveBlastDamage).
         // "half" is a reserved word in GLSL ES 3.00 — name it cellHalf.
@@ -4924,8 +4937,9 @@ drawKatarinaFallback(player, t, beat) {
         gl_PointSize = alive * clamp(size * uResolution.y / max(clip.w, 0.1),
           0.0, smoke > 0.5 ? 260.0 : 220.0);
 
-        float fadeIn = smoothstep(0.0, smoke > 0.5 ? 0.12 : 0.03, t);
-        float fadeOut = 1.0 - smoothstep(smoke > 0.5 ? 0.55 : 0.6, 1.0, t);
+        // Faster fades so flash/punch/out all land inside the short blast window.
+        float fadeIn = smoothstep(0.0, smoke > 0.5 ? 0.08 : 0.02, t);
+        float fadeOut = 1.0 - smoothstep(smoke > 0.5 ? 0.48 : 0.52, 1.0, t);
         vAlpha = alive * fadeIn * fadeOut
           * (smoke > 0.5 ? 0.2 : (0.045 + heat * 0.06) * (1.0 - uCore * 0.25));
 

@@ -469,14 +469,14 @@ test("arena blasts prefer the packaged explosion sample when it is decoded", () 
     throw new Error("procedural arena stack must not run when the sample plays");
   };
 
-  sfx.explosion(1, { profile: "arena", pan: 0.2, visualLife: 0.72 });
+  sfx.explosion(1, { profile: "arena", pan: 0.2, visualLife: 0.5 });
 
   assert.equal(samples.length, 1);
   assert.equal(samples[0].name, "explosion");
   assert.equal(samples[0].bus, "explosion");
   assert.equal(samples[0].pan, 0.2);
-  assert.ok(samples[0].duration <= 0.72 + 1e-6, "sample must not outlive the blast visual");
-  assert.ok(samples[0].duration >= 0.5, "sample still covers the fire corridor window");
+  assert.ok(samples[0].duration <= 0.5 + 1e-6, "sample must not outlive the blast visual");
+  assert.ok(samples[0].duration >= 0.45, "sample still covers the fire corridor window");
   assert.ok(samples[0].fadeOut <= samples[0].duration * 0.25 + 1e-6, "fade stays inside the visual window");
   assert.equal(tones.length, 1, "sample path keeps a thin sub bed");
   assert.equal(tones[0].bus, "explosion");
