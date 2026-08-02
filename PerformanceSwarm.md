@@ -2,21 +2,33 @@
 
 ## Objetivo do enxame
 
-Evoluir a performance do Riftbomb em até 20 rodadas sequenciais, com ganhos objetivos em tempo, peso, CPU/memória, rede, build ou percepção de velocidade, sem alterar regras de negócio ou reduzir garantias de segurança.
+Executar um novo ciclo contínuo de performance com **rodada 0 de consolidação e 200 rodadas sequenciais de melhoria**, com ganhos objetivos em tempo, peso, CPU/memória, rede, build ou percepção de velocidade, sem alterar regras de negócio ou reduzir garantias de segurança.
 
 ## Estado sequencial
 
-- Rodada atual: **20/20 — Polimento final e relatório (concluída)**
-- Última rodada concluída: **20/20 — Polimento final e relatório**
-- Próxima rodada planejada: **ciclo sequencial concluído; aguardar coletor humano**
-- Worktree isolada: `C:/Users/user/.codex/worktrees/r20p/riftbomb`
-- Branch local: `automation/perf-sequential-r20-final-report`
-- Base: `8584b6b89ed7c5d43006c7ea6d2784ae2204afc0`
-- Runtime medido: Node `v24.14.0`, npm `11.18.0`, Windows/PowerShell; build online sob WSL Node `v22.22.1`
+- Ciclo atual: **2 — 0..200**
+- Rodada atual: **0/200 — Consolidação do ciclo anterior (em andamento)**
+- Última rodada concluída: **ciclo 1, rodada 20/20**
+- Próxima rodada planejada: **1/200 — revalidar baseline no estado consolidado e publicado**
+- Worktree isolada: `C:/Users/user/.codex/worktrees/b29b/riftbomb`
+- Branch local: `automation/perf-consolidate-200`
+- Base do novo ciclo: `9cadeff` + ancestralidade do tip real `d52bbbf`
+- Runtime alvo: Node/npm local, Worker Cloudflare e servidor autoritativo; versões serão fixadas pela rodada 1
 
 ## Reivindicação ativa
 
-Nenhuma. A rodada 20 e o ciclo sequencial foram concluídos; o ledger está liberado para o coletor humano.
+Rodada 0/200 — consolidação e reinicialização. Arquivos pretendidos: `PerformanceSwarm.md` e artefatos gerados pelos builds obrigatórios. Intenção: preservar o produto atual, consolidar a ancestralidade dos 20 trabalhos anteriores, validar, publicar e iniciar o ciclo 0..200. Risco de conflito: alto, pois o produto evoluiu em paralelo. Risco de regressão: médio, mitigado por testes raiz/online/servidor, lint, prova do manifest live e verificação de marcadores. Medição: gates completos, hashes Git e SHA-256 do artefato publicado.
+
+## Regra sequencial do ciclo 2 — 0..200
+
+- A rodada **0** consolida o ciclo anterior, estabelece a base publicada e abre este ledger.
+- As rodadas **1..200** usam dez macrociclos de 20 áreas. Para uma rodada `N`, o macrociclo é `ceil(N / 20)` e a área é `((N - 1) mod 20) + 1`.
+- As 20 áreas continuam sendo: baseline; gargalos; bundle; render; assets; rede/cache; terceiros; API; banco; cache de aplicação; concorrência; cold start; build/CI; CPU/memória; observabilidade; segurança; mobile/rede lenta; regressão; top wins; relatório do macrociclo.
+- **20/200 não encerra o enxame.** Depois dela vem 21/200. O único encerramento automático permitido é **200/200**.
+- Cada sessão conclui exatamente uma rodada, com claim prévio, evidência antes/depois, validação proporcional e commit local seletivo.
+- O scorecard do ciclo 1 abaixo é baseline herdado, não licença para repetir trabalho; cada macrociclo deve procurar o próximo ganho real.
+
+## Ciclo 1 arquivado — rodadas 1..20 concluídas
 
 ## Baseline inicial
 
