@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-07-31
+
+### Release v1.4.0
+
+- Added authored Katarina dagger presentation, the depth-tested Nacre Hollow
+  arena scene and the black-bomb material/reference pipeline.
+- Consolidated the post-v1.3.0 visual stream with the full 20-round performance
+  program and its executable budgets.
+- Added complete player-facing, agent-attribution and operational notes in
+  [`PATCH_NOTES_V1.4.0.md`](PATCH_NOTES_V1.4.0.md).
+
 ## 2026-07-30
 
 ### Release v1.3.0
