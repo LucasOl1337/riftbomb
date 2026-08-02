@@ -77,7 +77,7 @@ function stubMatch(overrides = {}) {
         passOwners: new Set([2])
       }
     ],
-    blasts: [{ r: 5, c: 6, age: 0.1, life: 0.58, ownerId: 2, source: 1, core: true }],
+    blasts: [{ r: 5, c: 6, age: 0.1, life: 0.5, ownerId: 2, source: 1, core: true }],
     pickups: [{ r: 3, c: 3, x: 0, z: 0, type: "range" }],
     ...overrides
   };

@@ -2804,8 +2804,8 @@
           this.blasts.push({
             ...cell,
             age: 0,
-            // Longer window so multi-frame Imagine morph + dense sparks read clearly.
-            life: 0.72,
+            // Fire-corridor window: punch + strong fire + short smoke (visual == hitbox).
+            life: 0.5,
             source: bomb.id,
             ownerId: bomb.ownerId,
             originR: bomb.r,
@@ -2841,7 +2841,7 @@
         this.playExplosionAt(bomb, clamp(0.7 + bomb.range * 0.08, 0.7, 1.12), {
           sourceId: bomb.id,
           // Keep sample window locked to the fire-corridor visual (blasts[].life).
-          visualLife: 0.72
+          visualLife: 0.5
         });
         this.damageAtCells(cells, bomb);
       }
@@ -2901,7 +2901,7 @@
       /**
        * HITBOX_VISUAL_MATCH_V1 — while a blast cell is alive on screen, its
        * grid cell remains lethal. Damage is no longer a one-shot at detonation
-       * only: walking into the fire corridor during `blast.life` (0.72s) kills,
+       * only: walking into the fire corridor during `blast.life` (0.5s) kills,
        * matching the particle display which is drawn for the same cells/time.
        */
       applyActiveBlastDamage() {

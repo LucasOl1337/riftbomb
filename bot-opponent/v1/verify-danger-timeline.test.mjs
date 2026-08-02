@@ -83,15 +83,15 @@ test("cells out of the blast path are never deadly; a crate shields what is behi
 });
 
 test("an active blast is deadly now until the rest of its life", () => {
-  const view = makeView({ blasts: [{ r: 5, c: 6, age: 0.2, life: 0.58 }] });
+  const view = makeView({ blasts: [{ r: 5, c: 6, age: 0.2, life: 0.5 }] });
   const timeline = dangerTimeline(view);
 
   close(timeline.cells[5][6].deadlyFrom, 0, "blast cells are deadly from now");
-  close(timeline.cells[5][6].deadlyUntil, 0.38, "until the remainder of the blast life");
+  close(timeline.cells[5][6].deadlyUntil, 0.3, "until the remainder of the blast life");
   assert.equal(isDeadlyAt(timeline, 5, 6, 0), true);
-  assert.equal(isDeadlyAt(timeline, 5, 6, 0.4), false);
+  assert.equal(isDeadlyAt(timeline, 5, 6, 0.35), false);
   assert.equal(safeWindowAfter(timeline, 5, 6, 0), 0, "no safe window inside the blast");
-  assert.equal(safeWindowAfter(timeline, 5, 6, 0.4), Infinity, "safe forever once it passed");
+  assert.equal(safeWindowAfter(timeline, 5, 6, 0.35), Infinity, "safe forever once it passed");
 
   // Blast entries without age/life (older call sites) default to a fresh blast.
   const fresh = dangerTimeline(makeView({ blasts: [{ r: 5, c: 6 }] }));
@@ -151,7 +151,7 @@ test("escapePlan crosses a lane it has time for instead of freezing on binary da
 
 test("escapePlan waits out a closing cell on a safe one instead of stepping in", () => {
   // Corridor: the only west exit (r5 c5) sits under an active blast until
-  // 0.58s; the self cell stays safe until 2.0s. The plan holds ~0.13s and
+  // 0.5s; the self cell stays safe until 2.0s. The plan holds ~0.05s and
   // steps in right after the blast ends.
   const view = makeView({
     grid: corridorGrid(),
@@ -163,7 +163,7 @@ test("escapePlan waits out a closing cell on a safe one instead of stepping in",
   assert.equal(plan.reachedRefuge, true);
   assert.deepEqual(plan.refuge, { r: 5, c: 5 }, "the blast cell is a refuge once it clears");
   assert.deepEqual(plan.step, { dx: 0, dz: 0 }, "hold: the first move is only safe later");
-  close(plan.hold, 0.58 - 0.45, "holds until the exit crossing fits");
+  close(plan.hold, 0.5 - 0.45, "holds until the exit crossing fits");
 });
 
 test("escapePlan least-worst fallback holds on the cell with the most time left", () => {

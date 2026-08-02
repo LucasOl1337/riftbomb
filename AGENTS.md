@@ -50,14 +50,14 @@ Em `game/run-champion-bomb-duel.js` → `explodeBomb`:
 | Conceito | Valor | Onde |
 |----------|--------|------|
 | Células de blast | `blasts[]` com `core` + braços `dr/dc` | `explodeBomb` |
-| **Duração da animação** | **`life: 0.72`** | cada blast cell |
+| **Duração da animação** | **`life: 0.5`** | cada blast cell |
 | Remoção | `age >= life` no update | o fogo some do tabuleiro |
 | Desenho | `RIFTBOMB_BOMB_APPEARANCE.drawExplosion` | `draw-black-bomb.js` |
 | Partículas GPU | `renderer.drawExplosionBurst` (cruz, não nuvem radial) | `draw-bomber-rift.js` |
 
-Fases aproximadas (`phase = age / life`, life = 0.72 s):
+Fases aproximadas (`phase = age / life`, life = 0.5 s):
 
-- **0–10%** (~0–0,07 s): flash de ignição
+- **0–10%** (~0–0,05 s): flash de ignição
 - **~5–85%**: fogo / pico da cruz
 - **~45–100%**: fumaça e saída
 
@@ -72,9 +72,9 @@ Se mudar `life`, **atualize o áudio na mesma mudança** (`visualLife` / default
 | Proveniência | `game/arena-appearance/audio/PROVENANCE.md` |
 | Bundle | `package-arena-sfx.mjs` → `load-arena-sfx.js` (`RIFTBOMB_ARENA_SFX_SOURCES`) |
 | Runtime | `play-rift-sfx.js` profile **`arena`**: toca sample se decodificado; senão synth |
-| **Duração de playback** | **≤ life visual (0,72 s)** — nunca deixar o sample de 3+ s tocar inteiro |
-| API | `playExplosionAt(..., { sourceId, visualLife: 0.72 })` |
-| Chain / secondary | janela mais curta (~0,48 s) para não empilhar rabo |
+| **Duração de playback** | **≤ life visual (0,5 s)** — nunca deixar o sample de 3+ s tocar inteiro |
+| API | `playExplosionAt(..., { sourceId, visualLife: 0.5 })` |
+| Chain / secondary | janela mais curta (~0,35 s) para não empilhar rabo |
 | Champions | profiles (`powder`, `shadow`, `blood`, …) continuam sintéticos / banks próprios |
 
 **Regra de ouro:** quando a animação da blast some, o som da explosão também some. Arquivo longo no disco é ok; o **envelope de playback** é que importa.
@@ -103,7 +103,7 @@ Testes: `game/verify-cinematic-explosion.test.mjs`, `game/verify-rift-sfx.test.m
 |------|--------|
 | **Células letais** | As mesmas `blasts[]` desenhadas (`r,c` por célula da cruz) |
 | **Alcance** | `1..bomb.range` por eixo, para em parede (`grid===1`) e caixote (`grid===2`) |
-| **Tempo** | Dano **enquanto** `blast.age < blast.life` (0,72 s), não só no frame da detonation — `applyActiveBlastDamage()` no `update` |
+| **Tempo** | Dano **enquanto** `blast.age < blast.life` (0,5 s), não só no frame da detonation — `applyActiveBlastDamage()` no `update` |
 | **Espaço** | Partículas GPU clampadas ao AABB da célula (`±0.49 * tile` do centro); sparks CPU com `homeHalf` |
 | **Teste** | `verify-cinematic-explosion.test.mjs` (walk-in mid-life + clamp shader) |
 
@@ -166,7 +166,7 @@ Mudou SFX/VFX/regras de client → **novo sha no manifest live** ou o patch não
 
 1. Sample/VFX só no working tree → site antigo no bombpvp.com.
 2. Cortar `addShock` só na bomba e deixar caixote com `addShock` → anel volta no blast real.
-3. Tocar sample de vários segundos enquanto o blast vive 0,72 s → áudio “atrasado” / rabo.
+3. Tocar sample de vários segundos enquanto o blast vive 0,5 s → áudio “atrasado” / rabo.
 4. Declarar pronto sem provar o artifact em `https://bombpvp.com/riftbomb-parts/manifest.json`.
 5. Cool fire / heat bed em vermelho profundo → “borda vermelha” na explosão.
 6. Cubes/plates na explosão “para legibilidade” → retângulos óbvios; use só partículas GPU.

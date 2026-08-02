@@ -87,13 +87,13 @@ test("drawExplosion is 100% GPU particles — no mesh rectangles (PARTICLES_ONLY
     const recorder = createDrawRecorder();
     appearance.drawExplosion(
       recorder,
-      { r: 5, c: 6, core: true, age: phase * 0.72, life: 0.72, source: 1, ownerId: 1, dr: 0, dc: 0 },
+      { r: 5, c: 6, core: true, age: phase * 0.5, life: 0.5, source: 1, ownerId: 1, dr: 0, dc: 0 },
       0, 0, 1.2, 0.4, tile
     );
     assert.equal(recorder.bursts.length, 1, `phase ${phase} must emit the GPU particle burst`);
     assert.equal(recorder.bursts[0].core, true, "core blast must use the four-axis burst");
     assert.ok(Math.abs(recorder.bursts[0].phase - phase) < 0.001, "burst receives the blast phase");
-    assert.ok(recorder.bursts[0].life >= 0.7, "burst receives the blast life");
+    assert.ok(recorder.bursts[0].life >= 0.49, "burst receives the blast life");
     // Zero mesh draws — particles only.
     assert.equal(recorder.calls.length, 0, `phase ${phase}: no cube/sphere/plate mesh draws`);
   }
@@ -101,7 +101,7 @@ test("drawExplosion is 100% GPU particles — no mesh rectangles (PARTICLES_ONLY
   const armRecorder = createDrawRecorder();
   appearance.drawExplosion(
     armRecorder,
-    { r: 5, c: 7, core: false, dr: 0, dc: 1, step: 1, age: 0.2 * 0.72, life: 0.72, source: 1, ownerId: 1 },
+    { r: 5, c: 7, core: false, dr: 0, dc: 1, step: 1, age: 0.2 * 0.5, life: 0.5, source: 1, ownerId: 1 },
     tile, 0, 1.0, 0.3, tile
   );
   assert.equal(armRecorder.bursts.length, 1, "arm cell must emit the GPU particle burst");
@@ -248,7 +248,7 @@ test("explodeBomb emits multi-layer fire/smoke particles on the real match path"
   const coreCounts = particleCalls.filter((call) => call.core).reduce((s, c) => s + c.count, 0);
   assert.ok(coreCounts >= 100, "core corridor particles are dense");
   assert.ok(game.particles.length > 40, "real spawnCorridorParticles must enqueue many particles");
-  assert.ok(game.blasts.every((b) => b.life >= 0.7), "blast life extended for multi-frame morph");
+  assert.ok(game.blasts.every((b) => b.life >= 0.49 && b.life <= 0.51), "blast life is the 0.5s fire-corridor window");
 
   // Velocities must stay near cardinal axes (not isotropic radial).
   const offAxis = game.particles.filter((p) => {
@@ -316,7 +316,7 @@ test("blast hitbox cells match visual cells for the full blast life (HITBOX_VISU
   assert.equal(game.players[0].alive, false, "occupant of core cell dies at detonation");
   assert.equal(game.players[1].alive, true, "player outside blast is safe at detonation");
   assert.ok(game.blasts.some((b) => b.r === 5 && b.c === 7), "arm cell is a visual blast");
-  assert.ok(game.blasts.every((b) => b.life === 0.72), "visual life is the hitbox window");
+  assert.ok(game.blasts.every((b) => b.life === 0.5), "visual life is the hitbox window");
 
   // Mid-life: walk into an arm cell that is still drawing fire.
   const [armX, armZ] = game.worldFromCell(5, 7);
@@ -385,6 +385,6 @@ test("live renderer still routes blasts through RIFTBOMB_BOMB_APPEARANCE.drawExp
   assert.match(duel, /NO_RED_RIM_V1/);
   assert.match(duel, /spawnCorridorParticles\(x, 0\.34, z, \[1, 0\.38, 0\.05\]/);
   assert.doesNotMatch(duel, /spawnCorridorParticles\([^)]*\[0\.55, 0\.06, 0\.01\]/);
-  assert.match(duel, /life: 0\.72/);
+  assert.match(duel, /life: 0\.5/);
   assert.match(duel, /dr: 0, dc: 0, step: 0|core: true, dr: 0, dc: 0/);
 });

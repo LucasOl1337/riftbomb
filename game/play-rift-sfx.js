@@ -1356,18 +1356,18 @@
 
         try {
           // Arena bombs prefer the packaged FreeSound sample (CC0 Big Explosion / qubodup).
-          // Audio window matches blast visual life (explodeBomb life: 0.72) so the
+          // Audio window matches blast visual life (explodeBomb life: 0.5) so the
           // sample dies when the fire corridor leaves the board — no hanging tail.
           if (profileName === "arena" && this.sampleBuffers.explosion) {
             const visualLife = Number(options.visualLife);
             const blastLife = Number.isFinite(visualLife) && visualLife > 0
               ? clamp(visualLife, 0.35, 1.2)
-              : 0.72;
+              : 0.5;
             const sampleGain = (secondary ? 0.52 : 0.78) * mix;
             // Primary: full blast window. Secondary/chain: shorter so stacked bombs
             // don't keep roaring after their corridor is gone.
             const sampleDuration = secondary
-              ? Math.min(0.48, blastLife * 0.7)
+              ? Math.min(0.35, blastLife * 0.7)
               : blastLife;
             const sampleRate = 0.97 + Math.random() * 0.05 + chainDepth * 0.01;
             const sampleStarted = this.playSample("explosion", time, {

@@ -650,7 +650,7 @@ function resetV1Memory(memory) {
  * whether it is dangerous right now.
  *
  * Values verified against the real Match rules (game/run-champion-bomb-duel.js):
- *   - Blast lifetime: blasts spawn with `life: 0.58` and are culled once
+ *   - Blast lifetime: blasts spawn with `life: 0.5` and are culled once
  *     `age >= life` (explodeBomb, run-champion-bomb-duel.js:2449; update,
  *     run-champion-bomb-duel.js:2703-2704).
  *   - Fuse: bombs are planted with `fuse: 2.35` (placeBomb,
@@ -688,7 +688,7 @@ const DANGER_DIRECTIONS = [
   { dr: -1, dc: 0 }
 ];
 
-const DANGER_BLAST_LIFE = 0.58;    // run-champion-bomb-duel.js:2449 (blast.life)
+const DANGER_BLAST_LIFE = 0.5;     // run-champion-bomb-duel.js explodeBomb (blast.life)
 const DANGER_BOMB_FUSE = 2.35;     // run-champion-bomb-duel.js:731 (placeBomb fuse)
 const DANGER_CHAIN_FRAME = 1 / 60; // one updateBombs pass: run-champion-bomb-duel.js:2455 + 2412-2424
 const DANGER_STEP_MARGIN = 0.1;    // alignment + think-latency budget on crossing estimates
