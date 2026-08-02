@@ -12,7 +12,7 @@ Executar um novo ciclo contínuo de performance com **rodada 0 de consolidação
 - Próxima rodada planejada: **1/200 — revalidar baseline no estado consolidado e publicado**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/b29b/riftbomb`
 - Branch local: `automation/perf-consolidate-200`
-- Base do novo ciclo: `9cadeff` + ancestralidade do tip real `d52bbbf`
+- Base do novo ciclo: `9cadeff` + ancestralidade do tip real `d52bbbf` + explosão publicada `7927ca1`
 - Runtime alvo: Node/npm local, Worker Cloudflare e servidor autoritativo; versões serão fixadas pela rodada 1
 
 ## Reivindicação ativa
@@ -32,16 +32,18 @@ Nenhuma. A rodada 0/200 foi concluída e o ledger está liberado para a rodada 1
 
 | Rodada | Estado | Entrega | Evidência | Commit |
 |---|---|---|---|---|
-| 0/200 | Concluída | Ancestralidade do tip real `d52bbbf` e da release `e282d11` consolidada sobre `main` `9cadeff`; novo ciclo 0..200 inicializado e publicado | Diff líquido de runtime contra `main`: 0 arquivos; raiz 211/211, online 77/77, servidor 62/62, lint 0 erros; live `e636b664…` em 3/3 | `d0b4e95`, `29463c9`, `d2fbe03` |
+| 0/200 | Concluída | Ciclo `d52bbbf`, release `e282d11` e os commits concorrentes `6e4d150`/`7927ca1` consolidados; novo ciclo 0..200 inicializado e publicado | Raiz 211/211 antes da corrida e 212/212 no source final; explosão 52/52; online 77/77; servidor 62/62; lint 0 erros; live final `91e5ac50…` | `d0b4e95`, `29463c9`, `d2fbe03`, `c059cfe`, `c8177af` |
 
 ### Evidência da rodada 0
 
 - Antes: `main` não continha a ancestralidade dos 42 commits exclusivos do ciclo/release e o ledger encerrava incorretamente em 20/20.
 - Depois da consolidação local: `d52bbbf` e `e282d11` são ancestrais de `HEAD`; os conflitos foram resolvidos mantendo o produto mais novo porque ele já contém versões equivalentes ou superiores dos 20 ganhos.
 - O manifest publicado antes do deploy é `97364d480752012981e2a858f3313439e1141e744f03b2701f0f57aab5296ae9`, 2 partes e 5.075.840 bytes. O build validado produziu `e636b6643d945d3b646f0723fea140c4117f76be611930db8e30f9a9668a2cdd`, 2 partes e 5.075.844 bytes.
-- `origin/main` foi atualizado para `d2fbe03`; o LFS de 113.439.025 bytes foi enviado. A worktree principal local permaneceu intacta porque contém alterações do usuário não commitadas.
+- `origin/main` foi atualizado durante a consolidação; o LFS inicial de 113.439.025 bytes foi enviado. A worktree principal local permaneceu intacta enquanto continha alterações do usuário.
 - `npm run deploy:build` concluiu build e validação, mas a primeira chamada do Wrangler encontrou `workerd-linux-64` num processo Windows. Após instalar o binário Windows equivalente sem alterar o lockfile, `npm run deploy` publicou o mesmo `dist` validado no Worker `d46024c6-324a-44a6-88d6-3e4a349a4479`.
-- Prova live em 3/3: manifest `e636b6643d945d3b646f0723fea140c4117f76be611930db8e30f9a9668a2cdd`, caminho fingerprintado correspondente, 2 partes e 5.075.844 bytes; SHA-256 recomputado idêntico. Marcadores live: `HITBOX_VISUAL_MATCH_V1` 1x, `PARTICLES_ONLY_V1` 2x, `NO_RED_RIM_V1` 2x e `RIFTBOMB_ARENA_TEXTURE_PLAN` 2x.
+- Após esse deploy, outra execução concluiu e publicou `6e4d150`/`7927ca1`, reduzindo a vida da explosão para 0,5 s e comprimindo o ciclo visual no mesmo intervalo. Esses commits foram incorporados em `c8177af` em vez de o artefato mais novo ser sobrescrito.
+- Prova live final: manifest `91e5ac508003af67cbea3117c0467e7532624ba24f678ed23d5852d6562d3bad`, caminho fingerprintado correspondente, 2 partes e 5.076.883 bytes. Marcadores live: `HITBOX_VISUAL_MATCH_V1` 1x, `PARTICLES_ONLY_V1` 2x, `NO_RED_RIM_V1` 2x, `RIFTBOMB_ARENA_TEXTURE_PLAN` 2x e `visualLife` 6x.
+- Validação final concorrente: 52/52 testes focados de explosão/SFX/bot, 212/212 no `test:source` raiz e 77/77 contratos online executados na worktree cujo shell/manifest correspondem ao SHA live. Uma repetição do build local encontrou `EPERM` transitório ao renomear o LFS de 113 MB; o build havia concluído antes e o artefato live coerente permaneceu a fonte da prova.
 
 ## Ciclo 1 arquivado — rodadas 1..20 concluídas
 
