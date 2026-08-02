@@ -22,8 +22,8 @@
   background-image: url("/client/arenas/lattice.webp");
   background-position: center;
   background-size: cover;
-  filter: saturate(0.72) contrast(1.12);
-  opacity: 0.36;
+  filter: saturate(0.78) contrast(1.14) brightness(0.92);
+  opacity: 0.44;
   transform: scale(1.04);
   animation: arena-drift 12s ease-in-out infinite alternate;
 }
@@ -31,14 +31,15 @@
 .vignette {
   z-index: -1;
   background:
-    radial-gradient(circle at 50% 47%, rgb(3 8 13 / 8%) 0 16%, rgb(3 8 13 / 74%) 67%),
-    linear-gradient(180deg, rgb(3 8 13 / 82%) 0%, transparent 34%, rgb(3 8 13 / 90%) 100%);
+    radial-gradient(circle at 50% 46%, rgb(117 232 240 / 10%) 0 12%, transparent 42%),
+    radial-gradient(circle at 50% 47%, rgb(3 8 13 / 6%) 0 16%, rgb(3 8 13 / 78%) 68%),
+    linear-gradient(180deg, rgb(3 8 13 / 84%) 0%, transparent 34%, rgb(3 8 13 / 92%) 100%);
 }
 
 .brand {
   position: absolute;
   top: clamp(1.5rem, 4vw, 3rem);
-  left: clamp(1.25rem, 5vw, 5rem);
+  inset-inline-start: clamp(1.25rem, 5vw, 5rem);
   display: flex;
   align-items: center;
   gap: 0.8rem;
@@ -53,7 +54,9 @@
   color: #031015;
   background: #69e4f0;
   border: 1px solid #bffaff;
-  box-shadow: 0 0 1.6rem rgb(66 220 235 / 24%);
+  box-shadow:
+    0 0 1.6rem rgb(66 220 235 / 24%),
+    inset 0 0 0 1px rgb(255 255 255 / 18%);
   font-family: var(--font-geist-mono), monospace;
   font-size: 1rem;
   font-weight: 800;
@@ -63,11 +66,13 @@
 .brandMark b {
   line-height: 1;
   transform: rotate(-45deg);
+  /* Optical center of the diamond monogram */
+  translate: 0 0.02em;
 }
 
 .brand > span:last-child {
   display: grid;
-  gap: 0.08rem;
+  gap: 0.12rem;
 }
 
 .brand strong,
@@ -88,8 +93,18 @@
 }
 
 .status {
+  position: relative;
   width: min(100%, 43rem);
   text-align: center;
+}
+
+.status::before {
+  position: absolute;
+  z-index: -1;
+  inset: -18% -8% -12%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 42%, rgb(3 8 13 / 55%) 0 42%, transparent 72%);
+  content: "";
 }
 
 .eyebrow,
@@ -114,68 +129,77 @@
   font-size: clamp(2.5rem, 7.5vw, 5.6rem);
   font-weight: 680;
   letter-spacing: -0.065em;
-  line-height: 0.92;
+  line-height: 0.94;
   text-wrap: balance;
+  text-shadow: 0 0 2.8rem rgb(70 225 238 / 10%);
 }
 
 .copy {
-  max-width: 47ch;
+  max-width: 42ch;
   margin: clamp(1.25rem, 3vh, 1.8rem) auto 0;
-  color: rgb(221 241 243 / 70%);
+  color: rgb(221 241 243 / 74%);
   font-size: clamp(0.94rem, 1.5vw, 1.08rem);
-  line-height: 1.65;
+  line-height: 1.6;
   text-wrap: pretty;
 }
 
 .progress {
   position: relative;
-  width: min(100%, 24rem);
-  height: 2px;
+  width: min(100%, 22rem);
+  height: 5px;
   overflow: hidden;
-  margin: clamp(2rem, 5vh, 3rem) auto 0;
+  margin: clamp(2.1rem, 5vh, 3.1rem) auto 0;
   background: rgb(213 247 249 / 14%);
+  box-shadow:
+    inset 0 0 0 1px rgb(213 247 249 / 12%),
+    0 0 1.8rem rgb(43 199 212 / 14%);
 }
 
 .progress::before,
 .progress::after {
   position: absolute;
   top: 50%;
-  width: 5px;
+  z-index: 2;
+  width: 8px;
   aspect-ratio: 1;
   background: #f1c56a;
+  box-shadow: 0 0 0.7rem rgb(241 197 106 / 55%);
   content: "";
   transform: translateY(-50%) rotate(45deg);
 }
 
 .progress::before {
-  left: 0;
+  inset-inline-start: 0;
 }
 
 .progress::after {
-  right: 0;
+  inset-inline-end: 0;
 }
 
 .progress span {
   display: block;
-  width: 42%;
+  width: 40%;
   height: 100%;
-  background: #75e8f0;
-  box-shadow: 0 0 1.2rem rgb(43 199 212 / 70%);
-  animation: load-arena 1.8s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+  background: linear-gradient(90deg, rgb(117 232 240 / 28%) 0%, #75e8f0 48%, #d7faff 100%);
+  box-shadow:
+    0 0 1.1rem rgb(43 199 212 / 85%),
+    0 0 2.2rem rgb(117 232 240 / 35%);
+  animation: load-arena 1.8s cubic-bezier(0.2, 0, 0, 1) infinite;
 }
 
 .proof {
-  margin: 1rem 0 0;
-  color: rgb(203 232 235 / 50%);
-  font-size: 0.58rem;
+  margin: 1.15rem 0 0;
+  color: rgb(203 232 235 / 54%);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
 }
 
 .coordinate {
   position: absolute;
-  right: clamp(1.25rem, 5vw, 5rem);
+  inset-inline-end: clamp(1.25rem, 5vw, 5rem);
   bottom: clamp(1.35rem, 3vw, 2.5rem);
   margin: 0;
-  color: rgb(203 232 235 / 36%);
+  color: rgb(203 232 235 / 40%);
   font-size: 0.56rem;
 }
 
@@ -211,7 +235,7 @@
 
   .arena {
     background-position: 53% center;
-    opacity: 0.3;
+    opacity: 0.36;
   }
 
   .status h1 {
@@ -223,12 +247,12 @@
   }
 
   .progress {
-    width: min(100%, 19rem);
+    width: min(100%, 18rem);
   }
 
   .coordinate {
-    right: auto;
-    left: 50%;
+    inset-inline-end: auto;
+    inset-inline-start: 50%;
     width: max-content;
     transform: translateX(-50%);
   }

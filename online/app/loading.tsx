@@ -29,8 +29,14 @@ export default function Loading() {
           instalar nada.
         </p>
 
-        <div className={styles.progress} aria-hidden="true">
-          <span />
+        <div
+          className={styles.progress}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuetext="Carregando arena"
+        >
+          <span aria-hidden="true" />
         </div>
 
         <p className={styles.proof}>PvP em tempo real · sem download</p>
