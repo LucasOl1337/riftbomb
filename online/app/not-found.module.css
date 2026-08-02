@@ -43,14 +43,15 @@
 .vignette {
   z-index: -1;
   background:
-    radial-gradient(circle at 50% 46%, rgb(3 8 13 / 18%) 0 15%, rgb(3 8 13 / 76%) 63%),
-    linear-gradient(180deg, rgb(3 8 13 / 80%) 0%, transparent 32%, rgb(3 8 13 / 88%) 100%);
+    radial-gradient(circle at 50% 46%, rgb(117 232 240 / 10%) 0 12%, transparent 42%),
+    radial-gradient(circle at 50% 47%, rgb(3 8 13 / 10%) 0 16%, rgb(3 8 13 / 80%) 68%),
+    linear-gradient(180deg, rgb(3 8 13 / 84%) 0%, transparent 34%, rgb(3 8 13 / 92%) 100%);
 }
 
 .brand {
   position: absolute;
   top: clamp(1.5rem, 4vw, 3rem);
-  left: clamp(1.25rem, 5vw, 5rem);
+  inset-inline-start: clamp(1.25rem, 5vw, 5rem);
   display: flex;
   align-items: center;
   gap: 0.8rem;
@@ -65,7 +66,9 @@
   color: #031015;
   background: #69e4f0;
   border: 1px solid #bffaff;
-  box-shadow: 0 0 1.6rem rgb(66 220 235 / 24%);
+  box-shadow:
+    0 0 1.6rem rgb(66 220 235 / 24%),
+    inset 0 0 0 1px rgb(255 255 255 / 18%);
   font-family: var(--font-geist-mono), monospace;
   font-size: 1rem;
   font-weight: 800;
@@ -75,11 +78,13 @@
 .brandMark b {
   line-height: 1;
   transform: rotate(-45deg);
+  /* Optical center of the diamond monogram */
+  translate: 0 0.02em;
 }
 
 .brand > span:last-child {
   display: grid;
-  gap: 0.08rem;
+  gap: 0.12rem;
 }
 
 .brand strong,
@@ -100,8 +105,18 @@
 }
 
 .message {
+  position: relative;
   width: min(100%, 49rem);
   text-align: center;
+}
+
+.message::before {
+  position: absolute;
+  z-index: -1;
+  inset: -16% -8% -10%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 42%, rgb(3 8 13 / 58%) 0 42%, transparent 72%);
+  content: "";
 }
 
 .eyebrow,
@@ -113,9 +128,9 @@
 }
 
 .eyebrow {
-  margin: 0 0 clamp(1.4rem, 3vh, 2.2rem);
-  color: #82edf5;
-  font-size: clamp(0.63rem, 1.2vw, 0.74rem);
+  margin: 0 0 clamp(1.1rem, 2.4vh, 1.7rem);
+  color: rgb(130 237 245 / 88%);
+  font-size: clamp(0.62rem, 1.2vw, 0.72rem);
   font-weight: 650;
 }
 
@@ -130,33 +145,45 @@
   font-weight: 800;
   letter-spacing: -0.12em;
   line-height: 0.72;
-  text-shadow: 0 0 3.5rem rgb(70 225 238 / 13%);
+  text-shadow:
+    0 0 2.4rem rgb(70 225 238 / 18%),
+    0 0 4.5rem rgb(70 225 238 / 10%);
 }
 
 .signal {
   display: flex;
-  min-height: clamp(5.25rem, 14vw, 8.5rem);
-  align-items: center;
+  min-height: clamp(4.4rem, 11vw, 6.8rem);
+  align-items: flex-end;
   justify-content: center;
-  gap: clamp(0.5rem, 1.4vw, 0.8rem);
-  margin: 0 0 clamp(1.1rem, 2vh, 1.7rem);
+  gap: clamp(0.55rem, 1.3vw, 0.85rem);
+  margin: 0 0 clamp(1rem, 2vh, 1.45rem);
+  padding-block: 0.35rem;
 }
 
 .signal span {
-  width: clamp(0.7rem, 1.5vw, 1rem);
-  height: clamp(2.75rem, 8vw, 5.5rem);
-  background: #75e8f0;
-  box-shadow: 0 0 1.8rem rgb(43 199 212 / 32%);
-  transform-origin: center;
-  animation: signal-pulse 1.15s ease-in-out infinite;
+  width: clamp(0.55rem, 1.15vw, 0.78rem);
+  height: clamp(2.1rem, 6.2vw, 4.1rem);
+  background: linear-gradient(180deg, #d7faff 0%, #75e8f0 55%, rgb(117 232 240 / 55%) 100%);
+  box-shadow:
+    0 0 1.2rem rgb(43 199 212 / 42%),
+    0 0 2.4rem rgb(117 232 240 / 18%);
+  transform-origin: center bottom;
+  animation: signal-pulse 1.35s cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+.signal span:nth-child(1) {
+  height: clamp(1.55rem, 4.4vw, 2.85rem);
+  opacity: 0.72;
 }
 
 .signal span:nth-child(2) {
-  animation-delay: 120ms;
+  height: clamp(2.1rem, 6vw, 3.85rem);
+  animation-delay: 140ms;
 }
 
 .signal span:nth-child(3) {
-  animation-delay: 240ms;
+  height: clamp(2.75rem, 7.6vw, 5rem);
+  animation-delay: 280ms;
 }
 
 .code span:last-child {
@@ -189,14 +216,15 @@
   letter-spacing: -0.055em;
   line-height: 0.98;
   text-wrap: balance;
+  text-shadow: 0 0 2.8rem rgb(70 225 238 / 10%);
 }
 
 .copy {
-  max-width: 48ch;
-  margin: clamp(1.15rem, 2.5vh, 1.65rem) auto 0;
-  color: rgb(221 241 243 / 70%);
+  max-width: 42ch;
+  margin: clamp(1.05rem, 2.2vh, 1.45rem) auto 0;
+  color: rgb(221 241 243 / 74%);
   font-size: clamp(0.94rem, 1.5vw, 1.08rem);
-  line-height: 1.65;
+  line-height: 1.6;
   text-wrap: pretty;
 }
 
@@ -211,14 +239,18 @@
   color: #041014;
   background: #75e8f0;
   border: 0;
-  box-shadow: 0 0.8rem 2.5rem rgb(43 199 212 / 18%);
+  box-shadow:
+    0 0.8rem 2.5rem rgb(43 199 212 / 20%),
+    0 0 1.6rem rgb(117 232 240 / 16%);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.88rem;
   font-weight: 750;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  transition: transform 220ms ease, background-color 220ms ease, box-shadow 220ms ease;
+  transition-property: transform, background-color, box-shadow;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
 .cta span {
@@ -228,12 +260,16 @@
   place-items: center;
   background: rgb(3 12 16 / 12%);
   font-size: 1.1rem;
-  transition: transform 220ms ease;
+  transition-property: transform;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
 .cta:hover {
   background: #a0f5f8;
-  box-shadow: 0 1rem 3rem rgb(43 199 212 / 28%);
+  box-shadow:
+    0 1rem 3rem rgb(43 199 212 / 30%),
+    0 0 2rem rgb(117 232 240 / 22%);
   transform: translateY(-2px);
 }
 
@@ -247,10 +283,11 @@
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 1.25rem;
-  margin-top: clamp(1.8rem, 4vh, 2.6rem);
+  gap: 0.85rem 1.1rem;
+  margin-top: clamp(1.65rem, 3.6vh, 2.35rem);
 }
 
 .actions .cta {
@@ -258,20 +295,36 @@
 }
 
 .secondaryCta {
-  padding: 0.8rem 0.15rem;
-  color: rgb(221 241 243 / 72%);
-  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.15rem;
+  padding: 0.7rem 1.15rem;
+  color: rgb(221 241 243 / 86%);
+  background: rgb(3 12 16 / 28%);
+  border: 1px solid rgb(117 232 240 / 28%);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 4%);
+  font-size: 0.78rem;
   font-weight: 650;
-  letter-spacing: 0.04em;
-  text-decoration-color: rgb(117 232 240 / 42%);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.35rem;
-  transition: color 220ms ease, text-decoration-color 220ms ease;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
 .secondaryCta:hover {
   color: #effcff;
-  text-decoration-color: #75e8f0;
+  background: rgb(117 232 240 / 10%);
+  border-color: rgb(117 232 240 / 48%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 6%),
+    0 0 1.4rem rgb(43 199 212 / 12%);
+}
+
+.secondaryCta:active {
+  transform: scale(0.96);
 }
 
 .cta:focus-visible,
@@ -281,18 +334,19 @@
 }
 
 .hint {
-  margin: 1rem 0 0;
-  color: rgb(203 232 235 / 46%);
+  margin: 1.15rem 0 0;
+  color: rgb(203 232 235 / 50%);
   font-size: 0.58rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .coordinate {
   position: absolute;
-  right: clamp(1.25rem, 5vw, 5rem);
+  inset-inline-end: clamp(1.25rem, 5vw, 5rem);
   bottom: clamp(1.35rem, 3vw, 2.5rem);
   margin: 0;
-  color: rgb(203 232 235 / 36%);
+  color: rgb(203 232 235 / 40%);
   font-size: 0.56rem;
 }
 
@@ -309,8 +363,8 @@
 @keyframes signal-pulse {
   0%,
   100% {
-    opacity: 0.28;
-    transform: scaleY(0.42);
+    opacity: 0.38;
+    transform: scaleY(0.55);
   }
 
   50% {
@@ -341,12 +395,16 @@
 
   .actions {
     flex-direction: column;
-    gap: 0.65rem;
+    gap: 0.7rem;
+  }
+
+  .secondaryCta {
+    width: min(100%, 20rem);
   }
 
   .coordinate {
-    right: auto;
-    left: 50%;
+    inset-inline-end: auto;
+    inset-inline-start: 50%;
     width: max-content;
     transform: translateX(-50%);
   }
@@ -372,8 +430,8 @@
   }
 
   .signal {
-    min-height: min(16vh, 5.5rem);
-    margin-bottom: 0.8rem;
+    min-height: min(14vh, 4.6rem);
+    margin-bottom: 0.7rem;
   }
 
   .message h1 {
@@ -391,12 +449,19 @@
 
   .actions {
     flex-direction: row;
+    flex-wrap: nowrap;
     margin-top: 1rem;
   }
 
   .actions .cta {
     width: auto;
     margin-top: 0;
+  }
+
+  .secondaryCta {
+    min-height: 2.85rem;
+    width: auto;
+    padding-inline: 0.95rem;
   }
 
   .hint,
@@ -411,8 +476,14 @@
     animation: none;
   }
 
+  .signal span {
+    opacity: 0.85;
+    transform: none;
+  }
+
   .cta,
-  .cta span {
+  .cta span,
+  .secondaryCta {
     transition: none;
   }
 }
