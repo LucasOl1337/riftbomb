@@ -387,4 +387,20 @@ test("live renderer still routes blasts through RIFTBOMB_BOMB_APPEARANCE.drawExp
   assert.doesNotMatch(duel, /spawnCorridorParticles\([^)]*\[0\.55, 0\.06, 0\.01\]/);
   assert.match(duel, /life: 0\.5/);
   assert.match(duel, /dr: 0, dc: 0, step: 0|core: true, dr: 0, dc: 0/);
+  // Soft sparks must finish inside the 0.5s blast (no 0.7s+ hanging layers).
+  assert.doesNotMatch(duel, /spawnCorridorParticles\([^)]*,\s*0\.(5[6-9]|[6-9]\d)/);
+});
+
+test("GPU burst animation completes inside the short blast window (SNAPP_BURST_0_5_V1)", async () => {
+  const renderer = await readFile(path.join(gameDirectory, "draw-bomber-rift.js"), "utf8");
+  assert.match(renderer, /SNAPP_BURST_0_5_V1/);
+  assert.match(renderer, /designSeconds/);
+  assert.match(renderer, /tempo = clamp\(0\.72 \/ max\(uLife/);
+  // Emission is front-loaded — smoke birth no longer starts at phase 0.2+.
+  assert.doesNotMatch(renderer, /birth = smoke > 0\.5 \? 0\.2 \+ r1 \* 0\.4/);
+  // Motion must not dilute travel with span*uLife alone (that truncated short blasts).
+  assert.doesNotMatch(renderer, /seconds = t \* span \* uLife/);
+  // First detonation frame is allowed (phase 0 draws).
+  assert.match(renderer, /phase < 0 \|\| phase >= 1/);
+  assert.doesNotMatch(renderer, /phase <= 0 \|\| phase >= 1/);
 });
