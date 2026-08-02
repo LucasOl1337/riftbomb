@@ -7,8 +7,8 @@ Executar um novo ciclo contínuo de performance com **rodada 0 de consolidação
 ## Estado sequencial
 
 - Ciclo atual: **2 — 0..200**
-- Rodada atual: **0/200 — Consolidação do ciclo anterior (em andamento)**
-- Última rodada concluída: **ciclo 1, rodada 20/20**
+- Rodada atual: **0/200 — Consolidação do ciclo anterior (concluída)**
+- Última rodada concluída: **0/200 — Consolidação, merge, validação e publicação**
 - Próxima rodada planejada: **1/200 — revalidar baseline no estado consolidado e publicado**
 - Worktree isolada: `C:/Users/user/.codex/worktrees/b29b/riftbomb`
 - Branch local: `automation/perf-consolidate-200`
@@ -17,7 +17,7 @@ Executar um novo ciclo contínuo de performance com **rodada 0 de consolidação
 
 ## Reivindicação ativa
 
-Rodada 0/200 — consolidação e reinicialização. Arquivos pretendidos: `PerformanceSwarm.md` e artefatos gerados pelos builds obrigatórios. Intenção: preservar o produto atual, consolidar a ancestralidade dos 20 trabalhos anteriores, validar, publicar e iniciar o ciclo 0..200. Risco de conflito: alto, pois o produto evoluiu em paralelo. Risco de regressão: médio, mitigado por testes raiz/online/servidor, lint, prova do manifest live e verificação de marcadores. Medição: gates completos, hashes Git e SHA-256 do artefato publicado.
+Nenhuma. A rodada 0/200 foi concluída e o ledger está liberado para a rodada 1/200.
 
 ## Regra sequencial do ciclo 2 — 0..200
 
@@ -32,14 +32,16 @@ Rodada 0/200 — consolidação e reinicialização. Arquivos pretendidos: `Perf
 
 | Rodada | Estado | Entrega | Evidência | Commit |
 |---|---|---|---|---|
-| 0/200 | Publicação em andamento | Ancestralidade do tip real `d52bbbf` e da release `e282d11` consolidada sobre `main` `9cadeff`; novo ciclo 0..200 inicializado | Diff líquido de runtime contra `main`: 0 arquivos; raiz 211/211, online 77/77, servidor 62/62, lint 0 erros; artefato local `e636b664…` aguarda deploy | `d0b4e95`, `29463c9` |
+| 0/200 | Concluída | Ancestralidade do tip real `d52bbbf` e da release `e282d11` consolidada sobre `main` `9cadeff`; novo ciclo 0..200 inicializado e publicado | Diff líquido de runtime contra `main`: 0 arquivos; raiz 211/211, online 77/77, servidor 62/62, lint 0 erros; live `e636b664…` em 3/3 | `d0b4e95`, `29463c9`, `d2fbe03` |
 
 ### Evidência da rodada 0
 
 - Antes: `main` não continha a ancestralidade dos 42 commits exclusivos do ciclo/release e o ledger encerrava incorretamente em 20/20.
 - Depois da consolidação local: `d52bbbf` e `e282d11` são ancestrais de `HEAD`; os conflitos foram resolvidos mantendo o produto mais novo porque ele já contém versões equivalentes ou superiores dos 20 ganhos.
 - O manifest publicado antes do deploy é `97364d480752012981e2a858f3313439e1141e744f03b2701f0f57aab5296ae9`, 2 partes e 5.075.840 bytes. O build validado produziu `e636b6643d945d3b646f0723fea140c4117f76be611930db8e30f9a9668a2cdd`, 2 partes e 5.075.844 bytes.
-- A rodada só será marcada concluída depois de atualizar `main`, executar `npm run deploy:build` e provar o novo SHA no `bombpvp.com`.
+- `origin/main` foi atualizado para `d2fbe03`; o LFS de 113.439.025 bytes foi enviado. A worktree principal local permaneceu intacta porque contém alterações do usuário não commitadas.
+- `npm run deploy:build` concluiu build e validação, mas a primeira chamada do Wrangler encontrou `workerd-linux-64` num processo Windows. Após instalar o binário Windows equivalente sem alterar o lockfile, `npm run deploy` publicou o mesmo `dist` validado no Worker `d46024c6-324a-44a6-88d6-3e4a349a4479`.
+- Prova live em 3/3: manifest `e636b6643d945d3b646f0723fea140c4117f76be611930db8e30f9a9668a2cdd`, caminho fingerprintado correspondente, 2 partes e 5.075.844 bytes; SHA-256 recomputado idêntico. Marcadores live: `HITBOX_VISUAL_MATCH_V1` 1x, `PARTICLES_ONLY_V1` 2x, `NO_RED_RIM_V1` 2x e `RIFTBOMB_ARENA_TEXTURE_PLAN` 2x.
 
 ## Ciclo 1 arquivado — rodadas 1..20 concluídas
 
