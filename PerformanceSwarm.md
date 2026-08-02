@@ -28,6 +28,19 @@ Rodada 0/200 — consolidação e reinicialização. Arquivos pretendidos: `Perf
 - Cada sessão conclui exatamente uma rodada, com claim prévio, evidência antes/depois, validação proporcional e commit local seletivo.
 - O scorecard do ciclo 1 abaixo é baseline herdado, não licença para repetir trabalho; cada macrociclo deve procurar o próximo ganho real.
 
+## Ciclo 2 — histórico 0..200
+
+| Rodada | Estado | Entrega | Evidência | Commit |
+|---|---|---|---|---|
+| 0/200 | Publicação em andamento | Ancestralidade do tip real `d52bbbf` e da release `e282d11` consolidada sobre `main` `9cadeff`; novo ciclo 0..200 inicializado | Diff líquido de runtime contra `main`: 0 arquivos; raiz 211/211, online 77/77, servidor 62/62, lint 0 erros; artefato local `e636b664…` aguarda deploy | `d0b4e95`, `29463c9` |
+
+### Evidência da rodada 0
+
+- Antes: `main` não continha a ancestralidade dos 42 commits exclusivos do ciclo/release e o ledger encerrava incorretamente em 20/20.
+- Depois da consolidação local: `d52bbbf` e `e282d11` são ancestrais de `HEAD`; os conflitos foram resolvidos mantendo o produto mais novo porque ele já contém versões equivalentes ou superiores dos 20 ganhos.
+- O manifest publicado antes do deploy é `97364d480752012981e2a858f3313439e1141e744f03b2701f0f57aab5296ae9`, 2 partes e 5.075.840 bytes. O build validado produziu `e636b6643d945d3b646f0723fea140c4117f76be611930db8e30f9a9668a2cdd`, 2 partes e 5.075.844 bytes.
+- A rodada só será marcada concluída depois de atualizar `main`, executar `npm run deploy:build` e provar o novo SHA no `bombpvp.com`.
+
 ## Ciclo 1 arquivado — rodadas 1..20 concluídas
 
 ## Baseline inicial
