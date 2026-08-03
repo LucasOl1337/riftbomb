@@ -11,18 +11,26 @@
     "benchmark:grid-cache": "node scripts/benchmark-grid-cache.mjs",
     "benchmark:message-rate-limit": "node scripts/benchmark-message-rate-limit.mjs",
     "benchmark:telemetry": "node scripts/benchmark-telemetry-overhead.mjs",
+    "benchmark:health-response": "node scripts/benchmark-health-response.mjs",
+    "benchmark:upgrade-auth": "node scripts/benchmark-upgrade-auth.mjs",
     "start": "node src/server.mjs",
     "benchmark:boot": "node scripts/benchmark-server-boot.mjs",
     "benchmark:serialization": "node scripts/benchmark-json-transport.mjs",
-    "test": "npm run test:core && npm run test:runtime-loading && npm run test:serialization && npm run test:rate-limit && npm run test:transport && npm run test:rematch && npm run test:matchmaking && npm run test:resume",
+    "benchmark:protocol-cache": "node scripts/benchmark-protocol-cache.mjs",
+    "benchmark:resume-index": "node scripts/benchmark-resume-index.mjs",
+    "benchmark:quick-match-queue": "node scripts/benchmark-quick-match-queue.mjs",
+    "benchmark:snapshot-serialization": "node --expose-gc scripts/benchmark-snapshot-serialization.mjs",
+    "test": "npm run test:core && npm run test:runtime-loading && npm run test:serialization && npm run test:rate-limit && npm run test:health-response && npm run test:transport && npm run test:rematch && npm run test:matchmaking && npm run test:resume && npm run test:queue",
     "test:core": "node --test tests/authoritative-core.test.mjs",
     "test:runtime-loading": "node --test tests/authoritative-runtime-loading.test.mjs",
     "test:serialization": "node --test tests/json-transport.test.mjs",
     "test:rate-limit": "node --test tests/message-rate-limit.test.mjs",
+    "test:health-response": "node --test tests/health-response.test.mjs",
     "test:transport": "node --test --test-name-pattern=websocket tests/authoritative-server.test.mjs",
     "test:rematch": "node --test --test-name-pattern=rematch tests/authoritative-server.test.mjs",
     "test:matchmaking": "node --test --test-name-pattern=\"quick match\" tests/authoritative-server.test.mjs",
-    "test:resume": "node --test --test-name-pattern=\"quick-match|resume|legacy|leave|expires after reconnect grace\" tests/authoritative-server.test.mjs"
+    "test:resume": "node --test --test-name-pattern=\"quick-match|resume|legacy|leave|expires after reconnect grace\" tests/authoritative-server.test.mjs",
+    "test:queue": "node --test tests/quick-match-queue.test.mjs"
   },
   "dependencies": {
     "ws": "8.21.1"

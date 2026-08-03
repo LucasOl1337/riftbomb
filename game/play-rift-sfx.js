@@ -208,6 +208,8 @@
         this.sampleMeta = Object.create(null);
         this._sampleLoadPromise = null;
         this._sampleLoadContext = null;
+        /** @type {Record<string, Promise<object|null>>} lazy champion bank loads */
+        this._championBankPromises = Object.create(null);
         /** AudioContext time when the last champion VO finished starting. */
         this._lastVoiceAt = -Infinity;
         /** Seconds accumulated toward ambient move/idle banter. */
@@ -234,7 +236,10 @@
         this._graphCleanupPromise = null;
       }
 
-      async start() {
+      async start(champions = []) {
+        // CHAMPION_SFX_SPLIT_V1: begin audio immediately and fetch only the
+        // banks selected for this match. Synth fallbacks cover the fetch gap.
+        const championLoad = this.loadChampionSfx(champions);
         if (this._graphCleanupPromise) {
           const cleanup = this._graphCleanupPromise;
           await cleanup;
@@ -276,7 +281,7 @@
           try {
             await resumeAttempt;
           } catch (error) {
-            if (resumeContext !== this.ctx) return this.start();
+            if (resumeContext !== this.ctx) return this.start(champions);
             throw error;
           } finally {
             if (this._resumePromise === resumeAttempt) {
@@ -284,33 +289,77 @@
               this._resumeContext = null;
             }
           }
-          if (resumeContext !== this.ctx) return this.start();
+          if (resumeContext !== this.ctx) return this.start(champions);
         }
         if (this.ctx.state !== "running") throw new Error(`AudioContext remained ${this.ctx.state}`);
+        void championLoad.then(() => this._ensureSampleBuffers()).catch((error) => {
+          console.warn("[sfx] Champion sample bank skipped:", error);
+        });
         void this._ensureSampleBuffers().catch((error) => {
           console.warn("[sfx] Arena sample decode skipped:", error);
         });
         this._flushPendingEffects();
       }
 
+      async loadChampionSfx(champions = []) {
+        const manifest = globalThis.RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST || {};
+        const bankNames = Array.isArray(champions) ? champions : [champions];
+        const requested = [...new Set(bankNames
+          .map((champion) => String(champion || "").trim().toLowerCase())
+          .filter((champion) => champion && manifest[champion]))];
+        await Promise.all(requested.map((champion) =>
+          this._loadChampionSfxBank(champion, manifest[champion])
+        ));
+        if (this.ctx?.state === "running") await this._ensureSampleBuffers();
+      }
+
+      _loadChampionSfxBank(champion, source) {
+        const banks = globalThis.RIFTBOMB_CHAMPION_SFX_BANKS ||
+          (globalThis.RIFTBOMB_CHAMPION_SFX_BANKS = Object.create(null));
+        if (banks[champion]) return Promise.resolve(banks[champion]);
+        if (!source || typeof document === "undefined") return Promise.resolve(null);
+        if (this._championBankPromises[champion]) return this._championBankPromises[champion];
+
+        const promise = new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.async = true;
+          script.src = source;
+          script.onload = () => {
+            const bank = banks[champion];
+            if (bank) resolve(bank);
+            else reject(new Error(`Champion SFX bank did not register: ${champion}`));
+          };
+          script.onerror = () => reject(new Error(`Champion SFX bank failed to load: ${champion}`));
+          const target = document.head || document.documentElement;
+          if (!target?.append) {
+            reject(new Error("Champion SFX bank loader has no document target"));
+            return;
+          }
+          target.append(script);
+        }).catch((error) => {
+          console.warn(`[sfx] ${error.message}`);
+          return null;
+        });
+        this._championBankPromises[champion] = promise;
+        void promise.finally(() => {
+          if (this._championBankPromises[champion] === promise) {
+            delete this._championBankPromises[champion];
+          }
+        });
+        return promise;
+      }
+
       /**
-       * Decode packaged arena + champion samples (data URLs from load-*-sfx.js).
-       * Safe to call repeatedly; no-ops when sources are missing or already loaded.
+       * Decode packaged arena samples plus only the lazy champion banks already
+       * requested for this match. Safe to call repeatedly; no-ops when sources
+       * are missing or already loaded.
        */
       async _ensureSampleBuffers() {
         if (!this.ctx) return;
         const arenaSources = typeof RIFTBOMB_ARENA_SFX_SOURCES !== "undefined"
           ? RIFTBOMB_ARENA_SFX_SOURCES
           : null;
-        const championSources = typeof RIFTBOMB_CHAMPION_SFX_SOURCES !== "undefined"
-          ? RIFTBOMB_CHAMPION_SFX_SOURCES
-          : null;
-        const championMeta = typeof RIFTBOMB_CHAMPION_SFX_META !== "undefined"
-          ? RIFTBOMB_CHAMPION_SFX_META
-          : null;
-        if (championMeta && typeof championMeta === "object") {
-          Object.assign(this.sampleMeta, championMeta);
-        }
+        const championBanks = globalThis.RIFTBOMB_CHAMPION_SFX_BANKS || null;
 
         /** @type {Array<[string, string]>} bufferKey, dataUrl */
         const jobs = [];
@@ -321,17 +370,24 @@
             this.sampleVariants[key] = [key];
           }
         }
-        if (championSources && typeof championSources === "object") {
-          for (const [effect, value] of Object.entries(championSources)) {
-            const urls = Array.isArray(value) ? value : [value];
-            const keys = [];
-            urls.forEach((url, index) => {
-              if (!url) return;
-              const bufferKey = urls.length === 1 ? effect : `${effect}__${index}`;
-              keys.push(bufferKey);
-              if (!this.sampleBuffers[bufferKey]) jobs.push([bufferKey, url]);
-            });
-            if (keys.length) this.sampleVariants[effect] = keys;
+        if (championBanks && typeof championBanks === "object") {
+          for (const bank of Object.values(championBanks)) {
+            if (!bank || typeof bank !== "object") continue;
+            if (bank.meta && typeof bank.meta === "object") {
+              Object.assign(this.sampleMeta, bank.meta);
+            }
+            if (!bank.sources || typeof bank.sources !== "object") continue;
+            for (const [effect, value] of Object.entries(bank.sources)) {
+              const urls = Array.isArray(value) ? value : [value];
+              const keys = [];
+              urls.forEach((url, index) => {
+                if (!url) return;
+                const bufferKey = urls.length === 1 ? effect : `${effect}__${index}`;
+                keys.push(bufferKey);
+                if (!this.sampleBuffers[bufferKey]) jobs.push([bufferKey, url]);
+              });
+              if (keys.length) this.sampleVariants[effect] = keys;
+            }
           }
         }
         if (!jobs.length) return;

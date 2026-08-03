@@ -241,6 +241,18 @@
     const ABILITY_BUFFER_SECONDS = 0.15;
     const ABILITY_TIME_EPSILON = 0.000001;
 
+    function compactLiveParticles(particles) {
+      let writeIndex = 0;
+      for (let readIndex = 0; readIndex < particles.length; readIndex += 1) {
+        const particle = particles[readIndex];
+        if (particle.age >= particle.life || particle.y <= -0.2) continue;
+        particles[writeIndex] = particle;
+        writeIndex += 1;
+      }
+      particles.length = writeIndex;
+      return particles;
+    }
+
     class Game {
       constructor(renderer, sfx, presentation) {
         this.renderer = renderer;
@@ -3206,7 +3218,9 @@
             particle.z = clamp(particle.z, particle.homeZ - half, particle.homeZ + half);
           }
         }
-        this.particles = this.particles.filter((particle) => particle.age < particle.life && particle.y > -0.2);
+        // PARTICLES_COMPACT_IN_PLACE_V1: reuse the bounded list instead of
+        // allocating a new array every simulation frame.
+        compactLiveParticles(this.particles);
       }
 
       update(dt) {

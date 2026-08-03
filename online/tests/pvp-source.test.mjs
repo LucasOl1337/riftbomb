@@ -3,8 +3,38 @@ import { createHash, webcrypto } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { brotliDecompressSync } from "node:zlib";
 
 const root = new URL("../", import.meta.url);
+
+test("War Table memoizes stable subtrees across runtime bridge updates", async () => {
+  const page = await readFile(new URL("app/page.tsx", root), "utf8");
+
+  for (const component of [
+    "RuntimeFrame",
+    "BrandMark",
+    "ExpandIcon",
+    "ChampionAvatar",
+    "UnknownRivalAvatar",
+    "SectionHeading",
+    "ModeList",
+    "ArenaList",
+    "ChampionList",
+  ]) {
+    assert.match(
+      page,
+      new RegExp(`const ${component} = memo\\(function ${component}\\(`),
+      `${component} should skip unchanged leaf renders`,
+    );
+  }
+
+  assert.match(page, /runtimeStateEquals\(lastRuntimeRef\.current, next\)/);
+  assert.match(page, /const controlsDisabled = inLobby \|\| runtime\.matchmaking \|\| runtime\.busy/);
+  assert.match(page, /<ModeList activeMode=\{activeMode\} disabled=\{controlsDisabled\} onSelect=\{chooseMode\} \/>/);
+  assert.match(page, /<ArenaList arena=\{arena\} disabled=\{controlsDisabled\} onSelect=\{chooseArena\} \/>/);
+  assert.match(page, /<ChampionList champion=\{champion\} disabled=\{controlsDisabled\} onSelect=\{chooseChampion\} \/>/);
+  assert.match(page, /<ChampionAvatar champion=\{item\} size="sm" \/>/);
+});
 
 function extractFunctionDeclaration(source, name, nextDeclaration) {
   const start = source.indexOf(`function ${name}`);
@@ -39,8 +69,9 @@ test("loads the online duel layer into the reconstructed game", async () => {
   assert.match(page, /src="\/riftbomb-loader\.js"/);
   assert.match(page, /data-riftbomb-manifest='/);
   assert.match(loader, /online-duel\.css/);
-  assert.match(loader, /authoritative-audio\.js/);
-  assert.match(loader, /online-duel\.js/);
+  assert.match(loader, /online-duel-loader\.js/);
+  assert.doesNotMatch(loader, /<script src="\/online-duel\.js"><\/script>/);
+  assert.doesNotMatch(loader, /authoritative-audio\.js/);
   assert.match(loader, /Promise\.all/);
   assert.match(loader, /manifest\.partCount/);
   assert.match(loader, /response\.arrayBuffer/);
@@ -53,6 +84,95 @@ test("loads the online duel layer into the reconstructed game", async () => {
   assert.match(packager, /arenaTextureOutputDirectory/);
   assert.match(packager, /championModelOutputDirectory/);
   assert.doesNotMatch(page, /<script>[\s\S]*<\/script>/);
+});
+
+test("defers the online bridge until a command, session or direct visit needs it", async () => {
+  const [loader, bootstrap, runtime] = await Promise.all([
+    readFile(new URL("public/riftbomb-loader.js", root), "utf8"),
+    readFile(new URL("public/online-duel-loader.js", root), "utf8"),
+    readFile(new URL("public/online-duel.js", root), "utf8"),
+  ]);
+  assert.match(loader, /online-duel-loader\.js/);
+  assert.match(bootstrap, /RIFTBOMB_ONLINE_DUEL_LAZY_V1/);
+  assert.match(bootstrap, /const RUNTIME_URL = "\/online-duel\.js"/);
+  assert.ok(
+    Buffer.byteLength(bootstrap) < Buffer.byteLength(runtime) / 10,
+    "the critical bridge loader must stay below 10% of the deferred runtime",
+  );
+
+  const listeners = new Set();
+  const states = [];
+  const replayedCommands = [];
+  const requests = [];
+  const parent = { location: { href: "https://example.test/" } };
+  const window = {
+    parent,
+    location: { origin: "https://example.test" },
+    postMessage(message) { states.push(message); },
+    dispatchEvent(event) {
+      for (const listener of listeners) listener(event);
+    },
+  };
+  parent.postMessage = (message) => states.push(message);
+  let appendedScript;
+  const document = {
+    createElement(type) {
+      assert.equal(type, "script");
+      return {};
+    },
+    head: {
+      append(script) {
+        appendedScript = script;
+        requests.push(script.src);
+      },
+    },
+    body: null,
+  };
+  const context = {
+    MessageEvent: class MessageEvent {
+      constructor(type, init) {
+        Object.assign(this, { type }, init);
+      }
+    },
+    addEventListener(type, listener) {
+      assert.equal(type, "message");
+      listeners.add(listener);
+    },
+    document,
+    location: window.location,
+    sessionStorage: { getItem() { return null; } },
+    window,
+    URL,
+    console,
+  };
+  context.globalThis = context;
+  listeners.add((event) => {
+    if (event.data?.type === "command") replayedCommands.push(event.data);
+  });
+
+  vm.runInNewContext(bootstrap, context, { filename: "online-duel-loader.js" });
+  const bootstrapListener = [...listeners].at(-1);
+  assert.deepEqual(requests, []);
+  assert.equal(states.length, 1);
+  assert.equal(states[0].state.phase, "setup");
+  assert.equal(states[0].state.busy, false);
+
+  const command = {
+    source: "riftbomb-client",
+    version: 1,
+    type: "command",
+    action: "start-offline",
+    payload: { champion: "katarina", guestChampion: "zed", arena: "lattice" },
+  };
+  bootstrapListener({
+    source: parent,
+    origin: "https://example.test",
+    data: command,
+  });
+  assert.deepEqual(requests, ["/online-duel.js"]);
+  appendedScript.onload();
+  assert.deepEqual(replayedCommands, [command]);
+  assert.equal(appendedScript.async, true);
 });
 
 test("online movement prediction honors the canonical contestant lock", async () => {
@@ -232,7 +352,8 @@ test("movement and actions use independent bounded streams with causal ACK and r
   assert.match(server, /room\.game\?\.mode === "matchover"/);
   assert.match(server, /message\.inputEpoch === room\.inputEpoch/);
   assert.match(rooms, /message\.inputSeq !== room\.inputAccepted\[playerIndex\] \+ 1/);
-  assert.match(rooms, /room\.game\.update\(dt\);\s*room\.inputApplied\[0\] =/);
+  assert.match(rooms,
+    /room\.game\.update\(dt\);[\s\S]*const applied0 = room\.inputAccepted\[0\];[\s\S]*room\.inputApplied\[0\] = applied0/);
   assert.match(rooms, /snapshot\.input = this\.inputProtocol\(room\)/);
   assert.match(rooms, /snapshot\.action = this\.actionProtocol\(room\)/);
   assert.match(rooms, /message\.actionSeq !== room\.actionAck\[playerIndex\] \+ 1/);
@@ -425,17 +546,15 @@ test("superseded sockets cannot mutate the active room or audio cursor", async (
 });
 
 test("online one-shot audio is authoritative, ordered and locally panned", async () => {
-  const [duel, consumer] = await Promise.all([
-    readFile(new URL("public/online-duel.js", root), "utf8"),
-    readFile(new URL("public/authoritative-audio.js", root), "utf8")
-  ]);
+  const duel = await readFile(new URL("public/online-duel.js", root), "utf8");
+  assert.match(duel, /RIFTBOMB_AUTHORITATIVE_AUDIO_INLINE_V1/);
   assert.match(duel, /authoritativePredictionSink/);
   assert.match(duel, /lastPlayedSoundEventId/);
   assert.match(duel, /sourceId: `remote:\$\{event\.id\}`/);
   assert.match(duel, /game\.audioPanAt\(x, z\)/);
   assert.match(duel, /droppedSoundEventCount \+= result\.gap\.count/);
   assert.match(duel, /console\.warn\("Authoritative audio gap"/);
-  assert.match(consumer, /event\.id <= nextCursor/);
+  assert.match(duel, /event\.id <= nextCursor/);
   assert.equal((duel.match(/authoritativeAudio\.consume/g) || []).length, 1);
   assert.doesNotMatch(duel, /consumeAuthoritativeSound|receivedSoundEventId|predictedSounds/);
   assert.doesNotMatch(duel, /\.\.\.event\.options/);
@@ -512,15 +631,54 @@ test("caches only fingerprinted game artifacts as immutable", async () => {
   );
   assert.match(
     headers,
-    /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp\s+Cache-Control: public, max-age=31556952, immutable/,
+    /\/arena-textures\/\*\s+Cache-Control: public, max-age=31556952, immutable/,
   );
   assert.match(
     headers,
-    /\/arena-textures\/floor-storm-eye-combat-field-99509f91\.webp\s+Cache-Control: public, max-age=31556952, immutable/,
+    /\/champion-models\/\*\s+Cache-Control: public, max-age=31556952, immutable\s+Content-Encoding: br/,
+  );
+  assert.match(
+    headers,
+    /\/champion-sfx\/\*\s+Cache-Control: public, max-age=31556952, immutable\s+Content-Encoding: br/,
+  );
+  assert.match(
+    headers,
+    /\/client\/champions\/avatars\/\*\s+Cache-Control: public, max-age=31556952, immutable/,
   );
   assert.match(loader, /manifest\.partsPath !== `\/riftbomb-parts\/\$\{manifest\.sha256\}`/);
   assert.match(loader, /fetch\(`\$\{manifest\.partsPath\}\/part-\$\{name\}/);
   assert.doesNotMatch(headers, /^\/riftbomb\.html|^\/riftbomb-loader\.js/m);
+});
+
+test("code-splits champion SFX banks from the critical online part", async () => {
+  const { directory, names } = await readPackagedGameParts();
+  const game = (await Promise.all(
+    names.map((name) => readFile(new URL(name, directory), "utf8")),
+  )).join("");
+
+  assert.match(game, /CHAMPION_SFX_SPLIT_V1/);
+  assert.doesNotMatch(game, /RIFTBOMB_CHAMPION_SFX_SOURCES/);
+  const manifestMatch = game.match(
+    /const RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST = Object\.freeze\((\{.*?\})\);/s,
+  );
+  assert.ok(manifestMatch, "the online part must publish a lazy champion SFX URL map");
+  const sources = JSON.parse(manifestMatch[1]);
+  assert.deepEqual(Object.keys(sources), ["katarina"]);
+
+  let rawBytes = 0;
+  let publishedBytes = 0;
+  for (const [champion, url] of Object.entries(sources)) {
+    assert.match(url, new RegExp(`^/champion-sfx/${champion}-[a-f0-9]{64}\\.js$`));
+    const compressed = await readFile(new URL(`public${url}`, root));
+    const fingerprint = url.match(/-([a-f0-9]{64})\.js$/)?.[1];
+    assert.equal(createHash("sha256").update(compressed).digest("hex"), fingerprint);
+    const bank = brotliDecompressSync(compressed).toString("utf8");
+    assert.match(bank, /RIFTBOMB_CHAMPION_SFX_BANKS/);
+    assert.match(bank, new RegExp(`\\[\\"${champion}\\"\\]`));
+    rawBytes += Buffer.byteLength(bank);
+    publishedBytes += compressed.byteLength;
+  }
+  assert.ok(publishedBytes < rawBytes * 0.75, "lazy SFX chunks should retain the Brotli reduction");
 });
 
 test("keeps arena WebP files out of the initial online payload", async () => {
@@ -534,49 +692,49 @@ test("keeps arena WebP files out of the initial online payload", async () => {
     game,
     /ARENA_TEXTURE_SOURCE\s*=\s*Object\.freeze\(\{"crateSide":"data:image\/webp;base64/,
   );
-  assert.match(game, /\/arena-textures\/crate\.webp/);
-  assert.match(game, /\/arena-textures\/floor-salt-lens-combat-band-6ffb0854\.webp/);
-  assert.match(game, /\/arena-textures\/floor-clearing-v3\.webp/);
-  assert.match(game, /\/arena-textures\/nacre-growth-albedo\.webp/);
-  assert.match(game, /\/arena-textures\/nacre-reef-albedo\.webp/);
+  const arenaSourceMatch = game.match(
+    /const ARENA_TEXTURE_SOURCE = Object\.freeze\((\{.*?\})\);/s,
+  );
+  assert.ok(arenaSourceMatch, "the online part must publish an arena texture URL map");
+  const arenaSources = JSON.parse(arenaSourceMatch[1]);
+  assert.equal(Object.keys(arenaSources).length, 19);
   assert.doesNotMatch(game, /nacreScene|nacre-hollow-scene\.webp/);
-  assert.match(game, /\/arena-textures\/floor-storm-eye-combat-field-99509f91\.webp/);
-  assert.doesNotMatch(game, /\/arena-textures\/floor-clearing\.webp/);
-  assert.doesNotMatch(game, /\/arena-textures\/floor-lattice\.webp/);
-  assert.doesNotMatch(game, /\/arena-textures\/floor-pit\.webp/);
 
   const textures = [
-    ["game/arena-appearance/textures/crates/crate-albedo.webp", "crate.webp"],
-    ["game/arena-appearance/textures/crates/crate-top-albedo.webp", "crate-top.webp"],
+    ["crateSide", "game/arena-appearance/textures/crates/crate-albedo.webp"],
+    ["crateTop", "game/arena-appearance/textures/crates/crate-top-albedo.webp"],
     [
+      "floorLattice",
       "game/arena-appearance/textures/ground/floor-salt-lens-combat-band-6ffb0854.webp",
-      "floor-salt-lens-combat-band-6ffb0854.webp",
     ],
-    ["game/arena-appearance/textures/ground/floor-clearing-v3.webp", "floor-clearing-v3.webp"],
-    ["game/arena-appearance/textures/props/nacre-growth-albedo.webp", "nacre-growth-albedo.webp"],
-    ["game/arena-appearance/textures/props/nacre-reef-albedo.webp", "nacre-reef-albedo.webp"],
-    ["game/arena-appearance/textures/ground/floor-labyrinth.webp", "floor-labyrinth.webp"],
-    ["game/arena-appearance/textures/ground/floor-forts.webp", "floor-forts.webp"],
+    ["floorClearing", "game/arena-appearance/textures/ground/floor-clearing-v3.webp"],
+    ["nacreGrowth", "game/arena-appearance/textures/props/nacre-growth-albedo.webp"],
+    ["nacreReef", "game/arena-appearance/textures/props/nacre-reef-albedo.webp"],
+    ["floorLabyrinth", "game/arena-appearance/textures/ground/floor-labyrinth.webp"],
+    ["floorForts", "game/arena-appearance/textures/ground/floor-forts.webp"],
     [
+      "floorPit",
       "game/arena-appearance/textures/ground/floor-storm-eye-combat-field-99509f91.webp",
-      "floor-storm-eye-combat-field-99509f91.webp",
     ],
-    ["game/arena-appearance/textures/walls/wall-lattice.webp", "wall-lattice.webp"],
-    ["game/arena-appearance/textures/walls/wall-clearing.webp", "wall-clearing.webp"],
-    ["game/arena-appearance/textures/walls/wall-labyrinth.webp", "wall-labyrinth.webp"],
-    ["game/arena-appearance/textures/walls/wall-forts.webp", "wall-forts.webp"],
-    ["game/arena-appearance/textures/walls/wall-pit.webp", "wall-pit.webp"],
-    ["game/arena-appearance/textures/walls/wall-top-lattice.webp", "wall-top-lattice.webp"],
-    ["game/arena-appearance/textures/walls/wall-top-clearing.webp", "wall-top-clearing.webp"],
-    ["game/arena-appearance/textures/walls/wall-top-labyrinth.webp", "wall-top-labyrinth.webp"],
-    ["game/arena-appearance/textures/walls/wall-top-forts.webp", "wall-top-forts.webp"],
-    ["game/arena-appearance/textures/walls/wall-top-pit.webp", "wall-top-pit.webp"],
+    ["wallLattice", "game/arena-appearance/textures/walls/wall-lattice.webp"],
+    ["wallClearing", "game/arena-appearance/textures/walls/wall-clearing.webp"],
+    ["wallLabyrinth", "game/arena-appearance/textures/walls/wall-labyrinth.webp"],
+    ["wallForts", "game/arena-appearance/textures/walls/wall-forts.webp"],
+    ["wallPit", "game/arena-appearance/textures/walls/wall-pit.webp"],
+    ["wallTopLattice", "game/arena-appearance/textures/walls/wall-top-lattice.webp"],
+    ["wallTopClearing", "game/arena-appearance/textures/walls/wall-top-clearing.webp"],
+    ["wallTopLabyrinth", "game/arena-appearance/textures/walls/wall-top-labyrinth.webp"],
+    ["wallTopForts", "game/arena-appearance/textures/walls/wall-top-forts.webp"],
+    ["wallTopPit", "game/arena-appearance/textures/walls/wall-top-pit.webp"],
   ];
   assert.equal(textures.length, 19, "the online build must publish only the modular arena materials");
   const arenaUrls = game.match(/\/arena-textures\/[^"]+\.webp/g) || [];
   assert.equal(arenaUrls.length, textures.length);
   assert.equal(new Set(arenaUrls).size, textures.length, "every arena slot must own one URL");
-  for (const [sourceName, outputName] of textures) {
+  for (const [key, sourceName] of textures) {
+    const outputUrl = arenaSources[key];
+    assert.match(outputUrl, /^\/arena-textures\/[^/]+-[a-f0-9]{64}\.webp$/);
+    const outputName = outputUrl.split("/").at(-1);
     const source = await readFile(new URL(`../${sourceName}`, root));
     const output = await readFile(
       new URL(`public/arena-textures/${outputName}`, root),
@@ -595,10 +753,13 @@ test("loads only the playable champion models selected in the lobby", async () =
   const game = parts.join("");
   const champions = ["katarina", "zed", "renekton", "vladimir", "gangplank"];
 
-  assert.match(game, /const RIFTBOMB_EXPLOSION_FRAMES = Object\.freeze/);
-  // The trained V1 pilot ships as a separate asset, never inline: the solo
-  // CPU loads it on demand and falls back to the baseline if it is missing.
-  assert.match(game, /<script src="\/bot-v1\.js"><\/script>/);
+  // PARTICLES_ONLY_V1: legacy frame plates stay in the editable/offline
+  // bundle, but must not inflate the critical online part.
+  assert.doesNotMatch(game, /const RIFTBOMB_EXPLOSION_FRAME_SOURCES =/);
+  assert.doesNotMatch(game, /const RIFTBOMB_EXPLOSION_FRAMES = Object\.freeze/);
+  // The trained V1 pilot ships as a separate optional asset: the solo CPU
+  // loads it on demand and falls back to the baseline if it is missing.
+  assert.doesNotMatch(game, /<script src="\/bot-v1\.js"><\/script>/);
   assert.doesNotMatch(game, /RIFTBOMB_BOTS\.createV1Policy = createV1Policy/);
   const botV1 = await readFile(new URL("public/bot-v1.js", root), "utf8");
   assert.match(botV1, /RIFTBOMB_BOTS\.createV1Policy = createV1Policy/);
@@ -621,11 +782,37 @@ test("loads only the playable champion models selected in the lobby", async () =
     champions.length,
   );
 
-  for (const champion of champions) {
-    const script = await readFile(
-      new URL(`public/champion-models/${champion}.js`, root),
-      "utf8",
+  const championSourceMatch = game.match(
+    /const PLAYABLE_CHAMPION_MODEL_SOURCES = Object\.freeze\((\{.*?\})\);/s,
+  );
+  assert.ok(championSourceMatch, "the online part must publish a champion model URL map");
+  const championSources = JSON.parse(championSourceMatch[1]);
+  assert.deepEqual(Object.keys(championSources).sort(), [...champions].sort());
+
+  let uncompressedModelBytes = 0;
+  let publishedModelBytes = 0;
+
+  function assertCompressedFingerprint(url, compressed) {
+    const name = url.split("/").at(-1);
+    const match = name.match(/-([a-f0-9]{64})\.[^.]+$/);
+    assert.ok(match, `${url} must carry a SHA-256 fingerprint`);
+    assert.equal(
+      match[1],
+      createHash("sha256").update(compressed).digest("hex"),
+      `${url} fingerprint must cover the Brotli bytes served over the wire`,
     );
+  }
+
+  for (const champion of champions) {
+    const scriptUrl = championSources[champion];
+    assert.match(scriptUrl, new RegExp(`^/champion-models/${champion}-[a-f0-9]{64}\\.js$`));
+    const compressedScript = await readFile(
+      new URL(`public${scriptUrl}`, root),
+    );
+    assertCompressedFingerprint(scriptUrl, compressedScript);
+    const script = brotliDecompressSync(compressedScript).toString("utf8");
+    uncompressedModelBytes += Buffer.byteLength(script);
+    publishedModelBytes += compressedScript.byteLength;
     const match = script.match(/Object\.freeze\((\{.*\})\);\s*$/s);
     assert.ok(match, `${champion} model payload must be valid generated JavaScript`);
     const payload = JSON.parse(match[1]);
@@ -709,14 +896,23 @@ test("loads only the playable champion models selected in the lobby", async () =
       // Online ships VAT pose data as separate .bin assets (Workers 25 MiB/file cap).
       assert.equal(payload.frames, undefined);
       assert.equal(payload.normals, undefined);
-      assert.equal(payload.framesUrl, `/champion-models/${champion}-frames.bin`);
-      assert.equal(payload.normalsUrl, `/champion-models/${champion}-normals.bin`);
-      const packedFrames = await readFile(
-        new URL(`public/champion-models/${champion}-frames.bin`, root),
+      assert.match(
+        payload.framesUrl,
+        new RegExp(`^/champion-models/${champion}-frames-[a-f0-9]{64}\\.bin$`),
       );
-      const packedNormals = await readFile(
-        new URL(`public/champion-models/${champion}-normals.bin`, root),
+      assert.match(
+        payload.normalsUrl,
+        new RegExp(`^/champion-models/${champion}-normals-[a-f0-9]{64}\\.bin$`),
       );
+      const compressedFrames = await readFile(
+        new URL(`public${payload.framesUrl}`, root),
+      );
+      const compressedNormals = await readFile(
+        new URL(`public${payload.normalsUrl}`, root),
+      );
+      assertCompressedFingerprint(payload.framesUrl, compressedFrames);
+      assertCompressedFingerprint(payload.normalsUrl, compressedNormals);
+      publishedModelBytes += compressedFrames.byteLength + compressedNormals.byteLength;
       const compactRgb = (rgba, componentBytes) => {
         const rgbaPixelBytes = componentBytes * 4;
         const rgbPixelBytes = componentBytes * 3;
@@ -730,8 +926,13 @@ test("loads only the playable champion models selected in the lobby", async () =
         }
         return rgb;
       };
-      assert.deepEqual(packedFrames, compactRgb(frames, Uint16Array.BYTES_PER_ELEMENT));
-      assert.deepEqual(packedNormals, compactRgb(normals, Uint8Array.BYTES_PER_ELEMENT));
+      const packedFrames = brotliDecompressSync(compressedFrames);
+      const packedNormals = brotliDecompressSync(compressedNormals);
+      const expectedFrames = compactRgb(frames, Uint16Array.BYTES_PER_ELEMENT);
+      const expectedNormals = compactRgb(normals, Uint8Array.BYTES_PER_ELEMENT);
+      uncompressedModelBytes += expectedFrames.byteLength + expectedNormals.byteLength;
+      assert.deepEqual(packedFrames, expectedFrames);
+      assert.deepEqual(packedNormals, expectedNormals);
       assert.equal(packedFrames.byteLength, frames.byteLength * 3 / 4);
       assert.equal(packedNormals.byteLength, normals.byteLength * 3 / 4);
       assert.ok(script.length < 25 * 1024 * 1024, `${champion}.js must stay under Workers asset limit`);
@@ -745,6 +946,69 @@ test("loads only the playable champion models selected in the lobby", async () =
       assert.ok(payload.animation.clips, `${champion} must ship animation.clips`);
     }
   }
+  assert.ok(
+    publishedModelBytes < uncompressedModelBytes,
+    `Brotli model assets must be smaller than their decoded payload (${publishedModelBytes} < ${uncompressedModelBytes})`,
+  );
+  assert.ok(
+    publishedModelBytes <= Math.floor(uncompressedModelBytes * 0.75),
+    `Brotli model assets should stay below 75% of decoded bytes (${publishedModelBytes} <= ${Math.floor(uncompressedModelBytes * 0.75)})`,
+  );
+});
+
+test("loads the optional V1 bot once for CPU training and preserves fallback", async () => {
+  const duel = await readFile(new URL("public/online-duel.js", root), "utf8");
+  const loaderStart = duel.indexOf("  function ensureV1BotBundle");
+  const loaderEnd = duel.indexOf("\n  function defaultAuthoritativeServerUrl", loaderStart);
+  assert.ok(loaderStart >= 0 && loaderEnd > loaderStart, "V1 loader must have a stable boundary");
+  const loader = duel.slice(loaderStart, loaderEnd);
+  const makeLoader = new Function("document", "RIFTBOMB_BOTS", `
+    let v1BotBundlePromise = null;
+    const V1_BOT_BUNDLE_URL = "/bot-v1.js";
+    ${loader}
+    return ensureV1BotBundle;
+  `);
+
+  const bots = {};
+  const requests = [];
+  let appendedScript;
+  const document = {
+    createElement(type) {
+      assert.equal(type, "script");
+      return {};
+    },
+    head: {
+      append(script) {
+        appendedScript = script;
+        requests.push(script.src);
+        bots.createV1Policy = () => {};
+        script.onload();
+      },
+    },
+  };
+  const ensure = makeLoader(document, bots);
+  const first = ensure();
+  const second = ensure();
+  assert.equal(await first, true);
+  assert.equal(await second, true);
+  assert.deepEqual(requests, ["/bot-v1.js"]);
+  assert.equal(appendedScript.async, true);
+
+  const failed = makeLoader({
+    createElement() { return {}; },
+    head: { append(script) { script.onerror(); } },
+  }, {});
+  assert.equal(await failed(), false, "missing V1 asset must signal baseline fallback");
+
+  const offlineStart = duel.indexOf("async function startOfflineFromClient");
+  const offlineEnd = duel.indexOf("\n  async function handleClientCommand", offlineStart);
+  assert.ok(offlineStart >= 0 && offlineEnd > offlineStart, "offline flow must have a stable boundary");
+  const offline = duel.slice(offlineStart, offlineEnd);
+  assert.match(offline, /await ensureV1BotBundle\(\)/);
+  assert.ok(
+    offline.indexOf('if (payload.mode === "local")') < offline.indexOf("await ensureV1BotBundle()"),
+    "local multiplayer must not load the CPU-only bundle",
+  );
 });
 
 test("ships server-authoritative room and snapshot behavior", async () => {
@@ -814,5 +1078,35 @@ test("declares persistent signaling storage", async () => {
   assert.match(route, /preparing: true/);
   assert.match(route, /let schemaReady: Promise<void> \| null = null/);
   assert.match(route, /if \(!schemaReady\)/);
+  assert.match(route, /validatePostAction\(body\)/);
   assert.match(route, /createPersistedRoom\(db/);
+
+  const postStart = route.indexOf("export async function POST");
+  const postEnd = route.indexOf("export async function GET");
+  const post = route.slice(postStart, postEnd);
+  assert.ok(
+    post.indexOf("validatePostAction(body)") < post.indexOf("await ensureSchema(db)"),
+    "POST must reject invalid bodies before schema setup",
+  );
+
+  const get = route.slice(postEnd);
+  assert.ok(
+    get.indexOf("if (!validCode(code))") < get.indexOf("await ensureSchema(db)"),
+    "GET must reject invalid codes before schema setup",
+  );
+
+  const client = await readFile(new URL("public/online-duel.js", root), "utf8");
+  const joinStart = client.indexOf("async function joinRoom");
+  const joinEnd = client.indexOf("  function failConnection", joinStart);
+  const join = client.slice(joinStart, joinEnd);
+  assert.match(join, /await connectAuthoritative\("guest"\)/);
+  assert.doesNotMatch(
+    join,
+    /signaling\(\"GET\"/,
+    "guest join must not add a sequential D1 preflight before the authoritative hello",
+  );
+  const failureStart = client.indexOf("function failConnection");
+  const failureEnd = client.indexOf("  function resetConnection", failureStart);
+  const failure = client.slice(failureStart, failureEnd);
+  assert.match(failure, /\[\"room_full\", \"role_taken\"\]\.includes/);
 });

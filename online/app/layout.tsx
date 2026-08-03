@@ -12,10 +12,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = "https://bombpvp.com";
+const siteTitle = "Riftbomb — Bombas. Campeões. Sobreviva.";
+const siteDescription =
+  "Duelos Bomber Rift em tempo real no navegador. Fila rápida, convite por link ou treino — sem download.";
+
 export const metadata: Metadata = {
-  title: "Riftbomb — War Table",
-  description: "Monte seu protocolo, escolha a arena e entre em um duelo tático de Riftbomb.",
+  metadataBase: new URL(siteUrl),
+  title: siteTitle,
+  description: siteDescription,
+  applicationName: "Riftbomb",
   manifest: "/manifest.webmanifest",
+  alternates: {
+    canonical: "/",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -25,8 +35,25 @@ export const metadata: Metadata = {
     "codex-preview": "development",
   },
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: [
+      { url: "/favicon.ico", sizes: "48x48" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    type: "website",
+    locale: "pt_BR",
+    url: `${siteUrl}/`,
+    siteName: "Riftbomb",
+    title: siteTitle,
+    description: siteDescription,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
   },
 };
 

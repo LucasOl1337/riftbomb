@@ -7,7 +7,7 @@ const root = new URL("../", import.meta.url);
 test("advertises the real gameplay preview in the landing sitemap", async () => {
   const [sitemap, image] = await Promise.all([
     readFile(new URL("public/sitemap.xml", root), "utf8"),
-    readFile(new URL("app/twitter-image.png", root)),
+    readFile(new URL("app/twitter-image.webp", root)),
   ]);
 
   assert.match(
@@ -16,8 +16,10 @@ test("advertises the real gameplay preview in the landing sitemap", async () => 
   );
   assert.match(
     sitemap,
-    /<image:loc>https:\/\/bombpvp\.com\/twitter-image\.png<\/image:loc>/,
+    /<image:loc>https:\/\/bombpvp\.com\/twitter-image\.webp<\/image:loc>/,
   );
   assert.match(sitemap, /<image:title>Riftbomb/);
-  assert.equal(image.subarray(1, 4).toString("ascii"), "PNG");
+  assert.equal(image.subarray(0, 4).toString("ascii"), "RIFF");
+  assert.equal(image.subarray(8, 12).toString("ascii"), "WEBP");
+  assert.equal(image.subarray(12, 16).toString("ascii"), "VP8L");
 });

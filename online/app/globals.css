@@ -1,19 +1,20 @@
 :root {
-  --ink-0: #03080d;
-  --ink-1: #08121a;
-  --ink-2: #0c1b25;
-  --panel: rgb(5 14 21 / 92%);
-  --panel-soft: rgb(8 21 30 / 82%);
-  --line: rgb(145 184 196 / 18%);
-  --line-strong: rgb(190 226 234 / 33%);
-  --text: #e9f2f2;
-  --muted: #8ea5ad;
-  --muted-strong: #b5c5ca;
-  --cyan: #72d4dc;
-  --cyan-bright: #a6f5f4;
-  --gold: #d1ae69;
-  --gold-bright: #f3d494;
-  --danger: #df7777;
+  /* GLOBALS_ROOT_RB_BRIDGE_V1 — legacy shell names alias War Table rails */
+  --ink-0: var(--rb-canvas);
+  --ink-1: var(--rb-canvas-soft);
+  --ink-2: var(--rb-surface);
+  --panel: color-mix(in srgb, var(--rb-surface) 92%, transparent);
+  --panel-soft: color-mix(in srgb, var(--rb-surface-soft) 82%, transparent);
+  --line: var(--rb-line);
+  --line-strong: var(--rb-line-strong);
+  --text: var(--rb-text);
+  --muted: var(--rb-muted);
+  --muted-strong: var(--rb-text-soft);
+  --cyan: var(--rb-rift);
+  --cyan-bright: var(--rb-rift);
+  --gold: var(--rb-alloy);
+  --gold-bright: var(--rb-alloy-bright);
+  --danger: var(--rb-danger);
   background: var(--ink-0);
   color: var(--text);
   color-scheme: dark;

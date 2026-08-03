@@ -38,7 +38,9 @@
       if (game.mode === "playing") return;
       UI.start.disabled = true;
       UI.start.textContent = "Loading selected arena…";
-      void sfx.start().catch((error) => console.warn("Audio will resume after player input:", error));
+      void sfx.start(game.players.map((player) => player.champion)).catch((error) => {
+        console.warn("Audio will resume after player input:", error);
+      });
       const assetResults = await Promise.allSettled([
         renderer.ensureChampionModels(game.players.map((player) => player.champion)),
         renderer.ensureArenaTextures(game.arenaTemplate().theme)

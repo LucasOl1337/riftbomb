@@ -37,11 +37,13 @@ function openUntil(port, hello, expectedType) {
 }
 
 async function measureFirstMatch(port) {
+  const connectionStartedAt = performance.now();
   const host = await openUntil(port, {
     type: "hello",
     room: "ABC234",
     role: "host"
   }, "connected");
+  const firstConnectionMs = performance.now() - connectionStartedAt;
   let guest;
   try {
     const startedAt = performance.now();
@@ -51,7 +53,10 @@ async function measureFirstMatch(port) {
       role: "guest",
       ready: true
     }, "start");
-    return performance.now() - startedAt;
+    return {
+      firstConnectionMs,
+      firstMatchMs: performance.now() - startedAt
+    };
   } finally {
     host.terminate();
     guest?.terminate();
@@ -99,7 +104,7 @@ async function measureBoot(index, eager) {
         reject(new Error(`server exited with ${code}: ${stderr.trim()}`));
       });
     });
-    return { bootMs, firstMatchMs: await measureFirstMatch(port) };
+    return { bootMs, ...(await measureFirstMatch(port)) };
   } finally {
     if (child.exitCode === null) child.kill();
     await exited;
@@ -118,6 +123,8 @@ for (let index = 0; index < RUNS; index += 1) {
 
 const eagerBoot = eagerSamplesMs.map(({ bootMs }) => bootMs);
 const lazyBoot = lazySamplesMs.map(({ bootMs }) => bootMs);
+const eagerConnection = eagerSamplesMs.map(({ firstConnectionMs }) => firstConnectionMs);
+const lazyConnection = lazySamplesMs.map(({ firstConnectionMs }) => firstConnectionMs);
 const eagerMatch = eagerSamplesMs.map(({ firstMatchMs }) => firstMatchMs);
 const lazyMatch = lazySamplesMs.map(({ firstMatchMs }) => firstMatchMs);
 const eagerMedian = percentile(eagerBoot, 0.5);
@@ -132,10 +139,12 @@ console.log(JSON.stringify({
   runsPerMode: RUNS,
   eager: {
     boot: summarize(eagerBoot),
+    firstConnection: summarize(eagerConnection),
     firstMatch: summarize(eagerMatch)
   },
   lazy: {
     boot: summarize(lazyBoot),
+    firstConnection: summarize(lazyConnection),
     firstMatch: summarize(lazyMatch)
   },
   medianDeltaMs: Number((lazyMedian - eagerMedian).toFixed(3)),

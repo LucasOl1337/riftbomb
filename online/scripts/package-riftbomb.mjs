@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { brotliCompressSync, constants as zlibConstants } from "node:zlib";
 import { transform } from "esbuild";
 import {
   katarinaDaggerPresentation,
@@ -20,6 +21,7 @@ const shellOutput = path.join(onlineRoot, "public", "riftbomb.html");
 const outputDirectory = path.join(onlineRoot, "public", "riftbomb-parts");
 const arenaTextureOutputDirectory = path.join(onlineRoot, "public", "arena-textures");
 const championModelOutputDirectory = path.join(onlineRoot, "public", "champion-models");
+const championSfxOutputDirectory = path.join(onlineRoot, "public", "champion-sfx");
 const arenaTextureBundleSource = path.join(
   repositoryRoot,
   "game",
@@ -94,6 +96,13 @@ function replaceOnce(source, before, after) {
   return source.slice(0, first) + after + source.slice(first + before.length);
 }
 
+function fingerprintedAssetName(name, buffer) {
+  const extension = path.extname(name);
+  const stem = name.slice(0, -extension.length);
+  const digest = createHash("sha256").update(buffer).digest("hex");
+  return `${stem}-${digest}${extension}`;
+}
+
 const replacements = [
   [
     'this.presentation.announce("Death Lotus needs Red Ziggs nearby");',
@@ -115,10 +124,26 @@ for (const [before, after] of replacements) {
   if (onlineGame.includes(before)) onlineGame = replaceOnce(onlineGame, before, after);
 }
 
-// The V1 pilot bundle ships as a separate asset: the solo CPU gets the
-// trained bot without inflating the initial PvP payload. The external tag
-// keeps the original load order (after the baseline, before the rules);
-// if the asset ever fails to load, the CPU falls back to the baseline.
+// PARTICLES_ONLY_V1: the online explosion renderer uses the GPU point burst;
+// the old Image-based frame plates have no visual consumer in the published
+// path. Keep the editable/offline bundle intact, but remove this 2.3 MB base64
+// loader from the critical online part. The optional renderer path already
+// resolves to an empty texture set when the pack is absent.
+const explosionFrameMarker = "const RIFTBOMB_EXPLOSION_FRAME_SOURCES =";
+const explosionFrameIndex = onlineGame.indexOf(explosionFrameMarker);
+const explosionFrameScriptStart = onlineGame.lastIndexOf("  <script>\n", explosionFrameIndex);
+const explosionFrameScriptClosing = "  </script>\n";
+const explosionFrameScriptEnd = onlineGame.indexOf(explosionFrameScriptClosing, explosionFrameIndex);
+if (explosionFrameIndex < 0 || explosionFrameScriptStart < 0 || explosionFrameScriptEnd < 0) {
+  throw new Error("Unable to locate the optional explosion frame loader");
+}
+onlineGame =
+  onlineGame.slice(0, explosionFrameScriptStart) +
+  onlineGame.slice(explosionFrameScriptEnd + explosionFrameScriptClosing.length);
+
+// The V1 pilot bundle ships as a separate optional asset. Keep the trained
+// bot available for CPU training without making every published PvP boot
+// parse and fetch it; online-duel.js requests it only for that branch.
 const v1BotBundle = (await readFile(v1BotBundleSource, "utf8")).replace(/\r\n/g, "\n");
 const v1PolicyMarker = "RIFTBOMB_BOTS.createV1Policy = createV1Policy;";
 const v1PolicyIndex = onlineGame.indexOf(v1PolicyMarker);
@@ -130,7 +155,6 @@ if (v1PolicyIndex < 0 || v1ScriptStart < 0 || v1ScriptEnd < 0) {
 }
 onlineGame =
   onlineGame.slice(0, v1ScriptStart) +
-  '  <script src="/bot-v1.js"></script>\n' +
   onlineGame.slice(v1ScriptEnd + v1ScriptClosing.length);
 
 // Keep the editable match rules readable while avoiding a raw-shell payload
@@ -158,8 +182,20 @@ const arenaTextureAliasesAt = embeddedArenaTextures.indexOf(
 if (arenaTextureAliasesAt < 0) {
   throw new Error("Arena texture aliases are missing from the generated bundle.");
 }
+const arenaTextureAssets = Object.fromEntries(
+  await Promise.all(
+    Object.entries(arenaTextureFiles).map(async ([key, [sourceName, outputName]]) => {
+      const buffer = await readFile(path.join(arenaTextureSourceDirectory, sourceName));
+      return [key, {
+        sourceName,
+        outputName: fingerprintedAssetName(outputName, buffer),
+        buffer,
+      }];
+    }),
+  ),
+);
 const onlineArenaTextureSources = Object.fromEntries(
-  Object.entries(arenaTextureFiles).map(([key, [, outputName]]) => [
+  Object.entries(arenaTextureAssets).map(([key, { outputName }]) => [
     key,
     `/arena-textures/${outputName}`,
   ]),
@@ -183,7 +219,20 @@ onlineGame = replaceOnce(
 
 // Workers static assets hard-cap at 25 MiB per file. VAT frames/normals are
 // shipped as separate .bin assets so base64 JS never blows past that limit.
+// The published champion-models namespace is served with Content-Encoding: br;
+// fingerprint the compressed bytes while the browser transparently decodes
+// the original JavaScript and RGB VAT buffers.
 const WORKERS_ASSET_MAX_BYTES = 25 * 1024 * 1024;
+const CHAMPION_ASSET_COMPRESSION_QUALITY = 4;
+
+function compressChampionAsset(buffer) {
+  return brotliCompressSync(buffer, {
+    params: {
+      [zlibConstants.BROTLI_PARAM_QUALITY]: CHAMPION_ASSET_COMPRESSION_QUALITY,
+    },
+  });
+}
+
 const embeddedChampionModels = (await readFile(championModelBundleSource, "utf8")).replace(/\r\n/g, "\n");
 const katarinaDagger = await packageKatarinaDagger(repositoryRoot);
 
@@ -283,10 +332,50 @@ const championModelBundles = Object.fromEntries(
     ]),
   ),
 );
+const championModelAssets = Object.fromEntries(
+  playableChampions.map((champion) => {
+    const { payload, binaryAssets } = championModelBundles[champion];
+    const fingerprintedBinaryAssets = binaryAssets.map(({ name, buffer }) => {
+      const compressedBuffer = compressChampionAsset(buffer);
+      return {
+        name: fingerprintedAssetName(name, compressedBuffer),
+        buffer: compressedBuffer,
+      };
+    });
+    const binaryPaths = new Map(
+      binaryAssets.map(({ name }, index) => [
+        `/champion-models/${name}`,
+        `/champion-models/${fingerprintedBinaryAssets[index].name}`,
+      ]),
+    );
+    for (const field of ["framesUrl", "normalsUrl"]) {
+      if (payload[field]) payload[field] = binaryPaths.get(payload[field]) ?? payload[field];
+    }
+
+    const scriptBytes = Buffer.from(
+      [
+        '"use strict";',
+        `window.RIFTBOMB_PLAYABLE_CHAMPIONS.${champion} = Object.freeze(${JSON.stringify(payload)});`,
+        "",
+      ].join("\n"),
+    );
+    if (scriptBytes.byteLength >= WORKERS_ASSET_MAX_BYTES) {
+      throw new Error(
+        `${champion}.js is ${scriptBytes.byteLength} bytes; Workers assets must stay under ${WORKERS_ASSET_MAX_BYTES}`,
+      );
+    }
+    const compressedScriptBytes = compressChampionAsset(scriptBytes);
+    return [champion, {
+      scriptName: fingerprintedAssetName(`${champion}.js`, compressedScriptBytes),
+      scriptBytes: compressedScriptBytes,
+      binaryAssets: fingerprintedBinaryAssets,
+    }];
+  }),
+);
 const onlineChampionModelSources = Object.fromEntries(
   playableChampions.map((champion) => [
     champion,
-    `/champion-models/${champion}.js`,
+    `/champion-models/${championModelAssets[champion].scriptName}`,
   ]),
 );
 onlineGame = replaceOnce(
@@ -302,6 +391,51 @@ onlineGame = replaceOnce(
   ].join("\n"),
 );
 
+// CHAMPION_SFX_SPLIT_V1: champion voice banks are optional match assets.
+// Compress and fingerprint the lazy scripts so a selected bank is cached
+// independently without re-inflating the critical game part.
+const championSfxBundles = Object.fromEntries(
+  (await Promise.all(
+    playableChampions.map(async (champion) => {
+      const sourcePath = path.join(
+        championSourceDirectory,
+        champion,
+        "sfx",
+        "riftbomb-sfx-bank.js",
+      );
+      let sourceBytes;
+      try {
+        sourceBytes = await readFile(sourcePath);
+      } catch (error) {
+        if (error?.code === "ENOENT") return null;
+        throw error;
+      }
+      const compressedBytes = compressChampionAsset(sourceBytes);
+      return [champion, {
+        outputName: fingerprintedAssetName(`${champion}.js`, compressedBytes),
+        compressedBytes,
+      }];
+    }),
+  )).filter(Boolean),
+);
+const localChampionSfxManifest = Object.fromEntries(
+  Object.keys(championSfxBundles).map((champion) => [
+    champion,
+    `./champions/${champion}/sfx/riftbomb-sfx-bank.js`,
+  ]),
+);
+const onlineChampionSfxManifest = Object.fromEntries(
+  Object.entries(championSfxBundles).map(([champion, bundle]) => [
+    champion,
+    `/champion-sfx/${bundle.outputName}`,
+  ]),
+);
+onlineGame = replaceOnce(
+  onlineGame,
+  `const RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST = Object.freeze(${JSON.stringify(localChampionSfxManifest, null, 2)});`,
+  `const RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST = Object.freeze(${JSON.stringify(onlineChampionSfxManifest, null, 2)});`,
+);
+
 const game = Buffer.from(onlineGame);
 const partCount = Math.ceil(game.length / PART_SIZE);
 const sha256 = createHash("sha256").update(game).digest("hex");
@@ -313,37 +447,29 @@ await mkdir(versionedPartsDirectory, { recursive: true });
 await rm(arenaTextureOutputDirectory, { recursive: true, force: true });
 await mkdir(arenaTextureOutputDirectory, { recursive: true });
 await Promise.all(
-  Object.values(arenaTextureFiles).map(([sourceName, outputName]) =>
-    cp(
-      path.join(arenaTextureSourceDirectory, sourceName),
-      path.join(arenaTextureOutputDirectory, outputName),
-    ),
+  Object.values(arenaTextureAssets).map(({ outputName, buffer }) =>
+    writeFile(path.join(arenaTextureOutputDirectory, outputName), buffer),
   ),
 );
 await rm(championModelOutputDirectory, { recursive: true, force: true });
 await mkdir(championModelOutputDirectory, { recursive: true });
 await Promise.all(
   playableChampions.flatMap((champion) => {
-    const { payload, binaryAssets } = championModelBundles[champion];
-    const scriptBytes = Buffer.from(
-      [
-        '"use strict";',
-        `window.RIFTBOMB_PLAYABLE_CHAMPIONS.${champion} = Object.freeze(${JSON.stringify(payload)});`,
-        "",
-      ].join("\n"),
-    );
-    if (scriptBytes.byteLength >= WORKERS_ASSET_MAX_BYTES) {
-      throw new Error(
-        `${champion}.js is ${scriptBytes.byteLength} bytes; Workers assets must stay under ${WORKERS_ASSET_MAX_BYTES}`,
-      );
-    }
+    const { scriptName, scriptBytes, binaryAssets } = championModelAssets[champion];
     return [
-      writeFile(path.join(championModelOutputDirectory, `${champion}.js`), scriptBytes),
+      writeFile(path.join(championModelOutputDirectory, scriptName), scriptBytes),
       ...binaryAssets.map(({ name, buffer }) =>
         writeFile(path.join(championModelOutputDirectory, name), buffer),
       ),
     ];
   }),
+);
+await rm(championSfxOutputDirectory, { recursive: true, force: true });
+await mkdir(championSfxOutputDirectory, { recursive: true });
+await Promise.all(
+  Object.values(championSfxBundles).map(({ outputName, compressedBytes }) =>
+    writeFile(path.join(championSfxOutputDirectory, outputName), compressedBytes),
+  ),
 );
 
 for (let index = 0; index < partCount; index += 1) {

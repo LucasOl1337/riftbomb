@@ -1,6 +1,46 @@
 import assert from "node:assert/strict";
+import { timingSafeEqual } from "node:crypto";
+import { connect } from "node:net";
 import test from "node:test";
 import { WebSocket } from "ws";
+
+function rawUpgrade(port, proxySecret) {
+  return new Promise((resolve, reject) => {
+    const socket = connect(port, "127.0.0.1");
+    let response = "";
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      reject(new Error("upgrade response timed out"));
+    }, 1_000);
+    const finish = () => {
+      clearTimeout(timeout);
+      socket.destroy();
+      resolve(response);
+    };
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk) => {
+      response += chunk;
+      if (response.includes("\r\n\r\n")) finish();
+    });
+    socket.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    socket.on("connect", () => {
+      socket.write([
+        "GET /ws HTTP/1.1",
+        "Host: 127.0.0.1",
+        "Connection: Upgrade",
+        "Upgrade: websocket",
+        "Sec-WebSocket-Version: 13",
+        "Sec-WebSocket-Key: dGVzdC1rZXktZm9yLWF1dGg=",
+        `x-riftbomb-proxy: ${proxySecret}`,
+        "",
+        ""
+      ].join("\r\n"));
+    });
+  });
+}
 
 function openClient(port, hello, terminalType = "connected") {
   return new Promise((resolve, reject) => {
@@ -54,6 +94,28 @@ async function waitUntil(predicate, label, timeoutMs = 2000) {
   assert.equal(Boolean(predicate()), true, `${label} timed out`);
 }
 
+test("rejects unauthorized websocket upgrades before loading the transport runtime", async (t) => {
+  process.env.PORT = "0";
+  process.env.GAME_SERVER_PROXY_SECRET = "test-proxy-secret";
+  const {
+    server,
+    closeAuthoritativeServer,
+    webSocketRuntimeSnapshot
+  } = await import(`../src/server.mjs?test=upgrade-auth-${Date.now()}`);
+  await new Promise((resolve) => server.listening ? resolve() : server.once("listening", resolve));
+  t.after(() => closeAuthoritativeServer());
+
+  const rejected = await rawUpgrade(server.address().port, "wrong-proxy-secret");
+  assert.match(rejected, /^HTTP\/1\.1 401 Unauthorized/);
+  assert.deepEqual(webSocketRuntimeSnapshot(), { loaded: false, serverCreated: false });
+
+  const authorized = await openClient(server.address().port, {
+    type: "hello", room: "SECURE", role: "host", preset: null
+  });
+  assert.deepEqual(webSocketRuntimeSnapshot(), { loaded: true, serverCreated: true });
+  authorized.socket.terminate();
+});
+
 test("websocket resume revocation storage is capacity and sweep bounded", async (t) => {
   process.env.PORT = "0";
   process.env.GAME_SERVER_PROXY_SECRET = "test-proxy-secret";
@@ -89,6 +151,61 @@ test("websocket resume revocation storage is capacity and sweep bounded", async 
   assert.ok(productionBounds.capacity >= 256 && productionBounds.capacity <= 16_384);
   assert.equal(productionBounds.sweepLimit, 64);
   assert.ok(productionBounds.size <= productionBounds.capacity);
+});
+
+test("quick-match resume index keeps live seats and rejects stale candidates", async (t) => {
+  process.env.PORT = "0";
+  process.env.GAME_SERVER_PROXY_SECRET = "test-proxy-secret";
+  const {
+    server,
+    closeAuthoritativeServer,
+    createQuickMatchResumeIndex
+  } = await import(`../src/server.mjs?test=resume-index-${Date.now()}`);
+  await new Promise((resolve) => server.listening ? resolve() : server.once("listening", resolve));
+  t.after(() => closeAuthoritativeServer());
+
+  const cryptoRuntime = { timingSafeEqual };
+  const index = createQuickMatchResumeIndex();
+  const digest = Buffer.alloc(32, 7);
+  const room = {
+    code: "IDX001",
+    players: [{
+      quickMatch: true,
+      resumeProtocol: 1,
+      resumeTokenDigest: digest,
+      socket: null
+    }, null]
+  };
+  const duplicate = {
+    code: "IDX002",
+    players: [{
+      quickMatch: true,
+      resumeProtocol: 1,
+      resumeTokenDigest: digest,
+      socket: null
+    }, null]
+  };
+
+  assert.equal(index.add(room, 0, digest), true);
+  assert.equal(index.add(room, 0, digest), false);
+  assert.equal(index.size(), 1);
+  assert.deepEqual(index.find(digest, cryptoRuntime), { room, index: 0, role: "host" });
+
+  assert.equal(index.add(duplicate, 0, digest), true);
+  assert.equal(index.size(), 2);
+  room.players[0].quickMatch = false;
+  assert.deepEqual(index.find(digest, cryptoRuntime), {
+    room: duplicate,
+    index: 0,
+    role: "host"
+  });
+
+  assert.equal(index.remove(room, 0, digest), true);
+  assert.equal(index.remove(room, 0, digest), false);
+  assert.equal(index.size(), 1);
+  assert.equal(index.remove(duplicate, 0, digest), true);
+  assert.equal(index.find(digest, cryptoRuntime), null);
+  assert.equal(index.size(), 0);
 });
 
 test("websocket rejects malformed payloads without losing valid traffic", async (t) => {

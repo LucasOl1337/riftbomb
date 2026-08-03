@@ -23,3 +23,5 @@ artifacts/comparar-qa/
 # Operating-system files
 Thumbs.db
 .DS_Store
+# Oracle/local release staging (stage-release.mjs)
+.release/

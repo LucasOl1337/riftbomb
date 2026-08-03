@@ -7,7 +7,11 @@ import {
   createAuthoritativeDuel,
   serializeAuthoritativeSnapshot
 } from "../../../game/create-authoritative-duel.mjs";
-import { AuthoritativeRooms, updateGridCache } from "../src/authoritative-rooms.mjs";
+import {
+  AuthoritativeRooms,
+  invalidateProtocolCache,
+  updateGridCache
+} from "../src/authoritative-rooms.mjs";
 
 test("tracks exact grid changes without transient serialization", () => {
   const room = { gridCache: null };
@@ -25,6 +29,42 @@ test("tracks exact grid changes without transient serialization", () => {
   grid.push([4]);
   assert.equal(updateGridCache(room, grid), true);
   assert.deepEqual(room.gridCache, grid);
+});
+
+test("reuses immutable empty snapshot containers without changing the JSON shape", async () => {
+  const game = await createAuthoritativeDuel({
+    hostChampion: "katarina", guestChampion: "zed", arena: "lattice", matchTarget: 3
+  });
+  const first = serializeAuthoritativeSnapshot(game, 1);
+  const second = serializeAuthoritativeSnapshot(game, 2);
+
+  assert.equal(first.bombs, second.bombs);
+  assert.equal(first.particles, second.particles);
+  assert.equal(first.sound, second.sound);
+  assert.equal(Object.isFrozen(first.bombs), true);
+  assert.equal(Object.isFrozen(first.particles), true);
+  assert.equal(Object.isFrozen(first.sound), true);
+  const normalizeVolatile = (snapshot) => ({
+    ...snapshot,
+    s: 0,
+    serverTime: 0
+  });
+  assert.deepEqual(
+    normalizeVolatile(first),
+    normalizeVolatile(second),
+    "empty-container reuse must not alter snapshot fields"
+  );
+
+  assert.equal(game.placeBomb(game.players[0]), true);
+  game.particles = [{ x: 0, y: 0, z: 0, age: 0, life: 1 }];
+  const active = serializeAuthoritativeSnapshot(game, 3);
+  assert.notEqual(active.bombs, first.bombs);
+  assert.notEqual(active.particles, first.particles);
+  assert.equal(active.bombs.length, 1);
+  assert.equal(active.particles.length, 1);
+  assert.equal(active.sound.events.length, 1);
+  assert.equal(Object.isFrozen(active.bombs), false);
+  assert.equal(Object.isFrozen(active.particles), false);
 });
 
 test("movement input accepts only the next sequence in the active match epoch", () => {
@@ -145,6 +185,44 @@ test("action transport processes each sequence once and ACKs mechanical rejectio
   }), true, "the next current-round action cannot be head-of-line blocked");
   assert.deepEqual(manager.actionProtocol(room).ack, [4, 1]);
   assert.equal(applied.length, 5);
+});
+
+test("reuses protocol envelopes until their room cursors change", () => {
+  const manager = new AuthoritativeRooms({ rooms: new Map(), broadcast() {} });
+  const room = manager.create("CACHE1", {});
+
+  const firstInput = manager.inputProtocol(room);
+  const firstAction = manager.actionProtocol(room);
+  assert.strictEqual(manager.inputProtocol(room), firstInput);
+  assert.strictEqual(manager.actionProtocol(room), firstAction);
+
+  room.game = { round: 0 };
+  manager.duelRuntime = { applyPlayerAction() { return true; } };
+  assert.equal(manager.acceptInput(room, 0, {
+    type: "input", mask: 1, inputEpoch: 0, inputSeq: 1
+  }), true);
+  const changedInput = manager.inputProtocol(room);
+  assert.notStrictEqual(changedInput, firstInput);
+  assert.deepEqual(changedInput.accepted, [1, 0]);
+  assert.strictEqual(manager.inputProtocol(room), changedInput);
+  assert.strictEqual(manager.actionProtocol(room), firstAction);
+
+  assert.equal(manager.processPlayerAction(room, 1, {
+    type: "action", kind: "bomb", actionEpoch: 0, actionSeq: 1, actionRound: 0
+  }), true);
+  const changedAction = manager.actionProtocol(room);
+  assert.notStrictEqual(changedAction, firstAction);
+  assert.deepEqual(changedAction.ack, [0, 1]);
+
+  invalidateProtocolCache(room, "input");
+  const invalidatedInput = manager.inputProtocol(room);
+  assert.notStrictEqual(invalidatedInput, changedInput);
+  assert.deepEqual(invalidatedInput.accepted, [1, 0]);
+
+  room.inputEpoch = 1;
+  const changedEpoch = manager.inputProtocol(room);
+  assert.notStrictEqual(changedEpoch, invalidatedInput);
+  assert.equal(changedEpoch.epoch, 1);
 });
 
 const unlockKit = (player) => {
@@ -998,6 +1076,7 @@ test("shares one tick and snapshot clock across active rooms", async () => {
     room.players = [{ socket: {} }, { socket: {}, ready: true }];
     await manager.start(room);
   }
+  manager.create("LOBBY1", {});
 
   assert.equal(timers.size, 2);
   assert.deepEqual([...timers.values()].map(({ delay }) => Math.round(delay)), [17, 33]);
@@ -1012,7 +1091,10 @@ test("shares one tick and snapshot clock across active rooms", async () => {
   now += 1000 / 60;
   tickClock.callback();
   snapshotClock.callback();
-  assert.deepEqual([...rooms.values()].map(({ sequence }) => sequence), [1, 1]);
+  assert.deepEqual([...rooms.values()]
+    .filter(({ game }) => game)
+    .map(({ sequence }) => sequence), [1, 1]);
+  assert.equal(rooms.get("LOBBY1").sequence, 0);
   assert.equal(broadcasts.filter(({ message }) => message.type === "snapshot" && message.data.grid).length, 2);
   assert.deepEqual(
     broadcasts.find(({ room, message }) => room === inputRoom && message.type === "snapshot")
@@ -1044,9 +1126,16 @@ test("shares one tick and snapshot clock across active rooms", async () => {
   for (let sequence = 3; sequence <= 60; sequence += 1) snapshotClock.callback();
   assert.equal(broadcasts.slice(-2).filter(({ message }) => message.data.grid).length, 2);
 
+  const drainedCodes = [];
+  manager.runRoomQueue("tickQueueActive", (room) => drainedCodes.push(room.code));
+  assert.deepEqual(drainedCodes, ["ROOM01", "ROOM02"],
+    "shared queues must skip lobby rooms without an active game");
+
   manager.stop(rooms.get("ROOM01"));
+  assert.deepEqual([...manager.activeRooms].map(({ code }) => code), ["ROOM02"]);
   assert.equal(timers.size, 2);
   manager.stop(rooms.get("ROOM02"));
+  assert.equal(manager.activeRooms.size, 0);
   assert.equal(timers.size, 0);
   assert.deepEqual(cancelled, [1, 2]);
 });
@@ -1062,6 +1151,7 @@ test("yields between bounded room batches", () => {
       pending.push(callback);
     }
   });
+  for (const room of rooms.values()) manager.activeRooms.add(room);
 
   manager.runRoomQueue("tickQueueActive", (room) => visited.push(room.index));
   assert.equal(visited.length, 8);

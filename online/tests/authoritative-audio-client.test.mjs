@@ -5,11 +5,11 @@ import vm from "node:vm";
 import { createAuthoritativeAudioRecorder } from "../../game/create-authoritative-duel.mjs";
 
 const source = await readFile(
-  new URL("../public/authoritative-audio.js", import.meta.url),
+  new URL("../public/online-duel.js", import.meta.url),
   "utf8"
 );
 const context = vm.createContext({});
-vm.runInContext(source, context, { filename: "authoritative-audio.js" });
+vm.runInContext(source, context, { filename: "online-duel.js" });
 const { consume } = context.RIFTBOMB_AUTHORITATIVE_AUDIO;
 
 test("canonical server sound snapshots preserve every explosion identity", () => {

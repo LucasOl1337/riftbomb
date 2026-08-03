@@ -219,7 +219,7 @@ function traceAction(action, options = {}) {
   return { trace, pulses };
 }
 
-test("the SFX module stays explicitly registered before game startup", async () => {
+test("the SFX module and lazy champion manifest stay registered before game startup", async () => {
   const document = await readFile(documentPath, "utf8");
   const entrypoint = '<script src="./play-rift-sfx.js"></script>';
   const samplePack = '<script src="./arena-appearance/load-arena-sfx.js"></script>';
@@ -230,6 +230,50 @@ test("the SFX module stays explicitly registered before game startup", async () 
   assert.ok(document.indexOf(samplePack) < document.indexOf(entrypoint));
   assert.ok(document.indexOf(championPack) < document.indexOf(entrypoint));
   assert.ok(document.indexOf(entrypoint) < document.indexOf('<script src="./start-champion-duel.js"></script>'));
+});
+
+test("champion SFX samples are code-split out of the critical loader", async () => {
+  const loader = await readFile(path.join(gameDirectory, "load-champion-sfx.js"), "utf8");
+  const bank = await readFile(
+    path.join(gameDirectory, "..", "champions", "katarina", "sfx", "riftbomb-sfx-bank.js"),
+    "utf8",
+  );
+
+  assert.match(loader, /CHAMPION_SFX_SPLIT_V1/);
+  assert.match(loader, /RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST/);
+  assert.doesNotMatch(loader, /data:audio\//);
+  assert.ok(Buffer.byteLength(loader) < 4096, "the critical loader should remain metadata-sized");
+  assert.match(bank, /RIFTBOMB_CHAMPION_SFX_BANKS/);
+  assert.match(bank, /data:audio\//);
+  assert.ok(Buffer.byteLength(bank) > 1_000_000, "the large sample bank must live in the lazy chunk");
+});
+
+test("concurrent champion SFX requests share one lazy script and missing banks stay optional", async () => {
+  const scripts = [];
+  const SfxEngine = loadSfxEngine({
+    RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST: { katarina: "/champion-sfx/katarina.js" },
+    document: {
+      createElement(type) {
+        assert.equal(type, "script");
+        const script = {};
+        scripts.push(script);
+        return script;
+      },
+      head: {
+        append(script) {
+          assert.equal(script.src, "/champion-sfx/katarina.js");
+        }
+      }
+    }
+  });
+  const sfx = new SfxEngine();
+
+  const first = sfx.loadChampionSfx(["katarina"]);
+  const second = sfx.loadChampionSfx(["katarina", "zed"]);
+  assert.equal(scripts.length, 1);
+  scripts[0].onerror(new Error("offline test"));
+  await Promise.all([first, second]);
+  assert.equal(Object.keys(sfx.sampleMeta).length, 0);
 });
 
 test("distortion and final ceiling curves remain finite, symmetric and bounded", () => {

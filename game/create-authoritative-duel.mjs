@@ -12,6 +12,12 @@ const noOpService = new Proxy({}, {
 
 const AUDIO_EVENT_LIMIT = 64;
 const AUDIO_SNAPSHOT_LIMIT = 32;
+const EMPTY_SNAPSHOT_ARRAY = Object.freeze([]);
+const EMPTY_AUDIO_SNAPSHOT = Object.freeze({
+  v: 1,
+  latest: 0,
+  events: EMPTY_SNAPSHOT_ARRAY
+});
 const AUDIO_CUES = new Set([
   "barrelBoom", "bladeHit", "bomb", "cannonBarrage", "cannonImpact",
   "daggerLand", "deathLotus", "deathMark", "dominus", "explosion",
@@ -31,6 +37,7 @@ const finiteBetween = (value, min, max, fallback = null) => {
 export function createAuthoritativeAudioRecorder(startId = 0) {
   const events = [];
   let sequence = Number.isSafeInteger(startId) && startId >= 0 ? startId : 0;
+  let emptySnapshot = null;
   const record = (candidate = {}) => {
     const cue = String(candidate.type || "");
     if (!AUDIO_CUES.has(cue)) return false;
@@ -53,6 +60,14 @@ export function createAuthoritativeAudioRecorder(startId = 0) {
     emitGameEvent: record,
     snapshot(limit = AUDIO_SNAPSHOT_LIMIT) {
       const bounded = Math.max(0, Math.min(AUDIO_EVENT_LIMIT, Math.trunc(limit) || 0));
+      if (bounded === AUDIO_SNAPSHOT_LIMIT && events.length === 0) {
+        emptySnapshot ??= Object.freeze({
+          v: 1,
+          latest: sequence,
+          events: EMPTY_SNAPSHOT_ARRAY
+        });
+        return emptySnapshot;
+      }
       return { v: 1, latest: sequence, events: events.slice(-bounded) };
     },
     service: {
@@ -171,14 +186,16 @@ export function serializeAuthoritativeSnapshot(game, sequence, includeGrid = fal
   for (const key of snapshotScalars) snapshot[key] = game[key];
   for (const key of snapshotArrays) {
     snapshot[key] = key === "bombs"
-      ? game.bombs.map((bomb) => ({ ...bomb, passOwners: [...(bomb.passOwners || [])] }))
+      ? game.bombs.length === 0
+        ? EMPTY_SNAPSHOT_ARRAY
+        : game.bombs.map((bomb) => ({ ...bomb, passOwners: [...(bomb.passOwners || [])] }))
       : game[key];
   }
   if (includeGrid) snapshot.grid = game.grid;
-  snapshot.particles = game.particles.slice(-72);
-  snapshot.sound = game.authoritativeSound?.snapshot(AUDIO_SNAPSHOT_LIMIT) || {
-    v: 1, latest: 0, events: []
-  };
+  snapshot.particles = game.particles.length === 0
+    ? EMPTY_SNAPSHOT_ARRAY
+    : game.particles.slice(-72);
+  snapshot.sound = game.authoritativeSound?.snapshot(AUDIO_SNAPSHOT_LIMIT) || EMPTY_AUDIO_SNAPSHOT;
   snapshot.pendingWinnerId = game.pendingMatchWinner?.id || 0;
   return snapshot;
 }

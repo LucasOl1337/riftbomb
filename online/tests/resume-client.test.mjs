@@ -287,6 +287,65 @@ test("resume secret stays out of bridge, URL and log paths", async () => {
   assert.doesNotMatch(source, /searchParams\.set\([^\n]*resumeToken/);
 });
 
+test("bridge state excludes delivery cursors kept inside the iframe", async () => {
+  const source = await readFile(sourceUrl, "utf8");
+  const bridge = extract(source, "function clientStateSnapshot", "  function publishClientState");
+  assert.doesNotMatch(bridge, /inputDelivery|actionDelivery/);
+
+  const state = {
+    resuming: false,
+    role: "host",
+    roomCode: "ABC234",
+    connected: true,
+    rivalConnected: true,
+    guestReady: false,
+    inviteMode: false,
+    inviteUrl: "",
+    matchmaking: false,
+    quickMatch: false,
+    hostChampion: "katarina",
+    guestChampion: "zed",
+    arena: "lattice",
+    matchTarget: 3,
+  };
+  const game = { mode: "intro" };
+  const enabled = { disabled: false };
+  const status = { textContent: "Aguardando o segundo jogador.", dataset: { tone: "ok" } };
+  let inputSnapshotCalls = 0;
+  let actionSnapshotCalls = 0;
+  const clientStateSnapshot = new Function(
+    "state", "game", "runtimeBootRecord", "createButton", "showInviteButton",
+    "showJoinButton", "reliableInput", "reliableAction", "status", "clientPhase",
+    `${bridge}; return clientStateSnapshot;`
+  )(
+    state,
+    game,
+    null,
+    enabled,
+    enabled,
+    enabled,
+    { snapshot: () => { inputSnapshotCalls += 1; return { pending: [1] }; } },
+    { snapshot: () => { actionSnapshotCalls += 1; return { pending: [1] }; } },
+    status,
+    () => "lobby",
+  );
+
+  const snapshot = clientStateSnapshot();
+  for (const field of [
+    "phase", "role", "roomCode", "connected", "rivalConnected", "guestReady",
+    "inviteMode", "inviteUrl", "busy", "matchmaking", "quickMatch",
+    "hostChampion", "guestChampion", "arena", "matchTarget", "status", "tone",
+  ]) {
+    assert.equal(field in snapshot, true, field);
+  }
+  assert.equal(snapshot.role, "host");
+  assert.equal(snapshot.status, status.textContent);
+  assert.equal("inputDelivery" in snapshot, false);
+  assert.equal("actionDelivery" in snapshot, false);
+  assert.equal(inputSnapshotCalls, 0);
+  assert.equal(actionSnapshotCalls, 0);
+});
+
 test("iframe ready publication preserves the saved session until auto-resume", async () => {
   const source = await readFile(sourceUrl, "utf8");
   const declaration = extract(source, "function publishClientState", "  function clearSession");

@@ -603,6 +603,17 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
+.theatre-proof {
+  margin: 8px 2px 0;
+  color: var(--rb-alloy);
+  font-family: var(--rb-data);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
 .encounter-bar {
   display: grid;
   min-height: 58px;
@@ -665,6 +676,40 @@ a:focus-visible {
 .fighter--rival.is-unknown small {
   color: var(--rb-muted);
 }
+.fighter--rival.is-searching {
+  border-color: color-mix(in srgb, var(--rb-rift) 55%, var(--rb-line));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rb-rift) 28%, transparent);
+}
+
+.fighter--rival.is-searching small {
+  color: var(--rb-rift);
+}
+
+.fighter--rival.is-searching b {
+  color: var(--rb-text);
+}
+
+.fighter--rival.is-searching em {
+  color: var(--rb-text-soft);
+}
+
+.fighter--rival.is-searching .champion-avatar--unknown {
+  color: var(--rb-rift);
+  border-color: color-mix(in srgb, var(--rb-rift) 50%, var(--rb-line));
+  animation: rival-search-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes rival-search-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fighter--rival.is-searching .champion-avatar--unknown {
+    animation: none;
+  }
+}
+
 
 .versus-mark {
   display: flex;
@@ -1158,8 +1203,7 @@ a:focus-visible {
   color: var(--rb-warning);
 }
 
-.action-cluster[data-tone="error"] .action-cluster__status small,
-.client-notice {
+.action-cluster[data-tone="error"] .action-cluster__status small {
   color: var(--rb-danger);
 }
 
@@ -1174,6 +1218,19 @@ a:focus-visible {
 .client-notice {
   font-size: 12px;
   line-height: 1.4;
+  color: var(--rb-text-soft);
+}
+
+.client-notice[data-tone="success"] {
+  color: var(--rb-success);
+}
+
+.client-notice[data-tone="error"] {
+  color: var(--rb-danger);
+}
+
+.client-notice[data-tone="neutral"] {
+  color: var(--rb-text-soft);
 }
 
 .invite-fallback {
@@ -1235,6 +1292,16 @@ a:focus-visible {
   font-size: 20px;
 }
 
+.action-cluster__hint {
+  margin: 0;
+  color: var(--rb-text-soft);
+  font-family: var(--rb-data);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+}
+
 .action-cluster__secondary {
   min-height: 40px;
   border: 1px solid var(--rb-line);
@@ -1256,10 +1323,47 @@ a:focus-visible {
   z-index: 10;
   top: max(0.55rem, env(safe-area-inset-top));
   left: max(0.55rem, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(22rem, calc(100vw - 1.5rem));
 }
+
+/* MATCH_CHROME_CONNECTION_ALERT_V1: live disconnect copy while War Table is aria-hidden */
+.match-connection-alert {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--rb-danger);
+  background: rgb(3 8 11 / 84%);
+  color: #fff;
+  font-family: var(--rb-data);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  backdrop-filter: blur(8px);
+}
+
+/* MATCH_CHROME_RECONNECT_NOTICE_V1: ok-tone rival rejoin while War Table is aria-hidden */
+.match-reconnect-notice {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--rb-success);
+  background: rgb(3 8 11 / 84%);
+  color: #fff;
+  font-family: var(--rb-data);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  backdrop-filter: blur(8px);
+}
+
 
 .match-exit-button {
   min-height: 42px;
+  min-width: 44px;
   padding: 0 14px;
   border: 1px solid rgb(255 255 255 / 32%);
   background: rgb(3 8 11 / 76%);
@@ -1271,10 +1375,63 @@ a:focus-visible {
   backdrop-filter: blur(8px);
 }
 
+/* MATCH_CHROME_FULLSCREEN_V1 */
+.match-fullscreen-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.match-fullscreen-button svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  fill: none;
+}
+
 .match-exit-button:hover,
 .match-exit-button:focus-visible {
   border-color: var(--rb-danger);
   color: var(--rb-danger);
+}
+
+.match-fullscreen-button:hover,
+.match-fullscreen-button:focus-visible {
+  border-color: var(--rb-alloy);
+  color: var(--rb-alloy);
+  outline: 3px solid var(--rb-focus);
+  outline-offset: 2px;
+}
+
+/* FULLSCREEN_FEEDBACK_V1: mid-match outcome when War Table is aria-hidden */
+.match-presentation-notice {
+  flex: 1 1 12rem;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  background: rgb(3 8 11 / 82%);
+  color: var(--rb-text-soft);
+  font-family: var(--rb-data);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  backdrop-filter: blur(8px);
+}
+
+.match-presentation-notice[data-tone="success"] {
+  border-color: color-mix(in srgb, var(--rb-success) 55%, transparent);
+  color: var(--rb-success);
+}
+
+.match-presentation-notice[data-tone="error"] {
+  border-color: color-mix(in srgb, var(--rb-danger) 55%, transparent);
+  color: var(--rb-danger);
+}
+
+.match-presentation-notice[data-tone="neutral"] {
+  color: var(--rb-text-soft);
 }
 
 .rotate-gate {
@@ -1504,6 +1661,12 @@ a:focus-visible {
     font-size: 27px;
   }
 
+  .theatre-proof {
+    margin-top: 6px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+
   .encounter-bar {
     grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr);
     gap: 5px;
@@ -1641,6 +1804,11 @@ a:focus-visible {
     background: var(--rb-alloy);
     color: var(--rb-canvas);
     font-weight: 800;
+  }
+
+  .rotate-gate__action:focus-visible {
+    outline: 3px solid var(--rb-focus);
+    outline-offset: 3px;
   }
 }
 

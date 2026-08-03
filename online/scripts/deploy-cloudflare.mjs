@@ -6,6 +6,7 @@
  *   node scripts/deploy-cloudflare.mjs --build
  *
  * Requires:
+ *   - git branch `main` (or ALLOW_NON_MAIN_DEPLOY=1 for explicit override)
  *   - wrangler login (or CLOUDFLARE_API_TOKEN)
  *   - CLOUDFLARE_ACCOUNT_ID (optional if set in wrangler.production.jsonc)
  *   - dist/ from `npm run build`
@@ -17,6 +18,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const onlineRoot = path.resolve(__dirname, "..");
+const repositoryRoot = path.resolve(onlineRoot, "..");
 const distServer = path.join(onlineRoot, "dist", "server");
 const distClient = path.join(onlineRoot, "dist", "client");
 const productionConfigPath = path.join(onlineRoot, "wrangler.production.jsonc");
@@ -124,10 +126,62 @@ async function patchDistWrangler() {
   console.log(`Patched ${path.relative(onlineRoot, distWranglerPath)} for production deploy.`);
 }
 
+// DEPLOY_MAIN_ONLY_V1 — production bombpvp.com must not ship from swarm/feature branches
+// unless the owner explicitly opts in with ALLOW_NON_MAIN_DEPLOY=1.
+function envFlagEnabled(value) {
+  return /^(?:1|true|yes|on)$/iu.test(String(value || "").trim());
+}
+
+function resolveDeployBranch(env = process.env, runGit = runGitBranch) {
+  const refName = String(env.GITHUB_REF_NAME || "").trim();
+  if (refName) return refName;
+  const ref = String(env.GITHUB_REF || "").trim();
+  if (ref.startsWith("refs/heads/")) return ref.slice("refs/heads/".length);
+  return runGit();
+}
+
+function runGitBranch() {
+  const result = spawnSync("git", ["branch", "--show-current"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    shell: false,
+  });
+  if (result.status === 0) {
+    const branch = String(result.stdout || "").trim();
+    if (branch) return branch;
+  }
+  const head = spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    shell: false,
+  });
+  if (head.status === 0) {
+    const name = String(head.stdout || "").trim();
+    if (name && name !== "HEAD") return name;
+  }
+  return "";
+}
+
+function assertProductionDeployAllowed({
+  branch = resolveDeployBranch(),
+  allowNonMain = process.env.ALLOW_NON_MAIN_DEPLOY,
+  dryRun = false,
+} = {}) {
+  if (dryRun) return;
+  if (envFlagEnabled(allowNonMain)) return;
+  if (branch === "main") return;
+  const shown = branch || "(detached/unknown)";
+  throw new Error(
+    `bombpvp.com deploy is restricted to git branch "main" (current: ${shown}). ` +
+      "Checkout main, or set ALLOW_NON_MAIN_DEPLOY=1 for an explicit non-main deploy.",
+  );
+}
+
 async function main() {
   const wantBuild = process.argv.includes("--build");
   const dryRun = process.argv.includes("--dry-run");
   normalizeCloudflareEnvironment();
+  assertProductionDeployAllowed({ dryRun });
 
   if (wantBuild) {
     console.log("Building verified online artifact...");

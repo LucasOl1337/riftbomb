@@ -76,8 +76,7 @@
       .replace(
         "</body>",
         [
-          '<script src="/authoritative-audio.js"></script>',
-          '<script src="/online-duel.js"></script>',
+          '<script src="/online-duel-loader.js"></script>',
           "<script>",
           `document.documentElement.dataset.riftbombFetchMs = "${(fetchedAt - bootStartedAt).toFixed(1)}";`,
           `document.documentElement.dataset.riftbombReadyMs = (performance.now() - ${bootStartedAt}).toFixed(1);`,
@@ -90,7 +89,25 @@
     document.write(game);
     document.close();
   } catch (error) {
-    status.textContent = "Não foi possível carregar o jogo. Atualize a página.";
+    // LOADER_ERROR_RETRY_V1: falha de boot sem CTA trava o jogador no shell.
+    status.textContent = "Não foi possível carregar o jogo.";
+    status.setAttribute("role", "alert");
     console.error(error);
+    const host = status.parentElement;
+    if (host && !host.querySelector("[data-loader-retry]")) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.loaderRetry = "1";
+      button.textContent = "Tentar de novo";
+      button.setAttribute("aria-label", "Tentar carregar a arena de novo");
+      button.style.cssText =
+        "margin-top:16px;min-height:44px;padding:10px 18px;border:1px solid #f2b84b;" +
+        "background:#1a1408;color:#f2b84b;font:600 15px Arial,sans-serif;cursor:pointer";
+      button.addEventListener("click", () => {
+        location.reload();
+      });
+      host.appendChild(button);
+      button.focus();
+    }
   }
 })();

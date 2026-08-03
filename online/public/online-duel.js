@@ -1,9 +1,109 @@
 "use strict";
 
+/* RIFTBOMB_AUTHORITATIVE_AUDIO_INLINE_V1 */
+(() => {
+  const CUES = new Set([
+    "barrelBoom", "bladeHit", "bomb", "cannonBarrage", "cannonImpact",
+    "daggerLand", "deathLotus", "deathMark", "dominus", "explosion",
+    "gangplankQ", "hemoplague", "hemoplaguePop", "hit", "katQ", "katW",
+    "kill", "markPop", "pickup", "powderKeg", "removeScurvy", "renektonDice",
+    "renektonE", "renektonQ", "renektonQEmpowered", "renektonW",
+    "renektonWEmpowered", "sanguinePool", "shield", "shunpo", "tidesOfBlood",
+    "vladimirQ", "vladimirQEmpowered", "voracity", "zedE", "zedQ", "zedSwap",
+    "zedW"
+  ]);
+
+  const finiteBetween = (value, min, max, fallback = null) => {
+    const number = Number(value);
+    return Number.isFinite(number) ? Math.max(min, Math.min(max, number)) : fallback;
+  };
+
+  function normalize(candidate) {
+    if (!candidate || !Number.isSafeInteger(candidate.id) || candidate.id <= 0) return null;
+    const cue = String(candidate.cue || candidate.action ||
+      (candidate.kind === "explosion" ? "explosion" : ""));
+    if (!CUES.has(cue)) return null;
+    const event = {
+      id: candidate.id,
+      cue,
+      strength: finiteBetween(candidate.strength, 0.5, 1.45, 1),
+      x: finiteBetween(candidate.x, -64, 64),
+      z: finiteBetween(candidate.z, -64, 64)
+    };
+    const chainDepth = finiteBetween(candidate.chainDepth, 0, 4);
+    if (chainDepth !== null) event.chainDepth = Math.trunc(chainDepth);
+    return event;
+  }
+
+  function consume({ events = [], cursor = 0, play = () => undefined } = {}) {
+    let nextCursor = Number.isSafeInteger(cursor) && cursor >= 0 ? cursor : 0;
+    let played = 0;
+    let playbackErrors = 0;
+    const ordered = Array.isArray(events)
+      ? events.map(normalize).filter(Boolean).sort((left, right) => left.id - right.id)
+      : [];
+    const firstNewEvent = ordered.find((event) => event.id > nextCursor);
+    const gap = firstNewEvent && firstNewEvent.id > nextCursor + 1
+      ? {
+          from: nextCursor + 1,
+          to: firstNewEvent.id - 1,
+          count: firstNewEvent.id - nextCursor - 1
+        }
+      : null;
+    for (const event of ordered) {
+      if (event.id <= nextCursor) continue;
+      try { play(event); }
+      catch { playbackErrors += 1; }
+      nextCursor = event.id;
+      played += 1;
+    }
+    return { cursor: nextCursor, played, playbackErrors, gap };
+  }
+
+  globalThis.RIFTBOMB_AUTHORITATIVE_AUDIO = Object.freeze({ consume });
+})();
+
 (() => {
   if (typeof game === "undefined" || typeof UI === "undefined") return;
 
   const SIGNALING_URL = "/api/pvp";
+  /* RIFTBOMB_BOT_V1_LAZY_V1 */
+  const V1_BOT_BUNDLE_URL = "/bot-v1.js";
+  let v1BotBundlePromise = null;
+  function ensureV1BotBundle() {
+    if (typeof RIFTBOMB_BOTS !== "undefined" &&
+        typeof RIFTBOMB_BOTS.createV1Policy === "function") {
+      return Promise.resolve(true);
+    }
+    if (v1BotBundlePromise) return v1BotBundlePromise;
+    v1BotBundlePromise = new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = V1_BOT_BUNDLE_URL;
+      script.async = true;
+      script.onload = () => resolve(
+        typeof RIFTBOMB_BOTS !== "undefined" &&
+        typeof RIFTBOMB_BOTS.createV1Policy === "function",
+      );
+      script.onerror = () => {
+        v1BotBundlePromise = null;
+        resolve(false);
+      };
+      const parent = document.head || document.body;
+      if (!parent) {
+        v1BotBundlePromise = null;
+        resolve(false);
+        return;
+      }
+      try {
+        parent.append(script);
+      } catch {
+        v1BotBundlePromise = null;
+        resolve(false);
+      }
+    });
+    return v1BotBundlePromise;
+  }
+
   function defaultAuthoritativeServerUrl() {
     let pageUrl;
     try { pageUrl = new URL(window.parent.location.href); }
@@ -613,8 +713,6 @@
       guestChampion: state.guestChampion,
       arena: state.arena,
       matchTarget: state.matchTarget,
-      inputDelivery: reliableInput.snapshot(),
-      actionDelivery: reliableAction.snapshot(),
       status: status.textContent || "",
       tone: status.dataset.tone || ""
     };
@@ -1777,7 +1875,9 @@
     setStatus(state.inviteMode ? `Activating challenge ${code}…` : `Joining lobby ${code}…`);
     updateLobbyDisplay();
     try {
-      await signaling("GET", null, `?code=${encodeURIComponent(code)}`);
+      // The authoritative WebSocket owns room existence and seat arbitration.
+      // Avoid a sequential D1 preflight; its hello response carries the same
+      // room_not_found/role_taken failure path after one transport round-trip.
       await connectAuthoritative("guest");
       updateConnection("connected", `ONLINE · LOBBY ${code} · SÃO PAULO SERVER`);
       setStatus("Lobby found. Connected to the authoritative server.", "ok");
@@ -1794,7 +1894,7 @@
     setOnlineRole("offline");
     const message = error?.message === "room_not_found"
       ? "Lobby not found or expired. Check the code."
-      : error?.message === "room_full"
+      : ["room_full", "role_taken"].includes(error?.message)
         ? "That lobby already has two players."
         : "Could not create the online lobby. Try again.";
     setStatus(message, "error");
@@ -2331,6 +2431,7 @@
       game.selectChampion2(guestChampion);
       game.activatePlayerTwo();
     } else {
+      await ensureV1BotBundle();
       // Prefer the trained V1 profile; fall back to champion + baseline/V1 policy.
       let selected = false;
       try {

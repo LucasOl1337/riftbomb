@@ -3,7 +3,7 @@
   min-height: 100%;
   margin: 0;
   color-scheme: dark;
-  background: #03080d;
+  background: var(--rb-canvas);
 }
 
 .globalBody {
@@ -17,8 +17,8 @@
   overflow: hidden;
   place-items: center;
   padding: clamp(7.5rem, 14vh, 10rem) clamp(1.25rem, 5vw, 5rem) clamp(4rem, 9vh, 6rem);
-  color: #effcff;
-  background: #03080d;
+  color: var(--rb-text);
+  background: var(--rb-canvas);
   isolation: isolate;
 }
 
@@ -63,9 +63,9 @@
   width: 2.45rem;
   aspect-ratio: 1;
   place-items: center;
-  color: #031015;
-  background: #69e4f0;
-  border: 1px solid #bffaff;
+  color: var(--rb-canvas-soft);
+  background: var(--rb-rift);
+  border: 1px solid color-mix(in srgb, var(--rb-rift) 72%, white);
   box-shadow:
     0 0 1.6rem rgb(66 220 235 / 24%),
     inset 0 0 0 1px rgb(255 255 255 / 18%);
@@ -99,7 +99,8 @@
 }
 
 .brand small {
-  color: rgb(209 239 242 / 58%);
+  /* RECOVERY_SOFT_COPY_RB_V1 — soft chrome copy uses War Table muted/text rails */
+  color: color-mix(in srgb, var(--rb-text-soft) 58%, transparent);
   font-family: var(--font-geist-mono), monospace;
   font-size: 0.58rem;
 }
@@ -129,7 +130,7 @@
 
 .eyebrow {
   margin: 0 0 clamp(1.1rem, 2.4vh, 1.7rem);
-  color: rgb(130 237 245 / 88%);
+  color: var(--rb-rift);
   font-size: clamp(0.62rem, 1.2vw, 0.72rem);
   font-weight: 650;
 }
@@ -139,7 +140,7 @@
   align-items: center;
   justify-content: center;
   margin: 0 0 clamp(1.1rem, 2vh, 1.7rem);
-  color: rgb(238 252 255 / 92%);
+  color: color-mix(in srgb, var(--rb-text) 92%, transparent);
   font-family: var(--font-geist-mono), monospace;
   font-size: clamp(5.5rem, 19vw, 11.5rem);
   font-weight: 800;
@@ -163,7 +164,7 @@
 .signal span {
   width: clamp(0.55rem, 1.15vw, 0.78rem);
   height: clamp(2.1rem, 6.2vw, 4.1rem);
-  background: linear-gradient(180deg, #d7faff 0%, #75e8f0 55%, rgb(117 232 240 / 55%) 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rb-rift) 35%, white) 0%, var(--rb-rift) 55%, color-mix(in srgb, var(--rb-rift) 55%, transparent) 100%);
   box-shadow:
     0 0 1.2rem rgb(43 199 212 / 42%),
     0 0 2.4rem rgb(117 232 240 / 18%);
@@ -192,8 +193,8 @@
 
 .bomb {
   position: relative;
-  color: #071318;
-  -webkit-text-stroke: clamp(1px, 0.025em, 3px) #d7faff;
+  color: var(--rb-canvas-soft);
+  -webkit-text-stroke: clamp(1px, 0.025em, 3px) color-mix(in srgb, var(--rb-rift) 35%, white);
 }
 
 .bomb::before {
@@ -202,8 +203,8 @@
   left: 56%;
   width: 0.18em;
   height: 0.17em;
-  border-top: 0.025em solid #f1c56a;
-  border-right: 0.025em solid #f1c56a;
+  border-top: 0.025em solid var(--rb-alloy);
+  border-right: 0.025em solid var(--rb-alloy);
   content: "";
   transform: rotate(-30deg);
 }
@@ -222,13 +223,14 @@
 .copy {
   max-width: 42ch;
   margin: clamp(1.05rem, 2.2vh, 1.45rem) auto 0;
-  color: rgb(221 241 243 / 74%);
+  color: color-mix(in srgb, var(--rb-text-soft) 74%, transparent);
   font-size: clamp(0.94rem, 1.5vw, 1.08rem);
   line-height: 1.6;
   text-wrap: pretty;
 }
 
 .cta {
+  /* RECOVERY_CTA_ALLOY_V1 — primary matches War Table action-cluster */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -236,12 +238,12 @@
   min-height: 3.65rem;
   margin-top: clamp(1.8rem, 4vh, 2.6rem);
   padding: 0.85rem 1.15rem 0.85rem 1.45rem;
-  color: #041014;
-  background: #75e8f0;
+  color: var(--rb-canvas);
+  background: var(--rb-alloy);
   border: 0;
   box-shadow:
-    0 0.8rem 2.5rem rgb(43 199 212 / 20%),
-    0 0 1.6rem rgb(117 232 240 / 16%);
+    0 0.8rem 2.5rem rgb(216 185 110 / 22%),
+    0 0 1.6rem rgb(240 212 134 / 14%);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.88rem;
@@ -266,10 +268,10 @@
 }
 
 .cta:hover {
-  background: #a0f5f8;
+  background: var(--rb-alloy-bright);
   box-shadow:
-    0 1rem 3rem rgb(43 199 212 / 30%),
-    0 0 2rem rgb(117 232 240 / 22%);
+    0 1rem 3rem rgb(216 185 110 / 28%),
+    0 0 2rem rgb(240 212 134 / 18%);
   transform: translateY(-2px);
 }
 
@@ -295,15 +297,16 @@
 }
 
 .secondaryCta {
+  /* RECOVERY_SECONDARY_CTA_RB_V1 — ghost secondary uses War Table line/muted rails */
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 3.15rem;
   padding: 0.7rem 1.15rem;
-  color: rgb(221 241 243 / 86%);
-  background: rgb(3 12 16 / 28%);
-  border: 1px solid rgb(117 232 240 / 28%);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 4%);
+  color: var(--rb-text-soft);
+  background: color-mix(in srgb, var(--rb-canvas) 72%, transparent);
+  border: 1px solid var(--rb-line-strong);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rb-text) 4%, transparent);
   font-size: 0.78rem;
   font-weight: 650;
   letter-spacing: 0.06em;
@@ -315,12 +318,12 @@
 }
 
 .secondaryCta:hover {
-  color: #effcff;
-  background: rgb(117 232 240 / 10%);
-  border-color: rgb(117 232 240 / 48%);
+  color: var(--rb-text);
+  background: color-mix(in srgb, var(--rb-rift) 10%, transparent);
+  border-color: color-mix(in srgb, var(--rb-rift) 48%, transparent);
   box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 6%),
-    0 0 1.4rem rgb(43 199 212 / 12%);
+    inset 0 0 0 1px color-mix(in srgb, var(--rb-text) 6%, transparent),
+    0 0 1.4rem color-mix(in srgb, var(--rb-rift) 12%, transparent);
 }
 
 .secondaryCta:active {
@@ -329,13 +332,13 @@
 
 .cta:focus-visible,
 .secondaryCta:focus-visible {
-  outline: 3px solid #f1c56a;
+  outline: 3px solid var(--rb-alloy);
   outline-offset: 4px;
 }
 
 .hint {
   margin: 1.15rem 0 0;
-  color: rgb(203 232 235 / 50%);
+  color: color-mix(in srgb, var(--rb-muted) 50%, transparent);
   font-size: 0.58rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -346,7 +349,7 @@
   inset-inline-end: clamp(1.25rem, 5vw, 5rem);
   bottom: clamp(1.35rem, 3vw, 2.5rem);
   margin: 0;
-  color: rgb(203 232 235 / 40%);
+  color: color-mix(in srgb, var(--rb-muted) 40%, transparent);
   font-size: 0.56rem;
 }
 

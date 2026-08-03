@@ -5,8 +5,8 @@
   overflow: hidden;
   place-items: center;
   padding: clamp(7rem, 14vh, 10rem) clamp(1.25rem, 5vw, 5rem) clamp(4rem, 9vh, 6rem);
-  color: #effcff;
-  background: #03080d;
+  color: var(--rb-text);
+  background: var(--rb-canvas);
   isolation: isolate;
 }
 
@@ -51,9 +51,9 @@
   width: 2.45rem;
   aspect-ratio: 1;
   place-items: center;
-  color: #031015;
-  background: #69e4f0;
-  border: 1px solid #bffaff;
+  color: var(--rb-canvas-soft);
+  background: var(--rb-rift);
+  border: 1px solid color-mix(in srgb, var(--rb-rift) 72%, white);
   box-shadow:
     0 0 1.6rem rgb(66 220 235 / 24%),
     inset 0 0 0 1px rgb(255 255 255 / 18%);
@@ -87,7 +87,8 @@
 }
 
 .brand small {
-  color: rgb(209 239 242 / 58%);
+  /* LOADING_SOFT_COPY_RB_V1 — soft chrome copy uses War Table muted/text rails */
+  color: color-mix(in srgb, var(--rb-text-soft) 58%, transparent);
   font-family: var(--font-geist-mono), monospace;
   font-size: 0.58rem;
 }
@@ -118,7 +119,7 @@
 
 .eyebrow {
   margin: 0 0 clamp(1.4rem, 3vh, 2.2rem);
-  color: #82edf5;
+  color: var(--rb-rift);
   font-size: clamp(0.62rem, 1.2vw, 0.72rem);
   font-weight: 650;
 }
@@ -137,7 +138,7 @@
 .copy {
   max-width: 42ch;
   margin: clamp(1.25rem, 3vh, 1.8rem) auto 0;
-  color: rgb(221 241 243 / 74%);
+  color: color-mix(in srgb, var(--rb-text-soft) 74%, transparent);
   font-size: clamp(0.94rem, 1.5vw, 1.08rem);
   line-height: 1.6;
   text-wrap: pretty;
@@ -162,7 +163,7 @@
   z-index: 2;
   width: 8px;
   aspect-ratio: 1;
-  background: #f1c56a;
+  background: var(--rb-alloy);
   box-shadow: 0 0 0.7rem rgb(241 197 106 / 55%);
   content: "";
   transform: translateY(-50%) rotate(45deg);
@@ -180,7 +181,7 @@
   display: block;
   width: 40%;
   height: 100%;
-  background: linear-gradient(90deg, rgb(117 232 240 / 28%) 0%, #75e8f0 48%, #d7faff 100%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--rb-rift) 28%, transparent) 0%, var(--rb-rift) 48%, color-mix(in srgb, var(--rb-rift) 35%, white) 100%);
   box-shadow:
     0 0 1.1rem rgb(43 199 212 / 85%),
     0 0 2.2rem rgb(117 232 240 / 35%);
@@ -189,7 +190,7 @@
 
 .proof {
   margin: 1.15rem 0 0;
-  color: rgb(203 232 235 / 54%);
+  color: color-mix(in srgb, var(--rb-muted) 54%, transparent);
   font-size: 0.6rem;
   letter-spacing: 0.16em;
 }
@@ -199,7 +200,7 @@
   inset-inline-end: clamp(1.25rem, 5vw, 5rem);
   bottom: clamp(1.35rem, 3vw, 2.5rem);
   margin: 0;
-  color: rgb(203 232 235 / 40%);
+  color: color-mix(in srgb, var(--rb-muted) 40%, transparent);
   font-size: 0.56rem;
 }
 

@@ -4,14 +4,15 @@ import {
   readPersistedHostRoom,
   type D1Database,
 } from "./room-storage";
-
-type SessionDescription = {
-  type: "offer" | "answer";
-  sdp: string;
-};
+import {
+  normalizeCode,
+  validCode,
+  validatePostAction,
+  readJsonBodyWithinLimit,
+  type SessionDescription,
+} from "./validation";
 
 const ROOM_LIFETIME_MS = 10 * 60 * 1000;
-const MAX_SDP_LENGTH = 32_000;
 const ROOM_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 let schemaReady: Promise<void> | null = null;
 
@@ -55,40 +56,6 @@ async function ensureSchema(db: D1Database): Promise<void> {
   await schemaReady;
 }
 
-async function readBody(request: Request): Promise<Record<string, unknown>> {
-  const contentLength = Number(request.headers.get("content-length") || 0);
-  if (contentLength > MAX_SDP_LENGTH * 2) {
-    throw new Error("payload_too_large");
-  }
-  const value = await request.json();
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("invalid_body");
-  }
-  return value as Record<string, unknown>;
-}
-
-function validDescription(
-  value: unknown,
-  expectedType: SessionDescription["type"],
-): value is SessionDescription {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const description = value as Record<string, unknown>;
-  return (
-    description.type === expectedType &&
-    typeof description.sdp === "string" &&
-    description.sdp.length > 0 &&
-    description.sdp.length <= MAX_SDP_LENGTH
-  );
-}
-
-function normalizeCode(value: unknown): string {
-  return typeof value === "string" ? value.trim().toUpperCase() : "";
-}
-
-function validCode(code: string): boolean {
-  return /^[A-HJ-NP-Z2-9]{6}$/.test(code);
-}
-
 function createRoomCode(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return Array.from(
@@ -107,16 +74,14 @@ export async function POST(request: Request): Promise<Response> {
   if (!db) return response({ error: "pvp_storage_unavailable" }, 503);
 
   try {
-    await ensureSchema(db);
-    const body = await readBody(request);
+    const body = await readJsonBodyWithinLimit(request);
     const action = body.action;
+    const validationError = validatePostAction(body);
+    if (validationError) return response({ error: validationError }, 400);
     const now = Date.now();
+    await ensureSchema(db);
 
     if (action === "create") {
-      if (body.offer !== undefined && !validDescription(body.offer, "offer")) {
-        return response({ error: "invalid_offer" }, 400);
-      }
-
       const offer = body.offer ? JSON.stringify(body.offer) : "null";
       const hostToken = createHostToken();
       const expiresAt = now + ROOM_LIFETIME_MS;
@@ -134,9 +99,6 @@ export async function POST(request: Request): Promise<Response> {
     if (action === "publish-offer") {
       const code = normalizeCode(body.code);
       const hostToken = typeof body.hostToken === "string" ? body.hostToken : "";
-      if (!validCode(code) || hostToken.length < 32 || !validDescription(body.offer, "offer")) {
-        return response({ error: "invalid_offer" }, 400);
-      }
       const result = await db
         .prepare(
           "UPDATE pvp_rooms SET offer = ? WHERE code = ? AND host_token = ? AND expires_at >= ? AND answer IS NULL",
@@ -151,9 +113,6 @@ export async function POST(request: Request): Promise<Response> {
 
     if (action === "answer") {
       const code = normalizeCode(body.code);
-      if (!validCode(code) || !validDescription(body.answer, "answer")) {
-        return response({ error: "invalid_answer" }, 400);
-      }
       const result = await db
         .prepare(
           "UPDATE pvp_rooms SET answer = ?, guest_joined_at = ? WHERE code = ? AND expires_at >= ? AND answer IS NULL",
@@ -170,9 +129,6 @@ export async function POST(request: Request): Promise<Response> {
       const code = normalizeCode(body.code);
       const hostToken =
         typeof body.hostToken === "string" ? body.hostToken : "";
-      if (!validCode(code) || hostToken.length < 32) {
-        return response({ error: "invalid_room" }, 400);
-      }
       await db
         .prepare("DELETE FROM pvp_rooms WHERE code = ? AND host_token = ?")
         .bind(code, hostToken)
@@ -198,13 +154,13 @@ export async function GET(request: Request): Promise<Response> {
   if (!db) return response({ error: "pvp_storage_unavailable" }, 503);
 
   try {
-    await ensureSchema(db);
     const url = new URL(request.url);
     const code = normalizeCode(url.searchParams.get("code"));
     const hostToken = url.searchParams.get("hostToken") || "";
     if (!validCode(code)) return response({ error: "invalid_room" }, 400);
 
     const now = Date.now();
+    await ensureSchema(db);
     if (hostToken) {
       const room = await readPersistedHostRoom(db, code, hostToken, now);
       if (!room) return response({ error: "room_not_found" }, 404);
@@ -220,7 +176,9 @@ export async function GET(request: Request): Promise<Response> {
     const room = await readPersistedGuestRoom(db, code, now);
     if (!room) return response({ error: "room_not_found" }, 404);
     if (room.has_answer) return response({ error: "room_full" }, 409);
-    const offer = JSON.parse(room.offer) as SessionDescription | null;
+    const offer = room.offer
+      ? (JSON.parse(room.offer) as SessionDescription | null)
+      : null;
     if (!offer) return response({ preparing: true, expiresAt: room.expires_at });
     return response({
       offer,

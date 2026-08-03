@@ -45,22 +45,47 @@ test("host lookup returns only authorization, answer, and expiry", async () => {
   assert.equal(db.calls.length, 1);
   assert.match(
     db.calls[0].sql,
-    /^SELECT host_token = \? AS is_host, answer, expires_at /,
+    /^SELECT host_token = \? AS is_host, CASE WHEN host_token = \? THEN answer ELSE NULL END AS answer, expires_at /,
   );
   assert.doesNotMatch(db.calls[0].sql, /\boffer\b/);
-  assert.deepEqual(db.calls[0].values, ["host-token", "ABC234", 1_000]);
+  assert.deepEqual(db.calls[0].values, ["host-token", "host-token", "ABC234", 1_000]);
 });
 
-test("guest lookup returns only offer, answer presence, and expiry", async () => {
-  const expected = { offer: "offer-sdp", has_answer: 1, expires_at: 601_000 };
+test("host lookup can reject a token without materializing the answer SDP", async () => {
+  const expected = { is_host: 0, answer: null, expires_at: 601_000 };
+  const db = createDatabase(expected);
+
+  assert.deepEqual(
+    await readPersistedHostRoom(db, "ABC234", "wrong-token", 1_000),
+    expected,
+  );
+  assert.equal(db.calls.length, 1);
+  assert.deepEqual(db.calls[0].values, [
+    "wrong-token",
+    "wrong-token",
+    "ABC234",
+    1_000,
+  ]);
+});
+
+test("guest lookup omits the offer after the room is full", async () => {
+  const expected = { offer: null, has_answer: 1, expires_at: 601_000 };
   const db = createDatabase(expected);
 
   assert.deepEqual(await readPersistedGuestRoom(db, "ABC234", 1_000), expected);
   assert.equal(db.calls.length, 1);
   assert.match(
     db.calls[0].sql,
-    /^SELECT offer, answer IS NOT NULL AS has_answer, expires_at /,
+    /^SELECT CASE WHEN answer IS NULL THEN offer ELSE NULL END AS offer, answer IS NOT NULL AS has_answer, expires_at /,
   );
   assert.doesNotMatch(db.calls[0].sql, /\bhost_token\b/);
   assert.deepEqual(db.calls[0].values, ["ABC234", 1_000]);
+});
+
+test("guest lookup keeps the offer while a room is waiting", async () => {
+  const expected = { offer: "offer-sdp", has_answer: 0, expires_at: 601_000 };
+  const db = createDatabase(expected);
+
+  assert.deepEqual(await readPersistedGuestRoom(db, "ABC234", 1_000), expected);
+  assert.equal(db.calls.length, 1);
 });

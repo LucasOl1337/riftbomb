@@ -174,3 +174,29 @@ test("server boot graph does not import the duel runtime eagerly", async () => {
   const source = await readFile(serverPath, "utf8");
   assert.doesNotMatch(source, /from\s+["'][^"']*create-authoritative-duel\.mjs["']/);
 });
+
+test("server boot graph defers non-critical built-ins", async () => {
+  const serverPath = fileURLToPath(new URL("../src/server.mjs", import.meta.url));
+  const source = await readFile(serverPath, "utf8");
+  assert.doesNotMatch(source, /from\s+["']ws["']/);
+  assert.doesNotMatch(source, /from\s+["']node:crypto["']/);
+  assert.doesNotMatch(source, /from\s+["']node:perf_hooks["']/);
+  assert.match(source, /webSocketRuntimePromise\s*\?\?=\s*import\(["']ws["']\)/);
+  assert.match(source, /cryptoRuntimePromise\s*\?\?=\s*import\(["']node:crypto["']\)/);
+});
+
+test("server boot graph defers non-critical support modules", async () => {
+  const serverPath = fileURLToPath(new URL("../src/server.mjs", import.meta.url));
+  const source = await readFile(serverPath, "utf8");
+  for (const moduleName of [
+    "authoritative-rooms",
+    "json-transport",
+    "message-rate-limit",
+    "health-response",
+    "quick-match-queue"
+  ]) {
+    assert.doesNotMatch(source, new RegExp(`from\\s+["']\\./${moduleName}\\.mjs["']`));
+    assert.match(source, new RegExp(`import\\(["']\\./${moduleName}\\.mjs["']\\)`));
+  }
+  assert.match(source, /SERVER_BOOT_LAZY_V1/);
+});

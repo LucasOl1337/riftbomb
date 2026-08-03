@@ -21,7 +21,7 @@ export type HostRoomLookup = {
 };
 
 export type GuestRoomLookup = {
-  offer: string;
+  offer: string | null;
   has_answer: number;
   expires_at: number;
 };
@@ -34,9 +34,9 @@ export async function readPersistedHostRoom(
 ): Promise<HostRoomLookup | null> {
   return db
     .prepare(
-      "SELECT host_token = ? AS is_host, answer, expires_at FROM pvp_rooms WHERE code = ? AND expires_at >= ?",
+      "SELECT host_token = ? AS is_host, CASE WHEN host_token = ? THEN answer ELSE NULL END AS answer, expires_at FROM pvp_rooms WHERE code = ? AND expires_at >= ?",
     )
-    .bind(hostToken, code, now)
+    .bind(hostToken, hostToken, code, now)
     .first<HostRoomLookup>();
 }
 
@@ -47,7 +47,7 @@ export async function readPersistedGuestRoom(
 ): Promise<GuestRoomLookup | null> {
   return db
     .prepare(
-      "SELECT offer, answer IS NOT NULL AS has_answer, expires_at FROM pvp_rooms WHERE code = ? AND expires_at >= ?",
+      "SELECT CASE WHEN answer IS NULL THEN offer ELSE NULL END AS offer, answer IS NOT NULL AS has_answer, expires_at FROM pvp_rooms WHERE code = ? AND expires_at >= ?",
     )
     .bind(code, now)
     .first<GuestRoomLookup>();

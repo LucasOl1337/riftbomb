@@ -42,6 +42,17 @@ export function updateGridCache(room, grid) {
   return changed;
 }
 
+function getProtocolCache(room) {
+  return room.protocolCache ??= { input: null, action: null };
+}
+
+export function invalidateProtocolCache(room, kind = "all") {
+  const cache = room.protocolCache;
+  if (!cache) return;
+  if (kind === "input" || kind === "all") cache.input = null;
+  if (kind === "action" || kind === "all") cache.action = null;
+}
+
 export class AuthoritativeRooms {
   constructor({
     rooms,
@@ -53,6 +64,7 @@ export class AuthoritativeRooms {
     loadDuelRuntime = loadDefaultDuelRuntime
   }) {
     this.rooms = rooms;
+    this.activeRooms = new Set();
     this.broadcast = broadcast;
     this.scheduleInterval = scheduleInterval;
     this.cancelInterval = cancelInterval;
@@ -99,7 +111,8 @@ export class AuthoritativeRooms {
       lastTick: 0,
       createdAt: Date.now(),
       lastActivity: Date.now(),
-      gridCache: null
+      gridCache: null,
+      protocolCache: { input: null, action: null }
     };
     this.rooms.set(code, room);
     return room;
@@ -117,20 +130,31 @@ export class AuthoritativeRooms {
   }
 
   inputProtocol(room) {
-    return {
+    const cache = getProtocolCache(room);
+    if (cache.input?.epoch === room.inputEpoch) return cache.input;
+    const accepted = room.inputAccepted;
+    const applied = room.inputApplied;
+    const value = {
       v: INPUT_PROTOCOL_VERSION,
       epoch: room.inputEpoch,
-      accepted: room.inputAccepted.slice(),
-      ack: room.inputApplied.slice()
+      accepted: accepted.slice(),
+      ack: applied.slice()
     };
+    cache.input = value;
+    return value;
   }
 
   actionProtocol(room) {
-    return {
+    const cache = getProtocolCache(room);
+    if (cache.action?.epoch === room.inputEpoch) return cache.action;
+    const ack = room.actionAck;
+    const value = {
       v: ACTION_PROTOCOL_VERSION,
       epoch: room.inputEpoch,
-      ack: room.actionAck.slice()
+      ack: ack.slice()
     };
+    cache.action = value;
+    return value;
   }
 
   acceptInput(room, playerIndex, message) {
@@ -148,6 +172,7 @@ export class AuthoritativeRooms {
         message.inputSeq !== room.inputAccepted[playerIndex] + 1) return false;
     room.inputs[playerIndex] = message.mask;
     room.inputAccepted[playerIndex] = message.inputSeq;
+    invalidateProtocolCache(room, "input");
     room.inputReliable[playerIndex] = true;
     return true;
   }
@@ -180,6 +205,7 @@ export class AuthoritativeRooms {
       this.applyPlayerAction(room, playerIndex + 1, message);
     }
     room.actionAck[playerIndex] = message.actionSeq;
+    invalidateProtocolCache(room, "action");
     room.actionReliable[playerIndex] = true;
     return true;
   }
@@ -193,6 +219,7 @@ export class AuthoritativeRooms {
     room.inputs = [0, 0];
     room.lastTick = 0;
     room.gridCache = null;
+    this.activeRooms.delete(room);
     this.stopClockIfIdle();
   }
 
@@ -207,8 +234,13 @@ export class AuthoritativeRooms {
           this.duelRuntime.applyInputMask(room.game, 1, room.inputs[0]);
           this.duelRuntime.applyInputMask(room.game, 2, room.inputs[1]);
           room.game.update(dt);
-          room.inputApplied[0] = room.inputAccepted[0];
-          room.inputApplied[1] = room.inputAccepted[1];
+          const applied0 = room.inputAccepted[0];
+          const applied1 = room.inputAccepted[1];
+          if (room.inputApplied[0] !== applied0 || room.inputApplied[1] !== applied1) {
+            room.inputApplied[0] = applied0;
+            room.inputApplied[1] = applied1;
+            invalidateProtocolCache(room, "input");
+          }
           room.lastActivity = Date.now();
         });
       }, 1000 / TICK_RATE);
@@ -243,7 +275,7 @@ export class AuthoritativeRooms {
     }
     this.performanceCounters[startedCounter] += 1;
     this[activeFlag] = true;
-    const rooms = this.rooms.values();
+    const rooms = this.activeRooms.values();
     const drain = () => {
       for (let count = 0; count < ROOMS_PER_TURN; count += 1) {
         const next = rooms.next();
@@ -259,12 +291,8 @@ export class AuthoritativeRooms {
   }
 
   performanceSnapshot() {
-    let activeMatches = 0;
-    for (const room of this.rooms.values()) {
-      if (room.game) activeMatches += 1;
-    }
     return {
-      activeMatches,
+      activeMatches: this.activeRooms.size,
       tickClockActive: Boolean(this.tickTimer),
       snapshotClockActive: Boolean(this.snapshotTimer),
       ...this.performanceCounters
@@ -272,7 +300,7 @@ export class AuthoritativeRooms {
   }
 
   stopClockIfIdle() {
-    if ([...this.rooms.values()].some((room) => room.game)) return;
+    if (this.activeRooms.size > 0) return;
     this.cancelInterval(this.tickTimer);
     this.cancelInterval(this.snapshotTimer);
     this.tickTimer = null;
@@ -316,6 +344,7 @@ export class AuthoritativeRooms {
         return;
       }
       room.game = game;
+      this.activeRooms.add(room);
       room.inputEpoch = room.inputEpoch >= MAX_INPUT_SEQUENCE ? 1 : room.inputEpoch + 1;
       room.inputs = [0, 0];
       room.inputAccepted = [0, 0];
@@ -324,6 +353,7 @@ export class AuthoritativeRooms {
       room.actionAck = [0, 0];
       room.actionReliable = room.players.map((player) => player?.actionProtocol === 1);
       room.gridCache = null;
+      invalidateProtocolCache(room);
       room.lastTick = this.now();
       this.startClock();
       this.broadcast(room, {

@@ -44,3 +44,4 @@ next-env.d.ts
 /public/audio/
 /public/arena-textures/
 /public/champion-models/
+/public/champion-sfx/

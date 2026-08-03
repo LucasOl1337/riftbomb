@@ -66,6 +66,28 @@ const localEntrypoints = (document) => [
   ...document.matchAll(/<(?:link rel="stylesheet" href|script src)="\.\/([^"]+)"(?:><\/script>)?/g)
 ].map((match) => match[1]);
 
+test("particle cleanup compacts the bounded list in place", async () => {
+  const rules = await readFile(path.join(gameDirectory, "run-champion-bomb-duel.js"), "utf8");
+  assert.match(rules, /PARTICLES_COMPACT_IN_PLACE_V1/);
+  assert.match(rules, /compactLiveParticles\(this\.particles\)/);
+  assert.doesNotMatch(rules, /this\.particles = this\.particles\.filter\(/);
+
+  const context = vm.createContext({});
+  vm.runInContext(`${rules}\nglobalThis.__compactLiveParticles = compactLiveParticles;`, context);
+  const particles = [
+    { id: "expired", age: 1, life: 1, y: 0 },
+    { id: "live-a", age: 0.2, life: 1, y: 0 },
+    { id: "below-floor", age: 0, life: 1, y: -0.2 },
+    { id: "live-b", age: 0.4, life: 1, y: 0.6 }
+  ];
+  const compacted = context.__compactLiveParticles(particles);
+
+  assert.equal(compacted, particles, "cleanup must preserve the particle list identity");
+  assert.deepEqual(particles.map(({ id }) => id), ["live-a", "live-b"]);
+  assert.equal(particles[0].id, "live-a");
+  assert.equal(particles[1].id, "live-b");
+});
+
 test("the editable page enters every game module through one named path", async () => {
   const document = await readFile(sourcePath, "utf8");
   const expectedEntrypoints = localEntrypoints(document);
@@ -1547,6 +1569,20 @@ test("the build retains the five playable champions and duel rules", async () =>
   assert.match(document, /id="runtime-bootstrap" hidden/);
   assert.match(document, /id="chrome"/);
   assert.doesNotMatch(document, /id="intro"|UNOFFICIAL FAN PROTOTYPE|Champions of the Bomber Rift/);
+});
+
+test("the root build overlaps independent packaging before assembly", async () => {
+  const packageManifest = JSON.parse(await readFile(path.join(repositoryRoot, "package.json"), "utf8"));
+  const buildScript = await readFile(path.join(gameDirectory, "build-riftbomb.mjs"), "utf8");
+
+  assert.equal(packageManifest.scripts.build, "node game/build-riftbomb.mjs");
+  assert.match(buildScript, /Promise\.allSettled/);
+  assert.match(buildScript, /build-arena-appearance\.mjs/);
+  assert.match(buildScript, /package-champion-sfx\.mjs/);
+  assert.ok(
+    buildScript.indexOf("Promise.allSettled") < buildScript.indexOf("assemble-riftbomb.mjs"),
+    "assembly must remain after both parallel package steps",
+  );
 });
 
 test("mouse aim steers a directional cast toward the aimed arena point", async () => {

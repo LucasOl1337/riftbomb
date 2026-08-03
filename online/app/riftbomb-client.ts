@@ -68,35 +68,35 @@ export const CHAMPIONS: ReadonlyArray<{
     name: "Katarina",
     role: "Assassina",
     signature: "Mobilidade · Reativação",
-    portrait: "/client/champions/katarina.webp",
+    portrait: "/client/champions/avatars/katarina-avatar-dbf4bd7a3da41838e6ebea98a5eff5296451184dc3b071d53e4e9aa186845923.webp",
   },
   {
     id: "zed",
     name: "Zed",
     role: "Assassino",
     signature: "Sombra · Execução",
-    portrait: "/client/champions/zed-war-table-v1.webp",
+    portrait: "/client/champions/avatars/zed-avatar-1a959b10d054d0aefe1c0046eebd888810d7cab306bc928282312eee101e86ba.webp",
   },
   {
     id: "renekton",
     name: "Renekton",
     role: "Lutador",
     signature: "Fúria · Pressão",
-    portrait: "/client/champions/renekton-war-table-v1.webp",
+    portrait: "/client/champions/avatars/renekton-avatar-f424bf8e43906e3a0d6471acede086d23ad1cd1bfe0c25fbfa0258c36f39ce51.webp",
   },
   {
     id: "vladimir",
     name: "Vladimir",
     role: "Mago",
     signature: "Sangue · Sustento",
-    portrait: "/client/champions/vladimir-war-table-v1.webp",
+    portrait: "/client/champions/avatars/vladimir-avatar-7c9df2bdc3347435963d6febd028f9a68013d699fa42b580200637e8a642e944.webp",
   },
   {
     id: "gangplank",
     name: "Gangplank",
     role: "Especialista",
     signature: "Barril · Zona",
-    portrait: "/client/champions/gangplank-war-table-v1.webp",
+    portrait: "/client/champions/avatars/gangplank-avatar-59ce1e1c7d3174fc807506f81079ade20ea660eaa218aa2aa4b204ad5764e4cf.webp",
   },
 ] as const;
 
@@ -109,6 +109,7 @@ export const ARENAS: ReadonlyArray<{
   danger: string;
   cover: string;
   hero: string;
+  heroSrcSet: string;
 }> = [
   {
     id: "lattice",
@@ -119,6 +120,7 @@ export const ARENAS: ReadonlyArray<{
     danger: "Centro exposto",
     cover: "32%",
     hero: "/client/arenas/lattice.webp",
+    heroSrcSet: "/client/arenas/responsive/lattice-160-69f4459258e37a51282f358cf68a6c1f37f6a29fd9042141b616b0b496a9543c.webp 160w, /client/arenas/responsive/lattice-320-017ed634e9148be7463658dbc76825aa56478b91c3607d255b0e56f775dbaca0.webp 320w, /client/arenas/responsive/lattice-640-d769bc70693e4a8c11e30c638b727b0dbf86e529e9e68fbd09387099e06b818f.webp 640w, /client/arenas/responsive/lattice-1024-5d6f0a7202032e925f2b688550dd732ad42eeb2b2e39721d449bd9d17f94af1f.webp 1024w, /client/arenas/lattice.webp 1600w",
   },
   {
     id: "clearing",
@@ -129,6 +131,7 @@ export const ARENAS: ReadonlyArray<{
     danger: "Rotas espelhadas",
     cover: "46%",
     hero: "/client/arenas/clearing.webp",
+    heroSrcSet: "/client/arenas/responsive/clearing-160-fa92645bb79da3cd11a0c69f8c7aca7fa11dd2536631faafe9d4faec85db4b92.webp 160w, /client/arenas/responsive/clearing-320-9149bafa9e6f6cc014342ba9e6cbf14e6545d814b7d085844f79f778ec5d1a4b.webp 320w, /client/arenas/responsive/clearing-640-c66e1cdb805e580191eeb84de0269460b7bdfaf4eae82140b903c393b51e92c5.webp 640w, /client/arenas/responsive/clearing-1024-9604737e3d37a06edbd8ac752d0bcdb6173b5bf0e73822f90f11f2bb46ff8136.webp 1024w, /client/arenas/clearing.webp 1600w",
   },
   {
     id: "labyrinth",
@@ -139,6 +142,7 @@ export const ARENAS: ReadonlyArray<{
     danger: "Gargalos térmicos",
     cover: "61%",
     hero: "/client/arenas/labyrinth.webp",
+    heroSrcSet: "/client/arenas/responsive/labyrinth-160-dcffca722347e1119209ff5d6abb58f8c199cd6958c92b84cf159e0845d1225d.webp 160w, /client/arenas/responsive/labyrinth-320-41c2c23a42fd41abf04bb0c78746808a63e0f585e3ddd310feb0f94959fd64a4.webp 320w, /client/arenas/responsive/labyrinth-640-3d80ceb9c238bdf7bd48d51b1282ac8e91a380e3b8a3d651cc0dd9de52686909.webp 640w, /client/arenas/responsive/labyrinth-1024-f72179514997010448fdc1a5b6adbe5894dc15cd8f94269ffbf3e46df24484a5.webp 1024w, /client/arenas/labyrinth.webp 1600w",
   },
   {
     id: "forts",
@@ -149,6 +153,7 @@ export const ARENAS: ReadonlyArray<{
     danger: "Entradas laterais",
     cover: "55%",
     hero: "/client/arenas/forts-key-art-v2.webp",
+    heroSrcSet: "/client/arenas/responsive/forts-key-art-v2-160-d78186b91e4d554a14e9a9f8cd23014366140567cae7bf5e2392cede1dd0c011.webp 160w, /client/arenas/responsive/forts-key-art-v2-320-ec817612c62cc0c15ba70ac141b8b237f6e2360a57b8f6b38efa4ed88c7c993c.webp 320w, /client/arenas/responsive/forts-key-art-v2-640-3ecf8e6aadb2cf34f21da2a2206ac7ccc370cf7c3255761fcab83cac75fcd275.webp 640w, /client/arenas/responsive/forts-key-art-v2-1024-ce2ad5fc9b86884e009799b9420e5452fe62fbc10d8f16673dde859246f31982.webp 1024w, /client/arenas/forts-key-art-v2.webp 1600w",
   },
   {
     id: "pit",
@@ -159,6 +164,7 @@ export const ARENAS: ReadonlyArray<{
     danger: "Olho da tempestade",
     cover: "39%",
     hero: "/client/arenas/pit-key-art-v2.webp",
+    heroSrcSet: "/client/arenas/responsive/pit-key-art-v2-160-3d9b44d18928740cc653b2917b2032a296af7c6380cc5f9457b29c5348968fd1.webp 160w, /client/arenas/responsive/pit-key-art-v2-320-f328d9e2a839a6632945e1a065a216c1241edbd4539865311cdd1ad9869e9f55.webp 320w, /client/arenas/responsive/pit-key-art-v2-640-7f06dc487378e3aaa81994563b9aeb5fd93333d5e5d82266cf8b38a2b50375dd.webp 640w, /client/arenas/responsive/pit-key-art-v2-1024-602f7ba21f77ad2ecaa3b1fe2878bb69cae6a5850078671c49a8b196441a67f4.webp 1024w, /client/arenas/pit-key-art-v2.webp 1600w",
   },
 ] as const;
 
@@ -184,21 +190,21 @@ export const MODES: ReadonlyArray<{
 }> = [
   {
     id: "quick",
-    eyebrow: "PAREAMENTO AUTOMÁTICO",
+    eyebrow: "RIVAL ONLINE",
     name: "Partida rápida",
-    description: "Encontre um rival na região e dispute uma melhor de 3.",
+    description: "Rival em São Paulo. Melhor de 3, sem criar sala.",
   },
   {
     id: "friend",
     eyebrow: "CONVITE POR LINK",
     name: "Jogar com amigo",
-    description: "Configure uma melhor de 10 e envie um link que abre o duelo direto.",
+    description: "Gere um link de melhor de 10 e mande para o amigo entrar direto.",
   },
   {
     id: "solo",
     eyebrow: "CONTRA CPU",
     name: "Treinamento",
-    description: "Treine contra o V1 Renekton certificado como Dominus-01.",
+    description: "Pratique contra Dominus-01 (V1 Renekton) no navegador, sem fila.",
   },
 ] as const;
 
