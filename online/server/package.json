@@ -7,6 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "stage:release": "node deploy/stage-release.mjs",
     "benchmark:room-clock": "node scripts/benchmark-room-clock.mjs",
     "benchmark:grid-cache": "node scripts/benchmark-grid-cache.mjs",
     "benchmark:message-rate-limit": "node scripts/benchmark-message-rate-limit.mjs",

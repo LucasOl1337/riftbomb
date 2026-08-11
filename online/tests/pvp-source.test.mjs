@@ -3,7 +3,6 @@ import { createHash, webcrypto } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
-import { brotliDecompressSync } from "node:zlib";
 
 const root = new URL("../", import.meta.url);
 
@@ -57,8 +56,10 @@ async function readPackagedGameParts() {
 
 test("loads the online duel layer into the reconstructed game", async () => {
   const page = await readFile(new URL("public/riftbomb.html", root), "utf8");
+  const loaderMatch = page.match(/src="\/(riftbomb-loader-[a-f0-9]{64}\.js)"/);
+  assert.ok(loaderMatch, "the published shell must pin its arena loader by content hash");
   const loader = await readFile(
-    new URL("public/riftbomb-loader.js", root),
+    new URL(`public/${loaderMatch[1]}`, root),
     "utf8",
   );
   const packager = await readFile(
@@ -66,10 +67,10 @@ test("loads the online duel layer into the reconstructed game", async () => {
     "utf8",
   );
 
-  assert.match(page, /src="\/riftbomb-loader\.js"/);
+  assert.match(page, /src="\/riftbomb-loader-[a-f0-9]{64}\.js"/);
   assert.match(page, /data-riftbomb-manifest='/);
   assert.match(loader, /online-duel\.css/);
-  assert.match(loader, /online-duel-loader\.js/);
+  assert.match(loader, /online-duel-loader-[a-f0-9]{64}\.js/);
   assert.doesNotMatch(loader, /<script src="\/online-duel\.js"><\/script>/);
   assert.doesNotMatch(loader, /authoritative-audio\.js/);
   assert.match(loader, /Promise\.all/);
@@ -635,12 +636,13 @@ test("caches only fingerprinted game artifacts as immutable", async () => {
   );
   assert.match(
     headers,
-    /\/champion-models\/\*\s+Cache-Control: public, max-age=31556952, immutable\s+Content-Encoding: br/,
+    /\/champion-models\/\*\s+Cache-Control: public, max-age=31556952, immutable/,
   );
   assert.match(
     headers,
-    /\/champion-sfx\/\*\s+Cache-Control: public, max-age=31556952, immutable\s+Content-Encoding: br/,
+    /\/champion-sfx\/\*\s+Cache-Control: public, max-age=31556952, immutable/,
   );
+  assert.doesNotMatch(headers, /Content-Encoding:/);
   assert.match(
     headers,
     /\/client\/champions\/avatars\/\*\s+Cache-Control: public, max-age=31556952, immutable/,
@@ -665,20 +667,20 @@ test("code-splits champion SFX banks from the critical online part", async () =>
   const sources = JSON.parse(manifestMatch[1]);
   assert.deepEqual(Object.keys(sources), ["katarina"]);
 
-  let rawBytes = 0;
-  let publishedBytes = 0;
   for (const [champion, url] of Object.entries(sources)) {
     assert.match(url, new RegExp(`^/champion-sfx/${champion}-[a-f0-9]{64}\\.js$`));
-    const compressed = await readFile(new URL(`public${url}`, root));
+    const published = await readFile(new URL(`public${url}`, root));
     const fingerprint = url.match(/-([a-f0-9]{64})\.js$/)?.[1];
-    assert.equal(createHash("sha256").update(compressed).digest("hex"), fingerprint);
-    const bank = brotliDecompressSync(compressed).toString("utf8");
+    assert.equal(createHash("sha256").update(published).digest("hex"), fingerprint);
+    const source = await readFile(
+      new URL(`../champions/${champion}/sfx/riftbomb-sfx-bank.js`, root),
+    );
+    assert.deepEqual(published, source);
+    const bank = published.toString("utf8");
+    new vm.Script(bank, { filename: url });
     assert.match(bank, /RIFTBOMB_CHAMPION_SFX_BANKS/);
     assert.match(bank, new RegExp(`\\[\\"${champion}\\"\\]`));
-    rawBytes += Buffer.byteLength(bank);
-    publishedBytes += compressed.byteLength;
   }
-  assert.ok(publishedBytes < rawBytes * 0.75, "lazy SFX chunks should retain the Brotli reduction");
 });
 
 test("keeps arena WebP files out of the initial online payload", async () => {
@@ -789,30 +791,31 @@ test("loads only the playable champion models selected in the lobby", async () =
   const championSources = JSON.parse(championSourceMatch[1]);
   assert.deepEqual(Object.keys(championSources).sort(), [...champions].sort());
 
-  let uncompressedModelBytes = 0;
+  let expectedModelBytes = 0;
   let publishedModelBytes = 0;
 
-  function assertCompressedFingerprint(url, compressed) {
+  function assertAssetFingerprint(url, bytes) {
     const name = url.split("/").at(-1);
     const match = name.match(/-([a-f0-9]{64})\.[^.]+$/);
     assert.ok(match, `${url} must carry a SHA-256 fingerprint`);
     assert.equal(
       match[1],
-      createHash("sha256").update(compressed).digest("hex"),
-      `${url} fingerprint must cover the Brotli bytes served over the wire`,
+      createHash("sha256").update(bytes).digest("hex"),
+      `${url} fingerprint must cover the bytes served over the wire`,
     );
   }
 
   for (const champion of champions) {
     const scriptUrl = championSources[champion];
     assert.match(scriptUrl, new RegExp(`^/champion-models/${champion}-[a-f0-9]{64}\\.js$`));
-    const compressedScript = await readFile(
+    const publishedScript = await readFile(
       new URL(`public${scriptUrl}`, root),
     );
-    assertCompressedFingerprint(scriptUrl, compressedScript);
-    const script = brotliDecompressSync(compressedScript).toString("utf8");
-    uncompressedModelBytes += Buffer.byteLength(script);
-    publishedModelBytes += compressedScript.byteLength;
+    assertAssetFingerprint(scriptUrl, publishedScript);
+    const script = publishedScript.toString("utf8");
+    new vm.Script(script, { filename: scriptUrl });
+    expectedModelBytes += Buffer.byteLength(script);
+    publishedModelBytes += publishedScript.byteLength;
     const match = script.match(/Object\.freeze\((\{.*\})\);\s*$/s);
     assert.ok(match, `${champion} model payload must be valid generated JavaScript`);
     const payload = JSON.parse(match[1]);
@@ -904,15 +907,15 @@ test("loads only the playable champion models selected in the lobby", async () =
         payload.normalsUrl,
         new RegExp(`^/champion-models/${champion}-normals-[a-f0-9]{64}\\.bin$`),
       );
-      const compressedFrames = await readFile(
+      const publishedFrames = await readFile(
         new URL(`public${payload.framesUrl}`, root),
       );
-      const compressedNormals = await readFile(
+      const publishedNormals = await readFile(
         new URL(`public${payload.normalsUrl}`, root),
       );
-      assertCompressedFingerprint(payload.framesUrl, compressedFrames);
-      assertCompressedFingerprint(payload.normalsUrl, compressedNormals);
-      publishedModelBytes += compressedFrames.byteLength + compressedNormals.byteLength;
+      assertAssetFingerprint(payload.framesUrl, publishedFrames);
+      assertAssetFingerprint(payload.normalsUrl, publishedNormals);
+      publishedModelBytes += publishedFrames.byteLength + publishedNormals.byteLength;
       const compactRgb = (rgba, componentBytes) => {
         const rgbaPixelBytes = componentBytes * 4;
         const rgbPixelBytes = componentBytes * 3;
@@ -926,18 +929,16 @@ test("loads only the playable champion models selected in the lobby", async () =
         }
         return rgb;
       };
-      const packedFrames = brotliDecompressSync(compressedFrames);
-      const packedNormals = brotliDecompressSync(compressedNormals);
       const expectedFrames = compactRgb(frames, Uint16Array.BYTES_PER_ELEMENT);
       const expectedNormals = compactRgb(normals, Uint8Array.BYTES_PER_ELEMENT);
-      uncompressedModelBytes += expectedFrames.byteLength + expectedNormals.byteLength;
-      assert.deepEqual(packedFrames, expectedFrames);
-      assert.deepEqual(packedNormals, expectedNormals);
-      assert.equal(packedFrames.byteLength, frames.byteLength * 3 / 4);
-      assert.equal(packedNormals.byteLength, normals.byteLength * 3 / 4);
+      expectedModelBytes += expectedFrames.byteLength + expectedNormals.byteLength;
+      assert.deepEqual(publishedFrames, expectedFrames);
+      assert.deepEqual(publishedNormals, expectedNormals);
+      assert.equal(publishedFrames.byteLength, frames.byteLength * 3 / 4);
+      assert.equal(publishedNormals.byteLength, normals.byteLength * 3 / 4);
       assert.ok(script.length < 25 * 1024 * 1024, `${champion}.js must stay under Workers asset limit`);
-      assert.ok(packedFrames.byteLength < 25 * 1024 * 1024);
-      assert.ok(packedNormals.byteLength < 25 * 1024 * 1024);
+      assert.ok(publishedFrames.byteLength < 25 * 1024 * 1024);
+      assert.ok(publishedNormals.byteLength < 25 * 1024 * 1024);
       assert.equal(payload.animation.runtime, "vat-v1");
       assert.equal(payload.animation.componentsPerTexel, 3);
       assert.equal(payload.animation.frameCount, metadata.frameCount);
@@ -946,14 +947,7 @@ test("loads only the playable champion models selected in the lobby", async () =
       assert.ok(payload.animation.clips, `${champion} must ship animation.clips`);
     }
   }
-  assert.ok(
-    publishedModelBytes < uncompressedModelBytes,
-    `Brotli model assets must be smaller than their decoded payload (${publishedModelBytes} < ${uncompressedModelBytes})`,
-  );
-  assert.ok(
-    publishedModelBytes <= Math.floor(uncompressedModelBytes * 0.75),
-    `Brotli model assets should stay below 75% of decoded bytes (${publishedModelBytes} <= ${Math.floor(uncompressedModelBytes * 0.75)})`,
-  );
+  assert.equal(publishedModelBytes, expectedModelBytes);
 });
 
 test("loads the optional V1 bot once for CPU training and preserves fallback", async () => {

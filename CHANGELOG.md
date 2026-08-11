@@ -1,6 +1,37 @@
 # Changelog
 
+## 2026-08-11
+
+### Release v1.7.0
+
+- Fingerprinted the whole published boot chain by SHA-256 of the served bytes:
+  `riftbomb.html` → arena loader → online bridge loader → online runtime.
+- Removed every `Content-Encoding` declaration and the manual Brotli
+  pre-compression step, so no served byte depends on a custom encoding header
+  surviving the asset host.
+- Added executable coverage that walks the published chain, verifies each hash
+  and parses each link, replacing the assertions that required compressed bytes.
+- Added the throwaway `game/human-playtest-prototype/` collaboration-loop
+  prototype behind `npm run prototype:human-playtest`.
+- Added complete player-facing, agent-attribution and operational notes in
+  [`PATCH_NOTES_V1.7.0.md`](PATCH_NOTES_V1.7.0.md).
+
+## 2026-08-03
+
+### Release v1.6.0
+
+- Consolidated the canonical runtime in production with runtime, packaging and
+  asset optimizations, PvP UX work, deploy gates and reconnection,
+  accessibility and match-flow fixes.
+
 ## 2026-07-31
+
+### Release v1.5.0
+
+- Added mouse aim on desktop and drag aim on mobile, with hover targeting for
+  Shunpo, Death Lotus and Death Mark.
+- Carried aim over the reliable protocol so the authoritative server and client
+  prediction resolve identically.
 
 ### Release v1.4.0
 

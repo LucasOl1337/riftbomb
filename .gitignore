@@ -25,3 +25,9 @@ Thumbs.db
 .DS_Store
 # Oracle/local release staging (stage-release.mjs)
 .release/
+
+# Riptide artifacts (cloud-synced)
+.humanlayer/tasks/
+
+# Grok delegation scratch (session ids, logs, per-slot research output)
+.grok-fable/
