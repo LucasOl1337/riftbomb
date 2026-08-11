@@ -56,6 +56,17 @@ custom `Content-Encoding` header surviving the asset host.
   decoded bytes were removed, because they encoded the failure mode this release
   fixes.
 
+## Deploy pipeline unblocked
+
+- `online/server/package.json` was missing the `stage:release` script that
+  `online/server/tests/stage-release.test.mjs` requires, even though
+  `online/server/deploy/stage-release.mjs` exists and runs. That single missing
+  entry failed `npm run test:release-gates`, which the workflow runs **before**
+  `wrangler`, so the deploy job had been dying before publish on every push to
+  `main` since before v1.6.0. Adding the script restores the gate to 13/13.
+- This is a pre-existing defect, unrelated to the boot-chain work. It is
+  included here because without it merging this release does not deploy.
+
 ## Tooling
 
 - Added `game/human-playtest-prototype/`, a throwaway terminal prototype for the
@@ -122,10 +133,17 @@ All suites were run on the release content, not reported from an agent summary.
   `riftbomb.html` → `riftbomb-loader-3323b9d6….js` →
   `online-duel-loader-8f8e0114….js` → `online-duel-8cfab442….js`, each hash
   matching its bytes and each file parsing as JavaScript.
+- Release gates: **13/13** passed after the `stage:release` fix
+  (`npm --prefix online run test:release-gates`). They were 12/13 at v1.6.0.
 - Deploy path audited: `online/scripts/build-verified.sh` runs
   `package-riftbomb.mjs` before the Vinext build, and the workflow runs
   `npm run build` before `test:release-gates` and before `wrangler`. The
   gitignored boot assets are therefore regenerated in CI ahead of both gates.
+- Production state confirmed against the live origin, not assumed:
+  `https://bombpvp.com/riftbomb-parts/manifest.json` already returns
+  `f0fbadad…`, and
+  `https://bombpvp.com/riftbomb-loader-3323b9d6….js` returns `200`,
+  `text/javascript`, 4424 bytes — directly executable, no custom encoding.
 - No Playwright headless or `headless_shell` process was used.
 
 ## Known limitations and operations
@@ -152,5 +170,13 @@ All suites were run on the release content, not reported from an agent summary.
   snapshots) is planned, not implemented.
 - The Worker and the authoritative Oracle origin must still be deployed together
   because the protocol does not negotiate gameplay-rule versions.
+- **This release documents and version-controls what production already runs.**
+  `bombpvp.com` was updated by a manual `npm run deploy` while `main` stayed on
+  `v1.6.0`, because the CI deploy job had been failing at the release gates.
+  Production therefore led the repository for the whole window. The v1.6.0
+  release note's claim of live manifest `139d1d1f…` has been stale since then.
+  Merging this branch makes `main`, CI and the live site agree again; it is not
+  expected to change what players receive.
 - Publication is not complete until `bombpvp.com` serves the new manifest hash;
-  a green deploy job alone is not evidence.
+  a green deploy job alone is not evidence. Verify with
+  `curl -fsS https://bombpvp.com/riftbomb-parts/manifest.json`.
