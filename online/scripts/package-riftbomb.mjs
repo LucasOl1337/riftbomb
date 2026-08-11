@@ -1,9 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { brotliCompressSync, constants as zlibConstants } from "node:zlib";
 import { transform } from "esbuild";
 import {
   katarinaDaggerPresentation,
@@ -18,6 +17,10 @@ const gameSource = path.join(repositoryRoot, "riftbomb.html");
 const matchRulesSource = path.join(repositoryRoot, "game", "run-champion-bomb-duel.js");
 const shellSource = path.join(onlineRoot, "riftbomb-shell.html");
 const shellOutput = path.join(onlineRoot, "public", "riftbomb.html");
+const publicDirectory = path.join(onlineRoot, "public");
+const riftbombLoaderSource = path.join(publicDirectory, "riftbomb-loader.js");
+const onlineDuelLoaderSource = path.join(publicDirectory, "online-duel-loader.js");
+const onlineDuelSource = path.join(publicDirectory, "online-duel.js");
 const outputDirectory = path.join(onlineRoot, "public", "riftbomb-parts");
 const arenaTextureOutputDirectory = path.join(onlineRoot, "public", "arena-textures");
 const championModelOutputDirectory = path.join(onlineRoot, "public", "champion-models");
@@ -219,19 +222,10 @@ onlineGame = replaceOnce(
 
 // Workers static assets hard-cap at 25 MiB per file. VAT frames/normals are
 // shipped as separate .bin assets so base64 JS never blows past that limit.
-// The published champion-models namespace is served with Content-Encoding: br;
-// fingerprint the compressed bytes while the browser transparently decodes
-// the original JavaScript and RGB VAT buffers.
+// Publish directly consumable bytes. Cloudflare may compress transport at the
+// edge, but runtime correctness must not depend on a custom Content-Encoding
+// rule being preserved by the asset host.
 const WORKERS_ASSET_MAX_BYTES = 25 * 1024 * 1024;
-const CHAMPION_ASSET_COMPRESSION_QUALITY = 4;
-
-function compressChampionAsset(buffer) {
-  return brotliCompressSync(buffer, {
-    params: {
-      [zlibConstants.BROTLI_PARAM_QUALITY]: CHAMPION_ASSET_COMPRESSION_QUALITY,
-    },
-  });
-}
 
 const embeddedChampionModels = (await readFile(championModelBundleSource, "utf8")).replace(/\r\n/g, "\n");
 const katarinaDagger = await packageKatarinaDagger(repositoryRoot);
@@ -335,13 +329,10 @@ const championModelBundles = Object.fromEntries(
 const championModelAssets = Object.fromEntries(
   playableChampions.map((champion) => {
     const { payload, binaryAssets } = championModelBundles[champion];
-    const fingerprintedBinaryAssets = binaryAssets.map(({ name, buffer }) => {
-      const compressedBuffer = compressChampionAsset(buffer);
-      return {
-        name: fingerprintedAssetName(name, compressedBuffer),
-        buffer: compressedBuffer,
-      };
-    });
+    const fingerprintedBinaryAssets = binaryAssets.map(({ name, buffer }) => ({
+      name: fingerprintedAssetName(name, buffer),
+      buffer,
+    }));
     const binaryPaths = new Map(
       binaryAssets.map(({ name }, index) => [
         `/champion-models/${name}`,
@@ -364,10 +355,9 @@ const championModelAssets = Object.fromEntries(
         `${champion}.js is ${scriptBytes.byteLength} bytes; Workers assets must stay under ${WORKERS_ASSET_MAX_BYTES}`,
       );
     }
-    const compressedScriptBytes = compressChampionAsset(scriptBytes);
     return [champion, {
-      scriptName: fingerprintedAssetName(`${champion}.js`, compressedScriptBytes),
-      scriptBytes: compressedScriptBytes,
+      scriptName: fingerprintedAssetName(`${champion}.js`, scriptBytes),
+      scriptBytes,
       binaryAssets: fingerprintedBinaryAssets,
     }];
   }),
@@ -410,10 +400,9 @@ const championSfxBundles = Object.fromEntries(
         if (error?.code === "ENOENT") return null;
         throw error;
       }
-      const compressedBytes = compressChampionAsset(sourceBytes);
       return [champion, {
-        outputName: fingerprintedAssetName(`${champion}.js`, compressedBytes),
-        compressedBytes,
+        outputName: fingerprintedAssetName(`${champion}.js`, sourceBytes),
+        sourceBytes,
       }];
     }),
   )).filter(Boolean),
@@ -467,8 +456,8 @@ await Promise.all(
 await rm(championSfxOutputDirectory, { recursive: true, force: true });
 await mkdir(championSfxOutputDirectory, { recursive: true });
 await Promise.all(
-  Object.values(championSfxBundles).map(({ outputName, compressedBytes }) =>
-    writeFile(path.join(championSfxOutputDirectory, outputName), compressedBytes),
+  Object.values(championSfxBundles).map(({ outputName, sourceBytes }) =>
+    writeFile(path.join(championSfxOutputDirectory, outputName), sourceBytes),
   ),
 );
 
@@ -489,10 +478,43 @@ const manifest = {
   sha256,
   partsPath,
 };
-const shell = replaceOnce(
+const onlineDuelBytes = await readFile(onlineDuelSource);
+const onlineDuelName = fingerprintedAssetName("online-duel.js", onlineDuelBytes);
+const versionedOnlineDuelLoader = replaceOnce(
+  await readFile(onlineDuelLoaderSource, "utf8"),
+  'const RUNTIME_URL = "/online-duel.js";',
+  `const RUNTIME_URL = "/${onlineDuelName}";`,
+);
+const versionedOnlineDuelLoaderBytes = Buffer.from(versionedOnlineDuelLoader);
+const onlineDuelLoaderName = fingerprintedAssetName(
+  "online-duel-loader.js",
+  versionedOnlineDuelLoaderBytes,
+);
+const versionedRiftbombLoader = replaceOnce(
+  await readFile(riftbombLoaderSource, "utf8"),
+  "/online-duel-loader.js",
+  `/${onlineDuelLoaderName}`,
+);
+const versionedRiftbombLoaderBytes = Buffer.from(versionedRiftbombLoader);
+const riftbombLoaderName = fingerprintedAssetName(
+  "riftbomb-loader.js",
+  versionedRiftbombLoaderBytes,
+);
+const shellWithManifest = replaceOnce(
   await readFile(shellSource, "utf8"),
   "__RIFTBOMB_MANIFEST__",
   JSON.stringify(manifest).replaceAll("&", "&amp;").replaceAll("'", "&#39;"),
+);
+const shell = replaceOnce(
+  shellWithManifest,
+  'src="/riftbomb-loader.js"',
+  `src="/${riftbombLoaderName}"`,
+);
+const obsoleteBootAssets = (await readdir(publicDirectory)).filter((name) =>
+  /^(?:riftbomb-loader|online-duel(?:-loader)?)-[a-f0-9]{64}\.js$/u.test(name),
+);
+await Promise.all(
+  obsoleteBootAssets.map((name) => rm(path.join(publicDirectory, name), { force: true })),
 );
 await Promise.all([
   writeFile(
@@ -500,6 +522,15 @@ await Promise.all([
     `${JSON.stringify(manifest, null, 2)}\n`,
   ),
   writeFile(shellOutput, shell),
+  writeFile(path.join(publicDirectory, onlineDuelName), onlineDuelBytes),
+  writeFile(
+    path.join(publicDirectory, onlineDuelLoaderName),
+    versionedOnlineDuelLoaderBytes,
+  ),
+  writeFile(
+    path.join(publicDirectory, riftbombLoaderName),
+    versionedRiftbombLoaderBytes,
+  ),
 ]);
 
 await writeFile(path.join(onlineRoot, "public", "bot-v1.js"), v1BotBundle);

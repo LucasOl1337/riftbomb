@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
-import { brotliDecompressSync } from "node:zlib";
+import vm from "node:vm";
 import {
   INITIAL_RUNTIME_STATE,
   runtimeStateEquals,
@@ -237,16 +237,16 @@ test("keeps the runtime authoritative behind a same-origin message bridge", asyn
   assert.match(runtime, /await startHostOnlineMatch/);
 });
 
-test("ships both online bridge scripts precompressed without changing decoded bytes", async (t) => {
+test("ships directly executable online bridge scripts without relying on response encoding", async (t) => {
   const [source, loaderSource, headers] = await Promise.all([
     readFile(new URL("public/online-duel.js", root)),
     readFile(new URL("public/online-duel-loader.js", root)),
     readFile(new URL("public/_headers", root), "utf8"),
   ]);
-  let compressed;
-  let loaderCompressed;
+  let artifact;
+  let loaderArtifact;
   try {
-    [compressed, loaderCompressed] = await Promise.all([
+    [artifact, loaderArtifact] = await Promise.all([
       readFile(new URL("dist/client/online-duel.js", root)),
       readFile(new URL("dist/client/online-duel-loader.js", root)),
     ]);
@@ -258,20 +258,53 @@ test("ships both online bridge scripts precompressed without changing decoded by
     throw error;
   }
 
-  assert.match(
+  assert.doesNotMatch(
     headers,
-    /\/online-duel\.js\s+Content-Encoding: br/,
-    "the stable runtime URL must declare its production encoding",
+    /\/online-duel(?:-loader)?\.js\s+Content-Encoding:/,
+    "bridge scripts must remain executable even when the asset host drops custom encoding headers",
   );
-  assert.match(
-    headers,
-    /\/online-duel-loader\.js\s+Content-Encoding: br/,
-    "the lazy bridge URL must declare its production encoding",
+  assert.deepEqual(artifact, source);
+  assert.deepEqual(loaderArtifact, loaderSource);
+});
+
+test("fingerprints every executable in the published arena boot chain", async (t) => {
+  let shell;
+  try {
+    shell = await readFile(new URL("dist/client/riftbomb.html", root), "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      t.skip("requires the verified online build artifact");
+      return;
+    }
+    throw error;
+  }
+
+  async function readFingerprintedScript(owner, pattern, label) {
+    const match = owner.match(pattern);
+    assert.ok(match, `${label} must use a fingerprinted URL`);
+    const [, name, fingerprint] = match;
+    const bytes = await readFile(new URL(`dist/client/${name}`, root));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), fingerprint);
+    const source = bytes.toString("utf8");
+    new vm.Script(source, { filename: name });
+    return source;
+  }
+
+  const gameLoader = await readFingerprintedScript(
+    shell,
+    /src="\/(riftbomb-loader-([a-f0-9]{64})\.js)"/,
+    "arena loader",
   );
-  assert.ok(compressed.byteLength < source.byteLength);
-  assert.deepEqual(brotliDecompressSync(compressed), source);
-  assert.ok(loaderCompressed.byteLength < loaderSource.byteLength);
-  assert.deepEqual(brotliDecompressSync(loaderCompressed), loaderSource);
+  const bridgeLoader = await readFingerprintedScript(
+    gameLoader,
+    /\/(online-duel-loader-([a-f0-9]{64})\.js)/,
+    "online bridge loader",
+  );
+  await readFingerprintedScript(
+    bridgeLoader,
+    /\/(online-duel-([a-f0-9]{64})\.js)/,
+    "online runtime",
+  );
 });
 
 test("ships cached responsive arena artwork and compact champion portraits", async () => {

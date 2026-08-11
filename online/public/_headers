@@ -4,22 +4,20 @@
 /riftbomb-parts/manifest.json
   Cache-Control: no-store
 
-/online-duel.js
-  Content-Encoding: br
+/riftbomb-loader-*.js
+  Cache-Control: public, max-age=31556952, immutable
 
-/online-duel-loader.js
-  Content-Encoding: br
+/online-duel-*.js
+  Cache-Control: public, max-age=31556952, immutable
 
 /arena-textures/*
   Cache-Control: public, max-age=31556952, immutable
 
 /champion-models/*
   Cache-Control: public, max-age=31556952, immutable
-  Content-Encoding: br
 
 /champion-sfx/*
   Cache-Control: public, max-age=31556952, immutable
-  Content-Encoding: br
 
 /client/arenas/responsive/*
   Cache-Control: public, max-age=31556952, immutable
