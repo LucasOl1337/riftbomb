@@ -45,6 +45,7 @@ next-env.d.ts
 /public/arena-textures/
 /public/champion-models/
 /public/champion-sfx/
+/public/match-continuity-[0-9a-f]*.js
 /public/online-duel-[0-9a-f]*.js
 /public/online-duel-loader-[0-9a-f]*.js
 /public/riftbomb-loader-[0-9a-f]*.js

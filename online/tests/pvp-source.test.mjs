@@ -62,10 +62,7 @@ test("loads the online duel layer into the reconstructed game", async () => {
     new URL(`public/${loaderMatch[1]}`, root),
     "utf8",
   );
-  const packager = await readFile(
-    new URL("scripts/package-riftbomb.mjs", root),
-    "utf8",
-  );
+  const command = await readFile(new URL("scripts/package-riftbomb.mjs", root), "utf8");
 
   assert.match(page, /src="\/riftbomb-loader-[a-f0-9]{64}\.js"/);
   assert.match(page, /data-riftbomb-manifest='/);
@@ -77,13 +74,9 @@ test("loads the online duel layer into the reconstructed game", async () => {
   assert.match(loader, /manifest\.partCount/);
   assert.match(loader, /response\.arrayBuffer/);
   assert.match(loader, /new TextDecoder/);
-  assert.match(packager, /riftbomb\.html/);
-  assert.match(packager, /PART_SIZE/);
-  assert.match(packager, /manifest\.json/);
-  assert.match(packager, /rootBuildReady = process\.argv\[2\] === "--root-build-ready"/);
-  assert.match(packager, /if \(!rootBuildReady\)/);
-  assert.match(packager, /arenaTextureOutputDirectory/);
-  assert.match(packager, /championModelOutputDirectory/);
+  assert.match(command, /createOfflineGamePublication\(\)\.publish/);
+  assert.match(command, /rootBuildReady = process\.argv\[2\] === "--root-build-ready"/);
+  assert.doesNotMatch(command, /PART_SIZE|readFile|writeFile|manifest\.json/);
   assert.doesNotMatch(page, /<script>[\s\S]*<\/script>/);
 });
 
@@ -306,17 +299,12 @@ test("movement and actions use independent bounded streams with causal ACK and r
   assert.doesNotMatch(client, /function createReliableInputStream|function createReliableActionStream/);
   assert.match(client, /const \{ connection: matchConnection, delivery, runtime, session \} = continuity/);
   assert.match(client, /if \(state\.connected\) delivery\.replay\(\)/);
-  assert.match(client, /function sendMovementInput/);
-  assert.match(client, /delivery\.inputEpoch\(\) <= 0/);
+  assert.doesNotMatch(client, /function sendMovementInput|lastLegacyInput/);
+  assert.match(client, /delivery\.sendMovement\(inputMask\(\)\)/);
   assert.match(client, /delivery\.synchronize\(data, seatIndex\)/);
-  const matchControl = client.slice(
-    client.indexOf("function handleControl"),
-    client.indexOf("function sendControl")
-  );
-  assert.match(matchControl,
-    /delivery\.inputEpoch\(\) <= 0\) state\.lastLegacyInput = -1/,
-    "legacy movement dedupe must re-arm at every old-server match boundary");
-  assert.match(client, /if \(!delivery\.sendInput\(mask\)\) delivery\.replayInput\(\)/);
+  assert.match(client, /delivery\.beginMatch\(message, seatIndex\)/);
+  assert.match(continuity, /rearmLegacy/,
+    "legacy movement dedupe must re-arm at every old-server Match boundary");
   const keyup = client.slice(
     client.indexOf('addEventListener("keyup"'),
     client.indexOf('addEventListener("blur"')
@@ -333,7 +321,7 @@ test("movement and actions use independent bounded streams with causal ACK and r
     "match mode must not hide its critical action-delivery alert");
   assert.match(client, /if \(!sendOnlineAction\("bomb"\)\) return false/);
   assert.match(client, /if \(!sendOnlineAction\("ability", slot, aim\)\) return false/);
-  assert.match(client, /delivery\.sendAction\(kind, slot, game\.round, aim\)/,
+  assert.match(client, /const sent = delivery\.sendAction\(kind, slot, game\.round, aim\)/,
     "aimed abilities must preserve their target in the reliable action envelope");
   assert.doesNotMatch(client, /pagehide[^\n]*clearInterval/,
     "BFCache restore must keep the delivery timer available");
@@ -368,7 +356,8 @@ test("the bridge delegates socket generations and resume handshakes to Match con
   ]);
 
   assert.match(bridge, /matchConnection\.connect\(/);
-  assert.match(bridge, /matchConnection\.current\(\)/);
+  assert.match(bridge, /matchConnection\.isOpen\(\)/);
+  assert.doesNotMatch(bridge, /state\.socket|WebSocket\.OPEN/);
   assert.doesNotMatch(bridge, /pendingConnectCancel|new Function/);
   assert.match(continuity, /if \(activeSocket !== socket\) return/);
   assert.match(continuity, /pendingConnectionCancel/);
@@ -462,6 +451,12 @@ test("caches only fingerprinted game artifacts as immutable", async () => {
     headers,
     /\/riftbomb-parts\/manifest\.json\s+Cache-Control: no-store/,
   );
+  for (const asset of ["riftbomb-loader", "match-continuity", "online-duel"]) {
+    assert.match(
+      headers,
+      new RegExp(`/${asset}-\\*\\.js\\s+Cache-Control: public, max-age=31556952, immutable`),
+    );
+  }
   assert.match(
     headers,
     /\/arena-textures\/\*\s+Cache-Control: public, max-age=31556952, immutable/,

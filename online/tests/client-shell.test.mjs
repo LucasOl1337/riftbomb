@@ -238,16 +238,19 @@ test("keeps the runtime authoritative behind a same-origin message bridge", asyn
 });
 
 test("ships directly executable online bridge scripts without relying on response encoding", async (t) => {
-  const [source, loaderSource, headers] = await Promise.all([
+  const [source, continuitySource, loaderSource, headers] = await Promise.all([
     readFile(new URL("public/online-duel.js", root)),
+    readFile(new URL("public/match-continuity.js", root)),
     readFile(new URL("public/online-duel-loader.js", root)),
     readFile(new URL("public/_headers", root), "utf8"),
   ]);
   let artifact;
+  let continuityArtifact;
   let loaderArtifact;
   try {
-    [artifact, loaderArtifact] = await Promise.all([
+    [artifact, continuityArtifact, loaderArtifact] = await Promise.all([
       readFile(new URL("dist/client/online-duel.js", root)),
+      readFile(new URL("dist/client/match-continuity.js", root)),
       readFile(new URL("dist/client/online-duel-loader.js", root)),
     ]);
   } catch (error) {
@@ -260,10 +263,11 @@ test("ships directly executable online bridge scripts without relying on respons
 
   assert.doesNotMatch(
     headers,
-    /\/online-duel(?:-loader)?\.js\s+Content-Encoding:/,
+    /\/(?:match-continuity|online-duel(?:-loader)?)\.js\s+Content-Encoding:/,
     "bridge scripts must remain executable even when the asset host drops custom encoding headers",
   );
   assert.deepEqual(artifact, source);
+  assert.deepEqual(continuityArtifact, continuitySource);
   assert.deepEqual(loaderArtifact, loaderSource);
 });
 
@@ -300,11 +304,18 @@ test("fingerprints every executable in the published arena boot chain", async (t
     /\/(online-duel-loader-([a-f0-9]{64})\.js)/,
     "online bridge loader",
   );
-  await readFingerprintedScript(
-    bridgeLoader,
-    /\/(online-duel-([a-f0-9]{64})\.js)/,
-    "online runtime",
-  );
+  await Promise.all([
+    readFingerprintedScript(
+      bridgeLoader,
+      /\/(match-continuity-([a-f0-9]{64})\.js)/,
+      "Match continuity",
+    ),
+    readFingerprintedScript(
+      bridgeLoader,
+      /\/(online-duel-([a-f0-9]{64})\.js)/,
+      "online runtime",
+    ),
+  ]);
 });
 
 test("ships cached responsive arena artwork and compact champion portraits", async () => {

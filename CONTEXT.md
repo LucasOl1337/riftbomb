@@ -24,6 +24,18 @@ _Avoid_: Asset bundle, baked model
 O HTML autocontido e versionado que pode ser aberto diretamente para jogar Riftbomb.
 _Avoid_: Build, release page
 
+**Offline publication**:
+O módulo que transforma o Offline game, emite seus assets e conecta a cadeia de boot por hashes de conteúdo.
+_Avoid_: Packaging script, copy step
+
+**Match continuity**:
+O módulo client que preserva credenciais, reconexão, entrega confiável e bootstrap de uma Match publicada.
+_Avoid_: Online UI, socket helper
+
+**Authoritative room**:
+O módulo server que possui assentos, fila, retomada, relógio e snapshots de uma Match online; HTTP/WebSocket é apenas seu adaptador de transporte.
+_Avoid_: WebSocket handler, room map
+
 **Bot**:
 O controlador de CPU de um contestant na Match (hoje o Red / P2 até handoff humano local).
 _Avoid_: NPC genérico, AI agent, enemy script

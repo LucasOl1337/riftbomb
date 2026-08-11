@@ -7,6 +7,9 @@
 /riftbomb-loader-*.js
   Cache-Control: public, max-age=31556952, immutable
 
+/match-continuity-*.js
+  Cache-Control: public, max-age=31556952, immutable
+
 /online-duel-*.js
   Cache-Control: public, max-age=31556952, immutable
 
