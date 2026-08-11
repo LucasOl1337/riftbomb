@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash, timingSafeEqual } from "node:crypto";
 import test from "node:test";
 import {
   applyInputMask,
@@ -12,6 +13,69 @@ import {
   invalidateProtocolCache,
   updateGridCache
 } from "../src/authoritative-rooms.mjs";
+
+test("owns protected-seat admission, disconnect, expiry and revocation behind one interface", () => {
+  let now = 1_000;
+  const sent = [];
+  const broadcasts = [];
+  const manager = new AuthoritativeRooms({
+    rooms: new Map(),
+    reconnectGraceMs: 20,
+    roomTtlMs: 1_000,
+    wallNow: () => now,
+    transport: {
+      send(socket, message) {
+        sent.push({ socket, message });
+        return true;
+      },
+      broadcast(sockets, message) {
+        broadcasts.push({ sockets, message });
+      },
+      isOpen: (socket) => socket.readyState === 1,
+      close(socket, code, reason) {
+        socket.closed = { code, reason };
+        socket.readyState = 3;
+      }
+    }
+  });
+  const cryptoRuntime = { createHash, timingSafeEqual, randomInt: () => 0 };
+  const token = "a".repeat(64);
+  const host = { readyState: 1 };
+
+  manager.acceptConnection(host, {
+    type: "hello",
+    room: "DEEP24",
+    role: "host",
+    inputProtocol: 1,
+    actionProtocol: 1,
+    resumeProtocol: 1,
+    resumeToken: token
+  }, cryptoRuntime);
+  assert.deepEqual(sent.at(-1).message.resume, { v: 1, protected: true, resumed: false });
+  assert.equal(manager.lifecycleSnapshot().rooms, 1);
+  assert.equal(broadcasts.at(-1).message.type, "lobby");
+
+  manager.disconnect(host, now);
+  manager.maintain(now + 19);
+  assert.equal(manager.lifecycleSnapshot().rooms, 1);
+  manager.maintain(now + 20);
+  assert.equal(manager.lifecycleSnapshot().rooms, 0);
+
+  const stale = { readyState: 1 };
+  now += 21;
+  manager.acceptConnection(stale, {
+    type: "hello",
+    room: "DEEP24",
+    role: "host",
+    resumeOnly: true,
+    resumeProtocol: 1,
+    resumeToken: token
+  }, cryptoRuntime);
+  assert.deepEqual(sent.at(-1), {
+    socket: stale,
+    message: { type: "error", error: "resume_expired" }
+  });
+});
 
 test("tracks exact grid changes without transient serialization", () => {
   const room = { gridCache: null };
@@ -69,7 +133,7 @@ test("reuses immutable empty snapshot containers without changing the JSON shape
 
 test("movement input accepts only the next sequence in the active match epoch", () => {
   const rooms = new Map();
-  const manager = new AuthoritativeRooms({ rooms, broadcast() {} });
+  const manager = new AuthoritativeRooms({ rooms, transport: { broadcast() {} } });
   const room = manager.create("INPUT1", {});
   room.game = {};
   room.inputEpoch = 9;
@@ -112,7 +176,7 @@ test("movement input accepts only the next sequence in the active match epoch", 
 
 test("action transport processes each sequence once and ACKs mechanical rejection", () => {
   const rooms = new Map();
-  const manager = new AuthoritativeRooms({ rooms, broadcast() {} });
+  const manager = new AuthoritativeRooms({ rooms, transport: { broadcast() {} } });
   const room = manager.create("ACTN01", {});
   room.game = { round: 3 };
   room.inputEpoch = 9;
@@ -188,7 +252,10 @@ test("action transport processes each sequence once and ACKs mechanical rejectio
 });
 
 test("reuses protocol envelopes until their room cursors change", () => {
-  const manager = new AuthoritativeRooms({ rooms: new Map(), broadcast() {} });
+  const manager = new AuthoritativeRooms({
+    rooms: new Map(),
+    transport: { broadcast() {} }
+  });
   const room = manager.create("CACHE1", {});
 
   const firstInput = manager.inputProtocol(room);
@@ -366,7 +433,7 @@ test("Death Mark consumes dt carry, buffers the last 150 ms and then releases mo
 test("replayed reliable R actions cannot restart Death Mark commitment", async () => {
   const { game, zed } = await createDeathMarkFixture();
   const rooms = new Map();
-  const manager = new AuthoritativeRooms({ rooms, broadcast() {} });
+  const manager = new AuthoritativeRooms({ rooms, transport: { broadcast() {} } });
   const room = manager.create("ZEDR15", {});
   room.game = game;
   room.inputEpoch = 15;
@@ -1055,8 +1122,10 @@ test("shares one tick and snapshot clock across active rooms", async () => {
   let now = 100;
   const manager = new AuthoritativeRooms({
     rooms,
-    broadcast(room, message) {
-      broadcasts.push({ room, message });
+    transport: {
+      broadcast(sockets, message) {
+        broadcasts.push({ socket: sockets[0], message });
+      }
     },
     now: () => now,
     scheduleImmediate: (callback) => callback(),
@@ -1097,7 +1166,8 @@ test("shares one tick and snapshot clock across active rooms", async () => {
   assert.equal(rooms.get("LOBBY1").sequence, 0);
   assert.equal(broadcasts.filter(({ message }) => message.type === "snapshot" && message.data.grid).length, 2);
   assert.deepEqual(
-    broadcasts.find(({ room, message }) => room === inputRoom && message.type === "snapshot")
+    broadcasts.find(({ socket, message }) =>
+      socket === inputRoom.players[0].socket && message.type === "snapshot")
       .message.data.input,
     { v: 1, epoch: 1, accepted: [1, 0], ack: [1, 0] }
   );
@@ -1119,8 +1189,14 @@ test("shares one tick and snapshot clock across active rooms", async () => {
   const changedRoom = rooms.get("ROOM01");
   changedRoom.game.grid[0][0] = changedRoom.game.grid[0][0] === 0 ? 1 : 0;
   snapshotClock.callback();
-  assert.equal(broadcasts.find(({ room }) => room === changedRoom).message.data.grid, changedRoom.game.grid);
-  assert.equal(broadcasts.find(({ room }) => room !== changedRoom).message.data.grid, undefined);
+  assert.equal(
+    broadcasts.find(({ socket }) => socket === changedRoom.players[0].socket).message.data.grid,
+    changedRoom.game.grid
+  );
+  assert.equal(
+    broadcasts.find(({ socket }) => socket !== changedRoom.players[0].socket).message.data.grid,
+    undefined
+  );
 
   broadcasts.length = 0;
   for (let sequence = 3; sequence <= 60; sequence += 1) snapshotClock.callback();
@@ -1146,7 +1222,7 @@ test("yields between bounded room batches", () => {
   const visited = [];
   const manager = new AuthoritativeRooms({
     rooms,
-    broadcast() {},
+    transport: { broadcast() {} },
     scheduleImmediate(callback) {
       pending.push(callback);
     }

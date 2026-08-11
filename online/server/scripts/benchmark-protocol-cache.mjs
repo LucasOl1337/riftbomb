@@ -10,7 +10,7 @@ const REPEATS = 3;
 
 function createFixture() {
   const rooms = new Map();
-  const manager = new AuthoritativeRooms({ rooms, broadcast() {} });
+  const manager = new AuthoritativeRooms({ rooms, transport: { broadcast() {} } });
   for (let index = 0; index < ROOM_COUNT; index += 1) {
     const room = manager.create(`CACHE${index.toString().padStart(3, "0")}`, {});
     room.inputEpoch = 1;

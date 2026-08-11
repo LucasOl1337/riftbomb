@@ -25,7 +25,7 @@ test("loads the duel runtime once and only when the first match starts", async (
   const rooms = new Map();
   const manager = new AuthoritativeRooms({
     rooms,
-    broadcast() {},
+    transport: { broadcast() {} },
     loadDuelRuntime() {
       loads += 1;
       return fakeRuntime();
@@ -51,7 +51,7 @@ test("a room stopped while its runtime loads cannot start an orphaned match", as
   let scheduledClocks = 0;
   const manager = new AuthoritativeRooms({
     rooms,
-    broadcast() {},
+    transport: { broadcast() {} },
     loadDuelRuntime: () => new Promise((resolve) => { releaseRuntime = resolve; }),
     scheduleInterval() {
       scheduledClocks += 1;
@@ -97,7 +97,7 @@ test("a room stopped during duel creation cannot resurrect its game or clocks", 
   };
   const manager = new AuthoritativeRooms({
     rooms,
-    broadcast() {},
+    transport: { broadcast() {} },
     loadDuelRuntime: () => runtime,
     scheduleInterval() {
       scheduledClocks += 1;
@@ -141,7 +141,7 @@ test("a socket generation replaced during creation restarts with the current pla
   };
   const manager = new AuthoritativeRooms({
     rooms,
-    broadcast() {},
+    transport: { broadcast() {} },
     loadDuelRuntime: () => runtime,
     scheduleInterval: () => 1
   });
@@ -192,11 +192,12 @@ test("server boot graph defers non-critical support modules", async () => {
     "authoritative-rooms",
     "json-transport",
     "message-rate-limit",
-    "health-response",
-    "quick-match-queue"
+    "health-response"
   ]) {
     assert.doesNotMatch(source, new RegExp(`from\\s+["']\\./${moduleName}\\.mjs["']`));
     assert.match(source, new RegExp(`import\\(["']\\./${moduleName}\\.mjs["']\\)`));
   }
+  assert.doesNotMatch(source, /quick-match-queue/,
+    "the room lifecycle owns its queue implementation behind the authoritative seam");
   assert.match(source, /SERVER_BOOT_LAZY_V1/);
 });
