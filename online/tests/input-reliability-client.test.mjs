@@ -1,177 +1,133 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const source = await readFile(
-  new URL("../public/online-duel.js", import.meta.url),
-  "utf8"
-);
-const start = source.indexOf("  function createReliableInputStream");
-const end = source.indexOf("\n  const state =", start);
-assert.ok(start >= 0 && end > start, "reliable input factory must have a stable boundary");
-const declaration = source.slice(start, end);
-const createReliableInputStream = new Function(
-  "performance",
-  "INPUT_PROTOCOL_VERSION",
-  "INPUT_RETRY_MS",
-  "INPUT_OUTBOX_LIMIT",
-  "MAX_INPUT_SEQUENCE",
-  `"use strict"; ${declaration}; return createReliableInputStream;`
-)(
-  { now: () => 0 },
-  1,
-  120,
-  64,
-  0x7fffffff
-);
+const continuityUrl = new URL("../public/match-continuity.js", import.meta.url);
+await import(`${continuityUrl.href}?input=${Date.now()}`);
+const continuityFactory = globalThis.RIFTBOMB_MATCH_CONTINUITY;
 
-const movementStart = source.indexOf("  function sendMovementInput");
-const movementEnd = source.indexOf("\n  function sendCurrentInput", movementStart);
-assert.ok(movementStart >= 0 && movementEnd > movementStart,
-  "movement sender must have a stable boundary");
-const movementDeclaration = source.slice(movementStart, movementEnd);
-
-const protocol = (epoch, accepted, ack) => ({
-  v: 1,
-  epoch,
-  accepted: [accepted, 0],
-  ack: [ack, 0]
-});
-
-test("lost movement transitions replay in order with their original sequence", () => {
-  let now = 0;
+function createFixture() {
   const sent = [];
-  const stream = createReliableInputStream({
-    now: () => now,
+  const values = new Map();
+  const clock = { now: 0 };
+  const continuity = continuityFactory.create({
     send(message) {
       sent.push(structuredClone(message));
       return true;
-    }
+    },
+    storage: {
+      getItem: (key) => values.get(key) ?? null,
+      setItem: (key, value) => values.set(key, value),
+      removeItem: (key) => values.delete(key),
+    },
+    now: () => clock.now,
+    scheduleTimeout: () => 1,
+    cancelTimeout: () => undefined,
   });
+  return { clock, continuity, sent };
+}
 
-  assert.equal(stream.synchronize(protocol(4, 0, 0), 0), true);
-  assert.equal(stream.queue(8), true);
-  assert.equal(stream.queue(0), true);
+const inputProtocol = (epoch, accepted, ack) => ({
+  input: {
+    v: 1,
+    epoch,
+    accepted: [accepted, 0],
+    ack: [ack, 0],
+  },
+});
+
+test("lost movement transitions replay in order with their original sequence", () => {
+  const { clock, continuity, sent } = createFixture();
+  const delivery = continuity.delivery;
+
+  delivery.synchronize(inputProtocol(4, 0, 0), 0);
+  assert.equal(delivery.sendMovement(8), true);
+  assert.equal(delivery.sendMovement(0), true);
   assert.deepEqual(sent.map(({ inputSeq, mask }) => [inputSeq, mask]), [[1, 8], [2, 0]]);
-  assert.deepEqual(stream.snapshot().pendingSequences, [1, 2]);
+  assert.deepEqual(delivery.inputSnapshot().pendingSequences, [1, 2]);
 
-  now = 119;
-  assert.equal(stream.replay(), false);
-  now = 120;
-  assert.equal(stream.replay(), true);
+  clock.now = 119;
+  delivery.replay();
+  assert.equal(sent.length, 2);
+  clock.now = 120;
+  delivery.replay();
   assert.deepEqual(sent.map(({ inputSeq, mask }) => [inputSeq, mask]), [
-    [1, 8], [2, 0], [1, 8]
+    [1, 8], [2, 0], [1, 8],
   ]);
-  assert.equal(stream.snapshot().replayCount, 1);
+  assert.equal(delivery.inputSnapshot().replayCount, 1);
 
-  assert.equal(stream.synchronize(protocol(4, 2, 1), 0), true);
-  assert.deepEqual(stream.snapshot().pendingSequences, [2]);
-  assert.equal(stream.synchronize(protocol(4, 2, 2), 0), true);
-  assert.deepEqual(stream.snapshot().pendingSequences, []);
-  now = 500;
-  assert.equal(stream.replay(), false);
+  delivery.synchronize(inputProtocol(4, 2, 1), 0);
+  assert.deepEqual(delivery.inputSnapshot().pendingSequences, [2]);
+  delivery.synchronize(inputProtocol(4, 2, 2), 0);
+  assert.deepEqual(delivery.inputSnapshot().pendingSequences, []);
+  clock.now = 500;
+  delivery.replay();
+  assert.equal(sent.length, 3);
 });
 
-test("ACK never regresses and a new match epoch discards stale movement", () => {
-  const sent = [];
-  const stream = createReliableInputStream({
-    send(message) { sent.push(structuredClone(message)); return true; }
-  });
+test("ACK never regresses and a new Match epoch drops stale movement", () => {
+  const { continuity, sent } = createFixture();
+  const delivery = continuity.delivery;
+  delivery.synchronize(inputProtocol(7, 0, 0), 0);
+  delivery.sendMovement(4);
+  delivery.synchronize(inputProtocol(7, 1, 1), 0);
+  delivery.synchronize(inputProtocol(7, 1, 0), 0);
+  assert.equal(delivery.inputSnapshot().acknowledgedSequence, 1);
 
-  stream.synchronize(protocol(7, 0, 0), 0);
-  stream.queue(4);
-  stream.synchronize(protocol(7, 1, 1), 0);
-  assert.equal(stream.synchronize(protocol(7, 1, 0), 0), false);
-  assert.equal(stream.snapshot().acknowledgedSequence, 1);
-
-  assert.equal(stream.synchronize(protocol(8, 0, 0), 0), true);
-  assert.deepEqual(stream.snapshot().pendingSequences, []);
-  assert.equal(stream.synchronize(protocol(7, 0, 0), 0), false,
-    "a delayed cursor from the previous match must not roll the stream back");
-  assert.equal(stream.snapshot().epoch, 8);
-  assert.equal(stream.queue(4), true, "the held mask must be re-armed in the new epoch");
+  delivery.synchronize(inputProtocol(8, 0, 0), 0);
+  assert.deepEqual(delivery.inputSnapshot().pendingSequences, []);
+  delivery.synchronize(inputProtocol(7, 0, 0), 0);
+  assert.equal(delivery.inputSnapshot().epoch, 8);
+  assert.equal(delivery.sendMovement(4), true, "a new epoch must re-arm the held mask");
   assert.deepEqual(sent.at(-1), {
-    type: "input", mask: 4, inputEpoch: 8, inputSeq: 1
+    type: "input", mask: 4, inputEpoch: 8, inputSeq: 1,
   });
 });
 
-test("the movement outbox is bounded and never contains one-shot actions", () => {
-  const sent = [];
-  const stream = createReliableInputStream({
-    outboxLimit: 2,
-    send(message) { sent.push(structuredClone(message)); return true; }
-  });
-  stream.synchronize(protocol(2, 0, 0), 0);
-  assert.equal(stream.queue(1), true);
-  assert.equal(stream.queue(2), true);
-  assert.equal(stream.queue(4), false);
-  assert.equal(stream.queue(16), false);
-  assert.deepEqual(stream.snapshot().pendingSequences, [1, 2]);
+test("the movement outbox is bounded and contains only input envelopes", () => {
+  const { continuity, sent } = createFixture();
+  const delivery = continuity.delivery;
+  delivery.synchronize(inputProtocol(2, 0, 0), 0);
+  for (let index = 0; index < 64; index += 1) {
+    assert.equal(delivery.sendMovement(index % 2 ? 2 : 1), true);
+  }
+  assert.equal(delivery.sendMovement(4), true,
+    "a full outbox keeps the caller live while refusing another envelope");
+  assert.equal(delivery.sendMovement(16), false);
+  assert.equal(delivery.inputSnapshot().pendingSequences.length, 64);
+  assert.equal(sent.length, 64);
   assert.ok(sent.every(({ type }) => type === "input"));
   assert.ok(sent.every((message) => !("kind" in message) && !("slot" in message)));
 });
 
-test("invalid or future protocol cursors cannot prune pending input", () => {
-  const stream = createReliableInputStream({ send: () => true });
-  stream.synchronize(protocol(3, 0, 0), 0);
-  stream.queue(8);
+test("invalid or future cursors cannot prune pending input", () => {
+  const { continuity } = createFixture();
+  const delivery = continuity.delivery;
+  delivery.synchronize(inputProtocol(3, 0, 0), 0);
+  delivery.sendMovement(8);
   const invalid = [
     null,
-    { v: 1, epoch: 3, accepted: [0], ack: [1] },
-    { v: 1, epoch: 3, accepted: [1.5], ack: [1] },
-    { v: 1, epoch: -1, accepted: [1], ack: [1] },
-    { v: 1, epoch: 3, accepted: [2], ack: [2] }
+    { input: { v: 1, epoch: 3, accepted: [0], ack: [1] } },
+    { input: { v: 1, epoch: 3, accepted: [1.5], ack: [1] } },
+    { input: { v: 1, epoch: -1, accepted: [1], ack: [1] } },
+    { input: { v: 1, epoch: 3, accepted: [2], ack: [2] } },
   ];
-  for (const cursor of invalid) assert.equal(stream.synchronize(cursor, 0), false);
-  assert.deepEqual(stream.snapshot().pendingSequences, [1]);
+  for (const cursor of invalid) delivery.synchronize(cursor, 0);
+  assert.deepEqual(delivery.inputSnapshot().pendingSequences, [1]);
 });
 
-test("rolling deploy falls back only while the server has not advertised input v1", () => {
-  const legacy = [];
-  const queued = [];
-  const state = { lastLegacyInput: -1 };
-  let epoch = 0;
-  const reliableInput = {
-    currentEpoch: () => epoch,
-    queue(mask) { queued.push(mask); return true; },
-    replay() { throw new Error("a queued transition must not replay immediately"); }
-  };
-  const sendMovementInput = new Function(
-    "reliableInput",
-    "state",
-    "sendControl",
-    `"use strict"; ${movementDeclaration}; return sendMovementInput;`
-  )(
-    reliableInput,
-    state,
-    (message) => { legacy.push(structuredClone(message)); return true; }
-  );
-
-  assert.equal(sendMovementInput(8), true);
-  assert.equal(sendMovementInput(8), false);
-  assert.deepEqual(legacy, [{ type: "input", mask: 8 }]);
-
-  epoch = 1;
-  assert.equal(sendMovementInput(0), true);
-  assert.deepEqual(queued, [0]);
-  assert.equal(state.lastLegacyInput, -1);
-});
-
-test("an old-server rematch can resend the same held legacy direction", () => {
-  const sent = [];
-  const state = { lastLegacyInput: 8 };
-  const sendMovementInput = new Function(
-    "reliableInput",
-    "state",
-    "sendControl",
-    `"use strict"; ${movementDeclaration}; return sendMovementInput;`
-  )(
-    { currentEpoch: () => 0 },
-    state,
-    (message) => { sent.push(structuredClone(message)); return true; }
-  );
-
-  state.lastLegacyInput = -1;
-  assert.equal(sendMovementInput(8), true);
+test("legacy movement dedupe stays inside Match continuity", () => {
+  const { continuity, sent } = createFixture();
+  const delivery = continuity.delivery;
+  assert.equal(delivery.sendMovement(8), true);
+  assert.equal(delivery.sendMovement(8), false);
   assert.deepEqual(sent, [{ type: "input", mask: 8 }]);
+
+  delivery.beginMatch({}, 0);
+  assert.equal(delivery.sendMovement(8), true,
+    "an old-server rematch may resend the same held direction");
+  delivery.synchronize(inputProtocol(1, 0, 0), 0);
+  assert.equal(delivery.sendMovement(0), true);
+  assert.deepEqual(sent.at(-1), {
+    type: "input", mask: 0, inputEpoch: 1, inputSeq: 1,
+  });
 });

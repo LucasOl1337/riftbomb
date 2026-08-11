@@ -8,6 +8,7 @@
   const CLIENT_SOURCE = "riftbomb-client";
   const RUNTIME_SOURCE = "riftbomb-runtime";
   const CLIENT_BRIDGE_VERSION = 1;
+  const CONTINUITY_URL = "/match-continuity.js";
   const RUNTIME_URL = "/online-duel.js";
   const INITIAL_STATE = Object.freeze({
     phase: "setup",
@@ -77,28 +78,28 @@
     if (runtimeLoaded) return Promise.resolve(true);
     if (runtimePromise) return runtimePromise;
 
-    runtimePromise = new Promise((resolve, reject) => {
+    const loadScript = (url) => new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = RUNTIME_URL;
+      script.src = url;
       script.async = true;
-      script.onload = () => {
-        runtimeLoaded = true;
-        replayCommands();
-        resolve(true);
-      };
-      script.onerror = () => {
-        runtimePromise = null;
-        pendingCommands.splice(0);
-        reject(new Error("Online duel runtime failed to load"));
-      };
+      script.onload = () => resolve(true);
+      script.onerror = () => reject(new Error(`Online runtime dependency failed: ${url}`));
       const parent = document.head || document.body;
-      if (!parent) {
-        runtimePromise = null;
-        reject(new Error("Online duel runtime has no document parent"));
-        return;
-      }
+      if (!parent) return reject(new Error("Online duel runtime has no document parent"));
       parent.append(script);
     });
+    runtimePromise = loadScript(CONTINUITY_URL)
+      .then(() => loadScript(RUNTIME_URL))
+      .then(() => {
+        runtimeLoaded = true;
+        replayCommands();
+        return true;
+      })
+      .catch((error) => {
+        runtimePromise = null;
+        pendingCommands.splice(0);
+        throw error;
+      });
     return runtimePromise;
   }
 
