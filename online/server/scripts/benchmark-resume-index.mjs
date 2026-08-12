@@ -1,12 +1,12 @@
 import { timingSafeEqual } from "node:crypto";
 import { performance } from "node:perf_hooks";
+import { createQuickMatchResumeIndex } from "../src/authoritative-rooms.mjs";
 
 process.env.PORT = "0";
 process.env.GAME_SERVER_PROXY_SECRET = "benchmark-secret";
 
 const {
-  closeAuthoritativeServer,
-  createQuickMatchResumeIndex
+  closeAuthoritativeServer
 } = await import(`../src/server.mjs?benchmark=resume-index-${Date.now()}`);
 
 const ROOM_COUNT = Number(process.env.BENCH_RESUME_ROOMS || 256);

@@ -3,6 +3,10 @@ import { timingSafeEqual } from "node:crypto";
 import { connect } from "node:net";
 import test from "node:test";
 import { WebSocket } from "ws";
+import {
+  createBoundedRevokedResumeTokens,
+  createQuickMatchResumeIndex
+} from "../src/authoritative-rooms.mjs";
 
 function rawUpgrade(port, proxySecret) {
   return new Promise((resolve, reject) => {
@@ -122,7 +126,6 @@ test("websocket resume revocation storage is capacity and sweep bounded", async 
   const {
     server,
     closeAuthoritativeServer,
-    createBoundedRevokedResumeTokens,
     resumeSecuritySnapshot
   } = await import(`../src/server.mjs?test=bounded-revocations-${Date.now()}`);
   await new Promise((resolve) => server.listening ? resolve() : server.once("listening", resolve));
@@ -158,8 +161,7 @@ test("quick-match resume index keeps live seats and rejects stale candidates", a
   process.env.GAME_SERVER_PROXY_SECRET = "test-proxy-secret";
   const {
     server,
-    closeAuthoritativeServer,
-    createQuickMatchResumeIndex
+    closeAuthoritativeServer
   } = await import(`../src/server.mjs?test=resume-index-${Date.now()}`);
   await new Promise((resolve) => server.listening ? resolve() : server.once("listening", resolve));
   t.after(() => closeAuthoritativeServer());
@@ -1346,8 +1348,7 @@ for (const expiredRole of ["host", "guest"]) {
 
     target.socket.terminate();
     await waitUntil(() => room.players[expiredIndex]?.socket === null, `${expiredRole} disconnect`);
-    const disconnectedAt = Date.now();
-    room.players[expiredIndex].disconnectedAt = disconnectedAt;
+    const disconnectedAt = room.players[expiredIndex].disconnectedAt;
     runMaintenance(disconnectedAt + 19_999);
     assert.equal(rooms.get(code), room, "the seat must survive until the exact grace boundary");
     assert.notEqual(room.players[expiredIndex], null);

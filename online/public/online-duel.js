@@ -130,23 +130,10 @@
   const CLIENT_BRIDGE_VERSION = 1;
   const CLIENT_SOURCE = "riftbomb-client";
   const RUNTIME_SOURCE = "riftbomb-runtime";
-  const SESSION_KEY = "riftbomb-online-session-v1";
-  const PENDING_RESUME_KEY = "riftbomb-online-resume-pending-v1";
   const RESUME_PROTOCOL_VERSION = 1;
-  const RESUME_TOKEN_BYTES = 32;
-  // Covers the legacy server's worst-case 45 s dead-socket heartbeat during a
-  // rolling deploy. Authenticated v1 replacement still completes immediately.
-  const RESUME_ROLE_RETRY_DELAYS_MS = Object.freeze([
-    100, 250, 500, 1_000, 2_000, 4_000, 8_000, 12_000, 16_000, 16_000
-  ]);
   const INPUT_PROTOCOL_VERSION = 1;
-  const INPUT_RETRY_MS = 120;
-  const INPUT_OUTBOX_LIMIT = 64;
-  const MAX_INPUT_SEQUENCE = 0x7fffffff;
   const ACTION_PROTOCOL_VERSION = 1;
-  const ACTION_RETRY_MS = 120;
-  const ACTION_OUTBOX_LIMIT = 16;
-  const MAX_ACTION_SEQUENCE = 0x7fffffff;
+  const DELIVERY_REPLAY_INTERVAL_MS = 120;
   const authoritativeAudio = globalThis.RIFTBOMB_AUTHORITATIVE_AUDIO;
   const browserGameplaySfx = game.sfx;
   const authoritativePredictionSink = Object.freeze({
@@ -170,379 +157,6 @@
     return CHAMPION_NAMES[value] || "Katarina";
   }
 
-  function createResumeToken(fillRandom = (bytes) => globalThis.crypto.getRandomValues(bytes)) {
-    const bytes = new Uint8Array(RESUME_TOKEN_BYTES);
-    fillRandom(bytes);
-    return [...bytes].map((value) => value.toString(16).padStart(2, "0")).join("");
-  }
-
-  function validResumeToken(value) {
-    return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-  }
-
-  function definitiveResumeFailure(error) {
-    return new Set([
-      "resume_denied", "resume_expired", "room_not_found", "invalid_resume", "invalid_hello"
-    ]).has(error?.message);
-  }
-
-  function definitiveInitialConnectionFailure(error) {
-    return definitiveResumeFailure(error) ||
-      ["role_taken", "room_full"].includes(error?.message);
-  }
-
-  async function retryRoleTaken(
-    connect,
-    {
-      delays = RESUME_ROLE_RETRY_DELAYS_MS,
-      wait = (delay) => new Promise((resolve) => setTimeout(resolve, delay)),
-      active = () => true
-    } = {}
-  ) {
-    for (let attempt = 0; ; attempt += 1) {
-      if (!active()) throw new Error("resume_cancelled");
-      try {
-        return await connect();
-      } catch (error) {
-        if (error?.message !== "role_taken" || attempt >= delays.length || !active()) throw error;
-        await wait(delays[attempt]);
-      }
-    }
-  }
-
-  function createLatestSnapshotBuffer() {
-    let latest = null;
-    const push = (snapshot) => {
-      if (!snapshot || !Number.isFinite(snapshot.s) || snapshot.s <= 0 ||
-          (latest && snapshot.s <= latest.s)) return false;
-      // The server deliberately sends a full grid first after reattach. Preserve
-      // it while coalescing later state-only snapshots during asynchronous boot.
-      latest = !Array.isArray(snapshot.grid) && Array.isArray(latest?.grid)
-        ? { ...snapshot, grid: latest.grid }
-        : snapshot;
-      return true;
-    };
-    const take = () => {
-      const snapshot = latest;
-      latest = null;
-      return snapshot;
-    };
-    const reset = () => { latest = null; };
-    const peek = () => latest;
-    return Object.freeze({ peek, push, reset, take });
-  }
-
-  function createReliableInputStream({
-    send,
-    now = () => performance.now(),
-    retryMs = INPUT_RETRY_MS,
-    outboxLimit = INPUT_OUTBOX_LIMIT
-  } = {}) {
-    if (typeof send !== "function") throw new TypeError("reliable input requires send");
-    let epoch = 0;
-    let nextSequence = 1;
-    let acceptedSequence = 0;
-    let acknowledgedSequence = 0;
-    let lastMask = -1;
-    let replayCount = 0;
-    let outbox = [];
-
-    const seatCursor = (protocol, seatIndex) => {
-      if (!protocol || protocol.v !== INPUT_PROTOCOL_VERSION ||
-          !Number.isSafeInteger(protocol.epoch) || protocol.epoch < 0 ||
-          !Array.isArray(protocol.accepted) || !Array.isArray(protocol.ack) ||
-          !Number.isInteger(seatIndex) || seatIndex < 0) return null;
-      const accepted = protocol.accepted[seatIndex];
-      const ack = protocol.ack[seatIndex];
-      if (!Number.isSafeInteger(accepted) || accepted < 0 ||
-          accepted > MAX_INPUT_SEQUENCE || !Number.isSafeInteger(ack) || ack < 0 ||
-          ack > accepted || ack > MAX_INPUT_SEQUENCE) return null;
-      return { epoch: protocol.epoch, accepted, ack };
-    };
-
-    const transmit = (entry, replay = false) => {
-      entry.sentAt = now();
-      const delivered = send(entry.message) === true;
-      if (delivered && replay) replayCount += 1;
-      return delivered;
-    };
-
-    const synchronize = (protocol, seatIndex) => {
-      const cursor = seatCursor(protocol, seatIndex);
-      if (!cursor) return false;
-      if (cursor.epoch < epoch) return false;
-      if (cursor.epoch > epoch) {
-        epoch = cursor.epoch;
-        nextSequence = Math.min(MAX_INPUT_SEQUENCE + 1, cursor.accepted + 1);
-        acceptedSequence = cursor.accepted;
-        acknowledgedSequence = cursor.ack;
-        lastMask = -1;
-        outbox = [];
-        return true;
-      }
-      if (cursor.accepted < acceptedSequence || cursor.ack < acknowledgedSequence ||
-          cursor.accepted >= nextSequence) return false;
-      acceptedSequence = cursor.accepted;
-      acknowledgedSequence = cursor.ack;
-      nextSequence = Math.max(nextSequence, Math.min(MAX_INPUT_SEQUENCE + 1, cursor.accepted + 1));
-      outbox = outbox.filter(({ message }) => message.inputSeq > acknowledgedSequence);
-      return true;
-    };
-
-    const queue = (mask) => {
-      if (!Number.isInteger(mask) || mask < 0 || mask > 15 || epoch <= 0 ||
-          mask === lastMask || outbox.length >= outboxLimit ||
-          nextSequence > MAX_INPUT_SEQUENCE) return false;
-      const message = {
-        type: "input",
-        mask,
-        inputEpoch: epoch,
-        inputSeq: nextSequence++
-      };
-      const entry = { message, sentAt: Number.NEGATIVE_INFINITY };
-      outbox.push(entry);
-      lastMask = mask;
-      transmit(entry);
-      return true;
-    };
-
-    const replay = () => {
-      if (!outbox.length || now() - outbox[0].sentAt < retryMs) return false;
-      transmit(outbox[0], true);
-      return true;
-    };
-
-    const reset = () => {
-      epoch = 0;
-      nextSequence = 1;
-      acceptedSequence = 0;
-      acknowledgedSequence = 0;
-      lastMask = -1;
-      replayCount = 0;
-      outbox = [];
-    };
-
-    const snapshot = () => ({
-      version: INPUT_PROTOCOL_VERSION,
-      epoch,
-      nextSequence,
-      acceptedSequence,
-      acknowledgedSequence,
-      pendingSequences: outbox.map(({ message }) => message.inputSeq),
-      pendingMasks: outbox.map(({ message }) => message.mask),
-      replayCount
-    });
-    const currentEpoch = () => epoch;
-
-    return Object.freeze({ currentEpoch, queue, replay, reset, snapshot, synchronize });
-  }
-
-  function createReliableActionStream({
-    send,
-    persist = () => {},
-    now = () => performance.now(),
-    retryMs = ACTION_RETRY_MS,
-    outboxLimit = ACTION_OUTBOX_LIMIT
-  } = {}) {
-    if (typeof send !== "function") throw new TypeError("reliable action requires send");
-    if (typeof persist !== "function") throw new TypeError("reliable action requires persistence");
-    let mode = "unknown";
-    let epoch = 0;
-    let nextSequence = 1;
-    let acknowledgedSequence = 0;
-    let replayCount = 0;
-    let outbox = [];
-    let failure = "";
-
-    const validAction = (kind, slot) => kind === "bomb" ||
-      (kind === "ability" && Number.isInteger(slot) && slot >= 0 && slot <= 3);
-    const validRound = (round) => Number.isSafeInteger(round) && round >= 0;
-    const seatCursor = (protocol, seatIndex) => {
-      if (!protocol || protocol.v !== ACTION_PROTOCOL_VERSION ||
-          !Number.isSafeInteger(protocol.epoch) || protocol.epoch < 0 ||
-          !Array.isArray(protocol.ack) || !Number.isInteger(seatIndex) || seatIndex < 0) return null;
-      const ack = protocol.ack[seatIndex];
-      if (!Number.isSafeInteger(ack) || ack < 0 || ack > MAX_ACTION_SEQUENCE) return null;
-      return { epoch: protocol.epoch, ack };
-    };
-    const persistedState = () => ({
-      v: ACTION_PROTOCOL_VERSION,
-      epoch,
-      nextSequence,
-      acknowledgedSequence,
-      outbox: outbox.map(({ message }) => ({ ...message }))
-    });
-    const persistNow = () => {
-      try { return persist(persistedState()) !== false; } catch { return false; }
-    };
-    const transmit = (entry, replay = false) => {
-      entry.sentAt = now();
-      const delivered = send(entry.message) === true;
-      if (delivered && replay) replayCount += 1;
-      return delivered;
-    };
-    const clear = (nextMode = "unknown") => {
-      mode = nextMode;
-      epoch = 0;
-      nextSequence = 1;
-      acknowledgedSequence = 0;
-      replayCount = 0;
-      outbox = [];
-      failure = "";
-    };
-
-    const synchronize = (protocol, seatIndex) => {
-      const cursor = seatCursor(protocol, seatIndex);
-      if (!cursor || cursor.epoch < epoch) return false;
-      if (cursor.epoch > epoch) {
-        mode = "reliable";
-        epoch = cursor.epoch;
-        nextSequence = Math.min(MAX_ACTION_SEQUENCE + 1, cursor.ack + 1);
-        acknowledgedSequence = cursor.ack;
-        outbox = [];
-        persistNow();
-        return true;
-      }
-      if (cursor.ack < acknowledgedSequence) return false;
-      const changed = mode !== "reliable" || cursor.ack !== acknowledgedSequence ||
-        cursor.ack >= nextSequence ||
-        outbox.some(({ message }) => message.actionSeq <= cursor.ack);
-      const previousHead = outbox[0];
-      mode = "reliable";
-      acknowledgedSequence = cursor.ack;
-      nextSequence = Math.max(
-        nextSequence,
-        Math.min(MAX_ACTION_SEQUENCE + 1, cursor.ack + 1)
-      );
-      outbox = outbox.filter(({ message }) => message.actionSeq > cursor.ack);
-      if (changed) persistNow();
-      if (outbox.length && outbox[0] !== previousHead) transmit(outbox[0]);
-      return true;
-    };
-
-    const negotiate = (protocol, seatIndex) => {
-      if (seatCursor(protocol, seatIndex)) return synchronize(protocol, seatIndex);
-      const nextMode = protocol === undefined ? "legacy" : "disabled";
-      const changed = mode !== nextMode || epoch !== 0 || outbox.length > 0;
-      clear(nextMode);
-      if (changed) persistNow();
-      return false;
-    };
-
-    const hydrate = (saved) => {
-      clear();
-      if (!saved || saved.v !== ACTION_PROTOCOL_VERSION ||
-          !Number.isSafeInteger(saved.epoch) || saved.epoch <= 0 ||
-          !Number.isSafeInteger(saved.nextSequence) || saved.nextSequence <= 0 ||
-          saved.nextSequence > MAX_ACTION_SEQUENCE + 1 ||
-          !Number.isSafeInteger(saved.acknowledgedSequence) ||
-          saved.acknowledgedSequence < 0 ||
-          saved.acknowledgedSequence >= saved.nextSequence ||
-          !Array.isArray(saved.outbox) || saved.outbox.length > outboxLimit ||
-          saved.nextSequence !== saved.acknowledgedSequence + saved.outbox.length + 1) return false;
-      const restored = [];
-      for (let index = 0; index < saved.outbox.length; index += 1) {
-        const message = saved.outbox[index];
-        const expectedSequence = saved.acknowledgedSequence + index + 1;
-        if (!message || message.type !== "action" ||
-            !validAction(message.kind, message.slot) || !validRound(message.actionRound) ||
-            message.actionEpoch !== saved.epoch ||
-            message.actionSeq !== expectedSequence) return false;
-        const restoredMessage = {
-          type: "action",
-          kind: message.kind,
-          actionEpoch: message.actionEpoch,
-          actionSeq: message.actionSeq,
-          actionRound: message.actionRound
-        };
-        if (message.kind === "ability") {
-          restoredMessage.slot = message.slot;
-          if (Number.isFinite(message.aimX) && Number.isFinite(message.aimZ)) {
-            restoredMessage.aimX = message.aimX;
-            restoredMessage.aimZ = message.aimZ;
-          }
-        }
-        restored.push({ message: restoredMessage, sentAt: Number.NEGATIVE_INFINITY });
-      }
-      epoch = saved.epoch;
-      nextSequence = saved.nextSequence;
-      acknowledgedSequence = saved.acknowledgedSequence;
-      outbox = restored;
-      return true;
-    };
-
-    const queue = (kind, slot, round, aim = null) => {
-      failure = "";
-      if (mode !== "reliable" || epoch <= 0) {
-        failure = "protocol";
-        return false;
-      }
-      if (!validAction(kind, slot) || !validRound(round)) {
-        failure = "invalid";
-        return false;
-      }
-      if (outbox.length >= outboxLimit) {
-        failure = "capacity";
-        return false;
-      }
-      if (nextSequence > MAX_ACTION_SEQUENCE) {
-        failure = "sequence";
-        return false;
-      }
-      const message = {
-        type: "action",
-        kind,
-        actionEpoch: epoch,
-        actionSeq: nextSequence++,
-        actionRound: round
-      };
-      if (kind === "ability") {
-        message.slot = slot;
-        if (Number.isFinite(aim?.x) && Number.isFinite(aim?.z)) {
-          message.aimX = aim.x;
-          message.aimZ = aim.z;
-        }
-      }
-      const entry = { message, sentAt: Number.NEGATIVE_INFINITY };
-      outbox.push(entry);
-      // The durable tab session must contain the envelope before its first
-      // transmission so an F5 between send and ACK can replay the same action.
-      if (!persistNow()) {
-        outbox.pop();
-        nextSequence -= 1;
-        failure = "storage";
-        return false;
-      }
-      if (outbox.length === 1) transmit(entry);
-      return true;
-    };
-
-    const replay = () => {
-      if (mode !== "reliable" || !outbox.length ||
-          now() - outbox[0].sentAt < retryMs) return false;
-      transmit(outbox[0], true);
-      return true;
-    };
-    const reset = () => clear();
-    const snapshot = () => ({
-      version: ACTION_PROTOCOL_VERSION,
-      mode,
-      epoch,
-      nextSequence,
-      acknowledgedSequence,
-      pendingSequences: outbox.map(({ message }) => message.actionSeq),
-      pendingKinds: outbox.map(({ message }) => message.kind),
-      replayCount
-    });
-    const currentMode = () => mode;
-    const currentFailure = () => failure;
-
-    return Object.freeze({
-      currentFailure, currentMode, hydrate, negotiate, persistedState, queue, replay, reset,
-      snapshot, synchronize
-    });
-  }
-
   const state = {
     role: "offline",
     roomCode: "",
@@ -551,7 +165,6 @@
     resuming: false,
     resumePhase: "",
     sessionConfirmed: false,
-    socket: null,
     connected: false,
     matchmaking: false,
     quickMatch: false,
@@ -573,29 +186,40 @@
     arena: game.selectedArena,
     matchTarget: 3,
     guestRound: 0,
-    guestMode: "intro",
-    lastLegacyInput: -1
+    guestMode: "intro"
   };
 
-  const bufferedSnapshots = createLatestSnapshotBuffer();
-  let lifecycleGeneration = 0;
-  let matchRuntimeEpoch = 0;
-  let runtimeBootRecord = null;
-  let runtimeBootTail = Promise.resolve();
-  let pendingConnectCancel = null;
-
-  const reliableInput = createReliableInputStream({ send: sendControl });
-  const reliableAction = createReliableActionStream({
+  const continuityFactory = globalThis.RIFTBOMB_MATCH_CONTINUITY;
+  if (!continuityFactory?.create) {
+    throw new Error("Published Match continuity module is unavailable");
+  }
+  const continuity = continuityFactory.create({
     send: sendControl,
-    persist: () => saveSession()
+    storage: sessionStorage,
+    captureSession: () => ({
+      role: state.role,
+      roomCode: state.roomCode,
+      resumeToken: state.resumeToken,
+      hostChampion: state.hostChampion,
+      guestChampion: state.guestChampion,
+      arena: state.arena,
+      inviteMode: state.inviteMode,
+      quickMatch: state.quickMatch,
+      guestReady: state.guestReady,
+      matchTarget: state.matchTarget,
+      phase: ["lobby", "match"].includes(state.resumePhase)
+        ? state.resumePhase
+        : clientPhase(),
+      confirmed: Boolean(state.sessionConfirmed)
+    })
   });
+  const { connection: matchConnection, delivery, runtime, session } = continuity;
+
   setInterval(() => {
-    if (!state.connected) return;
-    reliableInput.replay();
-    reliableAction.replay();
-  }, INPUT_RETRY_MS);
+    if (state.connected) delivery.replay();
+  }, DELIVERY_REPLAY_INTERVAL_MS);
   // Timers are suspended automatically while a page is in BFCache. Clearing
-  // this interval on pagehide would make a restored match lose replay forever.
+  // this interval on pagehide would make a restored Match lose replay forever.
 
   // The modern React shell owns every visible lobby control. This hidden proxy
   // keeps the authoritative networking runtime independent from presentation.
@@ -687,7 +311,7 @@
   const championName = championNameSafe;
 
   function clientPhase() {
-    if (state.resuming || runtimeBootRecord) return "boot";
+    if (state.resuming || runtime.booting()) return "boot";
     if (game.mode === "playing" || game.mode === "matchover") return "match";
     return state.role === "offline" ? "setup" : "lobby";
   }
@@ -734,105 +358,39 @@
   }
 
   function clearSession() {
-    clearSavedSession();
-    clearPendingResume();
+    session.clear();
   }
 
   function clearSavedSession() {
-    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    session.clearSaved();
   }
 
   function clearPendingResume() {
-    try { sessionStorage.removeItem(PENDING_RESUME_KEY); } catch {}
+    session.clearPending();
   }
 
   function saveSession() {
-    try {
-      if (state.role === "offline" || !state.roomCode) {
-        // Startup status publications happen before auto-resume while the
-        // iframe still reports its initial offline role. Only explicit
-        // cancel/leave/failure flows are allowed to erase a saved credential.
-        return false;
-      }
-      // Persist even while briefly disconnected so F5 can reattach.
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-        role: state.role,
-        roomCode: state.roomCode,
-        resumeToken: state.resumeToken,
-        hostChampion: state.hostChampion,
-        guestChampion: state.guestChampion,
-        arena: state.arena,
-        inviteMode: state.inviteMode,
-        quickMatch: state.quickMatch,
-        guestReady: state.guestReady,
-        matchTarget: state.matchTarget,
-        phase: ["lobby", "match"].includes(state.resumePhase)
-          ? state.resumePhase
-          : clientPhase(),
-        confirmed: Boolean(state.sessionConfirmed),
-        actionDelivery: reliableAction.persistedState(),
-        savedAt: Date.now()
-      }));
-      return true;
-    } catch {
-      return false;
-    }
+    return session.save();
   }
 
   function readSession() {
-    try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
-      if (!raw) return null;
-      const data = JSON.parse(raw);
-      if (!data?.roomCode || !data?.role) return null;
-      if (!/^[A-HJ-NP-Z2-9]{6}$/.test(String(data.roomCode))) return null;
-      if (data.role !== "host" && data.role !== "guest") return null;
-      if (data.resumeToken !== undefined && data.resumeToken !== "" &&
-          !validResumeToken(data.resumeToken)) return null;
-      return data;
-    } catch {
-      return null;
-    }
+    return session.load();
   }
 
-  function sessionMatchesRoom(session, room) {
-    return Boolean(session && typeof room === "string" &&
-      session.roomCode === room.toUpperCase());
+  function sessionMatchesRoom(saved, room) {
+    return session.matchesRoom(saved, room);
   }
 
   function savePendingResume() {
-    if (!validResumeToken(state.resumeToken) || !state.quickMatch || state.roomCode) return;
-    try {
-      sessionStorage.setItem(PENDING_RESUME_KEY, JSON.stringify({
-        resumeToken: state.resumeToken,
-        quickMatch: true,
-        hostChampion: state.hostChampion,
-        arena: state.arena,
-        savedAt: Date.now()
-      }));
-    } catch {}
+    return session.savePending(state);
   }
 
   function readPendingResume() {
-    try {
-      const data = JSON.parse(sessionStorage.getItem(PENDING_RESUME_KEY) || "null");
-      if (!data?.quickMatch || !validResumeToken(data.resumeToken)) {
-        clearPendingResume();
-        return null;
-      }
-      return data;
-    } catch {
-      clearPendingResume();
-      return null;
-    }
+    return session.loadPending();
   }
 
   function ensureResumeToken() {
-    if (!validResumeToken(state.resumeToken)) {
-      state.resumeToken = readPendingResume()?.resumeToken || createResumeToken();
-    }
-    // Persist before opening the socket. A lost `connected` frame must not lock
-    // this browser out of the seat it just protected.
+    state.resumeToken = session.ensureToken(state.resumeToken);
     if (state.roomCode) saveSession();
     else savePendingResume();
     return state.resumeToken;
@@ -861,7 +419,6 @@
   function leaveOnlineSession({ fromMatch = false } = {}) {
     const wasPlaying = game.mode === "playing" || game.mode === "matchover";
     releaseCurrentSeat();
-    try { state.socket?.close(); } catch {}
     resetConnection();
     setOnlineRole("offline");
     setBusy(false);
@@ -887,19 +444,12 @@
   }
 
   function cancelQuickMatch() {
-    pendingConnectCancel?.();
-    pendingConnectCancel = null;
-    const socket = state.socket;
-    state.socket = null;
+    matchConnection.cancelPending();
     state.matchmaking = false;
     state.quickMatch = false;
     clearSession();
-    try {
-      if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "cancel-quick-match" }));
-      }
-      socket?.close();
-    } catch {}
+    matchConnection.send({ type: "cancel-quick-match" });
+    matchConnection.close();
     setOnlineRole("offline");
     setBusy(false);
     setStatus("Quick Match cancelado.", "ok");
@@ -1028,42 +578,6 @@
     bindLocalOnlineView();
   }
 
-  function messageInputEpoch(message) {
-    const epoch = message?.input?.epoch;
-    if (Number.isSafeInteger(epoch) && epoch > 0) return epoch;
-    if (message?.type === "rematch") {
-      if (game.mode !== "matchover" && matchRuntimeEpoch > 0) return matchRuntimeEpoch;
-      return Math.max(1, matchRuntimeEpoch + 1);
-    }
-    return Math.max(1, matchRuntimeEpoch);
-  }
-
-  async function ensureOnlineMatchRuntime(message, generation) {
-    const epoch = messageInputEpoch(message);
-    if (matchRuntimeEpoch === epoch && game.mode !== "intro") return true;
-    if (runtimeBootRecord?.generation === generation && runtimeBootRecord.epoch === epoch) {
-      return runtimeBootRecord.promise;
-    }
-
-    const promise = runtimeBootTail.catch(() => undefined).then(async () => {
-      if (generation !== lifecycleGeneration || state.role === "offline") return false;
-      await beginConfiguredGame();
-      if (generation !== lifecycleGeneration || state.role === "offline") {
-        returnToSetupState();
-        return false;
-      }
-      matchRuntimeEpoch = epoch;
-      return true;
-    });
-    runtimeBootRecord = { epoch, generation, promise };
-    runtimeBootTail = promise.catch(() => undefined);
-    try {
-      return await promise;
-    } finally {
-      if (runtimeBootRecord?.promise === promise) runtimeBootRecord = null;
-    }
-  }
-
   async function signaling(method, data, query = "") {
     const response = await fetch(`${SIGNALING_URL}${query}`, {
       method,
@@ -1085,89 +599,43 @@
     resume = false,
     resumePhase = ""
   } = {}) {
-    pendingConnectCancel?.();
-    pendingConnectCancel = null;
     const resumeToken = ensureResumeToken();
-    return new Promise((resolve, reject) => {
-      const socket = new WebSocket(AUTHORITATIVE_SERVER_URL);
-      state.socket = socket;
-      let settled = false;
-      let connectedReceived = false;
-      let timeout = 0;
-      let cancelPending = null;
-      const clearPendingCancel = () => {
-        if (pendingConnectCancel === cancelPending) pendingConnectCancel = null;
-      };
-      const failBeforeSettled = (reason) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        clearPendingCancel();
-        if (connectedReceived) state.connected = false;
-        try { socket.close(); } catch {}
-        reject(new Error(reason));
-      };
-      const succeed = (message) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timeout);
-        clearPendingCancel();
-        resolve(message);
-      };
-      cancelPending = () => failBeforeSettled("resume_cancelled");
-      pendingConnectCancel = cancelPending;
-      timeout = setTimeout(() => {
-        if (state.socket !== socket) return;
-        failBeforeSettled("authoritative_server_timeout");
-      }, 12_000);
-      socket.addEventListener("open", () => {
-        if (state.socket !== socket) return;
-        socket.send(JSON.stringify(quickMatch
-          ? {
-              type: "quick-match",
-              inputProtocol: INPUT_PROTOCOL_VERSION,
-              actionProtocol: ACTION_PROTOCOL_VERSION,
-              resumeProtocol: RESUME_PROTOCOL_VERSION,
-              resumeToken,
-              preset: lobbyPayload()
-            }
-          : {
-              type: "hello",
-              inputProtocol: INPUT_PROTOCOL_VERSION,
-              actionProtocol: ACTION_PROTOCOL_VERSION,
-              resumeProtocol: RESUME_PROTOCOL_VERSION,
-              resumeToken,
-              resumeOnly: resume && (
-                resumePhase === "match" || state.sessionConfirmed
-              ),
-              room: state.roomCode,
-              role,
-              ready: role === "guest" && state.guestReady,
-              preset: lobbyPayload()
-            }));
-      });
-      socket.addEventListener("message", (event) => {
-        if (state.socket !== socket) return;
-        let message;
-        try { message = JSON.parse(event.data); } catch { return; }
-        if (message.type === "error") {
-          failBeforeSettled(message.error || "authoritative_server_error");
-          return;
+    const hello = quickMatch
+      ? {
+          type: "quick-match",
+          inputProtocol: INPUT_PROTOCOL_VERSION,
+          actionProtocol: ACTION_PROTOCOL_VERSION,
+          resumeProtocol: RESUME_PROTOCOL_VERSION,
+          resumeToken,
+          preset: lobbyPayload()
         }
-        if (message.type === "quick-queued") {
-          clearTimeout(timeout);
-          settled = true;
+      : {
+          type: "hello",
+          inputProtocol: INPUT_PROTOCOL_VERSION,
+          actionProtocol: ACTION_PROTOCOL_VERSION,
+          resumeProtocol: RESUME_PROTOCOL_VERSION,
+          resumeToken,
+          resumeOnly: resume && (resumePhase === "match" || state.sessionConfirmed),
+          room: state.roomCode,
+          role,
+          ready: role === "guest" && state.guestReady,
+          preset: lobbyPayload()
+        };
+    const promise = matchConnection.connect({
+      url: AUTHORITATIVE_SERVER_URL,
+      hello,
+      resume,
+      resumePhase,
+      handlers: {
+        queued() {
           state.matchmaking = true;
           state.quickMatch = true;
           setBusy(true);
           setStatus("Buscando outro jogador no Quick Match…", "ok");
           updateConnection("waiting", "QUICK MATCH · BUSCANDO OPONENTE");
           publishClientState("quick-queued");
-          resolve();
-          return;
-        }
-        if (message.type === "connected") {
-          const wasConfirmed = state.sessionConfirmed;
+        },
+        connected(message) {
           state.sessionConfirmed = true;
           if (message.quickMatch) {
             state.matchmaking = false;
@@ -1179,18 +647,6 @@
             saveSession();
             clearPendingResume();
           }
-          const seatIndex = localOnlinePlayerId() - 1;
-          reliableInput.synchronize(message.input, seatIndex);
-          reliableAction.negotiate(message.action, seatIndex);
-          connectedReceived = true;
-          const freshLobbyClaim = resume && resumePhase === "lobby" && !wasConfirmed &&
-            message.resume?.v === RESUME_PROTOCOL_VERSION &&
-            message.resume.resumed === false;
-          if (resume && message.resume?.v === RESUME_PROTOCOL_VERSION &&
-              message.resume.resumed !== true && !freshLobbyClaim) {
-            failBeforeSettled("resume_denied");
-            return;
-          }
           if (Number.isSafeInteger(message.soundCursor) && message.soundCursor >= 0) {
             state.lastPlayedSoundEventId = Math.max(
               state.lastPlayedSoundEventId,
@@ -1198,79 +654,41 @@
             );
           }
           void onConnected({ resuming: resume });
-          if (freshLobbyClaim) {
-            // The page may have reloaded after persisting its bearer but before
-            // the first hello reached the server. The protected lobby claim is
-            // valid even though there was no prior seat to replace.
-            handleControl({
-              ...lobbyPayload(),
-              type: "resume",
-              activeMatch: false,
-              input: message.input
-            });
-            succeed(message);
-            return;
-          }
-          if (resume && message.resume?.v !== RESUME_PROTOCOL_VERSION) {
-            // Rolling compatibility with an older authoritative server. New
-            // servers always follow with an explicit authenticated `resume`.
-            handleControl({
-              ...lobbyPayload(),
-              type: "resume",
-              activeMatch: resumePhase === "match",
-              input: message.input
-            });
-          }
-          if (!resume || message.resume?.v !== RESUME_PROTOCOL_VERSION) {
-            succeed(message);
-          }
-          return;
-        }
-        if (message.type === "snapshot") {
-          try { receiveSnapshot(message.data); }
+        },
+        snapshot(data) {
+          try { receiveSnapshot(data); }
           catch (error) { console.warn("Ignored invalid authoritative snapshot", error); }
-          return;
-        }
-        if (message.type === "ping") {
-          if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: "pong", clientTime: Date.now() }));
-          }
-          return;
-        }
-        if (message.type === "presence") {
+        },
+        presence(message) {
           if (message.playerId === localOnlinePlayerId()) return;
           state.rivalConnected = message.connected === true;
           if (state.rivalConnected) {
             setStatus(`Player ${message.playerId} reconnected. Match continues.`, "ok");
-            updateConnection("connected", `ONLINE · LOBBY ${state.roomCode} · PLAYER ${message.playerId} RECONNECTED`);
+            updateConnection(
+              "connected",
+              `ONLINE · LOBBY ${state.roomCode} · PLAYER ${message.playerId} RECONNECTED`
+            );
           } else {
-            setStatus(`Player ${message.playerId} disconnected. Waiting briefly for reconnection.`, "error");
-            updateConnection("waiting", `ONLINE · LOBBY ${state.roomCode} · RECONNECTING PLAYER ${message.playerId}`);
+            setStatus(
+              `Player ${message.playerId} disconnected. Waiting briefly for reconnection.`,
+              "error"
+            );
+            updateConnection(
+              "waiting",
+              `ONLINE · LOBBY ${state.roomCode} · RECONNECTING PLAYER ${message.playerId}`
+            );
           }
           updateLobbyDisplay();
-          return;
-        }
-        handleControl(message);
-        if (resume && message.type === "resume" && !settled) {
-          succeed(message);
-        }
-      });
-      socket.addEventListener("close", () => {
-        clearTimeout(timeout);
-        if (state.socket !== socket) return;
-        if (!settled) failBeforeSettled("authoritative_server_unavailable");
-        else handleDisconnect();
-      });
-      socket.addEventListener("error", () => {
-        if (state.socket !== socket) return;
-        if (!settled) failBeforeSettled("authoritative_server_unavailable");
-      });
+        },
+        control: handleControl,
+        disconnected: handleDisconnect
+      }
     });
+    return promise;
   }
 
   async function onConnected({ resuming = false } = {}) {
-    const transportOpen = state.socket?.readyState === WebSocket.OPEN;
-    if (state.connected || !transportOpen) return;
+    if (state.connected || !matchConnection.isOpen()) return;
     state.connected = true;
     if (resuming) {
       setBusy(true);
@@ -1340,9 +758,7 @@
     }
     if (message.type === "start" || message.type === "rematch" || message.type === "resume") {
       const seatIndex = localOnlinePlayerId() - 1;
-      reliableInput.synchronize(message.input, seatIndex);
-      reliableAction.synchronize(message.action, seatIndex);
-      if (reliableInput.currentEpoch() <= 0) state.lastLegacyInput = -1;
+      delivery.beginMatch(message, seatIndex);
       void startOnlineMatch(message);
       return;
     }
@@ -1366,13 +782,7 @@
   }
 
   function sendControl(message) {
-    if (state.socket?.readyState !== WebSocket.OPEN) return false;
-    try {
-      state.socket.send(JSON.stringify(message));
-      return true;
-    } catch {
-      return false;
-    }
+    return matchConnection.send(message);
   }
 
   function lobbyPayload(type = "lobby") {
@@ -1433,7 +843,7 @@
       return;
     }
 
-    const generation = lifecycleGeneration;
+    const generation = runtime.generation();
     const isRematch = message.type === "rematch";
     if (isRematch) {
       if (state.role === "guest") {
@@ -1452,9 +862,15 @@
     // Serialize boot and make it idempotent for the authoritative input epoch.
     state.startInitiated = true;
     try {
-      if (!await ensureOnlineMatchRuntime(message, generation)) return;
+      if (!await runtime.ensure({
+        message,
+        currentMode: () => game.mode,
+        active: () => state.role !== "offline",
+        begin: beginConfiguredGame,
+        rollback: returnToSetupState
+      })) return;
     } catch (error) {
-      if (generation !== lifecycleGeneration) return;
+      if (generation !== runtime.generation()) return;
       console.warn("Could not initialize authoritative match runtime", error);
       state.resuming = false;
       setBusy(false);
@@ -1464,7 +880,7 @@
     game.p2Human = true;
     // Always re-bind seat/camera after start — beginGame may reset presentation to P1.
     bindLocalOnlineView();
-    const bufferedSnapshot = bufferedSnapshots.take();
+    const bufferedSnapshot = runtime.takeSnapshot();
     if (bufferedSnapshot) applySnapshot(bufferedSnapshot);
     state.resuming = false;
     state.resumePhase = "match";
@@ -1492,27 +908,22 @@
   }
 
   function receiveSnapshot(data) {
-    if (!data || ![2, 3].includes(data.v) || !Array.isArray(data.players)) return;
-    if (Number.isFinite(data.s) && data.s <= state.receivedSequence) return;
-    // ACK/outbox state is current even while rendering waits for model/runtime boot.
     const seatIndex = localOnlinePlayerId() - 1;
-    reliableInput.synchronize(data.input, seatIndex);
-    reliableAction.synchronize(data.action, seatIndex);
-    const runtimeUnavailable = state.resuming || runtimeBootRecord ||
-      (state.role !== "offline" && game.mode === "intro" && reliableInput.currentEpoch() > 0);
-    if (runtimeUnavailable) {
-      bufferedSnapshots.push(data);
-      return;
-    }
-    applySnapshot(data);
+    const defer = state.resuming || runtime.booting() ||
+      (state.role !== "offline" && game.mode === "intro" && delivery.inputEpoch() > 0);
+    const received = runtime.receiveSnapshot(data, {
+      seatIndex,
+      lastSequence: state.receivedSequence,
+      defer
+    });
+    if (received.status === "ready") applySnapshot(received.snapshot);
   }
 
   function applySnapshot(data) {
     if (!data || ![2, 3].includes(data.v) || !Array.isArray(data.players)) return;
     if (Number.isFinite(data.s) && data.s <= state.receivedSequence) return;
     const seatIndex = localOnlinePlayerId() - 1;
-    reliableInput.synchronize(data.input, seatIndex);
-    reliableAction.synchronize(data.action, seatIndex);
+    delivery.synchronize(data, seatIndex);
     state.receivedSequence = Number(data.s) || state.receivedSequence + 1;
     const previousRound = state.guestRound;
     const previousMode = state.guestMode;
@@ -1696,26 +1107,14 @@
     };
   }
 
-  function sendMovementInput(mask) {
-    if (reliableInput.currentEpoch() <= 0) {
-      if (mask === state.lastLegacyInput) return false;
-      const sent = sendControl({ type: "input", mask });
-      if (sent) state.lastLegacyInput = mask;
-      return sent;
-    }
-    state.lastLegacyInput = -1;
-    if (!reliableInput.queue(mask)) reliableInput.replay();
-    return true;
-  }
-
   function sendCurrentInput() {
     if (state.role === "host") state.localInput = hostLocalInput();
-    sendMovementInput(inputMask());
+    delivery.sendMovement(inputMask());
   }
 
   const originalUpdate = game.update.bind(game);
   game.update = (dt) => {
-    if (state.role !== "offline" && state.connected && state.socket) {
+    if (state.role !== "offline" && state.connected && matchConnection.isOpen()) {
       if (state.role === "guest") syncGuestStickInput();
       sendCurrentInput();
       reconcileLocalPlayer(dt);
@@ -1789,7 +1188,7 @@
   }
 
   async function startQuickMatch(options = {}) {
-    const pendingToken = validResumeToken(options.resumeToken) ? options.resumeToken : "";
+    const pendingToken = session.validToken(options.resumeToken) ? options.resumeToken : "";
     releaseCurrentSeat();
     resetConnection();
     // A new Quick Match is an explicit replacement for any older saved room.
@@ -1889,7 +1288,7 @@
     // A timeout can happen after the server protected the seat but before this
     // browser received `connected`. Keep the pre-persisted bearer unless the
     // server definitively rejected the claim.
-    if (definitiveInitialConnectionFailure(error)) clearSession();
+    if (session.definitiveInitialFailure(error)) clearSession();
     setBusy(false);
     setOnlineRole("offline");
     const message = error?.message === "room_not_found"
@@ -1906,15 +1305,8 @@
   }
 
   function resetConnection() {
-    pendingConnectCancel?.();
-    pendingConnectCancel = null;
-    try { state.socket?.close(); } catch {}
-    lifecycleGeneration += 1;
-    matchRuntimeEpoch = 0;
-    runtimeBootRecord = null;
-    bufferedSnapshots.reset();
+    continuity.reset();
     Object.assign(state, {
-      socket: null,
       connected: false, rivalConnected: false, guestReady: false, hostToken: "", resumeToken: "",
       resuming: false, resumePhase: "", sessionConfirmed: false, roomCode: "",
       matchmaking: false, quickMatch: false,
@@ -1924,15 +1316,12 @@
       droppedSoundEventCount: 0,
       localInput: { up: false, down: false, left: false, right: false },
       remoteHostTarget: null, localPlayerTarget: null,
-      pendingGuestBombs: [], lastLegacyInput: -1
+      pendingGuestBombs: []
     });
-    reliableInput.reset();
-    reliableAction.reset();
   }
 
   function chooseOffline() {
     releaseCurrentSeat();
-    try { state.socket?.close(); } catch {}
     resetConnection();
     setOnlineRole("offline");
     setBusy(false);
@@ -1968,7 +1357,7 @@
 
     resetConnection();
     state.roomCode = saved.roomCode;
-    state.resumeToken = validResumeToken(saved.resumeToken) ? saved.resumeToken : createResumeToken();
+    state.resumeToken = session.validToken(saved.resumeToken) ? saved.resumeToken : session.ensureToken("");
     state.resuming = true;
     state.resumePhase = saved.phase === "match" ? "match" : "lobby";
     state.sessionConfirmed = saved.confirmed === true;
@@ -1986,7 +1375,7 @@
       game.selectArena(state.arena);
       game.resetPlayers();
     }
-    reliableAction.hydrate(saved.actionDelivery);
+    delivery.hydrateAction(saved.actionDelivery);
     setOnlineRole(saved.role);
     roomLabel.textContent = state.inviteMode ? "CHALLENGE LINK · RESUME" : "LOBBY CODE · RESUME";
     roomCode.textContent = state.roomCode;
@@ -1995,22 +1384,22 @@
     setStatus(`Reconnecting to ${state.resumePhase} ${saved.roomCode}…`, "ok");
     updateLobbyDisplay();
     saveSession();
-    const resumeGeneration = lifecycleGeneration;
+    const resumeGeneration = runtime.generation();
     try {
-      await retryRoleTaken(() => connectAuthoritative(saved.role, {
+      await session.retryResume(() => connectAuthoritative(saved.role, {
         resume: true,
         resumePhase: state.resumePhase
       }), {
-        active: () => lifecycleGeneration === resumeGeneration &&
+        active: () => runtime.generation() === resumeGeneration &&
           state.resuming && state.role === saved.role
       });
       return true;
     } catch (error) {
-      if (error?.message === "resume_cancelled" || lifecycleGeneration !== resumeGeneration) {
+      if (error?.message === "resume_cancelled" || runtime.generation() !== resumeGeneration) {
         return false;
       }
       console.warn("Session resume failed", error);
-      const credentialRejected = definitiveResumeFailure(error);
+      const credentialRejected = session.definitiveResumeFailure(error);
       resetConnection();
       if (credentialRejected) clearSession();
       setBusy(false);
@@ -2033,7 +1422,7 @@
   }
 
   function sendInput() {
-    sendMovementInput(inputMask());
+    delivery.sendMovement(inputMask());
   }
 
   function setGuestDirection(direction, active) {
@@ -2067,30 +1456,18 @@
   }
 
   function sendOnlineAction(kind, slot, aim = null) {
-    if (reliableAction.currentMode() === "reliable") {
-      const queued = reliableAction.queue(kind, slot, game.round, aim);
-      if (!queued && reliableAction.currentFailure() === "storage") {
-        const message = "Action blocked: browser storage is unavailable. Reload after enabling site data.";
-        setStatus(message, "error");
-        showActionDeliveryError(message);
-      }
-      if (queued) clearActionDeliveryError();
-      return queued;
+    const sent = delivery.sendAction(kind, slot, game.round, aim);
+    if (!sent && delivery.actionFailure() === "storage") {
+      const message = "Action blocked: browser storage is unavailable. Reload after enabling site data.";
+      setStatus(message, "error");
+      showActionDeliveryError(message);
     }
-    if (reliableAction.currentMode() !== "legacy") return false;
-    const message = { type: "action", kind };
-    if (kind === "ability") {
-      message.slot = slot;
-      if (Number.isFinite(aim?.x) && Number.isFinite(aim?.z)) {
-        message.aimX = aim.x;
-        message.aimZ = aim.z;
-      }
-    }
-    return sendControl(message);
+    if (sent) clearActionDeliveryError();
+    return sent;
   }
 
   game.placeBomb = (player) => {
-    if (state.role === "offline" || !state.connected || !state.socket) {
+    if (state.role === "offline" || !state.connected || !matchConnection.isOpen()) {
       return offlinePlaceBomb(player || game.player);
     }
     const local = localOnlinePlayer();
@@ -2114,7 +1491,7 @@
   };
 
   game.castAbility = (slot, player, options = {}) => {
-    if (state.role === "offline" || !state.connected || !state.socket) {
+    if (state.role === "offline" || !state.connected || !matchConnection.isOpen()) {
       return offlineCastAbility(slot, player || game.player, options);
     }
     if (!Number.isInteger(slot)) return false;
@@ -2133,7 +1510,7 @@
 
   if (typeof offlineRequestDash === "function") {
     game.requestDash = (player) => {
-      if (state.role === "offline" || !state.connected || !state.socket) {
+      if (state.role === "offline" || !state.connected || !matchConnection.isOpen()) {
         return offlineRequestDash(player || game.player);
       }
       const local = localOnlinePlayer();
@@ -2262,7 +1639,7 @@
       // Server rebuilds the duel and broadcasts type "rematch".
       sendControl({
         type: "rematch",
-        inputEpoch: reliableInput.snapshot().epoch,
+        inputEpoch: delivery.inputSnapshot().epoch,
         hostChampion: state.hostChampion,
         guestChampion: state.guestChampion,
         arena: state.arena,
@@ -2632,4 +2009,3 @@
 })();
 
 // training-local-v1 2026-08-01T11:49:31.4238391-03:00
-

@@ -19,10 +19,12 @@ async function measure(iteration) {
   let registeredIntervals = 0;
   const manager = new AuthoritativeRooms({
     rooms,
-    broadcast(_room, message) {
-      const payload = JSON.stringify(message);
-      broadcasts += 1;
-      payloadBytes += Buffer.byteLength(payload);
+    transport: {
+      broadcast(_sockets, message) {
+        const payload = JSON.stringify(message);
+        broadcasts += 1;
+        payloadBytes += Buffer.byteLength(payload);
+      }
     },
     scheduleInterval(callback, delay) {
       registeredIntervals += 1;
