@@ -20,6 +20,12 @@ const loadDefaultDuelRuntime = () => import("../../../game/create-authoritative-
 const CHAMPIONS = new Set(["katarina", "zed", "renekton", "vladimir", "gangplank"]);
 const ARENAS = new Set(["lattice", "clearing", "labyrinth", "forts", "pit"]);
 
+function missingTransportOperation(name) {
+  return () => {
+    throw new TypeError(`transport.${name} is required`);
+  };
+}
+
 function sameResumeToken(expected, presented, cryptoRuntime) {
   return Buffer.isBuffer(expected) && Buffer.isBuffer(presented) &&
     expected.length === presented.length && cryptoRuntime.timingSafeEqual(expected, presented);
@@ -192,10 +198,14 @@ export class AuthoritativeRooms {
     this.rooms = rooms;
     this.activeRooms = new Set();
     this.transport = Object.freeze({
-      send: typeof transport.send === "function" ? transport.send : () => false,
-      broadcast: typeof transport.broadcast === "function" ? transport.broadcast : () => 0,
-      close: typeof transport.close === "function" ? transport.close : () => undefined,
-      isOpen: typeof transport.isOpen === "function" ? transport.isOpen : () => true
+      send: typeof transport.send === "function" ? transport.send : missingTransportOperation("send"),
+      broadcast: typeof transport.broadcast === "function"
+        ? transport.broadcast
+        : missingTransportOperation("broadcast"),
+      close: typeof transport.close === "function" ? transport.close : missingTransportOperation("close"),
+      isOpen: typeof transport.isOpen === "function"
+        ? transport.isOpen
+        : missingTransportOperation("isOpen")
     });
     this.maxRooms = maxRooms;
     this.roomTtlMs = roomTtlMs;

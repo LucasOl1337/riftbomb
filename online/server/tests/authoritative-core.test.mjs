@@ -14,6 +14,15 @@ import {
   updateGridCache
 } from "../src/authoritative-rooms.mjs";
 
+test("fails loudly when a required transport operation is missing", () => {
+  const manager = new AuthoritativeRooms({ rooms: new Map() });
+
+  assert.throws(() => manager.send({}, {}), /transport\.send is required/);
+  assert.throws(() => manager.broadcast({ players: [] }, {}), /transport\.broadcast is required/);
+  assert.throws(() => manager.transport.close({}), /transport\.close is required/);
+  assert.throws(() => manager.transport.isOpen({}), /transport\.isOpen is required/);
+});
+
 test("owns protected-seat admission, disconnect, expiry and revocation behind one interface", () => {
   let now = 1_000;
   const sent = [];
