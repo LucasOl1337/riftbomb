@@ -136,6 +136,40 @@ test("local prediction stays responsive and stops cleanly from 50 to 200 ms RTT"
   }
 });
 
+test("stable remote movement appears within two 30 Hz snapshots", () => {
+  let now = 0;
+  const movement = movementFactory.create({ now: () => now, wallNow: () => now });
+  const deliveries = [];
+  for (let serverTime = 0; serverTime <= 300; serverTime += 1_000 / 30) {
+    deliveries.push({
+      at: serverTime + 50,
+      player: { id: 2, x: serverTime / 1_000 * 3, z: 0, moving: true, lastDx: 1, lastDz: 0 },
+      serverTime,
+    });
+  }
+
+  let firstVisibleAt = null;
+  let remote = { id: 2, x: 0, z: 0, moving: false, lastDx: 1, lastDz: 0 };
+  for (let frame = 0; frame < 20; frame += 1) {
+    now = frame * (1_000 / 60);
+    while (deliveries.length && deliveries[0].at <= now + 0.001) {
+      const snapshot = deliveries.shift();
+      const previous = remote;
+      remote = { ...snapshot.player };
+      movement.acceptRemoteSnapshot(remote, previous, {
+        receivedWallTime: now,
+        roundTripMs: 100,
+        serverTime: snapshot.serverTime,
+      });
+    }
+    movement.stepRemote(remote);
+    if (firstVisibleAt === null && remote.x > 0.001) firstVisibleAt = now;
+  }
+
+  assert.ok(firstVisibleAt !== null && firstVisibleAt <= 90,
+    `stable remote movement stayed buffered for ${firstVisibleAt?.toFixed(1) ?? "the full run"} ms`);
+});
+
 test("remote snapshot buffering stays smooth and monotonic under arrival jitter", () => {
   let now = 0;
   const movement = movementFactory.create({
@@ -177,6 +211,25 @@ test("remote snapshot buffering stays smooth and monotonic under arrival jitter"
   assert.ok(Math.max(...deltas) <= 0.065,
     `remote contestant jumped ${Math.max(...deltas).toFixed(3)} units in one frame`);
   assert.ok(remote.x >= 3.2, `remote contestant stalled at ${remote.x.toFixed(3)}`);
+});
+
+test("remote buffer grows when snapshot jitter exceeds its two-tick base", () => {
+  let now = 0;
+  const movement = movementFactory.create({ now: () => now });
+  const match = {
+    mode: "playing",
+    roundLocked: false,
+    tile: 1.32,
+    canMoveContestant: () => true,
+    moveContestantByDirection() {},
+  };
+  const player = () => ({ id: 1, x: 0, z: 0, alive: true, dashing: 0 });
+  movement.acceptLocalSnapshot(match, player(), player(), { receivedAt: now, roundTripMs: 100 });
+  now = 80;
+  movement.acceptLocalSnapshot(match, player(), player(), { receivedAt: now, roundTripMs: 100 });
+
+  assert.ok(movement.telemetry().remoteBufferDelayMs > 120,
+    "high snapshot jitter must buy enough interpolation history to stay smooth");
 });
 
 test("published movement telemetry reports RTT, snapshot cadence and jitter", () => {

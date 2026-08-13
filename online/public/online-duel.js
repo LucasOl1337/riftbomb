@@ -65,6 +65,9 @@
 
 /* ONLINE_RESPONSIVENESS_V2 */
 (() => {
+  const MAX_REMOTE_BUFFER_MS = 150;
+  const SNAPSHOT_STEP_MS = 1_000 / 30;
+
   function directionFromMask(mask) {
     let dx = Number(Boolean(mask & 8)) - Number(Boolean(mask & 4));
     let dz = Number(Boolean(mask & 2)) - Number(Boolean(mask & 1));
@@ -80,7 +83,7 @@
     now = () => performance.now(),
     wallNow = () => Date.now(),
     defaultRoundTripMs = 50,
-    remoteDelayMs = 100,
+    remoteDelayMs = SNAPSHOT_STEP_MS * 2,
   } = {}) {
     const inputHistory = [{ at: now(), mask: 0 }];
     const remoteTracks = new Map();
@@ -253,7 +256,7 @@
     function stepRemote(contestant, currentWallTime = wallNow()) {
       const track = remoteTracks.get(contestant?.id);
       if (!contestant || !track?.length || clockOffsetMs === null) return;
-      const renderTime = currentWallTime - clockOffsetMs - remoteDelayMs;
+      const renderTime = currentWallTime - clockOffsetMs - remoteBufferDelay();
       let before = track[0];
       let after = track.at(-1);
       for (let index = 1; index < track.length; index += 1) {
@@ -278,6 +281,11 @@
       contestant.lastDz = pose.lastDz;
     }
 
+    function remoteBufferDelay() {
+      const jitterBudget = Math.min(MAX_REMOTE_BUFFER_MS, SNAPSHOT_STEP_MS + snapshotJitterMs * 2);
+      return Math.max(remoteDelayMs, jitterBudget);
+    }
+
     function reset(at = now()) {
       inputHistory.splice(0, inputHistory.length, { at, mask: 0 });
       remoteTracks.clear();
@@ -293,6 +301,7 @@
     function telemetry() {
       return Object.freeze({
         localCorrection: localError ? Math.hypot(localError.x, localError.z) : 0,
+        remoteBufferDelayMs: remoteBufferDelay(),
         remoteBufferSize: [...remoteTracks.values()].reduce((sum, track) => sum + track.length, 0),
         roundTripMs: lastRoundTripMs,
         snapshotAgeMs: lastSnapshotAgeMs,
@@ -486,6 +495,7 @@
     publish("riftbombRttMs", metrics.roundTripMs);
     publish("riftbombSnapshotJitterMs", metrics.snapshotJitterMs);
     publish("riftbombLocalCorrection", metrics.localCorrection);
+    publish("riftbombRemoteBufferMs", metrics.remoteBufferDelayMs);
   }
 
   globalThis.RIFTBOMB_ONLINE_NETCODE = Object.freeze({ telemetry: networkTelemetry });

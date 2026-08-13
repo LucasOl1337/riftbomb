@@ -154,3 +154,19 @@ test("movement delivery exposes RTT and pending-input age for visual reconciliat
   assert.equal(delivery.inputSnapshot().oldestPendingAgeMs, 60);
   assert.equal(delivery.inputSnapshot().roundTripMs, 100);
 });
+
+test("movement RTT measures the original input even after a replay", () => {
+  const { clock, continuity, sent } = createFixture();
+  const delivery = continuity.delivery;
+  delivery.synchronize(inputProtocol(9, 0, 0), 0);
+
+  delivery.sendMovement(8);
+  clock.now = 120;
+  delivery.replay();
+  assert.equal(sent.length, 2, "the fixture must exercise a real retransmission");
+  clock.now = 180;
+  delivery.synchronize(inputProtocol(9, 1, 1), 0);
+
+  assert.equal(delivery.inputSnapshot().roundTripMs, 180,
+    "a retransmission must not erase the latency already felt by the player");
+});

@@ -96,8 +96,8 @@
       nextSequence = Math.max(nextSequence, Math.min(MAX_INPUT_SEQUENCE + 1, cursor.accepted + 1));
       const acknowledged = outbox.filter(({ message }) => message.inputSeq <= acknowledgedSequence);
       const latestAcknowledged = acknowledged.at(-1);
-      if (latestAcknowledged && Number.isFinite(latestAcknowledged.sentAt)) {
-        const sample = Math.max(0, now() - latestAcknowledged.sentAt);
+      if (latestAcknowledged && Number.isFinite(latestAcknowledged.createdAt)) {
+        const sample = Math.max(0, now() - latestAcknowledged.createdAt);
         roundTripMs = roundTripMs === null ? sample : roundTripMs + (sample - roundTripMs) * 0.2;
       }
       outbox = outbox.filter(({ message }) => message.inputSeq > acknowledgedSequence);
