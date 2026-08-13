@@ -131,3 +131,26 @@ test("legacy movement dedupe stays inside Match continuity", () => {
     type: "input", mask: 0, inputEpoch: 1, inputSeq: 1,
   });
 });
+
+test("movement delivery exposes RTT and pending-input age for visual reconciliation", () => {
+  const { clock, continuity } = createFixture();
+  const delivery = continuity.delivery;
+  delivery.synchronize(inputProtocol(5, 0, 0), 0);
+
+  delivery.sendMovement(8);
+  clock.now = 40;
+  assert.equal(delivery.inputSnapshot().oldestPendingAgeMs, 40);
+  assert.equal(delivery.inputSnapshot().roundTripMs, null);
+
+  clock.now = 100;
+  delivery.synchronize(inputProtocol(5, 1, 1), 0);
+  assert.equal(delivery.inputSnapshot().roundTripMs, 100);
+  assert.equal(delivery.inputSnapshot().oldestPendingAgeMs, null);
+
+  clock.now = 200;
+  delivery.sendMovement(0);
+  clock.now = 260;
+  delivery.synchronize(inputProtocol(5, 2, 1), 0);
+  assert.equal(delivery.inputSnapshot().oldestPendingAgeMs, 60);
+  assert.equal(delivery.inputSnapshot().roundTripMs, 100);
+});

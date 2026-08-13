@@ -752,6 +752,31 @@
         }
       }
 
+      // ONLINE_MOVEMENT_PARITY_V2 — server ticks and browser prediction must
+      // use the same speed and collision path.
+      moveContestantByDirection(player, dx, dz, dt, analog = false) {
+        const passableBombs = this.bombs.filter((bomb) =>
+          !bomb.exploded && bomb.passOwners?.has(player.id)
+        );
+        const preparation = player.speedBoost > 0 ? 1.3 : 1;
+        const dash = player.dashing > 0 ? 2.7 : 1;
+        this.moveEntity(
+          player,
+          dx,
+          dz,
+          player.speed * preparation * dash,
+          dt,
+          0.3,
+          passableBombs,
+          analog,
+        );
+        for (const bomb of passableBombs) {
+          const fullyClear = Math.abs(player.x - bomb.x) > this.tile * 0.82 ||
+            Math.abs(player.z - bomb.z) > this.tile * 0.82;
+          if (fullyClear) bomb.passOwners.delete(player.id);
+        }
+      }
+
       // Analog-stick corner assist: when the move along one axis is blocked near
       // a corner, slide the entity sideways (at most one frame of travel) until
       // the blocked axis opens. Deterministic: pure function of position, grid
@@ -2398,16 +2423,7 @@
         }
         if (!moving && player.dashing <= 0) return;
 
-        const passableBombs = this.bombs.filter((bomb) =>
-          !bomb.exploded && bomb.passOwners?.has(player.id)
-        );
-        const preparation = player.speedBoost > 0 ? 1.3 : 1;
-        this.moveEntity(player, dx, dz, player.speed * preparation * (player.dashing > 0 ? 2.7 : 1), dt, 0.3, passableBombs, analog);
-        for (const bomb of passableBombs) {
-          const fullyClear = Math.abs(player.x - bomb.x) > this.tile * 0.82 ||
-            Math.abs(player.z - bomb.z) > this.tile * 0.82;
-          if (fullyClear) bomb.passOwners.delete(player.id);
-        }
+        this.moveContestantByDirection(player, dx, dz, dt, analog);
       }
 
       destroyBreakable(r, c, color = Renderer.colors.katCrimson, ownerId = null) {

@@ -428,7 +428,7 @@ test("abilities share a bounded simulation-time buffer and interrupt Death Lotus
   assert.match(rules, /abilityTargetAvailable\(player, slot\)/);
   assert.match(rules, /this\.gangplankKegPlacement\(player\)/);
   assert.match(online, /offlineCastAbility\(slot, actor, \{ buffer: false, \.\.\.\(aim \? \{ aim \} : \{\}\) \}\)/);
-  assert.match(online, /player\.ultChannel > 0\) game\.cancelKatarinaChannel\?\.\(player, "movement"\)/);
+  assert.match(online, /contestant\.ultChannel > 0\) match\.cancelKatarinaChannel\?\.\(contestant, "movement"\)/);
   assert.match(contract, /final \*\*150 ms\*\*/);
   assert.match(contract, /cannot acquire a target, free landing or deployable capacity later/);
   assert.match(contract, /Arena bombs remain immediate and outside the/);
@@ -751,7 +751,8 @@ test("analog stick gets cardinal snap and corner nudge while keyboard and AI pat
   assert.match(rules, /assist && dz !== 0/);
   assert.match(rules, /nudgeAroundCorner\(entity, nx, "x"/);
   assert.match(rules, /nudgeAroundCorner\(entity, nz, "z"/);
-  assert.match(rules, /passableBombs, analog\)/);
+  assert.match(rules, /moveContestantByDirection\(player, dx, dz, dt, analog\)/);
+  assert.match(rules, /passableBombs,\s+analog,/);
   // Nudge is capped at one frame of travel and is a pure function of state.
   assert.match(rules, /const shift = \(maxShift \* i\) \/ 2;/);
   assert.doesNotMatch(rules.match(/nudgeAroundCorner\(entity, target[\s\S]*?\n      \}/)[0], /Math\.random|Date\.|performance\./);

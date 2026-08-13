@@ -54,6 +54,7 @@
     let lastMask = -1;
     let lastLegacyMask = -1;
     let replayCount = 0;
+    let roundTripMs = null;
     let outbox = [];
 
     const seatCursor = (protocol, seatIndex) => {
@@ -84,6 +85,7 @@
         acknowledgedSequence = cursor.ack;
         lastMask = -1;
         lastLegacyMask = -1;
+        roundTripMs = null;
         outbox = [];
         return true;
       }
@@ -92,6 +94,12 @@
       acceptedSequence = cursor.accepted;
       acknowledgedSequence = cursor.ack;
       nextSequence = Math.max(nextSequence, Math.min(MAX_INPUT_SEQUENCE + 1, cursor.accepted + 1));
+      const acknowledged = outbox.filter(({ message }) => message.inputSeq <= acknowledgedSequence);
+      const latestAcknowledged = acknowledged.at(-1);
+      if (latestAcknowledged && Number.isFinite(latestAcknowledged.sentAt)) {
+        const sample = Math.max(0, now() - latestAcknowledged.sentAt);
+        roundTripMs = roundTripMs === null ? sample : roundTripMs + (sample - roundTripMs) * 0.2;
+      }
       outbox = outbox.filter(({ message }) => message.inputSeq > acknowledgedSequence);
       return true;
     };
@@ -100,7 +108,7 @@
           mask === lastMask || outbox.length >= outboxLimit ||
           nextSequence > MAX_INPUT_SEQUENCE) return false;
       const message = { type: "input", mask, inputEpoch: epoch, inputSeq: nextSequence++ };
-      const entry = { message, sentAt: Number.NEGATIVE_INFINITY };
+      const entry = { message, createdAt: now(), sentAt: Number.NEGATIVE_INFINITY };
       outbox.push(entry);
       lastMask = mask;
       transmit(entry);
@@ -131,6 +139,7 @@
       lastMask = -1;
       lastLegacyMask = -1;
       replayCount = 0;
+      roundTripMs = null;
       outbox = [];
     };
     const snapshot = () => ({
@@ -141,6 +150,8 @@
       acknowledgedSequence,
       pendingSequences: outbox.map(({ message }) => message.inputSeq),
       pendingMasks: outbox.map(({ message }) => message.mask),
+      oldestPendingAgeMs: outbox.length ? Math.max(0, now() - outbox[0].createdAt) : null,
+      roundTripMs,
       replayCount
     });
     return Object.freeze({

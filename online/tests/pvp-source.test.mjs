@@ -35,14 +35,6 @@ test("War Table memoizes stable subtrees across runtime bridge updates", async (
   assert.match(page, /<ChampionAvatar champion=\{item\} size="sm" \/>/);
 });
 
-function extractFunctionDeclaration(source, name, nextDeclaration) {
-  const start = source.indexOf(`function ${name}`);
-  const end = source.indexOf(nextDeclaration, start);
-  assert.notEqual(start, -1, `${name} declaration must exist`);
-  assert.notEqual(end, -1, `${name} declaration must have a stable boundary`);
-  return source.slice(start, end);
-}
-
 async function readPackagedGameParts() {
   const manifest = JSON.parse(
     await readFile(new URL("public/riftbomb-parts/manifest.json", root), "utf8"),
@@ -175,19 +167,12 @@ test("defers the online bridge until a command, session or direct visit needs it
   assert.equal(appendedScripts.every((script) => script.async), true);
 });
 
-test("online movement prediction honors the canonical contestant lock", async () => {
+test("online bridge delegates prediction and reconciliation to the published movement seam", async () => {
   const source = await readFile(new URL("public/online-duel.js", root), "utf8");
-  const prediction = extractFunctionDeclaration(
-    source,
-    "predictLocalMovement",
-    "  function interpolateRemoteHost"
-  );
-  assert.match(prediction, /game\.canMoveContestant\(player\)/);
-  assert.match(prediction, /player\.moving = false;\s+return;/);
-  assert.ok(
-    prediction.indexOf("game.canMoveContestant(player)") < prediction.indexOf("game.moveEntity(player"),
-    "a committed Zed must be stopped before optimistic position mutation"
-  );
+  assert.match(source, /ONLINE_RESPONSIVENESS_V2/);
+  assert.match(source, /globalThis\.RIFTBOMB_ONLINE_MOVEMENT/);
+  assert.match(source, /onlineMovement\.stepLocal\(game, player, inputMaskFrom\(input\), dt\)/);
+  assert.doesNotMatch(source, /localPlayerTarget|reconcileLocalPlayer/);
 });
 
 test("embeds the packaged manifest to remove its serial boot request", async () => {
@@ -866,7 +851,7 @@ test("ships server-authoritative room and snapshot behavior", async () => {
   assert.match(client, /type === "rematch"/);
   assert.match(client, /shareReady/);
   assert.match(client, /matchTarget: state\.matchTarget/);
-  assert.match(client, /function interpolateRemoteHost/);
+  assert.match(client, /function smoothRemoteMovement/);
   assert.match(client, /pendingGuestBombs\.push/);
   assert.match(client, /game\.placeBomb\(guest\)/);
   assert.match(client, /authoritativeAudio\.consume/);
