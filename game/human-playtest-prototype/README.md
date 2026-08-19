@@ -4,6 +4,8 @@
 
 This is a throwaway terminal prototype next to the offline game capability it may later inform. It does not open the game, call an LLM, save screenshots, or persist state. It exists only to push the proposed collaboration loop through awkward transitions before building the real controller.
 
+Live Training telemetry lives in `game/record-agent-play-session.js` / `game/observe-agent-play.js`. Usage: `learning-records/agent-play/README.md`.
+
 Run:
 
 ```bash
