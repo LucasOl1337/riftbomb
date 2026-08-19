@@ -149,7 +149,10 @@ test("the recorder writes and reads JSONL without a browser", async () => {
   await writeFile(filePath, context.formatAgentPlayJsonl(events));
   const parsed = context.parseAgentPlaySession(await readFile(filePath, "utf8"));
 
-  assert.deepEqual(parsed.events.map((event) => event.type), events.map((event) => event.type));
+  assert.deepEqual([...parsed.events].map((event) => String(event.type)), [
+    "session_start", "match_setup", "round_start", "bomb_plant",
+    "player_hp", "death", "round_end", "score", "note", "match_end"
+  ]);
   assert.ok(parsed.events.some((event) => event.type === "bomb_plant" && event.payload.bombId === 7));
   assert.ok(parsed.events.some((event) => event.type === "death" && event.payload.cause === "blast"));
   assert.ok(parsed.events.some((event) => event.type === "score" && event.payload.score[1] === 1));
