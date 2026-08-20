@@ -14,7 +14,8 @@ function assertReportShape(report) {
   assert.equal(report.opponent.policy, "baseline");
   assert.equal(report.opponent.player, 1);
   for (const field of ["v1MatchWins", "baselineMatchWins", "drawnMatches",
-    "rounds", "v1RoundWins", "v1RoundLosses", "drawnRounds", "timeouts"]) {
+    "rounds", "v1RoundWins", "v1RoundLosses", "drawnRounds", "timeouts",
+    "v1OwnBombDeaths"]) {
     assert.ok(Number.isInteger(report[field]) && report[field] >= 0, `${field} must be a non-negative integer`);
   }
   assert.ok(report.v1WinRate >= 0 && report.v1WinRate <= 1, "v1WinRate within [0, 1]");

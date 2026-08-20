@@ -14,7 +14,7 @@
 
 import { cellFromWorld, worldFromCell } from "../baseline-policy.mjs";
 // Single line on purpose: the V1 bundle strips imports with a one-line regex.
-import { DANGER_STEP_MARGIN, crossingSurvivable, dangerSecondsPerCell, dangerTimeline, safestNeighborStep } from "./danger-timeline.mjs";
+import { DANGER_STEP_MARGIN, crossingSurvivable, dangerSecondsPerCell, dangerTimeline, ownBombBlastCovers, safestNeighborStep } from "./danger-timeline.mjs";
 
 // Named NAV_* because the V1 bundle inlines this module in the same scope
 // as baseline-policy.mjs, which declares its own DIRECTIONS.
@@ -35,7 +35,7 @@ const NAV_ALIGN_TOLERANCE = 0.14;
  *
  * @returns {{ dist: number[][], parent: (object|null)[][] }}
  */
-export function bfsField(grid, bombs, from, selfId = null) {
+export function bfsField(grid, bombs, from, selfId = null, extraBlocked = null) {
   const rows = grid.length;
   const cols = grid[0].length;
   const dist = Array.from({ length: rows }, () => Array(cols).fill(Infinity));
@@ -51,6 +51,7 @@ export function bfsField(grid, bombs, from, selfId = null) {
       const c = cell.c + step.dc;
       if (dist[r]?.[c] !== Infinity) continue; // out of bounds or visited
       if (!isWalkable(grid, bombs, r, c, selfId)) continue;
+      if (extraBlocked?.(r, c)) continue;
       dist[r][c] = dist[cell.r][cell.c] + 1;
       parent[r][c] = cell;
       queue.push({ r, c });
@@ -87,8 +88,8 @@ export function pathFromField(field, from, to) {
  * Shortest walkable path from `from` to `to` as a cell list including both
  * ends, or null when no route exists.
  */
-export function findPath(grid, bombs, from, to, selfId = null) {
-  return pathFromField(bfsField(grid, bombs, from, selfId), from, to);
+export function findPath(grid, bombs, from, to, selfId = null, extraBlocked = null) {
+  return pathFromField(bfsField(grid, bombs, from, selfId, extraBlocked), from, to);
 }
 
 /**
@@ -102,25 +103,34 @@ export function findPath(grid, bombs, from, to, selfId = null) {
  * The danger guard is TEMPORAL, not binary: the step is only refused when
  * the next cell's deadly window overlaps the crossing — reaching its
  * center takes ~one cell time, leaving it ~two (plus DANGER_STEP_MARGIN).
- * A fresh bomb (danger 1, fuse far away) no longer paralyzes the route:
- * with the window still seconds away the bot crosses in time. When the
- * crossing WOULD be deadly the bot does not freeze on a null either — the
- * fallback is safestNeighborStep: hold on the current cell when it stays
- * safe the longest, otherwise sidestep to the neighbor with the most time
- * left (the "least worst" cell), so pursuit never walks into a closing
- * corridor nor stalls in a loop of nulls.
+ * A fresh *rival* bomb (danger 1, fuse far away) no longer paralyzes the
+ * route: with the window still seconds away the bot crosses in time.
+ * The bot's OWN blast cross is different — it must leave and stay off
+ * until the fire is gone (Training farm-suicides were re-entry during
+ * the fuse). Own-blast cells are blocked in this BFS (except the cell
+ * the bot already stands on). When the crossing WOULD be deadly the bot
+ * does not freeze on a null either — the fallback is safestNeighborStep:
+ * hold on the current cell when it stays safe the longest, otherwise
+ * sidestep to the neighbor with the most time left (the "least worst"
+ * cell), so pursuit never walks into a closing corridor nor stalls in a
+ * loop of nulls.
  */
 export function nextStepToward(view, targetCell) {
   const { cols, rows, tile } = view.meta;
   const { self } = view;
   const from = cellFromWorld(self.x, self.z, cols, rows, tile);
-  const path = findPath(view.grid, view.bombs, from, targetCell, self.id);
+  const avoidOwnBlast = (r, c) => ownBombBlastCovers(view, r, c)
+    && (r !== from.r || c !== from.c);
+  const path = findPath(view.grid, view.bombs, from, targetCell, self.id, avoidOwnBlast)
+    ?? findPath(view.grid, view.bombs, from, targetCell, self.id);
   if (!path || path.length < 2) return null;
 
   const next = path[1];
   const timeline = dangerTimeline(view);
   const cellTime = dangerSecondsPerCell(view);
-  if (!crossingSurvivable(timeline, next.r, next.c, cellTime, 2 * cellTime + DANGER_STEP_MARGIN)) {
+  const reentersOwnBlast = avoidOwnBlast(next.r, next.c);
+  if (reentersOwnBlast
+    || !crossingSurvivable(timeline, next.r, next.c, cellTime, 2 * cellTime + DANGER_STEP_MARGIN)) {
     return safestNeighborStep(view, timeline);
   }
 
