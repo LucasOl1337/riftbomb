@@ -14,7 +14,7 @@
 
 import { cellFromWorld, worldFromCell } from "../baseline-policy.mjs";
 // Single line on purpose: the V1 bundle strips imports with a one-line regex.
-import { DANGER_STEP_MARGIN, crossingSurvivable, dangerSecondsPerCell, dangerTimeline, ownBombBlastCovers, safestNeighborStep } from "./danger-timeline.mjs";
+import { DANGER_STEP_MARGIN, cellCurrentlyLethal, crossingSurvivable, dangerSecondsPerCell, dangerTimeline, ownBombBlastCovers, safestNeighborStep } from "./danger-timeline.mjs";
 
 // Named NAV_* because the V1 bundle inlines this module in the same scope
 // as baseline-policy.mjs, which declares its own DIRECTIONS.
@@ -129,7 +129,11 @@ export function nextStepToward(view, targetCell) {
   const timeline = dangerTimeline(view);
   const cellTime = dangerSecondsPerCell(view);
   const reentersOwnBlast = avoidOwnBlast(next.r, next.c);
+  // Arrive-at-center can sit after a short remaining blast life while the
+  // body crosses the cell boundary (and takes damage) first. Never step
+  // toward fire that is already on the floor.
   if (reentersOwnBlast
+    || cellCurrentlyLethal(view, next.r, next.c)
     || !crossingSurvivable(timeline, next.r, next.c, cellTime, 2 * cellTime + DANGER_STEP_MARGIN)) {
     return safestNeighborStep(view, timeline);
   }

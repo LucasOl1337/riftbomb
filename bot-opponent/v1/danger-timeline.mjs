@@ -67,11 +67,20 @@ export function dangerSecondsPerCell(view) {
 export function ownBombBlastCovers(view, r, c) {
   const selfId = view.self?.id;
   if (selfId == null) return false;
+  for (const blast of view.blasts) {
+    if (blast.r !== r || blast.c !== c) continue;
+    if (blast.ownerId == null || blast.ownerId === selfId) return true;
+  }
   for (const bomb of view.bombs) {
     if (bomb.exploded || bomb.ownerId !== selfId) continue;
     if (dangerBlastPathClear(bomb, r, c, view.grid)) return true;
   }
   return false;
+}
+
+/** True when a blast cell is already on the floor (lethal right now). */
+export function cellCurrentlyLethal(view, r, c) {
+  return view.blasts.some((blast) => blast.r === r && blast.c === c);
 }
 
 /** True when the self still has a live (not-yet-exploded) arena bomb. */
@@ -360,10 +369,11 @@ export function safestNeighborStep(view, timeline = dangerTimeline(view)) {
     const r = from.r + direction.dr;
     const c = from.c + direction.dc;
     if (!dangerWalkable(view, r, c)) continue;
-    // Off the own cross: never sidestep back onto it. On the cross the
-    // temporal escape owns the frame; if this fallback still runs, an
-    // off-cross neighbor already wins via the infinite safe window.
-    if (!onOwnBlast && ownBombBlastCovers(view, r, c)) continue;
+    // Off the own cross: never sidestep back onto it or into live fire.
+    // On the cross the temporal escape owns the frame; if this fallback
+    // still runs, an off-cross neighbor already wins via the infinite
+    // safe window.
+    if (!onOwnBlast && (ownBombBlastCovers(view, r, c) || cellCurrentlyLethal(view, r, c))) continue;
     const window = safeWindowAfter(timeline, r, c, cellTime);
     if (window > bestWindow) {
       bestWindow = window;

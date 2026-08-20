@@ -114,6 +114,30 @@ test("V1 at the pocket refuge does not walk back onto its own blast", () => {
   }
 });
 
+test("V1 at the pocket refuge does not walk into its own fire after the fuse", () => {
+  // Measured idle-Training death: leave to r2c11, then path to the crate
+  // drop through r1c11 while blast.age is still 0.42 of 0.5.
+  const policy = createV1Policy({ random: () => 0.5 });
+  const view = makeView({
+    at: { r: 2, c: 11 },
+    bombs: [],
+    blasts: [
+      { r: 1, c: 10, age: 0.42, life: 0.5, ownerId: 2 },
+      { r: 1, c: 11, age: 0.42, life: 0.5, ownerId: 2 },
+      { r: 1, c: 9, age: 0.42, life: 0.5, ownerId: 2 }
+    ],
+    pickups: [{ r: 1, c: 9, type: "range" }]
+  });
+
+  for (let i = 0; i < 8; i += 1) {
+    const intent = policy.think(view, 0.016);
+    const nextR = 2 + intent.dz;
+    const nextC = 11 + intent.dx;
+    assert.equal(ownBombBlastCovers(view, nextR, nextC), false,
+      `think ${i} walked back into live fire at r${nextR}c${nextC}`);
+  }
+});
+
 test("V1 standing on its own pocket bomb walks off the cross, not along it into the crate", () => {
   const policy = createV1Policy({ random: () => 0.5 });
   const view = makeView({
