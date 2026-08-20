@@ -72,10 +72,36 @@
       return ["Q", "W", "E", "R"];
     }
 
+    function integerOrNull(value) {
+      return Number.isInteger(value) ? value : null;
+    }
+
+    // Players live in world x/z. Tile is the same cell placeBomb uses
+    // (match.cellFromWorld), or player.r/c when a stub already has a cell.
+    // Null means the match has no tile yet.
+    function snapshotPlayerTile(match, player) {
+      const directR = integerOrNull(player?.r);
+      const directC = integerOrNull(player?.c);
+      if (directR != null && directC != null) return { r: directR, c: directC };
+      if (
+        typeof match?.cellFromWorld === "function"
+        && Number.isFinite(player?.x)
+        && Number.isFinite(player?.z)
+      ) {
+        const cell = match.cellFromWorld(player.x, player.z);
+        const r = integerOrNull(cell?.r);
+        const c = integerOrNull(cell?.c);
+        if (r != null && c != null) return { r, c };
+      }
+      return { r: null, c: null };
+    }
+
     function snapshotPlayer(match, player) {
       const unlocked = Array.isArray(player?.skillsUnlocked)
         ? player.skillsUnlocked.map(Boolean)
         : [true, true, true, true];
+      const tile = snapshotPlayerTile(match, player);
+      const maxBombs = Number(player?.maxBombs);
       return {
         id: player?.id ?? 0,
         name: player?.name || "",
@@ -84,6 +110,9 @@
         health: Number(player?.health) || 0,
         alive: Boolean(player?.alive),
         unlocked,
+        r: tile.r,
+        c: tile.c,
+        maxBombs: Number.isFinite(maxBombs) ? Math.trunc(maxBombs) : 0,
         cooldowns: [
           Number(player?.qCooldown) || 0,
           Number(player?.wCooldown) || 0,
@@ -232,7 +261,11 @@
             name: player.name,
             health: player.health,
             alive: player.alive,
-            unlocked: player.unlocked.slice()
+            unlocked: player.unlocked.slice(),
+            r: player.r,
+            c: player.c,
+            maxBombs: player.maxBombs,
+            bombs: player.bombs
           }))
         };
       }
