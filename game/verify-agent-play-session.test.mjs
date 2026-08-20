@@ -10,6 +10,10 @@ import { createAgentPlayStore } from "../online/scripts/agent-play-dev-plugin.mj
 const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.dirname(gameDirectory);
 
+function hostCopy(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 async function loadClassic(context, fileName) {
   const source = await readFile(path.join(gameDirectory, fileName), "utf8");
   vm.runInContext(source, context);
@@ -96,7 +100,7 @@ test("the sample fixture covers the published session schema", async () => {
   assert.equal(handoff.payload.control, "human");
   assert.equal(handoff.payload.hud, "Player 2 online/local");
   const heartbeat = session.events.find((event) => event.type === "heartbeat");
-  assert.deepEqual(heartbeat.payload.players[0], {
+  assert.deepEqual(hostCopy(heartbeat.payload.players[0]), {
     id: 1,
     name: "Blue Katarina",
     health: 1,
@@ -316,7 +320,7 @@ test("heartbeat players include live tile and bomb inventory", async () => {
   assert.equal(movedBeat.payload.players[1].bombs, 0);
 
   const plant = events.find((event) => event.type === "bomb_plant");
-  assert.deepEqual(plant.payload, { bombId: 7, ownerId: 1, who: "Blue Katarina", r: 9, c: 1 });
+  assert.deepEqual(hostCopy(plant.payload), { bombId: 7, ownerId: 1, who: "Blue Katarina", r: 9, c: 1 });
 
   const worldMatch = {
     ...match,
