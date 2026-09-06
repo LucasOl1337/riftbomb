@@ -53,7 +53,7 @@ The CLI posts to the local URL first; if `npm run dev` is down it appends to the
 
 ## What is recorded
 
-Events, not frames: session start, champion / map / Training bot, round start/end, score, HP, bomb plant, death (who + cause when the match already knows), skill unlock / lock / cast, P2 `CPU controls Red` vs human handoff, 1 Hz heartbeat (crates + clock + score).
+Events, not frames: session start, champion / map / Training bot, round start/end, score, HP, bomb plant, death (who + cause when the match already knows), skill unlock / lock / cast, P2 `CPU controls Red` vs human handoff, 1 Hz heartbeat (crates + clock + score + each player's live tile `r`/`c` or `null`, `maxBombs`, and active `bombs`).
 
 Arrow or Enter flipping Red to human emits `p2_control` with `hud: "Player 2 online/local"`.
 

@@ -10,6 +10,10 @@ import { createAgentPlayStore } from "../online/scripts/agent-play-dev-plugin.mj
 const gameDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.dirname(gameDirectory);
 
+function hostCopy(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
 async function loadClassic(context, fileName) {
   const source = await readFile(path.join(gameDirectory, fileName), "utf8");
   vm.runInContext(source, context);
@@ -95,6 +99,22 @@ test("the sample fixture covers the published session schema", async () => {
   const handoff = session.events.find((event) => event.type === "p2_control");
   assert.equal(handoff.payload.control, "human");
   assert.equal(handoff.payload.hud, "Player 2 online/local");
+  const heartbeat = session.events.find((event) => event.type === "heartbeat");
+  assert.deepEqual(hostCopy(heartbeat.payload.players[0]), {
+    id: 1,
+    name: "Blue Katarina",
+    health: 1,
+    alive: true,
+    unlocked: [true, false, false, false],
+    r: 9,
+    c: 1,
+    maxBombs: 1,
+    bombs: 0
+  });
+  assert.equal(heartbeat.payload.players[1].r, 1);
+  assert.equal(heartbeat.payload.players[1].c, 11);
+  assert.equal(heartbeat.payload.players[1].maxBombs, 1);
+  assert.equal(heartbeat.payload.players[1].bombs, 0);
 });
 
 test("the recorder writes and reads JSONL without a browser", async () => {
@@ -201,6 +221,207 @@ test("the observer taps a live match for bomb, death, score, and P2 handoff", as
   match.players[0].skillsUnlocked[3] = false;
   match.castAbility(3, match.players[0]);
   assert.ok(events.some((event) => event.type === "skill_locked"));
+});
+
+function dummyMatchPlayers(overrides = []) {
+  return [
+    {
+      id: 1,
+      name: "Blue Katarina",
+      champion: "katarina",
+      side: "blue",
+      health: 1,
+      alive: true,
+      skillsUnlocked: [false, false, false, false],
+      qCooldown: 0,
+      wCooldown: 0,
+      eCooldown: 0,
+      rCooldown: 0,
+      maxBombs: 1,
+      r: 9,
+      c: 1,
+      ...overrides[0]
+    },
+    {
+      id: 2,
+      name: "Red Renekton",
+      champion: "renekton",
+      side: "red",
+      health: 1,
+      alive: true,
+      skillsUnlocked: [false, false, false, false],
+      qCooldown: 0,
+      wCooldown: 0,
+      eCooldown: 0,
+      rCooldown: 0,
+      maxBombs: 1,
+      r: 1,
+      c: 11,
+      ...overrides[1]
+    }
+  ];
+}
+
+test("heartbeat players include live tile and bomb inventory", async () => {
+  const context = vm.createContext({ console });
+  await loadClassic(context, "record-agent-play-session.js");
+  const events = [];
+  let now = 1_787_165_400_000;
+  const session = context.createAgentPlaySession({
+    sessionId: "ap-test-heartbeat-0001",
+    now: () => now,
+    events,
+    emit() {}
+  });
+  const planted = [];
+  const match = {
+    mode: "playing",
+    elapsed: 0,
+    round: 1,
+    roundWins: [0, 0],
+    roundLocked: false,
+    p2Human: false,
+    selectedChampion: "katarina",
+    selectedChampion2: "renekton",
+    selectedBot: "v1-renekton",
+    selectedArena: "lattice",
+    matchTarget: 3,
+    roundTime: 90,
+    grid: [[0, 2], [2, 1]],
+    bombs: planted,
+    players: dummyMatchPlayers(),
+    arenaTemplate: () => ({ id: "lattice", label: "Salt Lens Array" }),
+    activeBombsFor: (player) => planted.filter((bomb) => bomb.ownerId === player.id && !bomb.exploded).length,
+    skillSlotLabel: (_player, slot) => ["Bouncing Blade", "Preparation", "Shunpo", "Death Lotus"][slot]
+  };
+
+  session.ingestMatch(match, "update");
+  now += 1000;
+  session.ingestMatch(match, "update");
+  const spawnBeat = events.filter((event) => event.type === "heartbeat").at(-1);
+  assert.deepEqual(spawnBeat.payload.players.map((player) => ({
+    id: player.id, r: player.r, c: player.c, maxBombs: player.maxBombs, bombs: player.bombs
+  })), [
+    { id: 1, r: 9, c: 1, maxBombs: 1, bombs: 0 },
+    { id: 2, r: 1, c: 11, maxBombs: 1, bombs: 0 }
+  ]);
+
+  planted.push({ id: 7, ownerId: 1, r: 9, c: 1, exploded: false });
+  match.players[0].maxBombs = 2;
+  match.players[0].r = 7;
+  match.players[0].c = 3;
+  now += 1000;
+  session.ingestMatch(match, "update");
+  const movedBeat = events.filter((event) => event.type === "heartbeat").at(-1);
+  assert.equal(movedBeat.payload.players[0].r, 7);
+  assert.equal(movedBeat.payload.players[0].c, 3);
+  assert.equal(movedBeat.payload.players[0].maxBombs, 2);
+  assert.equal(movedBeat.payload.players[0].bombs, 1);
+  assert.equal(movedBeat.payload.players[1].bombs, 0);
+
+  const plant = events.find((event) => event.type === "bomb_plant");
+  assert.deepEqual(hostCopy(plant.payload), { bombId: 7, ownerId: 1, who: "Blue Katarina", r: 9, c: 1 });
+
+  const worldMatch = {
+    ...match,
+    bombs: [],
+    players: dummyMatchPlayers([
+      { r: undefined, c: undefined, x: 1.32, z: -5.28, maxBombs: 3 },
+      { r: undefined, c: undefined, x: 6.6, z: -3.96, maxBombs: 1 }
+    ]),
+    cellFromWorld(x, z) {
+      return { c: Math.round(x / 1.32), r: Math.round(z / 1.32) + 8 };
+    },
+    activeBombsFor: () => 0
+  };
+  now += 1000;
+  const worldEvents = [];
+  const worldSession = context.createAgentPlaySession({
+    sessionId: "ap-test-heartbeat-world-0001",
+    now: () => now,
+    events: worldEvents,
+    emit() {}
+  });
+  worldSession.ingestMatch(worldMatch, "update");
+  now += 1000;
+  worldSession.ingestMatch(worldMatch, "update");
+  const worldBeat = worldEvents.filter((event) => event.type === "heartbeat").at(-1);
+  assert.equal(worldBeat.payload.players[0].r, 4);
+  assert.equal(worldBeat.payload.players[0].c, 1);
+  assert.equal(worldBeat.payload.players[0].maxBombs, 3);
+  assert.equal(worldBeat.payload.players[0].bombs, 0);
+
+  const blankMatch = {
+    ...match,
+    bombs: [],
+    players: dummyMatchPlayers([
+      { r: undefined, c: undefined, maxBombs: undefined },
+      { r: undefined, c: undefined, maxBombs: undefined }
+    ]),
+    activeBombsFor: () => 0
+  };
+  now += 1000;
+  const blankEvents = [];
+  const blankSession = context.createAgentPlaySession({
+    sessionId: "ap-test-heartbeat-null-0001",
+    now: () => now,
+    events: blankEvents,
+    emit() {}
+  });
+  blankSession.ingestMatch(blankMatch, "update");
+  now += 1000;
+  blankSession.ingestMatch(blankMatch, "update");
+  const blankBeat = blankEvents.filter((event) => event.type === "heartbeat").at(-1);
+  assert.equal(blankBeat.payload.players[0].r, null);
+  assert.equal(blankBeat.payload.players[0].c, null);
+  assert.equal(blankBeat.payload.players[0].maxBombs, 0);
+  assert.equal(blankBeat.payload.players[0].bombs, 0);
+});
+
+test("a live match heartbeat uses cellFromWorld spawn tiles and activeBombsFor", async () => {
+  const events = [];
+  let now = 1_787_165_400_000;
+  const { match } = await loadObservedMatch(events, { now: () => now });
+  match.selectBotOpponent?.("missing");
+  match.selectedBot = "v1-renekton";
+  match.selectedChampion2 = "renekton";
+  match.resetPlayers();
+  match.p2Human = false;
+  match.start();
+
+  const blue = match.players[0];
+  const red = match.players[1];
+  const blueTile = match.cellFromWorld(blue.x, blue.z);
+  const redTile = match.cellFromWorld(red.x, red.z);
+  assert.equal(blueTile.r, match.rows - 2);
+  assert.equal(blueTile.c, 1);
+  assert.equal(redTile.r, 1);
+  assert.equal(redTile.c, match.cols - 2);
+
+  now += 1000;
+  match.presentation.update(match);
+  const spawnBeat = events.filter((event) => event.type === "heartbeat").at(-1);
+  assert.equal(spawnBeat.payload.players[0].r, blueTile.r);
+  assert.equal(spawnBeat.payload.players[0].c, blueTile.c);
+  assert.equal(spawnBeat.payload.players[0].maxBombs, blue.maxBombs);
+  assert.equal(spawnBeat.payload.players[0].bombs, 0);
+  assert.equal(spawnBeat.payload.players[1].r, redTile.r);
+  assert.equal(spawnBeat.payload.players[1].c, redTile.c);
+  assert.equal(spawnBeat.payload.players[1].maxBombs, red.maxBombs);
+  assert.equal(spawnBeat.payload.players[1].bombs, 0);
+
+  assert.equal(match.placeBomb(blue), true);
+  now += 1000;
+  match.presentation.update(match);
+  const plantedBeat = events.filter((event) => event.type === "heartbeat").at(-1);
+  assert.equal(plantedBeat.payload.players[0].bombs, 1);
+  assert.equal(plantedBeat.payload.players[0].maxBombs, 1);
+  assert.equal(plantedBeat.payload.players[1].bombs, 0);
+
+  const plant = events.find((event) => event.type === "bomb_plant");
+  assert.deepEqual(Object.keys(plant.payload).sort(), ["bombId", "c", "ownerId", "r", "who"]);
+  assert.equal(plant.payload.r, blueTile.r);
+  assert.equal(plant.payload.c, blueTile.c);
 });
 
 test("the local store persists events and notes on disk", async () => {
