@@ -58,6 +58,38 @@ export function dangerSecondsPerCell(view) {
   return speed > 0 ? view.meta.tile / speed : DANGER_CELL_TIME;
 }
 
+/**
+ * True when a live bomb owned by the self still paints (r, c) on its
+ * cardinal blast. Used to stay OFF the cross after planting: crossing
+ * before the fuse ends is survivable, but walking back onto the same
+ * cells is how Training farm-suicides (own-arena-bomb).
+ */
+export function ownBombBlastCovers(view, r, c) {
+  const selfId = view.self?.id;
+  if (selfId == null) return false;
+  for (const blast of view.blasts) {
+    if (blast.r !== r || blast.c !== c) continue;
+    if (blast.ownerId == null || blast.ownerId === selfId) return true;
+  }
+  for (const bomb of view.bombs) {
+    if (bomb.exploded || bomb.ownerId !== selfId) continue;
+    if (dangerBlastPathClear(bomb, r, c, view.grid)) return true;
+  }
+  return false;
+}
+
+/** True when a blast cell is already on the floor (lethal right now). */
+export function cellCurrentlyLethal(view, r, c) {
+  return view.blasts.some((blast) => blast.r === r && blast.c === c);
+}
+
+/** True when the self still has a live (not-yet-exploded) arena bomb. */
+export function ownBombLive(view) {
+  const selfId = view.self?.id;
+  if (selfId == null) return false;
+  return view.bombs.some((bomb) => !bomb.exploded && bomb.ownerId === selfId);
+}
+
 // Mirrors blastPathClear in bot-opponent/baseline-policy.mjs (private
 // there): true when the bomb's blast reaches (r, c) — the bomb's own cell
 // included, solids stop the ray, a crate is hit but shields what is behind.
@@ -329,6 +361,7 @@ export function safestNeighborStep(view, timeline = dangerTimeline(view)) {
   const { cols, rows } = view.meta;
   const from = cellFromWorld(view.self.x, view.self.z, cols, rows, view.meta.tile);
   const cellTime = dangerSecondsPerCell(view);
+  const onOwnBlast = ownBombBlastCovers(view, from.r, from.c);
 
   let bestWindow = safeWindowAfter(timeline, from.r, from.c, 0);
   const step = { dx: 0, dz: 0 };
@@ -336,6 +369,11 @@ export function safestNeighborStep(view, timeline = dangerTimeline(view)) {
     const r = from.r + direction.dr;
     const c = from.c + direction.dc;
     if (!dangerWalkable(view, r, c)) continue;
+    // Off the own cross: never sidestep back onto it or into live fire.
+    // On the cross the temporal escape owns the frame; if this fallback
+    // still runs, an off-cross neighbor already wins via the infinite
+    // safe window.
+    if (!onOwnBlast && (ownBombBlastCovers(view, r, c) || cellCurrentlyLethal(view, r, c))) continue;
     const window = safeWindowAfter(timeline, r, c, cellTime);
     if (window > bestWindow) {
       bestWindow = window;

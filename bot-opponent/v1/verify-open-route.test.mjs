@@ -85,11 +85,13 @@ test("v1 plants on the stand cell with a proven escape and records open-route", 
 
   const intent = policy.think(view, 0.016);
   assert.equal(intent.plantBomb, true, "the V1 bombs the route crate on purpose");
-  assert.deepEqual({ dx: intent.dx, dz: intent.dz }, { dx: 0, dz: 0 },
-    "it holds position on the planting frame");
+  assert.deepEqual({ dx: intent.dx, dz: intent.dz }, { dx: 0, dz: -1 },
+    "the plant frame already starts the first hop off the blast cross");
   assert.equal(policy.memory.lastBombReason, "open-route");
-  assert.deepEqual(policy.memory.targetCell, { r: 5, c: 7 });
+  assert.deepEqual(policy.memory.targetCell, { r: 4, c: 5 },
+    "the temporal plan's refuge replaces the crate as the walk target");
   assert.equal(policy.memory.lastDecision.plantBomb, true);
+  assert.equal(policy.memory.objective, "escape");
 });
 
 test("v1 does not plant when the bomb seals the only exit — it steps back", () => {
