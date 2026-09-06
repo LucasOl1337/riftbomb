@@ -276,6 +276,37 @@ test("concurrent champion SFX requests share one lazy script and missing banks s
   assert.equal(Object.keys(sfx.sampleMeta).length, 0);
 });
 
+test("Katarina's sample bank sleeps behind a reversible flag while procedural combat audio remains", async () => {
+  const scripts = [];
+  const SfxEngine = loadSfxEngine({
+    RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST: {
+      katarina: "/champion-sfx/katarina.js",
+      zed: "/champion-sfx/zed.js",
+    },
+    RIFTBOMB_CHAMPION_SFX_BANK_ENABLED: { katarina: false, zed: true },
+    document: {
+      createElement(type) {
+        assert.equal(type, "script");
+        const script = {};
+        scripts.push(script);
+        return script;
+      },
+      head: { append() {} },
+    },
+  });
+  const sfx = new SfxEngine();
+  const load = sfx.loadChampionSfx(["katarina", "zed"]);
+  assert.deepEqual(scripts.map(({ src }) => src), ["/champion-sfx/zed.js"]);
+  scripts[0].onerror(new Error("optional fixture bank"));
+  await load;
+
+  const loader = await readFile(path.join(gameDirectory, "load-champion-sfx.js"), "utf8");
+  assert.match(loader, /KATARINA_SFX_SLEEP_V1/);
+  assert.match(loader, /"katarina": "\.\/champions\/katarina\/sfx\/riftbomb-sfx-bank\.js"/);
+  assert.match(loader, /"katarina": false/);
+  assert.ok(traceAction("katQ").trace.length > 0, "Katarina keeps procedural ability feedback");
+});
+
 test("distortion and final ceiling curves remain finite, symmetric and bounded", () => {
   const SfxEngine = loadSfxEngine();
   const sfx = new SfxEngine();

@@ -8,6 +8,7 @@ const outputPath = path.join(repositoryRoot, "game", "load-champion-sfx.js");
 const generatedBankName = "riftbomb-sfx-bank.js";
 
 const playableChampions = ["katarina", "zed", "renekton", "vladimir", "gangplank"];
+const bankEnabled = Object.freeze({ katarina: false });
 
 async function fileExists(filePath) {
   try {
@@ -31,6 +32,20 @@ async function dataUrl(absolutePath) {
           ? "audio/webm"
           : "audio/mpeg";
   return `data:${mime};base64,${buffer.toString("base64")}`;
+}
+
+async function writeGenerated(filePath, contents) {
+  for (let attempt = 1; attempt <= 6; attempt += 1) {
+    try {
+      await writeFile(filePath, contents);
+      return;
+    } catch (error) {
+      const mayBeLocked = ["EACCES", "EPERM", "UNKNOWN"].includes(error?.code);
+      if (!mayBeLocked || attempt === 6) throw error;
+      // Windows scanners may briefly hold a generated audio script after a build.
+      await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+    }
+  }
 }
 
 /**
@@ -103,7 +118,7 @@ globalThis.RIFTBOMB_CHAMPION_SFX_BANKS[${JSON.stringify(champion)}] = Object.fre
 `;
     const bankPath = path.join(root, "champions", champion, "sfx", generatedBankName);
     await mkdir(path.dirname(bankPath), { recursive: true });
-    await writeFile(bankPath, source);
+    await writeGenerated(bankPath, source);
     manifest[champion] = `./champions/${champion}/sfx/${generatedBankName}`;
     sampleEffectCount += Object.keys(bank.sources).length;
   }
@@ -112,10 +127,14 @@ globalThis.RIFTBOMB_CHAMPION_SFX_BANKS[${JSON.stringify(champion)}] = Object.fre
 
 // CHAMPION_SFX_SPLIT_V1 — keep large voice banks out of the critical HTML.
 const RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST = Object.freeze(${JSON.stringify(manifest, null, 2)});
+// KATARINA_SFX_SLEEP_V1 — keep the packaged bank intact, but do not load it
+// until it is retuned and explicitly re-enabled.
+const RIFTBOMB_CHAMPION_SFX_BANK_ENABLED = Object.freeze(${JSON.stringify(bankEnabled, null, 2)});
 globalThis.RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST = RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST;
+globalThis.RIFTBOMB_CHAMPION_SFX_BANK_ENABLED = RIFTBOMB_CHAMPION_SFX_BANK_ENABLED;
 globalThis.RIFTBOMB_CHAMPION_SFX_BANKS = globalThis.RIFTBOMB_CHAMPION_SFX_BANKS || Object.create(null);
 `;
-  await writeFile(path.join(root, "game", "load-champion-sfx.js"), loader);
+  await writeGenerated(path.join(root, "game", "load-champion-sfx.js"), loader);
   return {
     outputPath: path.join(root, "game", "load-champion-sfx.js"),
     champions: Object.keys(banks),

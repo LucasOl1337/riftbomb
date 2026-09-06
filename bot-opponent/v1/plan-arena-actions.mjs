@@ -10,7 +10,7 @@
 import { cellFromWorld, dangerAt, isBlocked, worldFromCell } from "../baseline-policy.mjs";
 import { bfsField, nextStepToward, pathFromField } from "./navigate-arena.mjs";
 import { dangerTimeline, escapePlan } from "./danger-timeline.mjs";
-import { canPlantRouteBomb, findRouteCrate, hasTemporalBombEscape } from "./open-route.mjs";
+import { canPlantRouteBomb, findRouteCrate, hasTemporalBombEscape, hypotheticalBomb } from "./open-route.mjs";
 import { bombCutsRivalEscape, predictRivalCell } from "./read-rival.mjs";
 import { aggressionOf, aggressionPickupSlack } from "./personality.mjs";
 import { advantageEngageAllowed } from "./advantage.mjs";
@@ -187,16 +187,12 @@ function openRouteObjective(view, intent, memory, arenaMemory, from, field, pers
   }
 
   if (canPlantRouteBomb(view, from) && hasTemporalBombEscape(view, from)) {
-    intent.dx = 0;
-    intent.dz = 0;
     intent.plantBomb = true;
     memory.lastBombReason = "open-route";
-    if (memory.lastDecision) {
-      memory.lastDecision.dx = 0;
-      memory.lastDecision.dz = 0;
-      memory.lastDecision.plantBomb = true;
-    }
-    return intent;
+    if (memory.lastDecision) memory.lastDecision.plantBomb = true;
+    // Plant and start the first escape hop on the same frame — holding
+    // still here is how the spawn-pocket dummy died on its own fuse.
+    return beginEscapeFromPlant(view, intent, memory, arenaMemory);
   }
 
   // No proven escape (bomb limit reached, rival fire closing in, or the
@@ -328,6 +324,26 @@ export function vetoBombWithoutEscape(view, intent, memory) {
   memory.lastBombReason = null;
   if (memory.lastDecision) memory.lastDecision.plantBomb = false;
   return intent;
+}
+
+/**
+ * Same-frame leave after a plant the veto just approved: the bomb is not
+ * in the WorldView yet, so escapeTemporalDanger cannot see it. Replay the
+ * proven temporal plan against a hypothetical bomb and start walking off
+ * the cross immediately (place, leave, stay off until the blast ends).
+ */
+export function beginEscapeFromPlant(view, intent, memory, arenaMemory) {
+  if (!intent.plantBomb) return intent;
+  const { cols, rows, tile } = view.meta;
+  const from = cellFromWorld(view.self.x, view.self.z, cols, rows, tile);
+  const scoped = { ...view, bombs: [...view.bombs, hypotheticalBomb(view, from)] };
+  const plan = escapePlan(scoped, dangerTimeline(scoped));
+  if (!plan) return intent;
+  memory.objective = "escape";
+  memory.targetCell = plan.refuge;
+  memory.route = plan.route;
+  if (memory.lastDecision) memory.lastDecision.objective = "escape";
+  return commitRouteStep(intent, memory, arenaMemory, escapeStepIntent(scoped, plan));
 }
 
 // --- Wall-stall recovery ---------------------------------------------------

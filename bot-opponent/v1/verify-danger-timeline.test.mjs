@@ -229,3 +229,17 @@ test("nextStepToward crosses a fresh lane when the crossing fits before the blas
   assert.deepEqual(nextStepToward(view, { r: 5, c: 9 }), { dx: 1, dz: 0 },
     "a fresh bomb lane no longer paralyzes the route");
 });
+
+test("nextStepToward does not walk back onto the self's own blast cross", () => {
+  // Same geometry as the rival-lane crossing above, but the bomb is the
+  // V1's: leaving the cross is required, re-entering during the fuse is
+  // the Training suicide. The shortest path east sits on the cross, so
+  // the step must hold or leave the lane — never walk east into it.
+  const view = makeView({
+    self: { id: 2, x: -1, z: 0 }, // cell r5 c5, off the bomb cell
+    bombs: [bomb({ r: 5, c: 8, range: 3, age: 0, ownerId: 2, passOwners: [2] })]
+  });
+  const step = nextStepToward(view, { r: 5, c: 9 });
+  assert.ok(step, "a stay-off fallback still returns a step");
+  assert.notEqual(step.dx, 1, "must not step east back onto the own blast row");
+});

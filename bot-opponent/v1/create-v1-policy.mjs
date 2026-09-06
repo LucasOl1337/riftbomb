@@ -21,7 +21,7 @@ import { createBaselinePolicy } from "../baseline-policy.mjs";
 import { createV1Memory, resetV1Memory } from "./v1-memory.mjs";
 import { observeRival } from "./read-rival.mjs";
 import { aggressionOf } from "./personality.mjs";
-import { escapeTemporalDanger, navigateObjective, planArenaActions, unstickMovement, unwedgeMovement, vetoBombWithoutEscape } from "./plan-arena-actions.mjs";
+import { beginEscapeFromPlant, escapeTemporalDanger, navigateObjective, planArenaActions, unstickMovement, unwedgeMovement, vetoBombWithoutEscape } from "./plan-arena-actions.mjs";
 
 export function createV1Policy({ champion = null, profile = "rift", random = Math.random, personality = null } = {}) {
   const arena = createBaselinePolicy({ profile, random });
@@ -52,8 +52,10 @@ export function createV1Policy({ champion = null, profile = "rift", random = Mat
       navigateObjective(view, intent, memory, arena.memory, temperament);
       // The veto runs after every planner so a plant from the baseline OR
       // the route opener is dropped when the temporal escape cannot prove
-      // a refuge; the escape step then owns the frame as usual.
+      // a refuge. A surviving plant starts its leave on this frame: the
+      // bomb is not in the view yet, so escapeTemporalDanger cannot see it.
       vetoBombWithoutEscape(view, intent, memory);
+      beginEscapeFromPlant(view, intent, memory, arena.memory);
       escapeTemporalDanger(view, intent, memory, arena.memory);
       unstickMovement(view, intent, memory, arena.memory);
       // Wedge recovery (cycle 15) runs last and only with a champion

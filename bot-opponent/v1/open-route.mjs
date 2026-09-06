@@ -161,7 +161,7 @@ export function hasBombEscape(view, bombCell) {
   return false;
 }
 
-function hypotheticalBomb(view, bombCell) {
+export function hypotheticalBomb(view, bombCell) {
   return {
     id: -1,
     ownerId: view.self.id,

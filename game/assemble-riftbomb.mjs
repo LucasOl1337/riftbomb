@@ -22,7 +22,17 @@ async function writeGeneratedArtifact(targetPath, contents) {
     await writeFile(temporaryPath, contents);
     // Same-directory rename publishes the complete artifact in one filesystem step.
     // Readers keep seeing the previous bundle until the replacement is ready.
-    await rename(temporaryPath, targetPath);
+    for (let attempt = 1; attempt <= 6; attempt += 1) {
+      try {
+        await rename(temporaryPath, targetPath);
+        break;
+      } catch (error) {
+        const mayBeLocked = error?.code === "EPERM" || error?.code === "EACCES";
+        if (!mayBeLocked || attempt === 6) throw error;
+        // Windows scanners can briefly hold the freshly written 100+ MB bundle.
+        await new Promise((resolve) => setTimeout(resolve, attempt * 100));
+      }
+    }
   } finally {
     try {
       await rm(temporaryPath, { force: true });
