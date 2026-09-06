@@ -63,6 +63,268 @@
   globalThis.RIFTBOMB_AUTHORITATIVE_AUDIO = Object.freeze({ consume });
 })();
 
+/* ONLINE_RESPONSIVENESS_V2 */
+(() => {
+  const MAX_REMOTE_BUFFER_MS = 150;
+  const SNAPSHOT_STEP_MS = 1_000 / 30;
+
+  function directionFromMask(mask) {
+    let dx = Number(Boolean(mask & 8)) - Number(Boolean(mask & 4));
+    let dz = Number(Boolean(mask & 2)) - Number(Boolean(mask & 1));
+    const length = Math.hypot(dx, dz);
+    if (length > 0) {
+      dx /= length;
+      dz /= length;
+    }
+    return { dx, dz, moving: length > 0 };
+  }
+
+  function createOnlineMovement({
+    now = () => performance.now(),
+    wallNow = () => Date.now(),
+    defaultRoundTripMs = 50,
+    remoteDelayMs = SNAPSHOT_STEP_MS * 2,
+  } = {}) {
+    const inputHistory = [{ at: now(), mask: 0 }];
+    const remoteTracks = new Map();
+    let localError = null;
+    let clockOffsetMs = null;
+    let lastRoundTripMs = null;
+    let lastSnapshotAt = null;
+    let lastSnapshotAgeMs = null;
+    let snapshotIntervalMs = null;
+    let snapshotJitterMs = 0;
+
+    function recordInput(mask, at = now()) {
+      const normalized = Number.isInteger(mask) ? Math.max(0, Math.min(15, mask)) : 0;
+      const latest = inputHistory.at(-1);
+      if (latest?.mask !== normalized) inputHistory.push({ at, mask: normalized });
+      const cutoff = at - 500;
+      while (inputHistory.length > 2 && inputHistory[1].at < cutoff) inputHistory.shift();
+      return normalized;
+    }
+
+    function inputAt(at) {
+      for (let index = inputHistory.length - 1; index >= 0; index -= 1) {
+        if (inputHistory[index].at <= at) return inputHistory[index].mask;
+      }
+      return 0;
+    }
+
+    function predict(match, contestant, mask, dt) {
+      if (!contestant?.alive || match.mode !== "playing" || match.roundLocked) return false;
+      if (typeof match.canMoveContestant === "function" && !match.canMoveContestant(contestant)) {
+        contestant.moving = false;
+        return false;
+      }
+      let { dx, dz, moving } = directionFromMask(mask);
+      contestant.moving = moving;
+      if (moving) {
+        if (contestant.ultChannel > 0) match.cancelKatarinaChannel?.(contestant, "movement");
+        contestant.lastDx = dx;
+        contestant.lastDz = dz;
+        contestant.facing = Math.atan2(dx, dz);
+      } else {
+        dx = contestant.lastDx;
+        dz = contestant.lastDz;
+      }
+      if (!moving && contestant.dashing <= 0) return false;
+      if (typeof match.moveContestantByDirection !== "function") {
+        throw new Error("Canonical contestant movement is unavailable");
+      }
+      match.moveContestantByDirection(contestant, dx, dz, dt, false);
+      return true;
+    }
+
+    function replay(match, contestant, from, to) {
+      let cursor = from;
+      let mask = inputAt(from);
+      const changes = inputHistory.filter((entry) => entry.at > from && entry.at <= to);
+      const advance = (until) => {
+        let remaining = Math.max(0, (until - cursor) / 1000);
+        while (remaining > 0.000001) {
+          const step = Math.min(1 / 60, remaining);
+          predict(match, contestant, mask, step);
+          remaining -= step;
+        }
+        cursor = until;
+      };
+      for (const change of changes) {
+        advance(change.at);
+        mask = change.mask;
+      }
+      advance(to);
+    }
+
+    function acceptLocalSnapshot(match, authoritative, previous, {
+      receivedAt = now(),
+      roundTripMs = defaultRoundTripMs,
+      unacknowledgedInputAgeMs = null,
+    } = {}) {
+      localError = null;
+      if (!authoritative || !previous) return;
+      const pendingAge = Number.isFinite(unacknowledgedInputAgeMs)
+        ? Math.max(0, unacknowledgedInputAgeMs)
+        : 0;
+      const measuredRoundTrip = Number.isFinite(roundTripMs) ? roundTripMs : null;
+      const rtt = measuredRoundTrip ?? Math.max(defaultRoundTripMs, pendingAge);
+      const localInputLeadsAuthority = inputAt(receivedAt) !== 0 || pendingAge > 0;
+      const predictionWindow = localInputLeadsAuthority ? rtt : rtt / 2;
+      const snapshotAge = Math.max(0, Math.min(250, Math.max(predictionWindow, pendingAge)));
+      if (lastSnapshotAt !== null) {
+        const interval = Math.max(0, receivedAt - lastSnapshotAt);
+        const jitterSample = Math.abs(interval - 1_000 / 30);
+        snapshotIntervalMs = snapshotIntervalMs === null
+          ? interval
+          : snapshotIntervalMs + (interval - snapshotIntervalMs) * 0.2;
+        snapshotJitterMs = snapshotJitterMs === 0
+          ? jitterSample
+          : snapshotJitterMs + (jitterSample - snapshotJitterMs) * 0.2;
+      }
+      lastSnapshotAt = receivedAt;
+      lastRoundTripMs = measuredRoundTrip;
+      lastSnapshotAgeMs = snapshotAge;
+      replay(match, authoritative, receivedAt - snapshotAge, receivedAt);
+      if (typeof match.canMoveContestant === "function" &&
+          !match.canMoveContestant(authoritative)) return;
+      const errorX = previous.x - authoritative.x;
+      const errorZ = previous.z - authoritative.z;
+      if (Math.hypot(errorX, errorZ) >= match.tile) return;
+      authoritative.x = previous.x;
+      authoritative.z = previous.z;
+      localError = { playerId: authoritative.id, x: errorX, z: errorZ };
+    }
+
+    function applyLocalCorrection(contestant, dt) {
+      if (!localError || contestant?.id !== localError.playerId) return;
+      const decay = Math.exp(-10 * dt);
+      const nextX = localError.x * decay;
+      const nextZ = localError.z * decay;
+      contestant.x += nextX - localError.x;
+      contestant.z += nextZ - localError.z;
+      localError.x = nextX;
+      localError.z = nextZ;
+      if (Math.hypot(nextX, nextZ) < 0.002) localError = null;
+    }
+
+    function stepLocal(match, contestant, mask, dt, at = now()) {
+      const normalized = recordInput(mask, at);
+      predict(match, contestant, normalized, dt);
+      applyLocalCorrection(contestant, dt);
+    }
+
+    function acceptRemoteSnapshot(authoritative, previous, {
+      receivedWallTime = wallNow(),
+      roundTripMs = null,
+      serverTime,
+      snapDistance = Number.POSITIVE_INFINITY,
+    } = {}) {
+      if (!authoritative || !Number.isFinite(serverTime)) return;
+      const measuredRoundTrip = Number.isFinite(roundTripMs) ? Math.max(0, roundTripMs) : null;
+      const offsetSample = receivedWallTime - serverTime - (measuredRoundTrip ?? 0) / 2;
+      clockOffsetMs = clockOffsetMs === null
+        ? offsetSample
+        : Math.min(clockOffsetMs, offsetSample);
+      const track = remoteTracks.get(authoritative.id) || [];
+      const latest = track.at(-1);
+      if (!latest || serverTime > latest.serverTime) {
+        track.push({
+          serverTime,
+          x: authoritative.x,
+          z: authoritative.z,
+          moving: authoritative.moving,
+          lastDx: authoritative.lastDx,
+          lastDz: authoritative.lastDz,
+        });
+        while (track.length > 2 && track[1].serverTime < serverTime - 1_000) track.shift();
+        remoteTracks.set(authoritative.id, track);
+      }
+      const distance = previous
+        ? Math.hypot(authoritative.x - previous.x, authoritative.z - previous.z)
+        : Number.POSITIVE_INFINITY;
+      if (previous && track.length > 1 && distance < snapDistance) {
+        authoritative.x = previous.x;
+        authoritative.z = previous.z;
+        authoritative.moving = previous.moving;
+        authoritative.lastDx = previous.lastDx;
+        authoritative.lastDz = previous.lastDz;
+      } else if (distance >= snapDistance) {
+        remoteTracks.set(authoritative.id, track.slice(-1));
+      }
+    }
+
+    function stepRemote(contestant, currentWallTime = wallNow()) {
+      const track = remoteTracks.get(contestant?.id);
+      if (!contestant || !track?.length || clockOffsetMs === null) return;
+      const renderTime = currentWallTime - clockOffsetMs - remoteBufferDelay();
+      let before = track[0];
+      let after = track.at(-1);
+      for (let index = 1; index < track.length; index += 1) {
+        if (track[index].serverTime < renderTime) {
+          before = track[index];
+          continue;
+        }
+        after = track[index];
+        break;
+      }
+      if (renderTime <= track[0].serverTime) before = after = track[0];
+      else if (renderTime >= track.at(-1).serverTime) before = after = track.at(-1);
+      const span = after.serverTime - before.serverTime;
+      const amount = span > 0
+        ? Math.max(0, Math.min(1, (renderTime - before.serverTime) / span))
+        : 0;
+      contestant.x = before.x + (after.x - before.x) * amount;
+      contestant.z = before.z + (after.z - before.z) * amount;
+      const pose = amount < 0.5 ? before : after;
+      contestant.moving = pose.moving;
+      contestant.lastDx = pose.lastDx;
+      contestant.lastDz = pose.lastDz;
+    }
+
+    function remoteBufferDelay() {
+      const jitterBudget = Math.min(MAX_REMOTE_BUFFER_MS, SNAPSHOT_STEP_MS + snapshotJitterMs * 2);
+      return Math.max(remoteDelayMs, jitterBudget);
+    }
+
+    function reset(at = now()) {
+      inputHistory.splice(0, inputHistory.length, { at, mask: 0 });
+      remoteTracks.clear();
+      localError = null;
+      clockOffsetMs = null;
+      lastRoundTripMs = null;
+      lastSnapshotAt = null;
+      lastSnapshotAgeMs = null;
+      snapshotIntervalMs = null;
+      snapshotJitterMs = 0;
+    }
+
+    function telemetry() {
+      return Object.freeze({
+        localCorrection: localError ? Math.hypot(localError.x, localError.z) : 0,
+        remoteBufferDelayMs: remoteBufferDelay(),
+        remoteBufferSize: [...remoteTracks.values()].reduce((sum, track) => sum + track.length, 0),
+        roundTripMs: lastRoundTripMs,
+        snapshotAgeMs: lastSnapshotAgeMs,
+        snapshotIntervalMs,
+        snapshotJitterMs,
+      });
+    }
+
+    return Object.freeze({
+      acceptLocalSnapshot,
+      acceptRemoteSnapshot,
+      predict,
+      recordInput,
+      reset,
+      stepLocal,
+      stepRemote,
+      telemetry,
+    });
+  }
+
+  globalThis.RIFTBOMB_ONLINE_MOVEMENT = Object.freeze({ create: createOnlineMovement });
+})();
+
 (() => {
   if (typeof game === "undefined" || typeof UI === "undefined") return;
 
@@ -135,6 +397,9 @@
   const ACTION_PROTOCOL_VERSION = 1;
   const DELIVERY_REPLAY_INTERVAL_MS = 120;
   const authoritativeAudio = globalThis.RIFTBOMB_AUTHORITATIVE_AUDIO;
+  const movementFactory = globalThis.RIFTBOMB_ONLINE_MOVEMENT;
+  if (!movementFactory?.create) throw new Error("Published online movement module is unavailable");
+  const onlineMovement = movementFactory.create();
   const browserGameplaySfx = game.sfx;
   const authoritativePredictionSink = Object.freeze({
     emitGameEvent() { return false; },
@@ -178,8 +443,6 @@
     lastPlayedSoundEventId: 0,
     droppedSoundEventCount: 0,
     localInput: { up: false, down: false, left: false, right: false },
-    remoteHostTarget: null,
-    localPlayerTarget: null,
     pendingGuestBombs: [],
     hostChampion: game.selectedChampion,
     guestChampion: "zed",
@@ -214,6 +477,28 @@
     })
   });
   const { connection: matchConnection, delivery, runtime, session } = continuity;
+
+  function networkTelemetry() {
+    return Object.freeze({
+      ...onlineMovement.telemetry(),
+      pendingInputAgeMs: delivery.inputSnapshot().oldestPendingAgeMs,
+    });
+  }
+
+  function publishNetworkTelemetry() {
+    const metrics = networkTelemetry();
+    const root = document.documentElement;
+    const publish = (name, value) => {
+      if (Number.isFinite(value)) root.dataset[name] = value.toFixed(1);
+      else delete root.dataset[name];
+    };
+    publish("riftbombRttMs", metrics.roundTripMs);
+    publish("riftbombSnapshotJitterMs", metrics.snapshotJitterMs);
+    publish("riftbombLocalCorrection", metrics.localCorrection);
+    publish("riftbombRemoteBufferMs", metrics.remoteBufferDelayMs);
+  }
+
+  globalThis.RIFTBOMB_ONLINE_NETCODE = Object.freeze({ telemetry: networkTelemetry });
 
   setInterval(() => {
     if (state.connected) delivery.replay();
@@ -539,6 +824,7 @@
   }
 
   function setOnlineRole(role) {
+    if (state.role !== role) onlineMovement.reset();
     state.role = role;
     game.sfx = role === "offline" ? browserGameplaySfx : authoritativePredictionSink;
     panel.dataset.mode = role;
@@ -937,6 +1223,7 @@
     for (const key of SNAPSHOT_ARRAYS) if (Array.isArray(data[key])) game[key] = data[key];
     game.bombs = game.bombs.map((bomb) => ({ ...bomb, passOwners: new Set(bomb.passOwners || []) }));
     const predictionNow = performance.now();
+    const inputDelivery = delivery.inputSnapshot();
     state.pendingGuestBombs = state.pendingGuestBombs.filter((prediction) => {
       if (prediction.round !== game.round) return false;
       const confirmed = game.bombs.some((bomb) =>
@@ -958,47 +1245,23 @@
     const authoritativeLocal = game.players.find((player) => player.id === localPlayerId);
     const authoritativeRemote = game.players.find((player) => player.id === remotePlayerId);
     if (previousLocal && authoritativeLocal && data.round === previousRound) {
-      const distance = Math.hypot(
-        authoritativeLocal.x - previousLocal.x,
-        authoritativeLocal.z - previousLocal.z
-      );
-      if (typeof game.canMoveContestant === "function" &&
-          !game.canMoveContestant(authoritativeLocal)) {
-        // A commitment snapshot is already the visual authority. Never blend
-        // toward a stale pre-cast prediction while Zed vanishes or dashes.
-        state.localPlayerTarget = null;
-      } else {
-        state.localPlayerTarget = {
-          playerId: authoritativeLocal.id,
-          x: authoritativeLocal.x,
-          z: authoritativeLocal.z
-        };
-        if (distance < game.tile) {
-          authoritativeLocal.x = previousLocal.x;
-          authoritativeLocal.z = previousLocal.z;
-        } else {
-          state.localPlayerTarget = null;
-        }
-      }
+      onlineMovement.recordInput(inputMask(), predictionNow);
+      onlineMovement.acceptLocalSnapshot(game, authoritativeLocal, previousLocal, {
+        receivedAt: predictionNow,
+        roundTripMs: inputDelivery.roundTripMs,
+        unacknowledgedInputAgeMs: inputDelivery.oldestPendingAgeMs,
+      });
     }
     if (previousRemote && authoritativeRemote && data.round === previousRound) {
-      const distance = Math.hypot(
-        authoritativeRemote.x - previousRemote.x,
-        authoritativeRemote.z - previousRemote.z
-      );
-      state.remoteHostTarget = {
-        playerId: authoritativeRemote.id,
-        x: authoritativeRemote.x, z: authoritativeRemote.z,
-        moving: authoritativeRemote.moving,
-        lastDx: authoritativeRemote.lastDx, lastDz: authoritativeRemote.lastDz
-      };
-      if (distance < game.tile * 1.75) {
-        authoritativeRemote.x = previousRemote.x;
-        authoritativeRemote.z = previousRemote.z;
-      } else {
-        state.remoteHostTarget = null;
-      }
+      onlineMovement.acceptRemoteSnapshot(authoritativeRemote, previousRemote, {
+        receivedWallTime: Date.now(),
+        roundTripMs: inputDelivery.roundTripMs,
+        serverTime: data.serverTime,
+        snapDistance: game.tile * 1.75,
+      });
     }
+    if (data.round !== previousRound) onlineMovement.reset(predictionNow);
+    publishNetworkTelemetry();
     // Keep local seat identity after every snapshot — never pin to blue/P1 by default.
     game.localPlayerId = localPlayerId;
     game.player = authoritativeLocal || game.players[0];
@@ -1046,55 +1309,15 @@
 
   function predictLocalMovement(dt) {
     const player = localOnlinePlayer();
-    if (!player?.alive || game.mode !== "playing" || game.roundLocked) return;
-    if (typeof game.canMoveContestant === "function" && !game.canMoveContestant(player)) {
-      player.moving = false;
-      return;
-    }
     const input = state.role === "guest" ? state.localInput : hostLocalInput();
-    let dx = Number(input.right) - Number(input.left);
-    let dz = Number(input.down) - Number(input.up);
-    const length = Math.hypot(dx, dz);
-    if (length > 0) {
-      if (player.ultChannel > 0) game.cancelKatarinaChannel?.(player, "movement");
-      dx /= length; dz /= length;
-      player.lastDx = dx; player.lastDz = dz; player.moving = true;
-      game.moveEntity(player, dx, dz, player.speed, dt, 0.3);
-    } else player.moving = false;
+    onlineMovement.stepLocal(game, player, inputMaskFrom(input), dt);
   }
 
-  function interpolateRemoteHost(dt) {
-    const target = state.remoteHostTarget;
-    const remote = game.players.find((player) => player.id === target?.playerId);
-    if (!remote || !target || game.mode !== "playing") return;
-    const blend = 1 - Math.exp(-24 * dt);
-    remote.x += (target.x - remote.x) * blend;
-    remote.z += (target.z - remote.z) * blend;
-    remote.moving = target.moving;
-    remote.lastDx = target.lastDx;
-    remote.lastDz = target.lastDz;
-    if (Math.hypot(target.x - remote.x, target.z - remote.z) < 0.008) {
-      remote.x = target.x;
-      remote.z = target.z;
-    }
-  }
-
-  function reconcileLocalPlayer(dt) {
-    const target = state.localPlayerTarget;
-    const local = game.players.find((player) => player.id === target?.playerId);
-    if (!local || !target || game.mode !== "playing") return;
-    if (typeof game.canMoveContestant === "function" && !game.canMoveContestant(local)) {
-      state.localPlayerTarget = null;
-      return;
-    }
-    const blend = 1 - Math.exp(-10 * dt);
-    local.x += (target.x - local.x) * blend;
-    local.z += (target.z - local.z) * blend;
-    if (Math.hypot(target.x - local.x, target.z - local.z) < 0.006) {
-      local.x = target.x;
-      local.z = target.z;
-      state.localPlayerTarget = null;
-    }
+  function smoothRemoteMovement() {
+    if (game.mode !== "playing") return;
+    const remotePlayerId = localOnlinePlayerId() === 1 ? 2 : 1;
+    const remote = game.players.find((player) => player.id === remotePlayerId);
+    onlineMovement.stepRemote(remote);
   }
 
   function hostLocalInput() {
@@ -1117,9 +1340,8 @@
     if (state.role !== "offline" && state.connected && matchConnection.isOpen()) {
       if (state.role === "guest") syncGuestStickInput();
       sendCurrentInput();
-      reconcileLocalPlayer(dt);
       predictLocalMovement(dt);
-      interpolateRemoteHost(dt);
+      smoothRemoteMovement();
       game.updateParticles(dt * 0.25);
       return;
     }
@@ -1315,7 +1537,6 @@
       lastPlayedSoundEventId: 0,
       droppedSoundEventCount: 0,
       localInput: { up: false, down: false, left: false, right: false },
-      remoteHostTarget: null, localPlayerTarget: null,
       pendingGuestBombs: []
     });
   }
@@ -1414,11 +1635,15 @@
     }
   }
 
+  function inputMaskFrom(input) {
+    return Number(input.up) |
+      (Number(input.down) << 1) |
+      (Number(input.left) << 2) |
+      (Number(input.right) << 3);
+  }
+
   function inputMask() {
-    return Number(state.localInput.up) |
-      (Number(state.localInput.down) << 1) |
-      (Number(state.localInput.left) << 2) |
-      (Number(state.localInput.right) << 3);
+    return inputMaskFrom(state.localInput);
   }
 
   function sendInput() {

@@ -303,10 +303,11 @@
 
       async loadChampionSfx(champions = []) {
         const manifest = globalThis.RIFTBOMB_CHAMPION_SFX_BANK_MANIFEST || {};
+        const enabled = globalThis.RIFTBOMB_CHAMPION_SFX_BANK_ENABLED || {};
         const bankNames = Array.isArray(champions) ? champions : [champions];
         const requested = [...new Set(bankNames
           .map((champion) => String(champion || "").trim().toLowerCase())
-          .filter((champion) => champion && manifest[champion]))];
+          .filter((champion) => champion && manifest[champion] && enabled[champion] !== false))];
         await Promise.all(requested.map((champion) =>
           this._loadChampionSfxBank(champion, manifest[champion])
         ));
@@ -371,7 +372,9 @@
           }
         }
         if (championBanks && typeof championBanks === "object") {
-          for (const bank of Object.values(championBanks)) {
+          const enabled = globalThis.RIFTBOMB_CHAMPION_SFX_BANK_ENABLED || {};
+          for (const [champion, bank] of Object.entries(championBanks)) {
+            if (enabled[champion] === false) continue;
             if (!bank || typeof bank !== "object") continue;
             if (bank.meta && typeof bank.meta === "object") {
               Object.assign(this.sampleMeta, bank.meta);

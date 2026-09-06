@@ -13,12 +13,17 @@
  * the baseline but mobile. It pilots P1's default champion (Katarina)
  * through the same imitated-keyboard path, with its own RNG stream.
  *
+ * Idle Training (`--opponent idle`): P1 is Katarina who never moves or
+ * plants — the observed local-Training case where Blue can win 3–0
+ * without planting if Red farm-suicides on its own arena bomb.
+ *
  * Determinism: every source of randomness comes from seeded mulberry32
  * streams — the Match's `this.random` (map crates, particles), the V1 policy
  * random and the P1 baseline random. Same seed => same report.
  *
  * Usage: node bot-opponent/v1/run-cpu-duels.mjs --matches 100 --seed 42
  *        node bot-opponent/v1/run-cpu-duels.mjs --opponent v1 --aggression 0.8
+ *        node bot-opponent/v1/run-cpu-duels.mjs --opponent idle --matches 3
  * Output: one JSON report on stdout (see REPORT_FIELDS below).
  */
 
@@ -60,8 +65,8 @@ function parseArgs(argv) {
     throw new Error("--matches must be a positive integer");
   }
   if (!Number.isFinite(options.seed)) throw new Error("--seed must be a number");
-  if (options.opponent !== "baseline" && options.opponent !== "v1") {
-    throw new Error("--opponent must be \"baseline\" or \"v1\"");
+  if (options.opponent !== "baseline" && options.opponent !== "v1" && options.opponent !== "idle") {
+    throw new Error("--opponent must be \"baseline\", \"v1\" or \"idle\"");
   }
   if (options.aggression !== null
     && (!Number.isFinite(options.aggression) || options.aggression < 0 || options.aggression > 1)) {
@@ -138,7 +143,8 @@ function createRoundStats() {
     frames: 0,
     v1Pickups: 0,
     v1FirstBomb: null, // bomb id of the first V1 bomb this round
-    v1SurvivedFirstBomb: null // true/false once that bomb exploded
+    v1SurvivedFirstBomb: null, // true/false once that bomb exploded
+    v1OwnBombDeaths: 0
   };
 }
 
@@ -165,9 +171,13 @@ function runMatch(context, matchIndex, seed, { opponent = "baseline", aggression
   });
   // Self-play (B8): the P1 opponent is a second V1 without a champion
   // module — the pure arena brain, kitless like the baseline but mobile.
-  const p1Policy = opponent === "v1"
-    ? context.RIFTBOMB_BOTS.createV1Policy({ random: p1Rng })
-    : context.RIFTBOMB_BOTS.createBaselinePolicy({ random: p1Rng });
+  // Idle Training: P1 never thinks — same as a human who does not touch
+  // WASD or plant, the case that turned Dominus-01 into a suicide dummy.
+  const p1Policy = opponent === "idle"
+    ? null
+    : opponent === "v1"
+      ? context.RIFTBOMB_BOTS.createV1Policy({ random: p1Rng })
+      : context.RIFTBOMB_BOTS.createBaselinePolicy({ random: p1Rng });
 
   // Instrumentation wraps instance methods only — Match rules stay untouched.
   const skillsCast = { q: 0, w: 0, e: 0, r: 0 };
@@ -176,6 +186,14 @@ function runMatch(context, matchIndex, seed, { opponent = "baseline", aggression
     const result = originalCastAbility(slot, player);
     if (result && player.id === 2) skillsCast["qwer"[slot]] += 1;
     return result;
+  };
+  const originalHitContestant = match.hitContestant.bind(match);
+  match.hitContestant = (player, bomb) => {
+    const wasAlive = player.alive;
+    originalHitContestant(player, bomb);
+    if (wasAlive && !player.alive && player.id === 2 && bomb?.ownerId === 2) {
+      roundStats.v1OwnBombDeaths += 1;
+    }
   };
   const originalCollectPickups = match.collectPickups.bind(match);
   match.collectPickups = () => {
@@ -208,7 +226,8 @@ function runMatch(context, matchIndex, seed, { opponent = "baseline", aggression
       winner: pendingRoundWinner,
       frames: roundStats.frames,
       v1Pickups: roundStats.v1Pickups,
-      v1SurvivedFirstBomb: roundStats.v1SurvivedFirstBomb
+      v1SurvivedFirstBomb: roundStats.v1SurvivedFirstBomb,
+      v1OwnBombDeaths: roundStats.v1OwnBombDeaths
     });
     roundStats = createRoundStats();
     pendingRoundWinner = null;
@@ -230,8 +249,9 @@ function runMatch(context, matchIndex, seed, { opponent = "baseline", aggression
     roundStats.frames += 1;
 
     // P1 thinks through the same perception bundle, with selfId = 1.
+    // Idle Training skips this: keys stay empty and placeBomb is never called.
     const p1 = match.players[0];
-    if (p1?.alive && !match.roundLocked) {
+    if (p1Policy && p1?.alive && !match.roundLocked) {
       const view = context.RIFTBOMB_BOTS.buildWorldView(match, DT, p1.id);
       applyHumanStyleIntent(match, p1, p1Policy.think(view, DT));
     }
@@ -261,7 +281,7 @@ function runMatch(context, matchIndex, seed, { opponent = "baseline", aggression
     if (match.round !== prevRound) {
       prevRound = match.round;
       closeRound();
-      p1Policy.reset({ random: () => 0 });
+      p1Policy?.reset({ random: () => 0 });
     }
   }
 
@@ -320,6 +340,7 @@ export async function runCpuDuels({ matches = 100, seed = 42, opponent = "baseli
     v1RoundWins,
     v1RoundLosses,
     drawnRounds,
+    v1OwnBombDeaths: allRounds.reduce((sum, r) => sum + (r.v1OwnBombDeaths ?? 0), 0),
     v1FirstBombSurvivalRate: bombRounds.length ? round(survivedFirstBomb / bombRounds.length) : null,
     v1PickupsPerRound: allRounds.length
       ? round(allRounds.reduce((sum, r) => sum + r.v1Pickups, 0) / allRounds.length)
