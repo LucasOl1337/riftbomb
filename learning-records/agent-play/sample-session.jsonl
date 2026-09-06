@@ -1,0 +1,15 @@
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":1,"t":1787165400000,"matchTime":0,"type":"session_start","payload":{"sessionId":"ap-20260819-185000-fx01"}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":2,"t":1787165400000,"matchTime":0,"type":"match_setup","payload":{"mode":"training","map":"lattice","arenaLabel":"Salt Lens Array","champion":"katarina","rival":"renekton","bot":"v1-renekton","matchTarget":3,"p2Control":"cpu","p2Hud":"CPU controls Red","score":[0,0]}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":3,"t":1787165400000,"matchTime":0,"type":"round_start","payload":{"round":1}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":4,"t":1787165401200,"matchTime":1.2,"type":"bomb_plant","payload":{"bombId":1,"ownerId":1,"who":"Blue Katarina","r":9,"c":1}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":5,"t":1787165401800,"matchTime":1.8,"type":"skill_unlock","payload":{"playerId":1,"name":"Blue Katarina","slot":0,"skill":"Bouncing Blade"}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":6,"t":1787165402100,"matchTime":2.1,"type":"skill_cast","payload":{"playerId":1,"name":"Blue Katarina","slot":0,"skill":"Bouncing Blade"}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":7,"t":1787165404000,"matchTime":4,"type":"skill_locked","payload":{"skill":"Death Lotus","line":"Death Lotus locked · break crates"}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":8,"t":1787165408000,"matchTime":8,"type":"player_hp","payload":{"playerId":1,"name":"Blue Katarina","health":0,"alive":false}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":9,"t":1787165408000,"matchTime":8,"type":"death","payload":{"who":"Blue Katarina","playerId":1,"cause":"blast","line":"Blue Katarina was caught in the blast"}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":10,"t":1787165408000,"matchTime":8,"type":"round_end","payload":{"round":1,"draw":false,"winnerId":2,"winner":"Red Renekton","score":[0,1],"line":"Red Renekton wins round 1"}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":11,"t":1787165408000,"matchTime":8,"type":"score","payload":{"score":[0,1]}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":12,"t":1787165410000,"matchTime":10,"type":"p2_control","payload":{"control":"human","hud":"Player 2 online/local","line":"Player 2 joined · Red Renekton is local"}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":13,"t":1787165412000,"matchTime":12,"type":"heartbeat","payload":{"crates":42,"clock":78,"score":[0,1],"p2Control":"human","p2Hud":"Player 2 online/local","players":[{"id":1,"name":"Blue Katarina","health":1,"alive":true,"unlocked":[true,false,false,false]},{"id":2,"name":"Red Renekton","health":1,"alive":true,"unlocked":[false,false,false,false]}]}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":14,"t":1787165415000,"matchTime":15,"type":"note","payload":{"text":"Round 1 death was walk-back into my own blast after crate starve","kind":"death_reason","hypothesis":"Need a bomb before committing to mid"}}
+{"v":1,"sessionId":"ap-20260819-185000-fx01","seq":15,"t":1787165420000,"matchTime":20,"type":"match_end","payload":{"winnerId":2,"winner":"Red Renekton","score":[0,3],"elapsed":20}}

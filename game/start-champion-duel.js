@@ -417,7 +417,10 @@
         ensureChampionModel() { return Promise.resolve(); },
         ensureChampionModels() { return Promise.resolve(); }
       };
-      game = new Game(previewRenderer, sfx, new BrowserMatchPresentation());
+      const presentation = typeof attachAgentPlayPresentation === "function"
+        ? attachAgentPlayPresentation(new BrowserMatchPresentation())
+        : new BrowserMatchPresentation();
+      game = new Game(previewRenderer, sfx, presentation);
       game.activateBotOpponent();
       // The Nacre review route is a deterministic visual inspection surface.
       // Force the matching arena before Renderer captures any of its six views.

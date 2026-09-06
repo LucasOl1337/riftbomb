@@ -17,6 +17,10 @@ tools/cdragon-data/
 learning-records/hostile-ui/videos/
 learning-records/hostile-ui/videos-raw/
 
+# Live Training sessions (keep README + sample fixture)
+learning-records/agent-play/current.json
+learning-records/agent-play/ap-*.jsonl
+
 # QA visual local (capturas podem conter estado de produção)
 artifacts/comparar-qa/
 
